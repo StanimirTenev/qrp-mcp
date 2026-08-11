@@ -2,23 +2,30 @@
 
 <!-- mcp-name: eu.quantumreadiness/qrp-mcp -->
 
-**Find the cryptography in your codebase that a quantum computer would break — from your AI agent, in one command.**
+**Every signature in your wallet, contract and validator rests on elliptic-curve cryptography.
+A large quantum computer breaks it. This tells your AI agent exactly where yours is.**
 
-An MCP server that scans a local directory for classical public-key cryptography, weak
-primitives and CI signing commands, then classifies what it finds: broken by Shor's
-algorithm, post-quantum, or neither.
+An MCP server that scans a local directory for cryptography that Shor's algorithm defeats —
+secp256k1, Ed25519, BLS, Schnorr, RSA — plus weak primitives and CI signing commands, and
+classifies each one: broken by a quantum computer, post-quantum, or neither.
 
 **Everything runs on your machine.** No network calls, no account, no API key, nothing
-uploaded. The server makes zero outbound connections — by design, not by configuration.
+uploaded. A tool that reads your keys' surroundings has no business phoning home, so this one
+makes zero outbound connections — enforced by a test, not promised in a paragraph.
 
-## Why deterministic matters
+## Why this matters for chains and wallets
 
-There is no LLM inside this tool. The same input always produces the same output, and every
-finding points at a file and a line you can open yourself.
+Bitcoin and Ethereum authenticate with **ECDSA over secp256k1**. Solana, Cardano and Polkadot
+use **Ed25519**. Ethereum's consensus layer aggregates with **BLS12-381**. Taproot adds
+**Schnorr**.
 
-That is the point of giving it to an agent: **the agent brings the language, the tool brings
-the truth.** An agent that guesses about your cryptography is worse than useless; one that
-reads a deterministic inventory can actually reason about it.
+All four are public-key schemes whose security rests on discrete-log hardness — and all four
+fall to the same quantum algorithm. The practical consequence is specific: **once a public key
+is exposed, the private key becomes derivable.** Reused addresses, on-chain public keys,
+and long-lived validator keys are where that exposure already exists today.
+
+None of this is a prediction about dates. It is an inventory question: *which of my code paths
+sign with what?* That question has an answer right now, and this tool gives it.
 
 ## Quick start
 
@@ -37,50 +44,69 @@ Add it to your MCP client — no installation step, `uvx` fetches and runs it:
 
 Then ask your agent:
 
-> Scan ~/code/my-service for quantum-vulnerable cryptography.
+> Scan ~/code/my-protocol for quantum-vulnerable cryptography.
 
 ## Tools
 
 | Tool | What it does |
 | --- | --- |
-| `scan_repo(path)` | Scans a directory's source code, CI/CD configs and infrastructure-as-code; returns findings and a summary |
+| `scan_repo(path)` | Scans a directory's source, CI/CD configs and infrastructure-as-code; returns findings and a summary |
 | `list_algorithms()` | The algorithm families the server recognises and how each is classified |
 
 ## What it looks at
 
-- **Source code** (Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C#, shell) — RSA, DSA, DH,
-  ECDSA and elliptic-curve usage, plus MD5, SHA-1, RC4 and DES/3DES.
-- **CI/CD pipelines** (GitHub Actions, GitLab CI, Jenkins, Azure Pipelines, CircleCI) —
-  signing commands such as `gpg --sign`, `cosign sign`, `signtool`, `jarsigner`, `codesign`.
-- **Infrastructure as code** — Terraform and Kubernetes key algorithms, and private key
-  material committed by mistake.
+**Chain and wallet code** — `secp256k1`, `ecrecover`, ethers, web3, bitcoinjs, `ECPair`,
+`btcec`, tweetnacl, `@solana/web3.js`, `solana_program`, `bls12-381`, blst, `@chainsafe/bls`,
+BIP340/Taproot Schnorr. Solidity (`.sol`), Rust (`.rs`), Move and Cairo are scanned alongside
+Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C# and shell.
 
-Example summary:
+**Classical crypto anywhere else** — RSA, DSA, DH, ECDSA and elliptic-curve usage, plus MD5,
+SHA-1, RC4 and DES/3DES.
+
+**CI/CD pipelines** — signing commands such as `gpg --sign`, `cosign sign`, `signtool`,
+`jarsigner`, `codesign`.
+
+**Infrastructure as code** — Terraform and Kubernetes key algorithms, and private key material
+committed by mistake.
+
+Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/openzeppelin-contracts)
+(711 files, about five seconds):
 
 ```json
 {
-  "total_findings": 14,
-  "quantum_vulnerable_count": 6,
-  "pqc_ready_count": 0,
-  "weak_count": 2,
-  "highest_severity": "critical",
-  "pqc_readiness": "classical_only"
+  "detected_algorithms": ["ECDSA", "RSA"],
+  "summary": {
+    "quantum_vulnerable_count": 2,
+    "pqc_ready_count": 0,
+    "highest_severity": "high",
+    "pqc_readiness": "classical_only"
+  }
 }
 ```
 
+## Why deterministic
+
+There is no LLM inside this tool. The same input always produces the same output, and every
+finding points at a file and a line you can open yourself.
+
+That is the point of handing it to an agent: **the agent brings the language, the tool brings
+the truth.** An agent guessing about your signing code is worse than nothing; an agent reading
+a deterministic inventory can actually reason about it.
+
 ## What it is not
 
-This is a **free inventory tool**, not a full readiness assessment. It deliberately does not do:
+A **free inventory tool**, not a readiness assessment. It deliberately does not do:
 
 - risk scoring or prioritisation,
 - migration planning,
 - network, host or certificate scanning,
 - tracking change over time.
 
-Those live in the [Quantum Readiness Platform](https://quantumreadiness.eu) — the product this
-tool comes from. If the inventory tells you that you have a problem, that is where you go to
-work out what to do about it. Nothing here is crippled to make you upgrade: what it does, it
-does completely.
+Those live in the [Quantum Readiness Platform](https://quantumreadiness.eu), the product this
+tool is extracted from. Nothing here is crippled to push you there — what it does, it does
+completely.
+
+It also does not tell you that you are about to be hacked. It tells you what you are using.
 
 ## License
 

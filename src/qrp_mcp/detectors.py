@@ -6,7 +6,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-SOURCE_EXTENSIONS = {".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh"}
+SOURCE_EXTENSIONS = {
+    ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
+    # Smart contracts and chain tooling
+    ".sol", ".rs", ".move", ".cairo",
+}
 
 EXCLUDED_DIRS = {
     ".git", "node_modules", "venv", ".venv", "__pycache__", "vendor", "dist", "build", ".tox", "target",
@@ -51,6 +55,25 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
     ("RC4", "RC4 usage", re.compile(r"crypto/rc4|\bRC4\b", re.IGNORECASE)),
     ("DES", "DES/3DES usage", re.compile(r"crypto/des\b|DESede|3DES|TripleDES", re.IGNORECASE)),
+    # Blockchain / wallet signing. These map onto the same classical primitives -- a
+    # secp256k1 signature is ECDSA, and Shor breaks it like any other elliptic curve.
+    ("ECDSA", "secp256k1 (ECDSA) usage", re.compile(
+        r"secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
+        r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|\bweb3\b|"
+        r"eth_sign|personal_sign|signTypedData",
+        re.IGNORECASE,
+    )),
+    ("Ed25519", "Ed25519 usage", re.compile(
+        r"\bed25519\b|tweetnacl|\bnacl\.sign\b|@solana/web3\.js|solana_program::|"
+        r"sodium_crypto_sign",
+        re.IGNORECASE,
+    )),
+    ("Schnorr", "Schnorr signature usage", re.compile(
+        r"\bschnorr\b|\bbip340\b|\btaproot\b", re.IGNORECASE,
+    )),
+    ("BLS", "BLS signature usage", re.compile(
+        r"bls12[-_]?381|\bblst\b|@chainsafe/bls|\bbls_sig\b", re.IGNORECASE,
+    )),
 ]
 
 # (command_type, compiled regex) for signing commands found in CI/build configs.

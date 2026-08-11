@@ -62,6 +62,10 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("RSAPSS", "RSA", "classical_vulnerable", "public_key"),
     ("RSA", "RSA", "classical_vulnerable", "public_key"),
     ("DSA", "DSA", "classical_vulnerable", "signature"),
+    # Signature schemes common in blockchains. Both rest on discrete-log/pairing
+    # hardness and fall to Shor exactly as ECDSA does.
+    ("SCHNORR", "Schnorr", "classical_vulnerable", "signature"),
+    ("BLS", "BLS", "classical_vulnerable", "signature"),
     ("DIFFIEHELLMAN", "DH", "classical_vulnerable", "key_exchange"),
     ("DHE", "DH", "classical_vulnerable", "key_exchange"),
     ("DH", "DH", "classical_vulnerable", "key_exchange"),

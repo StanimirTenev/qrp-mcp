@@ -150,10 +150,21 @@ def test_full_fingerprint_matches_original() -> None:
         assert old_response.contract_version == new_response.contract_version
 
 
-def test_known_algorithms_matches_original_minus_hndl() -> None:
+# Families added after extraction for the blockchain audience. Everything the original
+# knew must survive unchanged; these are additions on top.
+ADDED_FAMILIES = {"Schnorr", "BLS"}
+
+
+def test_known_algorithms_extends_original_without_changing_it() -> None:
     original = _load_original()
     old = [
         {k: v for k, v in entry.items() if k != "hndl_capable"}
         for entry in original.algorithms()["algorithms"]
     ]
-    assert old == new.known_algorithms()
+    current = new.known_algorithms()
+
+    added = [entry for entry in current if entry["family"] in ADDED_FAMILIES]
+    assert {entry["family"] for entry in added} == ADDED_FAMILIES
+
+    kept = [entry for entry in current if entry["family"] not in ADDED_FAMILIES]
+    assert kept == old, "an existing algorithm family changed or disappeared"
