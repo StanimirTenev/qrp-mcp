@@ -1,8 +1,9 @@
-"""Differential test: the extracted classifier must behave identically to the original
-crypto-fingerprint-service, apart from the deliberately removed HNDL fields.
+"""Differential test: the classifier here must behave identically to the upstream service
+it was extracted from, apart from fields deliberately left out.
 
-This is the check that proves the extraction did not silently drop a branch. It is skipped
-when the original service source is not present (i.e. everywhere except the author's machine).
+This is the check that proves the extraction did not silently drop a branch. It runs only
+when `QRP_UPSTREAM_CLASSIFIER` points at the upstream source, and skips otherwise -- so it
+is a maintainer's check, not something a contributor needs to satisfy.
 """
 
 from __future__ import annotations
@@ -17,19 +18,15 @@ import pytest
 
 from qrp_mcp import classifier as new
 
-ORIGINAL_PATH = Path(
-    os.environ.get(
-        "QRP_FINGERPRINT_SERVICE_PATH",
-        Path.home() / "Quantum-Readiness-Platform/services/crypto-fingerprint-service/app/main.py",
-    )
-)
+_UPSTREAM = os.environ.get("QRP_UPSTREAM_CLASSIFIER")
+ORIGINAL_PATH = Path(_UPSTREAM) if _UPSTREAM else None
 
 HNDL_SENTENCE = " Recorded traffic is exposed to harvest-now-decrypt-later."
 
 
 def _load_original():
-    if not ORIGINAL_PATH.is_file():
-        pytest.skip(f"original service not available at {ORIGINAL_PATH}")
+    if ORIGINAL_PATH is None or not ORIGINAL_PATH.is_file():
+        pytest.skip("set QRP_UPSTREAM_CLASSIFIER to run the differential check")
     name = "_original_fingerprint"
     if name in sys.modules:
         return sys.modules[name]
