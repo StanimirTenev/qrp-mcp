@@ -7,13 +7,13 @@
     "url": "https://github.com/StanimirTenev/qrp-mcp",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://quantumreadiness.eu",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "qrp-mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": {
         "type": "stdio"
       }
