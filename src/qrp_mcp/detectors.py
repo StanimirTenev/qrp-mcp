@@ -125,29 +125,38 @@ def is_ci_config_file(path: Path, repo_path: Path) -> bool:
     return path.name in CI_CONFIG_FILENAMES
 
 
-def _read_lines(path: Path) -> list[str]:
+def _read_lines(path: Path) -> list[str] | None:
+    """Lines of the file, or None when it could not be read.
+
+    None is not an empty file. A file the scanner cannot open -- no permission, an I/O
+    error, a path it lacks the rights for -- yields no findings, and returning [] here
+    would make that indistinguishable from a file that WAS read and is clean. scan_repo
+    reports those paths separately, so a failed check cannot read as a pass.
+    """
     try:
         return path.read_text(encoding="utf-8", errors="ignore").splitlines()
     except OSError:
-        return []
+        return None
 
 
-def is_iac_file(path: Path, repo_path: Path) -> bool:
+def is_iac_file(path: Path, repo_path: Path, lines: list[str] | None = None) -> bool:
     if path.suffix in IAC_EXTENSIONS:
         return True
     if path.suffix in {".yaml", ".yml"}:
         # Content-sniff for a Kubernetes manifest shape rather than trusting the extension
         # alone -- most .yaml files in a repo are not IaC.
-        lines = _read_lines(path)
+        lines = (_read_lines(path) or []) if lines is None else lines
         has_api_version = any(re.match(r"^apiVersion:\s*\S+", line) for line in lines)
         has_kind = any(re.match(r"^kind:\s*\S+", line) for line in lines)
         return has_api_version and has_kind
     return False
 
 
-def scan_source_file(path: Path, rel_path: str) -> list[dict[str, Any]]:
+def scan_source_file(path: Path, rel_path: str,
+                     lines: list[str] | None = None) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
-    for line_no, line in enumerate(_read_lines(path), start=1):
+    lines = (_read_lines(path) or []) if lines is None else lines
+    for line_no, line in enumerate(lines, start=1):
         for algorithm, description, pattern in ALGORITHM_PATTERNS:
             if pattern.search(line):
                 findings.append({
@@ -160,9 +169,11 @@ def scan_source_file(path: Path, rel_path: str) -> list[dict[str, Any]]:
     return findings
 
 
-def scan_ci_file(path: Path, rel_path: str) -> list[dict[str, Any]]:
+def scan_ci_file(path: Path, rel_path: str,
+                 lines: list[str] | None = None) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
-    for line_no, line in enumerate(_read_lines(path), start=1):
+    lines = (_read_lines(path) or []) if lines is None else lines
+    for line_no, line in enumerate(lines, start=1):
         for command_type, pattern in SIGNING_COMMAND_PATTERNS:
             if pattern.search(line):
                 findings.append({
@@ -174,11 +185,13 @@ def scan_ci_file(path: Path, rel_path: str) -> list[dict[str, Any]]:
     return findings
 
 
-def scan_iac_file(path: Path, rel_path: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def scan_iac_file(path: Path, rel_path: str,
+                  lines: list[str] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Returns (algorithm_findings, embedded_key_findings) for a Terraform/Kubernetes IaC file."""
     algorithm_findings: list[dict[str, Any]] = []
     embedded_key_findings: list[dict[str, Any]] = []
-    for line_no, line in enumerate(_read_lines(path), start=1):
+    lines = (_read_lines(path) or []) if lines is None else lines
+    for line_no, line in enumerate(lines, start=1):
         for algorithm, description, pattern in IAC_ALGORITHM_PATTERNS:
             if pattern.search(line):
                 algorithm_findings.append({
@@ -205,22 +218,39 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     embedded_key_findings: list[dict[str, Any]] = []
     files_scanned = {"source": 0, "ci_config": 0, "iac": 0}
 
+    unreadable: list[str] = []
+
     for path in iter_repo_files(repo_path):
         rel_path = path.relative_to(repo_path).as_posix()
-        if is_ci_config_file(path, repo_path):
+        is_ci = is_ci_config_file(path, repo_path)
+        if not (is_ci or path.suffix in IAC_EXTENSIONS or path.suffix in SOURCE_EXTENSIONS
+                or path.suffix in {".yaml", ".yml"}):
+            continue
+
+        # Read once, here: classification and scanning must see the same content, and a
+        # file that cannot be read has to leave a mark rather than pass as scanned-clean.
+        lines = _read_lines(path)
+        if lines is None:
+            unreadable.append(rel_path)
+            continue
+
+        if is_ci:
             files_scanned["ci_config"] += 1
-            ci_findings.extend(scan_ci_file(path, rel_path))
-        elif is_iac_file(path, repo_path):
+            ci_findings.extend(scan_ci_file(path, rel_path, lines))
+        elif is_iac_file(path, repo_path, lines):
             files_scanned["iac"] += 1
-            algo_findings, key_findings = scan_iac_file(path, rel_path)
+            algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
             iac_findings.extend(algo_findings)
             embedded_key_findings.extend(key_findings)
         elif path.suffix in SOURCE_EXTENSIONS:
             files_scanned["source"] += 1
-            source_findings.extend(scan_source_file(path, rel_path))
+            source_findings.extend(scan_source_file(path, rel_path, lines))
 
     return {
         "files_scanned": files_scanned,
+        # Attempted and NOT read. files_scanned counts only files actually read, so
+        # "0 findings" can be checked against a denominator instead of trusted.
+        "unreadable_files": unreadable,
         "source_code_findings": source_findings,
         "ci_pipeline_findings": ci_findings,
         "iac_findings": iac_findings,

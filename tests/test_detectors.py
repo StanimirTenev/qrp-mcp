@@ -130,3 +130,25 @@ def test_is_ci_config_file_recognizes_known_paths(tmp_path: Path):
     assert is_ci_config_file(gh, tmp_path) is True
     assert is_ci_config_file(gitlab, tmp_path) is True
     assert is_ci_config_file(regular, tmp_path) is False
+
+
+def test_a_file_that_cannot_be_read_is_reported_not_counted_as_clean(tmp_path: Path):
+    """A failed read must not look like a pass: it leaves the scanned count and shows up
+    as unreadable, so "0 findings" can be checked against what was actually opened."""
+    readable = tmp_path / "wallet.py"
+    readable.write_text("from ecdsa import SECP256k1\n", encoding="utf-8")
+    blocked = tmp_path / "secrets_helper.py"
+    blocked.write_text("from ecdsa import SECP256k1\n", encoding="utf-8")
+
+    before = scan_repo(tmp_path)
+    assert before["files_scanned"]["source"] == 2
+    assert before["unreadable_files"] == []
+
+    blocked.chmod(0o000)
+    try:
+        after = scan_repo(tmp_path)
+    finally:
+        blocked.chmod(0o644)
+
+    assert after["unreadable_files"] == ["secrets_helper.py"]
+    assert after["files_scanned"]["source"] == 1, "an unopened file must not count as scanned"

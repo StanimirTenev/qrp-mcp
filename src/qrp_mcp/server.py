@@ -21,6 +21,11 @@ def scan_repo(path: str) -> dict[str, Any]:
     and returns the algorithms in use, per-finding detail, and a summary of how exposed
     the project is. Runs entirely on this machine -- no network calls, nothing uploaded.
 
+    `files_scanned` counts only files that were actually read. Files the scanner could
+    not open are listed in `unreadable_files` instead of being counted as scanned: no
+    findings in a file nobody could read is not the same as a file that is clean, and
+    the difference is the coverage of the whole report.
+
     Args:
         path: Directory to scan (e.g. a checked-out repository).
     """
