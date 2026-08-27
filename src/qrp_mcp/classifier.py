@@ -48,6 +48,19 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("SPHINCS", "SLH-DSA", "pqc_ready", "signature"),
     ("FALCON", "Falcon", "pqc_ready", "signature"),
     ("FRODO", "FrodoKEM", "pqc_ready", "key_exchange"),
+    ("CLASSICMCELIECE", "Classic McEliece", "pqc_ready", "key_exchange"),
+    ("MCELIECE", "Classic McEliece", "pqc_ready", "key_exchange"),
+    ("NTRU", "NTRU", "pqc_ready", "key_exchange"),
+    ("BIKE", "BIKE", "pqc_ready", "key_exchange"),
+    ("HQC", "HQC", "pqc_ready", "key_exchange"),
+    ("XMSS", "XMSS", "pqc_ready", "signature"),
+    # Post-quantum by design, but no longer safe to rely on. Recognising them is
+    # the point: unrecognised is the worst of the three outcomes, because it
+    # reads as "nothing found" rather than "found and broken".
+    ("SIKE", "SIKE", "pqc_ready", "key_exchange"),
+    ("HAWK", "HAWK", "pqc_ready", "signature"),
+    # LMS is deliberately absent: the squashed token "LMS" also matches ordinary
+    # words such as "films", and a false positive here is worse than a miss.
     # Classical elliptic-curve (specific before generic EC)
     ("ECDSA", "ECDSA", "classical_vulnerable", "signature"),
     ("EDDSA", "EdDSA", "classical_vulnerable", "signature"),
@@ -71,6 +84,34 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("DH", "DH", "classical_vulnerable", "key_exchange"),
     ("EC", "EC", "classical_vulnerable", "public_key"),
 ]
+
+# The mathematical family a post-quantum scheme rests on, and where it stands.
+# "Post-quantum" is not one property. Families fail in different ways and on
+# different timelines, and a scheme can be post-quantum by design while being
+# withdrawn or broken in practice: SIKE fell to a classical attack in 2022, and
+# HAWK was withdrawn from NIST standardisation in 2026. A tool that reports both
+# as simply "PQC" is reporting a category, not an assessment.
+#   standardised -> published standard
+#   selected     -> chosen for standardisation, standard not yet published
+#   candidate    -> under evaluation or recommended by a national body
+#   withdrawn    -> pulled from standardisation
+#   broken       -> a practical attack is public
+_PQC_SCHEMES: dict[str, tuple[str, str]] = {
+    "ML-KEM": ("structured lattice", "standardised"),
+    "ML-DSA": ("structured lattice", "standardised"),
+    "SLH-DSA": ("hash-based", "standardised"),
+    "XMSS": ("hash-based", "standardised"),
+    "Falcon": ("structured lattice", "selected"),
+    "HQC": ("code-based", "selected"),
+    "Classic McEliece": ("code-based", "candidate"),
+    "BIKE": ("code-based", "candidate"),
+    "FrodoKEM": ("unstructured lattice", "candidate"),
+    "NTRU": ("structured lattice", "candidate"),
+    "HAWK": ("structured lattice", "withdrawn"),
+    "SIKE": ("isogeny-based", "broken"),
+}
+
+_PQC_UNSAFE = ("withdrawn", "broken")
 
 # Weak / deprecated tokens that can co-occur (e.g. a weak signature hash).
 _WEAK_TOKENS: list[tuple[str, str]] = [
@@ -140,6 +181,8 @@ class Finding(BaseModel):
     location: str
     raw_value: str
     algorithm_family: str
+    pqc_family: str | None = None
+    pqc_status: str | None = None
     classification: Classification
     quantum_vulnerable: bool
     weak_key: bool
@@ -188,16 +231,41 @@ def classify_algorithm(
         _token, family, classification, _kind = family_entry
 
         if classification == "pqc_ready":
+            pqc_family, pqc_status = _PQC_SCHEMES[family]
+
+            if pqc_status in _PQC_UNSAFE:
+                return Finding(
+                    source=source,
+                    location=location,
+                    raw_value=raw_value,
+                    algorithm_family=family,
+                    pqc_family=pqc_family,
+                    pqc_status=pqc_status,
+                    classification="deprecated_weak",
+                    quantum_vulnerable=False,
+                    weak_key=False,
+                    severity="high",
+                    reason=(
+                        f"{family} is a post-quantum ({pqc_family}) scheme that is "
+                        f"{pqc_status}; it must not be counted as quantum-resistant."
+                    ),
+                )
+
             return Finding(
                 source=source,
                 location=location,
                 raw_value=raw_value,
                 algorithm_family=family,
+                pqc_family=pqc_family,
+                pqc_status=pqc_status,
                 classification="pqc_ready",
                 quantum_vulnerable=False,
                 weak_key=False,
                 severity="info",
-                reason=f"{family} is a post-quantum algorithm; quantum-resistant.",
+                reason=(
+                    f"{family} is a post-quantum {pqc_family} scheme "
+                    f"({pqc_status}); quantum-resistant."
+                ),
             )
 
         # classical_vulnerable public-key algorithm

@@ -63,6 +63,12 @@ Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C# and shell.
 **Classical crypto anywhere else** — RSA, DSA, DH, ECDSA and elliptic-curve usage, plus MD5,
 SHA-1, RC4 and DES/3DES.
 
+**Post-quantum schemes, by family** — ML-KEM, ML-DSA, SLH-DSA, Falcon, NTRU, Classic McEliece,
+BIKE, HQC, FrodoKEM, XMSS. Each carries the mathematical family it rests on (structured or
+unstructured lattice, code-based, hash-based, isogeny-based) and where it stands: standardised,
+selected, candidate, withdrawn or broken. SIKE is reported as broken and HAWK as withdrawn
+rather than counted as quantum-resistant — "post-quantum" is a category, not an assessment.
+
 **CI/CD pipelines** — signing commands such as `gpg --sign`, `cosign sign`, `signtool`,
 `jarsigner`, `codesign`.
 

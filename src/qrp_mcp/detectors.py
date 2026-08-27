@@ -74,6 +74,42 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("BLS", "BLS signature usage", re.compile(
         r"bls12[-_]?381|\bblst\b|@chainsafe/bls|\bbls_sig\b", re.IGNORECASE,
     )),
+    # Post-quantum schemes. Without these, a codebase that has already adopted
+    # ML-KEM scans as having no post-quantum cryptography at all, which reads as
+    # "not started" rather than "migrating".
+    # Where the scheme name is also an ordinary English word (falcon, bike, hawk,
+    # frodo), the pattern requires a parameter set: a false positive on a bicycle
+    # is worse than missing an unparameterised mention.
+    ("ML-KEM", "ML-KEM (Kyber) usage", re.compile(
+        r"\bml[-_]?kem[-_]?\d{3}\b|\bml[-_]?kem\b|\bkyber\d*\b|pqcrystals[-_]?kyber|"
+        r"crypto_kem_kyber", re.IGNORECASE,
+    )),
+    ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
+        r"\bml[-_]?dsa[-_]?\d{2}\b|\bml[-_]?dsa\b|\bdilithium\d*\b|pqcrystals[-_]?dilithium",
+        re.IGNORECASE,
+    )),
+    ("SLH-DSA", "SLH-DSA (SPHINCS+) usage", re.compile(
+        r"\bslh[-_]?dsa\b|\bsphincs", re.IGNORECASE,
+    )),
+    ("Falcon", "Falcon (FN-DSA) usage", re.compile(
+        r"\bfalcon[-_]?(512|1024)\b|\bfn[-_]?dsa\b", re.IGNORECASE,
+    )),
+    ("Classic McEliece", "Classic McEliece usage", re.compile(
+        r"\bclassic[-_ ]?mceliece\b|\bmceliece\b", re.IGNORECASE,
+    )),
+    ("NTRU", "NTRU usage", re.compile(r"\bntru|\bsntrup\d+\b", re.IGNORECASE)),
+    ("BIKE", "BIKE usage", re.compile(r"\bbike[-_]?l[135]\b", re.IGNORECASE)),
+    ("HQC", "HQC usage", re.compile(r"\bhqc[-_]?(128|192|256)\b", re.IGNORECASE)),
+    ("XMSS", "XMSS usage", re.compile(r"\bxmss(mt)?\b", re.IGNORECASE)),
+    ("FrodoKEM", "FrodoKEM usage", re.compile(
+        r"\bfrodokem\b|\bfrodo[-_]?(640|976|1344)\b", re.IGNORECASE,
+    )),
+    # Recognising these two is the point: both are post-quantum by design and
+    # neither is safe to rely on. Unrecognised, they read as "nothing found".
+    ("SIKE", "SIKE usage (broken)", re.compile(r"\bsike(p\d{3})?\b", re.IGNORECASE)),
+    ("HAWK", "HAWK usage (withdrawn)", re.compile(
+        r"\bhawk[-_]?(256|512|1024)\b", re.IGNORECASE,
+    )),
 ]
 
 # (command_type, compiled regex) for signing commands found in CI/build configs.
