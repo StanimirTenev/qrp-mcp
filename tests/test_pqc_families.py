@@ -121,3 +121,37 @@ def test_parameter_set_suffixes_are_detected(tmp_path, text, expected):
 # XMSS is the same defect as reporting Classic McEliece as an elliptic curve.
 def test_leading_boundary_still_separates_distinct_schemes(tmp_path):
     assert _scan(tmp_path, "root = fxmss_tree(seed)") == set()
+
+
+# --- classifier layer -----------------------------------------------------
+# The source-code path was fixed first; this is the other one, which takes
+# algorithm names from certificates and from someone else's CBOM. Squashing
+# strips separators, and once they are gone a longer name and a shorter one are
+# the same string: "XMSS" sits inside "FXMSS", and FXMSS is a different
+# construction whose own specification says its security proof is TODO.
+@pytest.mark.parametrize(
+    "value",
+    ["FXMSS", "fxmss_tree", "FXMSS-SHA2-256", "specification", "records", "technical"],
+)
+def test_a_longer_word_is_not_the_scheme_inside_it(value):
+    assert classify(value).classification == "unknown"
+
+
+# ...while every name that really does carry the scheme still resolves, including
+# the parameter-set suffixes and the camelCase spellings certificates use.
+@pytest.mark.parametrize(
+    "value,family",
+    [
+        ("XMSS", "XMSS"),
+        ("XMSSMT-SHA2_20/2_256", "XMSS"),
+        ("xmss_sha256_h10", "XMSS"),
+        ("md5WithRSAEncryption", "RSA"),
+        ("rsaEncryption", "RSA"),
+        ("id-ecPublicKey", "EC"),
+        ("secp256k1", "EC"),
+        ("sntrup761x25519", "NTRU"),
+        ("Classic-McEliece-6688128", "Classic McEliece"),
+    ],
+)
+def test_real_names_still_resolve(value, family):
+    assert classify(value).algorithm_family == family

@@ -50,6 +50,9 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("FRODO", "FrodoKEM", "pqc_ready", "key_exchange"),
     ("CLASSICMCELIECE", "Classic McEliece", "pqc_ready", "key_exchange"),
     ("MCELIECE", "Classic McEliece", "pqc_ready", "key_exchange"),
+    # Streamlined NTRU Prime by its own name: in "sntrup761x25519" the letters
+    # "ntru" are inside a longer word, so the generic token no longer reaches it.
+    ("SNTRUP", "NTRU", "pqc_ready", "key_exchange"),
     ("NTRU", "NTRU", "pqc_ready", "key_exchange"),
     ("BIKE", "BIKE", "pqc_ready", "key_exchange"),
     ("HQC", "HQC", "pqc_ready", "key_exchange"),
@@ -82,6 +85,11 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("DIFFIEHELLMAN", "DH", "classical_vulnerable", "key_exchange"),
     ("DHE", "DH", "classical_vulnerable", "key_exchange"),
     ("DH", "DH", "classical_vulnerable", "key_exchange"),
+    # Named curves, before the generic token. secp256k1 used to be classified
+    # only because "EC" happens to sit inside the letters of "secp" -- right for
+    # the wrong reason, and it stopped being right the moment token matching
+    # required a word boundary.
+    ("SECP", "EC", "classical_vulnerable", "public_key"),
     ("EC", "EC", "classical_vulnerable", "public_key"),
 ]
 
@@ -152,9 +160,36 @@ def _squash(value: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", value.upper())
 
 
-def _find_public_key_family(squashed: str) -> tuple[str, str, str, str] | None:
+def _starts_a_word(raw: str, token: str) -> bool:
+    """True if `token` appears in `raw` as a name in its own right.
+
+    Squashing strips the separators, and once they are gone a longer name and a
+    shorter one are the same string: "XMSS" is inside "FXMSS", and FXMSS is a
+    different construction with no security proof. So the token is re-checked
+    against the original value, allowing separators between its characters but
+    requiring a non-letter, or the start of the string, in front of it.
+
+    Only the front is anchored. Parameter sets are suffixes -- XMSSMT and
+    ML-KEM-768 must still match -- so anchoring the end would refuse the forms
+    real code and real certificates actually carry.
+
+    A lowercase-to-uppercase step counts as a boundary, because certificate
+    algorithm names are camelCase: the RSA in "md5WithRSAEncryption" is a name,
+    while the ec in "specification" is not.
+    """
+    pattern = r"[-_ .]*".join(re.escape(c) for c in token)
+    for match in re.finditer(pattern, raw, re.IGNORECASE):
+        start = match.start()
+        if start == 0 or not raw[start - 1].isalpha():
+            return True
+        if raw[start - 1].islower() and raw[start].isupper():
+            return True
+    return False
+
+
+def _find_public_key_family(squashed: str, raw: str) -> tuple[str, str, str, str] | None:
     for entry in _PUBLIC_KEY_FAMILIES:
-        if entry[0] in squashed:
+        if entry[0] in squashed and _starts_a_word(raw, entry[0]):
             return entry
     return None
 
@@ -225,7 +260,7 @@ def classify_algorithm(
     """
     squashed = _squash(raw_value or "")
     weak = _find_weak_token(squashed)
-    family_entry = _find_public_key_family(squashed)
+    family_entry = _find_public_key_family(squashed, raw_value or "")
 
     if family_entry is not None:
         _token, family, classification, _kind = family_entry
