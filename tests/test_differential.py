@@ -5,11 +5,10 @@ This is the check that proves the extraction did not silently drop a branch. It 
 when `QRP_UPSTREAM_CLASSIFIER` points at the upstream source, and skips otherwise -- so it
 is a maintainer's check, not something a contributor needs to satisfy.
 
-KNOWN DELIBERATE DIVERGENCE (0.2.2): token matching here requires the token to begin a word.
-Upstream matches anywhere in the squashed value, which reports FXMSS as standardised XMSS and
-the word "specification" as a quantum-vulnerable elliptic curve. Until upstream carries the
-same rule, this test is expected to diverge on those inputs, and that divergence is the fix
-rather than a regression.
+As of 0.3.0 there is no divergence: the word-boundary rule, the specificity ordering, the
+`also_present` components and the full scheme table were all ported back to the service, and
+this file passes clean against it. A failure here now means the two have drifted, not that one
+is ahead.
 """
 
 from __future__ import annotations
@@ -155,7 +154,11 @@ def test_full_fingerprint_matches_original() -> None:
 
 # Families added after extraction for the blockchain audience. Everything the original
 # knew must survive unchanged; these are additions on top.
-ADDED_FAMILIES = {"Schnorr", "BLS"}
+# The two tables were in parity as of qrp-mcp 0.3.0: every family added here --
+# Schnorr, BLS, the stateful hash-based schemes, the third-round candidates --
+# was ported back to the service. An entry appearing here again means one side
+# gained a scheme the other has not, which is exactly what this test is for.
+ADDED_FAMILIES: set[str] = set()
 
 
 def test_known_algorithms_extends_original_without_changing_it() -> None:
@@ -170,4 +173,4 @@ def test_known_algorithms_extends_original_without_changing_it() -> None:
     assert {entry["family"] for entry in added} == ADDED_FAMILIES
 
     kept = [entry for entry in current if entry["family"] not in ADDED_FAMILIES]
-    assert kept == old, "an existing algorithm family changed or disappeared"
+    assert kept == old, "the two algorithm tables have drifted apart"
