@@ -75,16 +75,24 @@ Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C# and shell.
 **Classical crypto anywhere else** — RSA, DSA, DH, ECDSA and elliptic-curve usage, plus MD5,
 SHA-1, RC4 and DES/3DES.
 
-**TLS hybrids** — the RFC 10024 groups `X25519MLKEM768`, `SecP256r1MLKEM768` and
-`SecP384r1MLKEM1024`, plus `sntrup761x25519`. Both halves are reported: the post-quantum
-KEM and the classical key agreement beside it, since the classical half is the component
-Shor breaks.
+**Hybrids and composites** — the RFC 10024 TLS groups `X25519MLKEM768`,
+`SecP256r1MLKEM768` and `SecP384r1MLKEM1024`, OpenSSH 10's default `mlkem768x25519-sha256`,
+and the composite certificate algorithms of draft-ietf-lamps-pq-composite-sigs such as
+`id-MLDSA44-RSA2048-PSS-SHA256`. A hybrid holds if either half holds, so the post-quantum
+scheme leads — and the classical half is carried in `also_present` rather than dropped, since
+it is the component Shor breaks.
 
-**Post-quantum schemes, by family** — ML-KEM, ML-DSA, SLH-DSA, Falcon, NTRU, Classic McEliece,
-BIKE, HQC, FrodoKEM, XMSS. Each carries the mathematical family it rests on (structured or
-unstructured lattice, code-based, hash-based, isogeny-based) and where it stands: standardised,
-selected, candidate, withdrawn or broken. SIKE is reported as broken and HAWK as withdrawn
-rather than counted as quantum-resistant — "post-quantum" is a category, not an assessment.
+**Post-quantum schemes, by family** — ML-KEM, ML-DSA, SLH-DSA, Falcon (FN-DSA), NTRU,
+Classic McEliece, BIKE, HQC, FrodoKEM, XMSS, and the stateful LMS/HSS of SP 800-208 that
+CNSA 2.0 requires for firmware signing. The nine schemes NIST advanced to its third
+additional-signatures round in May 2026 — FAEST, HAWK, MAYO, MQOM, QR-UOV, SDitH, SNOVA,
+SQIsign, UOV — are recognised as candidates, and CROSS as dropped from that process.
+
+Each carries the mathematical family it rests on (structured or unstructured lattice,
+code-based, hash-based, isogeny-based, multivariate, symmetric-based) and where it stands:
+standardised, selected, candidate, withdrawn, eliminated or broken. SIKE is reported as broken
+and HAWK as withdrawn rather than counted as quantum-resistant — "post-quantum" is a category,
+not an assessment.
 
 **CI/CD pipelines** — signing commands such as `gpg --sign`, `cosign sign`, `signtool`,
 `jarsigner`, `codesign`.

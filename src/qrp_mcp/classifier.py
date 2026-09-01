@@ -36,7 +36,9 @@ Classification = Literal[
 
 Usage = Literal["signature", "public_key", "key_exchange", "cipher", "explicit"]
 
-# Ordered most-specific-first. The first token found in the squashed value wins.
+# The longest matching token wins, so this list is grouped for reading rather
+# than ordered for correctness. Adding a short token can no longer shadow a
+# longer one that was already here.
 # fields: token, family, classification, kind
 _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     # Post-quantum
@@ -57,6 +59,30 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("BIKE", "BIKE", "pqc_ready", "key_exchange"),
     ("HQC", "HQC", "pqc_ready", "key_exchange"),
     ("XMSS", "XMSS", "pqc_ready", "signature"),
+    # Stateful hash-based signatures, SP 800-208. CNSA 2.0 requires LMS or XMSS
+    # for firmware and code signing, so leaving them out was not a small gap. LMS
+    # used to be excluded because the squashed token also matched inside "films";
+    # requiring the token to begin a word removed that reason.
+    ("HSS", "HSS/LMS", "pqc_ready", "signature"),
+    ("LMS", "HSS/LMS", "pqc_ready", "signature"),
+    # FIPS 206 renames Falcon to FN-DSA, and "DSA" sits inside "FN-DSA": before
+    # the longest token began winning, a standardised post-quantum signature was
+    # reported as classical DSA.
+    ("FNDSA", "Falcon", "pqc_ready", "signature"),
+    # The nine schemes NIST advanced to the third additional-signatures round on
+    # 14 May 2026. None is standardised; all are candidates, and an inventory that
+    # cannot name them reports "unknown", which reads as nothing found.
+    ("FAEST", "FAEST", "pqc_ready", "signature"),
+    ("SQISIGN", "SQIsign", "pqc_ready", "signature"),
+    ("QRUOV", "QR-UOV", "pqc_ready", "signature"),
+    ("SNOVA", "SNOVA", "pqc_ready", "signature"),
+    ("SDITH", "SDitH", "pqc_ready", "signature"),
+    ("MQOM", "MQOM", "pqc_ready", "signature"),
+    ("MAYO", "MAYO", "pqc_ready", "signature"),
+    ("UOV", "UOV", "pqc_ready", "signature"),
+    # Dropped by NIST at the end of the second round. Naming it is the point:
+    # unrecognised reads as nothing found, not as a scheme that lost its process.
+    ("CROSS", "CROSS", "pqc_ready", "signature"),
     # Post-quantum by design, but no longer safe to rely on. Recognising them is
     # the point: unrecognised is the worst of the three outcomes, because it
     # reads as "nothing found" rather than "found and broken".
@@ -64,12 +90,13 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("HAWK", "HAWK", "pqc_ready", "signature"),
     # LMS is deliberately absent: the squashed token "LMS" also matches ordinary
     # words such as "films", and a false positive here is worse than a miss.
-    # Classical elliptic-curve (specific before generic EC)
+    # Classical elliptic-curve
     ("ECDSA", "ECDSA", "classical_vulnerable", "signature"),
     ("EDDSA", "EdDSA", "classical_vulnerable", "signature"),
     ("ED25519", "Ed25519", "classical_vulnerable", "signature"),
     ("ED448", "Ed448", "classical_vulnerable", "signature"),
     ("X25519", "X25519", "classical_vulnerable", "key_exchange"),
+    ("CURVE25519", "X25519", "classical_vulnerable", "key_exchange"),
     ("X448", "X448", "classical_vulnerable", "key_exchange"),
     ("ECDH", "ECDH", "classical_vulnerable", "key_exchange"),
     ("ECPUBLICKEY", "EC", "classical_vulnerable", "public_key"),
@@ -90,6 +117,8 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     # the wrong reason, and it stopped being right the moment token matching
     # required a word boundary.
     ("SECP", "EC", "classical_vulnerable", "public_key"),
+    ("BRAINPOOL", "EC", "classical_vulnerable", "public_key"),
+    ("PRIME256V1", "EC", "classical_vulnerable", "public_key"),
     ("EC", "EC", "classical_vulnerable", "public_key"),
 ]
 
@@ -102,7 +131,8 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
 #   standardised -> published standard
 #   selected     -> chosen for standardisation, standard not yet published
 #   candidate    -> under evaluation or recommended by a national body
-#   withdrawn    -> pulled from standardisation
+#   withdrawn    -> pulled from standardisation by its own authors
+#   eliminated   -> dropped by NIST at the end of an evaluation round
 #   broken       -> a practical attack is public
 _PQC_SCHEMES: dict[str, tuple[str, str]] = {
     "ML-KEM": ("structured lattice", "standardised"),
@@ -117,9 +147,19 @@ _PQC_SCHEMES: dict[str, tuple[str, str]] = {
     "NTRU": ("structured lattice", "candidate"),
     "HAWK": ("structured lattice", "withdrawn"),
     "SIKE": ("isogeny-based", "broken"),
+    "HSS/LMS": ("hash-based", "standardised"),
+    "SQIsign": ("isogeny-based", "candidate"),
+    "FAEST": ("symmetric-based", "candidate"),
+    "SDitH": ("code-based", "candidate"),
+    "MQOM": ("multivariate", "candidate"),
+    "MAYO": ("multivariate", "candidate"),
+    "UOV": ("multivariate", "candidate"),
+    "QR-UOV": ("multivariate", "candidate"),
+    "SNOVA": ("multivariate", "candidate"),
+    "CROSS": ("code-based", "eliminated"),
 }
 
-_PQC_UNSAFE = ("withdrawn", "broken")
+_PQC_UNSAFE = ("withdrawn", "broken", "eliminated")
 
 # Weak / deprecated tokens that can co-occur (e.g. a weak signature hash).
 _WEAK_TOKENS: list[tuple[str, str]] = [
@@ -169,6 +209,10 @@ _WORDLIKE_SUFFIX: dict[str, str] = {
     "BIKE": r"[-_]?L[135]",
     "FRODO": r"KEM|[-_]?(640|976|1344)",
     "HAWK": r"[-_]?(256|512|1024)",
+    # "mayo" and "cross" are ordinary words long before they were signature
+    # schemes -- Mayo Clinic, crossroads, cross-site.
+    "MAYO": r"[-_]?[1235]",
+    "CROSS": r"[-_]?R[-_]?SDP",
 }
 
 
@@ -204,11 +248,45 @@ def _starts_a_word(raw: str, token: str) -> bool:
     return False
 
 
+def _all_public_key_families(squashed: str, raw: str) -> list[tuple[str, str, str, str]]:
+    """Every family whose token appears in the value, longest token first.
+
+    Longest first rather than list order, because the recurring defect in this
+    file has been a short generic token shadowing a longer specific one: DSA
+    eating FN-DSA, AES eating FAEST, EC eating McEliece and secp256k1. Ordering
+    the table by hand made that a matter of vigilance; ordering the matches by
+    length makes it a property of the matcher.
+    """
+    hits = [
+        entry
+        for entry in _PUBLIC_KEY_FAMILIES
+        if entry[0] in squashed and _starts_a_word(raw, entry[0])
+    ]
+    # Post-quantum first, then longest token. A hybrid or a composite holds if
+    # either half holds, so X25519MLKEM768 is a post-quantum key agreement that
+    # also contains X25519 -- not an X25519 exchange that happens to mention
+    # ML-KEM. Length breaks the remaining ties, which is what stops DSA from
+    # shadowing FN-DSA.
+    hits.sort(key=lambda entry: (entry[2] == "pqc_ready", len(entry[0])), reverse=True)
+
+    seen: set[str] = set()
+    unique: list[tuple[str, str, str, str]] = []
+    for entry in hits:
+        # A token contained in one already accepted is the same name seen through
+        # a shorter lens: EC inside ECDSA, RSA inside RSASSA. It is not a second
+        # component, and listing it would make every ECDSA finding look composite.
+        if any(entry[0] in kept[0] for kept in unique):
+            continue
+        if entry[1] in seen:
+            continue
+        seen.add(entry[1])
+        unique.append(entry)
+    return unique
+
+
 def _find_public_key_family(squashed: str, raw: str) -> tuple[str, str, str, str] | None:
-    for entry in _PUBLIC_KEY_FAMILIES:
-        if entry[0] in squashed and _starts_a_word(raw, entry[0]):
-            return entry
-    return None
+    families = _all_public_key_families(squashed, raw)
+    return families[0] if families else None
 
 
 def _find_weak_token(squashed: str) -> tuple[str, str] | None:
@@ -233,6 +311,11 @@ class Finding(BaseModel):
     location: str
     raw_value: str
     algorithm_family: str
+    # Every other family named in the same value. A composite certificate
+    # algorithm carries two: id-MLDSA44-RSA2048-PSS-SHA256 is ML-DSA *and*
+    # RSA-2048, and an inventory that reports only the post-quantum half is
+    # describing the half that is fine.
+    also_present: list[str] = Field(default_factory=list)
     pqc_family: str | None = None
     pqc_status: str | None = None
     classification: Classification
@@ -277,7 +360,15 @@ def classify_algorithm(
     """
     squashed = _squash(raw_value or "")
     weak = _find_weak_token(squashed)
-    family_entry = _find_public_key_family(squashed, raw_value or "")
+    families = _all_public_key_families(squashed, raw_value or "")
+    family_entry = families[0] if families else None
+    also_present = [entry[1] for entry in families[1:]]
+    # Said out loud in the reason as well as carried in the field: a composite or
+    # hybrid name is the one place where reporting a single family drops half of
+    # what the value says.
+    alongside = (
+        f" The same value also names {', '.join(also_present)}." if also_present else ""
+    )
 
     if family_entry is not None:
         _token, family, classification, _kind = family_entry
@@ -291,6 +382,7 @@ def classify_algorithm(
                     location=location,
                     raw_value=raw_value,
                     algorithm_family=family,
+                    also_present=also_present,
                     pqc_family=pqc_family,
                     pqc_status=pqc_status,
                     classification="deprecated_weak",
@@ -308,6 +400,7 @@ def classify_algorithm(
                 location=location,
                 raw_value=raw_value,
                 algorithm_family=family,
+                also_present=also_present,
                 pqc_family=pqc_family,
                 pqc_status=pqc_status,
                 classification="pqc_ready",
@@ -316,7 +409,7 @@ def classify_algorithm(
                 severity="info",
                 reason=(
                     f"{family} is a post-quantum {pqc_family} scheme "
-                    f"({pqc_status}); quantum-resistant."
+                    f"({pqc_status}); quantum-resistant.{alongside}"
                 ),
             )
 
@@ -339,6 +432,7 @@ def classify_algorithm(
             location=location,
             raw_value=raw_value,
             algorithm_family=family,
+            also_present=also_present,
             classification="classical_vulnerable",
             quantum_vulnerable=True,
             weak_key=weak_key,
