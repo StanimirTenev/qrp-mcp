@@ -67,7 +67,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # "X25519MLKEM768" reports the post-quantum half only, and the component Shor
     # actually breaks disappears from the inventory.
     ("X25519", "X25519 key agreement usage", re.compile(
-        r"(?<![A-Za-z])x25519", re.IGNORECASE,
+        r"(?<![A-Za-z])x25519|(?<![A-Za-z])curve25519", re.IGNORECASE,
     )),
     ("X448", "X448 key agreement usage", re.compile(
         r"(?<![A-Za-z])x448(?![0-9])", re.IGNORECASE,
@@ -113,6 +113,27 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("BIKE", "BIKE usage", re.compile(r"(?<![A-Za-z])bike[-_]?l[135]", re.IGNORECASE)),
     ("HQC", "HQC usage", re.compile(r"(?<![A-Za-z])hqc[-_]?(128|192|256)", re.IGNORECASE)),
     ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss", re.IGNORECASE)),
+    # Stateful hash-based, SP 800-208. CNSA 2.0 requires LMS or XMSS for firmware
+    # and code signing, so a firmware pipeline that had complied scanned as empty.
+    ("HSS/LMS", "LMS/HSS stateful signature usage", re.compile(
+        r"(?<![A-Za-z])lms[-_]?sha|(?<![A-Za-z])hss[-_/]?lms|(?<![A-Za-z])lms[-_]?(sha256|shake)|"
+        r"(?<![A-Za-z])hsslms|lms_sha256_m\d+_h\d+",
+        re.IGNORECASE,
+    )),
+    # The nine schemes NIST advanced to the third additional-signatures round on
+    # 14 May 2026, plus CROSS, which it dropped. "mayo" and "cross" are ordinary
+    # words, so those two need their parameter set, as falcon and bike do.
+    ("FAEST", "FAEST usage", re.compile(r"(?<![A-Za-z])faest", re.IGNORECASE)),
+    ("SQIsign", "SQIsign usage", re.compile(r"(?<![A-Za-z])sqisign", re.IGNORECASE)),
+    ("SNOVA", "SNOVA usage", re.compile(r"(?<![A-Za-z])snova", re.IGNORECASE)),
+    ("SDitH", "SDitH usage", re.compile(r"(?<![A-Za-z])sdith", re.IGNORECASE)),
+    ("MQOM", "MQOM usage", re.compile(r"(?<![A-Za-z])mqom", re.IGNORECASE)),
+    ("QR-UOV", "QR-UOV usage", re.compile(r"(?<![A-Za-z])qr[-_]?uov", re.IGNORECASE)),
+    ("UOV", "UOV usage", re.compile(r"(?<![A-Za-z])uov[-_]?(i|ip|iii|v|s|pkc)", re.IGNORECASE)),
+    ("MAYO", "MAYO usage", re.compile(r"(?<![A-Za-z])mayo[-_]?[1235]", re.IGNORECASE)),
+    ("CROSS", "CROSS usage (dropped by NIST)", re.compile(
+        r"(?<![A-Za-z])cross[-_]?r?[-_]?sdp", re.IGNORECASE,
+    )),
     ("FrodoKEM", "FrodoKEM usage", re.compile(
         r"(?<![A-Za-z])frodokem|(?<![A-Za-z])frodo[-_]?(640|976|1344)", re.IGNORECASE,
     )),
