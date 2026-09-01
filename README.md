@@ -94,6 +94,10 @@ standardised, selected, candidate, withdrawn, eliminated or broken. SIKE is repo
 and HAWK as withdrawn rather than counted as quantum-resistant — "post-quantum" is a category,
 not an assessment.
 
+**Configuration** — `nginx.conf`, `sshd_config`, `openssl.cnf`, `.ini`, `.toml`,
+`.properties`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid group
+is chosen: `X25519MLKEM768` and `mlkem768x25519-sha256` are almost never strings in code.
+
 **CI/CD pipelines** — signing commands such as `gpg --sign`, `cosign sign`, `signtool`,
 `jarsigner`, `codesign`.
 
@@ -125,6 +129,10 @@ the truth.** An agent guessing about your signing code is worse than nothing; an
 a deterministic inventory can actually reason about it.
 
 ## What it is not
+
+It reads source, configuration, CI pipelines, infrastructure-as-code and Kubernetes
+manifests. It does not read documentation, binaries or images — and it counts only what it
+opened, so `files_scanned` is a denominator rather than a claim.
 
 A **free inventory tool**, not a readiness assessment. It deliberately does not do:
 

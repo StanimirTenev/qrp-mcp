@@ -20,6 +20,15 @@ CI_CONFIG_FILENAMES = {".gitlab-ci.yml", "Jenkinsfile", "azure-pipelines.yml"}
 
 IAC_EXTENSIONS = {".tf", ".tfvars"}
 
+# Where cryptographic choices are configured rather than written. A TLS or SSH
+# hybrid group -- X25519MLKEM768, mlkem768x25519-sha256 -- is almost never a
+# string in code; it is a line in nginx.conf or sshd_config. Scanning only source
+# meant the whole RFC 10024 vocabulary could be deployed and stay invisible.
+CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg"}
+
+# The same files that carry no extension at all.
+CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf"}
+
 # (algorithm, description, compiled regex matched against a single source line)
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
@@ -196,6 +205,11 @@ def is_ci_config_file(path: Path, repo_path: Path) -> bool:
     return path.name in CI_CONFIG_FILENAMES
 
 
+def is_config_file(path: Path) -> bool:
+    """A configuration file, by extension or by one of the extensionless names."""
+    return path.suffix in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
+
+
 def _read_lines(path: Path) -> list[str] | None:
     """Lines of the file, or None when it could not be read.
 
@@ -287,7 +301,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     ci_findings: list[dict[str, Any]] = []
     iac_findings: list[dict[str, Any]] = []
     embedded_key_findings: list[dict[str, Any]] = []
-    files_scanned = {"source": 0, "ci_config": 0, "iac": 0}
+    files_scanned = {"source": 0, "ci_config": 0, "iac": 0, "config": 0}
 
     unreadable: list[str] = []
 
@@ -295,7 +309,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         rel_path = path.relative_to(repo_path).as_posix()
         is_ci = is_ci_config_file(path, repo_path)
         if not (is_ci or path.suffix in IAC_EXTENSIONS or path.suffix in SOURCE_EXTENSIONS
-                or path.suffix in {".yaml", ".yml"}):
+                or path.suffix in {".yaml", ".yml"} or is_config_file(path)):
             continue
 
         # Read once, here: classification and scanning must see the same content, and a
@@ -316,6 +330,21 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         elif path.suffix in SOURCE_EXTENSIONS:
             files_scanned["source"] += 1
             source_findings.extend(scan_source_file(path, rel_path, lines))
+        else:
+            # Configuration: the extensions above, and any YAML that is not a
+            # manifest. This branch exists so that nothing can be opened and then
+            # dropped: reaching here used to fall off the end of the loop, leaving
+            # a file that was read, counted nowhere, and listed nowhere -- which is
+            # the one thing this scanner is not allowed to do.
+            #
+            # Both pattern sets run, because a config file carries both shapes: a
+            # cipher list reads like source, a key algorithm declaration reads like
+            # infrastructure.
+            files_scanned["config"] += 1
+            source_findings.extend(scan_source_file(path, rel_path, lines))
+            algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
+            iac_findings.extend(algo_findings)
+            embedded_key_findings.extend(key_findings)
 
     return {
         "files_scanned": files_scanned,
