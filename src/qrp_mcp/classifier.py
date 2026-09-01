@@ -248,6 +248,53 @@ def _starts_a_word(raw: str, token: str) -> bool:
     return False
 
 
+# Object identifiers, as certificates and third-party CBOMs carry them. An OID
+# has no letters, so token matching can never reach it: 2.16.840.1.101.3.4.3.17
+# is ML-DSA-44 and classified as "unknown" until the number itself is looked up.
+# The arcs are hierarchical, so the longest matching prefix wins -- the same
+# specificity rule the token table uses.
+_OID_FAMILIES: list[tuple[str, str, str, str]] = [
+    # NIST CSOR post-quantum. sigAlgs = 2.16.840.1.101.3.4.3, kems = ...3.4.4
+    *[(f"2.16.840.1.101.3.4.3.{n}", "ML-DSA", "pqc_ready", "signature") for n in (17, 18, 19)],
+    # SLH-DSA: twelve pure variants and twelve pre-hash variants.
+    *[
+        (f"2.16.840.1.101.3.4.3.{n}", "SLH-DSA", "pqc_ready", "signature")
+        for n in [*range(20, 32), *range(35, 47)]
+    ],
+    *[(f"2.16.840.1.101.3.4.4.{n}", "ML-KEM", "pqc_ready", "key_exchange") for n in (1, 2, 3)],
+    # Classical. PKCS#1, ANSI X9.62 / X9.57, the EdDSA arc, and the SECG and
+    # brainpool named-curve arcs.
+    ("1.2.840.113549.1.1", "RSA", "classical_vulnerable", "public_key"),
+    ("1.2.840.10045.4", "ECDSA", "classical_vulnerable", "signature"),
+    ("1.2.840.10045.2.1", "EC", "classical_vulnerable", "public_key"),
+    ("1.2.840.10045.3", "EC", "classical_vulnerable", "public_key"),
+    ("1.2.840.10040.4", "DSA", "classical_vulnerable", "signature"),
+    ("1.3.101.110", "X25519", "classical_vulnerable", "key_exchange"),
+    ("1.3.101.111", "X448", "classical_vulnerable", "key_exchange"),
+    ("1.3.101.112", "Ed25519", "classical_vulnerable", "signature"),
+    ("1.3.101.113", "Ed448", "classical_vulnerable", "signature"),
+    ("1.3.132.0", "EC", "classical_vulnerable", "public_key"),
+    ("1.3.36.3.3.2.8", "EC", "classical_vulnerable", "public_key"),
+]
+
+_LOOKS_LIKE_AN_OID = re.compile(r"^\d+(?:\.\d+)+$")
+
+
+def _find_oid_family(raw: str) -> tuple[str, str, str, str] | None:
+    """Resolve a dotted object identifier to a family, longest arc first."""
+    value = (raw or "").strip()
+    if not _LOOKS_LIKE_AN_OID.match(value):
+        return None
+    matches = [
+        entry
+        for entry in _OID_FAMILIES
+        if value == entry[0] or value.startswith(entry[0] + ".")
+    ]
+    if not matches:
+        return None
+    return max(matches, key=lambda entry: len(entry[0]))
+
+
 def _all_public_key_families(squashed: str, raw: str) -> list[tuple[str, str, str, str]]:
     """Every family whose token appears in the value, longest token first.
 
@@ -257,6 +304,12 @@ def _all_public_key_families(squashed: str, raw: str) -> list[tuple[str, str, st
     the table by hand made that a matter of vigilance; ordering the matches by
     length makes it a property of the matcher.
     """
+    oid = _find_oid_family(raw)
+    if oid is not None:
+        # An OID names exactly one algorithm. There is no phrase to search and no
+        # second component hiding in the digits.
+        return [oid]
+
     hits = [
         entry
         for entry in _PUBLIC_KEY_FAMILIES
