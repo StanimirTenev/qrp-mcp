@@ -160,6 +160,18 @@ def _squash(value: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", value.upper())
 
 
+# Scheme names that are also ordinary English words. A value that is nothing but
+# the name is an algorithm field saying BIKE, and is taken at face value. Inside a
+# longer phrase the word has to carry a parameter set, because "my bike" and
+# "frodo baggins" are not cryptography. The source detectors draw the same line.
+_WORDLIKE_SUFFIX: dict[str, str] = {
+    "FALCON": r"[-_]?(512|1024)",
+    "BIKE": r"[-_]?L[135]",
+    "FRODO": r"KEM|[-_]?(640|976|1344)",
+    "HAWK": r"[-_]?(256|512|1024)",
+}
+
+
 def _starts_a_word(raw: str, token: str) -> bool:
     """True if `token` appears in `raw` as a name in its own right.
 
@@ -178,12 +190,17 @@ def _starts_a_word(raw: str, token: str) -> bool:
     while the ec in "specification" is not.
     """
     pattern = r"[-_ .]*".join(re.escape(c) for c in token)
+    suffix = _WORDLIKE_SUFFIX.get(token)
     for match in re.finditer(pattern, raw, re.IGNORECASE):
         start = match.start()
-        if start == 0 or not raw[start - 1].isalpha():
-            return True
-        if raw[start - 1].islower() and raw[start].isupper():
-            return True
+        if start and raw[start - 1].isalpha():
+            # camelCase is the one letter-to-letter step that is still a boundary.
+            if not (raw[start - 1].islower() and raw[start].isupper()):
+                continue
+        if suffix and _squash(raw) != token:
+            if not re.match(suffix, raw[match.end():], re.IGNORECASE):
+                continue
+        return True
     return False
 
 
