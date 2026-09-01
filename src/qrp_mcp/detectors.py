@@ -80,35 +80,39 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # Where the scheme name is also an ordinary English word (falcon, bike, hawk,
     # frodo), the pattern requires a parameter set: a false positive on a bicycle
     # is worse than missing an unparameterised mention.
+    # No trailing \b on these: real code writes the parameter set as a suffix
+    # (slh_dsa_sha2_128s, ml_kem_768_keygen, mceliece348864), and a word boundary
+    # after the scheme name refuses every one of them. The LEADING \b is what
+    # does the protective work -- it is why "FXMSS" does not match XMSS.
     ("ML-KEM", "ML-KEM (Kyber) usage", re.compile(
-        r"\bml[-_]?kem[-_]?\d{3}\b|\bml[-_]?kem\b|\bkyber\d*\b|pqcrystals[-_]?kyber|"
-        r"crypto_kem_kyber", re.IGNORECASE,
+        r"\bml[-_]?kem|\bkyber|pqcrystals[-_]?kyber|crypto_kem_kyber", re.IGNORECASE,
     )),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
-        r"\bml[-_]?dsa[-_]?\d{2}\b|\bml[-_]?dsa\b|\bdilithium\d*\b|pqcrystals[-_]?dilithium",
-        re.IGNORECASE,
+        r"\bml[-_]?dsa|\bdilithium|pqcrystals[-_]?dilithium", re.IGNORECASE,
     )),
     ("SLH-DSA", "SLH-DSA (SPHINCS+) usage", re.compile(
-        r"\bslh[-_]?dsa\b|\bsphincs", re.IGNORECASE,
+        r"\bslh[-_]?dsa|\bsphincs", re.IGNORECASE,
     )),
     ("Falcon", "Falcon (FN-DSA) usage", re.compile(
-        r"\bfalcon[-_]?(512|1024)\b|\bfn[-_]?dsa\b", re.IGNORECASE,
+        r"\bfalcon[-_]?(512|1024)|\bfn[-_]?dsa", re.IGNORECASE,
     )),
     ("Classic McEliece", "Classic McEliece usage", re.compile(
-        r"\bclassic[-_ ]?mceliece\b|\bmceliece\b", re.IGNORECASE,
+        r"\bclassic[-_ ]?mceliece|\bmceliece", re.IGNORECASE,
     )),
-    ("NTRU", "NTRU usage", re.compile(r"\bntru|\bsntrup\d+\b", re.IGNORECASE)),
-    ("BIKE", "BIKE usage", re.compile(r"\bbike[-_]?l[135]\b", re.IGNORECASE)),
-    ("HQC", "HQC usage", re.compile(r"\bhqc[-_]?(128|192|256)\b", re.IGNORECASE)),
-    ("XMSS", "XMSS usage", re.compile(r"\bxmss(mt)?\b", re.IGNORECASE)),
+    ("NTRU", "NTRU usage", re.compile(r"\bntru|\bsntrup\d+", re.IGNORECASE)),
+    ("BIKE", "BIKE usage", re.compile(r"\bbike[-_]?l[135]", re.IGNORECASE)),
+    ("HQC", "HQC usage", re.compile(r"\bhqc[-_]?(128|192|256)", re.IGNORECASE)),
+    ("XMSS", "XMSS usage", re.compile(r"\bxmss", re.IGNORECASE)),
     ("FrodoKEM", "FrodoKEM usage", re.compile(
-        r"\bfrodokem\b|\bfrodo[-_]?(640|976|1344)\b", re.IGNORECASE,
+        r"\bfrodokem|\bfrodo[-_]?(640|976|1344)", re.IGNORECASE,
     )),
     # Recognising these two is the point: both are post-quantum by design and
     # neither is safe to rely on. Unrecognised, they read as "nothing found".
-    ("SIKE", "SIKE usage (broken)", re.compile(r"\bsike(p\d{3})?\b", re.IGNORECASE)),
+    ("SIKE", "SIKE usage (broken)", re.compile(
+        r"\bsikep?\d{3}|\bsike\b|\bsike[-_]", re.IGNORECASE,
+    )),
     ("HAWK", "HAWK usage (withdrawn)", re.compile(
-        r"\bhawk[-_]?(256|512|1024)\b", re.IGNORECASE,
+        r"\bhawk[-_]?(256|512|1024)", re.IGNORECASE,
     )),
 ]
 
