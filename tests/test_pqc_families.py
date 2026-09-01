@@ -123,6 +123,30 @@ def test_leading_boundary_still_separates_distinct_schemes(tmp_path):
     assert _scan(tmp_path, "root = fxmss_tree(seed)") == set()
 
 
+# RFC 10024 names the TLS 1.3 hybrids by concatenation, so the scheme is preceded
+# by a digit rather than a separator. A word boundary refuses that, and a config
+# that had adopted the standard scanned as having no cryptography at all.
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ('groups = "X25519MLKEM768"', {"ML-KEM", "X25519"}),
+        ('groups = "SecP256r1MLKEM768"', {"ML-KEM"}),
+        ('groups = "SecP384r1MLKEM1024"', {"ML-KEM"}),
+        ('groups = "X25519Kyber768Draft00"', {"ML-KEM", "X25519"}),
+        ("kex = sntrup761x25519-sha512@openssh.com", {"NTRU", "X25519"}),
+    ],
+)
+def test_tls_hybrids_report_both_halves(tmp_path, text, expected):
+    assert expected <= _scan(tmp_path, text)
+
+
+# The classical half is the point: it is the component Shor actually breaks, and
+# reporting only the post-quantum name would drop it from the inventory.
+def test_the_classical_half_of_a_hybrid_is_not_dropped(tmp_path):
+    findings = _scan(tmp_path, 'ssl_conf_curves = "X25519MLKEM768"')
+    assert "X25519" in findings
+
+
 # --- classifier layer -----------------------------------------------------
 # The source-code path was fixed first; this is the other one, which takes
 # algorithm names from certificates and from someone else's CBOM. Squashing

@@ -63,6 +63,15 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"eth_sign|personal_sign|signTypedData",
         re.IGNORECASE,
     )),
+    # X25519 is the classical half of every RFC 10024 TLS hybrid. Without it,
+    # "X25519MLKEM768" reports the post-quantum half only, and the component Shor
+    # actually breaks disappears from the inventory.
+    ("X25519", "X25519 key agreement usage", re.compile(
+        r"(?<![A-Za-z])x25519", re.IGNORECASE,
+    )),
+    ("X448", "X448 key agreement usage", re.compile(
+        r"(?<![A-Za-z])x448(?![0-9])", re.IGNORECASE,
+    )),
     ("Ed25519", "Ed25519 usage", re.compile(
         r"\bed25519\b|tweetnacl|\bnacl\.sign\b|@solana/web3\.js|solana_program::|"
         r"sodium_crypto_sign",
@@ -80,39 +89,40 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # Where the scheme name is also an ordinary English word (falcon, bike, hawk,
     # frodo), the pattern requires a parameter set: a false positive on a bicycle
     # is worse than missing an unparameterised mention.
-    # No trailing \b on these: real code writes the parameter set as a suffix
-    # (slh_dsa_sha2_128s, ml_kem_768_keygen, mceliece348864), and a word boundary
-    # after the scheme name refuses every one of them. The LEADING \b is what
-    # does the protective work -- it is why "FXMSS" does not match XMSS.
+    # Neither end carries a plain \b. Real code writes the parameter set as a
+    # suffix (slh_dsa_sha2_128s, ml_kem_768_keygen, mceliece348864), and RFC 10024
+    # names the TLS hybrids by concatenation: X25519MLKEM768 puts a digit in front
+    # of the scheme. A word boundary refuses both. What does the protective work is
+    # the lookbehind for a LETTER -- it is why "FXMSS" still does not match XMSS.
     ("ML-KEM", "ML-KEM (Kyber) usage", re.compile(
-        r"\bml[-_]?kem|\bkyber|pqcrystals[-_]?kyber|crypto_kem_kyber", re.IGNORECASE,
+        r"(?<![A-Za-z])ml[-_]?kem|(?<![A-Za-z])kyber|pqcrystals[-_]?kyber|crypto_kem_kyber", re.IGNORECASE,
     )),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
-        r"\bml[-_]?dsa|\bdilithium|pqcrystals[-_]?dilithium", re.IGNORECASE,
+        r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])dilithium|pqcrystals[-_]?dilithium", re.IGNORECASE,
     )),
     ("SLH-DSA", "SLH-DSA (SPHINCS+) usage", re.compile(
-        r"\bslh[-_]?dsa|\bsphincs", re.IGNORECASE,
+        r"(?<![A-Za-z])slh[-_]?dsa|(?<![A-Za-z])sphincs", re.IGNORECASE,
     )),
     ("Falcon", "Falcon (FN-DSA) usage", re.compile(
-        r"\bfalcon[-_]?(512|1024)|\bfn[-_]?dsa", re.IGNORECASE,
+        r"(?<![A-Za-z])falcon[-_]?(512|1024)|(?<![A-Za-z])fn[-_]?dsa", re.IGNORECASE,
     )),
     ("Classic McEliece", "Classic McEliece usage", re.compile(
-        r"\bclassic[-_ ]?mceliece|\bmceliece", re.IGNORECASE,
+        r"(?<![A-Za-z])classic[-_ ]?mceliece|(?<![A-Za-z])mceliece", re.IGNORECASE,
     )),
-    ("NTRU", "NTRU usage", re.compile(r"\bntru|\bsntrup\d+", re.IGNORECASE)),
-    ("BIKE", "BIKE usage", re.compile(r"\bbike[-_]?l[135]", re.IGNORECASE)),
-    ("HQC", "HQC usage", re.compile(r"\bhqc[-_]?(128|192|256)", re.IGNORECASE)),
-    ("XMSS", "XMSS usage", re.compile(r"\bxmss", re.IGNORECASE)),
+    ("NTRU", "NTRU usage", re.compile(r"(?<![A-Za-z])ntru|(?<![A-Za-z])sntrup\d+", re.IGNORECASE)),
+    ("BIKE", "BIKE usage", re.compile(r"(?<![A-Za-z])bike[-_]?l[135]", re.IGNORECASE)),
+    ("HQC", "HQC usage", re.compile(r"(?<![A-Za-z])hqc[-_]?(128|192|256)", re.IGNORECASE)),
+    ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss", re.IGNORECASE)),
     ("FrodoKEM", "FrodoKEM usage", re.compile(
-        r"\bfrodokem|\bfrodo[-_]?(640|976|1344)", re.IGNORECASE,
+        r"(?<![A-Za-z])frodokem|(?<![A-Za-z])frodo[-_]?(640|976|1344)", re.IGNORECASE,
     )),
     # Recognising these two is the point: both are post-quantum by design and
     # neither is safe to rely on. Unrecognised, they read as "nothing found".
     ("SIKE", "SIKE usage (broken)", re.compile(
-        r"\bsikep?\d{3}|\bsike\b|\bsike[-_]", re.IGNORECASE,
+        r"(?<![A-Za-z])sikep?\d{3}|(?<![A-Za-z])sike\b|(?<![A-Za-z])sike[-_]", re.IGNORECASE,
     )),
     ("HAWK", "HAWK usage (withdrawn)", re.compile(
-        r"\bhawk[-_]?(256|512|1024)", re.IGNORECASE,
+        r"(?<![A-Za-z])hawk[-_]?(256|512|1024)", re.IGNORECASE,
     )),
 ]
 
