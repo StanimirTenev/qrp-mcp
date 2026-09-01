@@ -155,3 +155,31 @@ def test_a_longer_word_is_not_the_scheme_inside_it(value):
 )
 def test_real_names_still_resolve(value, family):
     assert classify(value).algorithm_family == family
+
+
+# Four scheme names are also ordinary English words. A value that is nothing but
+# the name is an algorithm field and is taken at face value; the same word inside
+# a phrase has to carry a parameter set, or a bicycle becomes post-quantum ready.
+@pytest.mark.parametrize(
+    "phrase", ["my bike", "the falcon", "frodo baggins", "Hawk Ridge", "a falcon in flight"]
+)
+def test_wordlike_names_need_more_than_the_word(phrase):
+    assert classify(phrase).classification == "unknown"
+
+
+@pytest.mark.parametrize(
+    "value,family",
+    [
+        ("BIKE", "BIKE"),
+        ("Falcon", "Falcon"),
+        ("HAWK", "HAWK"),
+        ("BIKE-L3", "BIKE"),
+        ("bike_l1_keygen", "BIKE"),
+        ("Falcon-1024", "Falcon"),
+        ("FrodoKEM", "FrodoKEM"),
+        ("frodo-976", "FrodoKEM"),
+        ("HAWK-512", "HAWK"),
+    ],
+)
+def test_wordlike_names_still_resolve_when_they_are_the_name(value, family):
+    assert classify(value).algorithm_family == family
