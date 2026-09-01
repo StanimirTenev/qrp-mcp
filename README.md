@@ -75,6 +75,11 @@ Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C# and shell.
 **Classical crypto anywhere else** — RSA, DSA, DH, ECDSA and elliptic-curve usage, plus MD5,
 SHA-1, RC4 and DES/3DES.
 
+**TLS hybrids** — the RFC 10024 groups `X25519MLKEM768`, `SecP256r1MLKEM768` and
+`SecP384r1MLKEM1024`, plus `sntrup761x25519`. Both halves are reported: the post-quantum
+KEM and the classical key agreement beside it, since the classical half is the component
+Shor breaks.
+
 **Post-quantum schemes, by family** — ML-KEM, ML-DSA, SLH-DSA, Falcon, NTRU, Classic McEliece,
 BIKE, HQC, FrodoKEM, XMSS. Each carries the mathematical family it rests on (structured or
 unstructured lattice, code-based, hash-based, isogeny-based) and where it stands: standardised,
