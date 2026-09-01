@@ -135,3 +135,47 @@ def test_named_curves_resolve(value):
 def test_ordinary_language_is_not_an_inventory(tmp_path, phrase):
     assert classify(phrase).classification == "unknown"
     assert scan(tmp_path, phrase) == set()
+
+
+# Object identifiers, as certificates and third-party CBOMs carry them. An OID
+# has no letters, so token matching can never reach it -- every one of these
+# classified as "unknown" until the number itself was looked up.
+@pytest.mark.parametrize(
+    "oid,family",
+    [
+        ("2.16.840.1.101.3.4.3.17", "ML-DSA"),   # ML-DSA-44
+        ("2.16.840.1.101.3.4.3.19", "ML-DSA"),   # ML-DSA-87
+        ("2.16.840.1.101.3.4.3.20", "SLH-DSA"),  # first of the twelve
+        ("2.16.840.1.101.3.4.3.46", "SLH-DSA"),  # last of the pre-hash twelve
+        ("2.16.840.1.101.3.4.4.2", "ML-KEM"),    # ML-KEM-768
+        ("1.2.840.113549.1.1.1", "RSA"),         # rsaEncryption
+        ("1.2.840.113549.1.1.11", "RSA"),        # sha256WithRSAEncryption
+        ("1.2.840.10045.2.1", "EC"),             # id-ecPublicKey
+        ("1.2.840.10045.4.3.2", "ECDSA"),        # ecdsa-with-SHA256
+        ("1.2.840.10045.3.1.7", "EC"),           # prime256v1
+        ("1.2.840.10040.4.3", "DSA"),            # dsa-with-SHA1
+        ("1.3.101.112", "Ed25519"),
+        ("1.3.101.110", "X25519"),
+        ("1.3.132.0.34", "EC"),                  # secp384r1
+        ("1.3.132.0.10", "EC"),                  # secp256k1
+        ("1.3.36.3.3.2.8.1.1.7", "EC"),          # brainpoolP256r1
+    ],
+)
+def test_object_identifiers_resolve(oid, family):
+    finding = classify(oid)
+    assert finding.algorithm_family == family
+    assert finding.classification != "unknown"
+
+
+# The post-quantum OIDs carry the family and standing too, not just a name.
+def test_a_post_quantum_oid_carries_its_family_and_standing():
+    finding = classify("2.16.840.1.101.3.4.4.3")
+    assert finding.algorithm_family == "ML-KEM"
+    assert finding.pqc_family == "structured lattice"
+    assert finding.pqc_status == "standardised"
+
+
+# An unregistered arc is unknown, not a guess. Dotted digits are not evidence.
+@pytest.mark.parametrize("value", ["1.2.3.4.5", "0.0", "9.9.9.9.9.9", "not.an.oid", "1.2.840"])
+def test_an_unrecognised_oid_stays_unknown(value):
+    assert classify(value).classification == "unknown"
