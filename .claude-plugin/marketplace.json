@@ -1,0 +1,30 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "quantumreadiness",
+  "owner": {
+    "name": "Stanimir Tenev",
+    "url": "https://quantumreadiness.eu"
+  },
+  "description": "Local, offline cryptographic inventory tooling for the post-quantum transition.",
+  "plugins": [
+    {
+      "name": "qrp",
+      "displayName": "QRP cryptographic inventory",
+      "source": "./plugin",
+      "description": "Scans a local directory for cryptography that Shor's algorithm defeats, classifies each post-quantum scheme by family and standardisation status, and reports the files it could not read. No network calls, no account.",
+      "version": "0.2.0",
+      "author": {
+        "name": "Stanimir Tenev",
+        "url": "https://quantumreadiness.eu"
+      },
+      "homepage": "https://quantumreadiness.eu",
+      "repository": "https://github.com/StanimirTenev/qrp-mcp",
+      "license": "Apache-2.0",
+      "category": "security",
+      "keywords": [
+        "post-quantum", "pqc", "cryptography", "cbom", "crypto-inventory",
+        "security", "offline", "bitcoin", "ethereum", "secp256k1"
+      ]
+    }
+  ]
+}
