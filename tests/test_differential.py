@@ -4,6 +4,12 @@ it was extracted from, apart from fields deliberately left out.
 This is the check that proves the extraction did not silently drop a branch. It runs only
 when `QRP_UPSTREAM_CLASSIFIER` points at the upstream source, and skips otherwise -- so it
 is a maintainer's check, not something a contributor needs to satisfy.
+
+KNOWN DELIBERATE DIVERGENCE (0.2.2): token matching here requires the token to begin a word.
+Upstream matches anywhere in the squashed value, which reports FXMSS as standardised XMSS and
+the word "specification" as a quantum-vulnerable elliptic curve. Until upstream carries the
+same rule, this test is expected to diverge on those inputs, and that divergence is the fix
+rather than a regression.
 """
 
 from __future__ import annotations
