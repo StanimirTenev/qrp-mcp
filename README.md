@@ -46,6 +46,18 @@ Then ask your agent:
 
 > Scan ~/code/my-protocol for quantum-vulnerable cryptography.
 
+### As a Claude Code plugin
+
+The same server, packaged with a skill, so there is no config file to edit:
+
+```
+/plugin marketplace add StanimirTenev/qrp-mcp
+/plugin install qrp@quantumreadiness
+```
+
+Then `/qrp:pqc-scan` in any project. Both routes need [`uv`](https://docs.astral.sh/uv/) on
+your PATH, since `uvx` is what fetches and runs the server.
+
 ## Tools
 
 | Tool | What it does |

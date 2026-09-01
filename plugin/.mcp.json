@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "qrp": {
+      "command": "uvx",
+      "args": ["qrp-mcp"]
+    }
+  }
+}

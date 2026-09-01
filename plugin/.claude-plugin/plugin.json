@@ -1,0 +1,12 @@
+{
+  "name": "qrp",
+  "description": "Find cryptography a quantum computer would break — secp256k1, Ed25519, BLS, Schnorr, RSA — in a local codebase, and report what the scan could not read. Runs entirely on your machine.",
+  "version": "0.2.0",
+  "author": {
+    "name": "Stanimir Tenev",
+    "url": "https://quantumreadiness.eu"
+  },
+  "homepage": "https://quantumreadiness.eu",
+  "repository": "https://github.com/StanimirTenev/qrp-mcp",
+  "license": "Apache-2.0"
+}
