@@ -80,13 +80,20 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"hazmat\.primitives\.asymmetric\.ec\b|crypto/elliptic|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']EC[\"']|openssl\s+ecparam|"
         r"\bEC_KEY_new\w*|\bEC_GROUP_new\w*|\bEVP_PKEY_EC\b|\bEC_POINT_\w+|"
-        r"\bECCurve\.|\bECParameters\b",
+        r"\bECCurve\.|\bECParameters\b|"
+        # IKE proposal syntax: ecp384 is NIST P-384 and lives in swanctl.conf,
+        # where a scanner reading only library calls never meets it.
+        r"(?<![A-Za-z])ecp(?:192|224|256|384|521)(?![0-9])",
         re.IGNORECASE,
     )),
     ("DH", "Diffie-Hellman usage", re.compile(
         r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|Diffie[- ]?Hellman|"
         r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
-        r"\bECDiffieHellmanCng\b|\bECDiffieHellman\.Create\b", re.IGNORECASE,
+        r"\bECDiffieHellmanCng\b|\bECDiffieHellman\.Create\b|"
+        # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
+        # finite-field Diffie-Hellman.
+        r"(?<![A-Za-z])modp(?:1024|1536|2048|3072|4096|6144|8192)(?![0-9])",
+        re.IGNORECASE,
     )),
     ("MD5", "MD5 usage", re.compile(
         r"hashlib\.md5|crypto/md5|MessageDigest\.getInstance\(\s*[\"']MD5[\"']|"
@@ -116,6 +123,17 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
         r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|\bweb3\b|"
         r"eth_sign|personal_sign|signTypedData",
+        re.IGNORECASE,
+    )),
+    # RFC 8784. Quantum resistance with no post-quantum algorithm to find, so it
+    # is matched by the configuration directives that turn it on rather than by a
+    # scheme name. Bare "ppk" is deliberately not enough: .ppk is also PuTTY's key
+    # format, and a key file is not a postquantum preshared key.
+    ("PPK", "RFC 8784 postquantum preshared key", re.compile(
+        r"(?<![A-Za-z])ppk_(?:id|required|secret|dynamic)(?![A-Za-z])|"
+        r"(?<![A-Za-z])ppk[ \t]*=|@ppk(?![A-Za-z])|"
+        r"(?<![A-Za-z])ppk[ \t]+(?:manual|dynamic)(?![A-Za-z])|"
+        r"RFC[ \t-]?8784",
         re.IGNORECASE,
     )),
     # X25519 is the classical half of every RFC 10024 TLS hybrid. Without it,
