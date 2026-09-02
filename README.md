@@ -131,8 +131,13 @@ a deterministic inventory can actually reason about it.
 ## What it is not
 
 It reads source, configuration, CI pipelines, infrastructure-as-code and Kubernetes
-manifests. It does not read documentation, binaries or images — and it counts only what it
-opened, so `files_scanned` is a denominator rather than a claim.
+manifests. It does not read documentation, binaries or images.
+
+Every file under the path is accounted for in one of three ways: **scanned**, **unreadable**,
+or **skipped because the tool does not claim that type** — the last counted by extension, so
+the coverage figure has a base. `files_scanned + unreadable_files + files_skipped_by_type`
+always equals `files_present`. A scan that read seven files out of nine is a different report
+from one that read seven out of four hundred, and only one of them is worth trusting.
 
 A **free inventory tool**, not a readiness assessment. It deliberately does not do:
 

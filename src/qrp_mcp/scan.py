@@ -33,6 +33,8 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
     return {
         "target": str(repo_path),
         "files_scanned": scan_result["files_scanned"],
+        "files_present": scan_result["files_present"],
+        "files_skipped_by_type": scan_result["files_skipped_by_type"],
         "unreadable_files": scan_result["unreadable_files"],
         "detected_algorithms": scan_result["detected_algorithms"],
         "findings": [f.model_dump() for f in response.findings],

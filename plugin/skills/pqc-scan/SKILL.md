@@ -27,7 +27,16 @@ that names only the post-quantum one is describing the half that is fine. Say bo
 it is zero. A file nobody could open is not a file that is clean, and the difference is the
 coverage of the whole report. Never let an unreadable file pass as an absence of findings.
 
-**3. Coverage.** Files scanned against files present, as a number.
+**3. Coverage, as a fraction with a real base.** `files_scanned` against `files_present` —
+how much was read, out of how much was there. Then `files_skipped_by_type`: files not read
+because this tool does not claim that type, counted by extension. That is a boundary of the
+scan, not a gap in it, but it is the reader's to judge, not yours to hide. The three outcomes
+always account for every file: scanned, unreadable, skipped.
+
+If the skipped list contains something that could hold cryptography — `.env`, `.pem`, `.p12`,
+`.json`, a Dockerfile, a binary — say so, and offer to look at those files yourself. You are
+holding the tree; the scanner is not. That question is the one thing you can answer that it
+cannot.
 
 Then stop.
 
