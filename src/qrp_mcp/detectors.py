@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .certificates import is_certificate_file, scan_certificate_file
+
 SOURCE_EXTENSIONS = {
     ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
     # C and C++ headers. Declarations live here, and in a C codebase they are
@@ -402,7 +404,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     ci_findings: list[dict[str, Any]] = []
     iac_findings: list[dict[str, Any]] = []
     embedded_key_findings: list[dict[str, Any]] = []
-    files_scanned = {"source": 0, "ci_config": 0, "iac": 0, "config": 0}
+    files_scanned = {"source": 0, "ci_config": 0, "iac": 0, "config": 0, "certificate": 0}
 
     unreadable: list[str] = []
     # The denominator. files_scanned says how much was read; on its own it does not
@@ -417,7 +419,8 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         rel_path = path.relative_to(repo_path).as_posix()
         is_ci = is_ci_config_file(path, repo_path)
         if not (is_ci or path.suffix in IAC_EXTENSIONS or path.suffix in SOURCE_EXTENSIONS
-                or path.suffix in {".yaml", ".yml"} or is_config_file(path)):
+                or path.suffix in {".yaml", ".yml"} or is_config_file(path)
+                or is_certificate_file(path)):
             kind = path.suffix.lower() or "(no extension)"
             skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
             continue
@@ -429,7 +432,14 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
             unreadable.append(rel_path)
             continue
 
-        if is_ci:
+        if is_certificate_file(path):
+            # Certificates and keys are read as bytes, not lines: a .der carries no
+            # lines at all, and a .pem that fails to decode must still be counted.
+            files_scanned["certificate"] += 1
+            algo_findings, key_findings = scan_certificate_file(path, rel_path)
+            source_findings.extend(algo_findings)
+            embedded_key_findings.extend(key_findings)
+        elif is_ci:
             files_scanned["ci_config"] += 1
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
         elif is_iac_file(path, repo_path, lines):
