@@ -59,7 +59,7 @@ def _build(tmp_path):
 
 def test_every_file_class_lands_in_its_bucket(tmp_path):
     counted = _build(tmp_path)["files_scanned"]
-    assert counted == {"source": 5, "ci_config": 1, "iac": 2, "config": 5}
+    assert counted == {"source": 5, "ci_config": 1, "iac": 2, "config": 5, "certificate": 0}
 
 
 def test_configuration_files_are_read_at_all(tmp_path):
@@ -159,3 +159,71 @@ def test_generated_caches_stay_out_of_the_denominator(tmp_path):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("generated\n", encoding="utf-8")
     assert scan_directory(str(tmp_path))["files_present"] == before
+
+
+# --- certificates and keys --------------------------------------------------
+# Scanning five well-known repositories put a number on this gap: 1,284 public
+# keys, 1,059 private keys and 652 certificates sat in files the scanner never
+# opened, so embedded_key_findings was 0 in every one of them.
+CERTIFICATE_TREE = {
+    "tls/server.pem": (
+        "-----BEGIN CERTIFICATE-----\n"
+        # Minimal DER carrying the rsaEncryption identifier 1.2.840.113549.1.1.1.
+        "MAoGCCqGSIb3DQEBAQ==\n"
+        "-----END CERTIFICATE-----\n"
+    ),
+    "tls/server.key": (
+        "-----BEGIN RSA PRIVATE KEY-----\nMAA=\n-----END RSA PRIVATE KEY-----\n"
+    ),
+    "tls/params.pem": (
+        "-----BEGIN DH PARAMETERS-----\nMAA=\n-----END DH PARAMETERS-----\n"
+    ),
+    "ssh/id_ed25519.pub": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA user@host\n",
+    "ssh/id_ecdsa.pub": "ecdsa-sha2-nistp256 AAAAE2VjZHNh user@host\n",
+}
+
+
+def _build_certs(tmp_path):
+    for rel, text in CERTIFICATE_TREE.items():
+        target = tmp_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+    return scan_directory(str(tmp_path))
+
+
+def test_certificate_and_key_files_are_opened(tmp_path):
+    result = _build_certs(tmp_path)
+    assert result["files_scanned"]["certificate"] == len(CERTIFICATE_TREE)
+    for ext in (".pem", ".key", ".pub"):
+        assert ext not in result["files_skipped_by_type"]
+
+
+def test_private_key_material_is_reported(tmp_path):
+    """The pattern for this existed and no path ever opened such a file."""
+    keys = _build_certs(tmp_path)["evidence"]["embedded_keys"]
+    assert [k["type"] for k in keys] == ["RSA PRIVATE KEY"]
+
+
+def test_algorithms_come_from_labels_and_ssh_key_types(tmp_path):
+    families = {f["algorithm_family"] for f in _build_certs(tmp_path)["findings"]}
+    assert {"RSA", "DH", "Ed25519", "ECDSA"} <= families
+
+
+def test_the_three_outcomes_still_account_for_every_file(tmp_path):
+    result = _build_certs(tmp_path)
+    counted = sum(result["files_scanned"].values())
+    unread = len(result["unreadable_files"])
+    skipped = sum(result["files_skipped_by_type"].values())
+    assert counted + unread + skipped == result["files_present"]
+
+
+def test_malformed_certificates_yield_nothing_rather_than_nonsense(tmp_path):
+    """OpenSSL's corpus is deliberately full of broken certificates. A file that
+    cannot be understood must leave the scan as nothing found, not as an
+    exception and not as an invented algorithm."""
+    (tmp_path / "broken.pem").write_bytes(b"-----BEGIN CERTIFICATE-----\n!!!!\n")
+    (tmp_path / "garbage.der").write_bytes(bytes(range(256)) * 4)
+    (tmp_path / "empty.crt").write_bytes(b"")
+    result = scan_directory(str(tmp_path))
+    assert result["files_scanned"]["certificate"] == 3
+    assert result["findings"] == []

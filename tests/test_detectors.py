@@ -27,7 +27,7 @@ def test_scan_repo_detects_source_algorithms_and_signing_commands(tmp_path: Path
 
     result = scan_repo(tmp_path)
 
-    assert result["files_scanned"] == {"source": 2, "ci_config": 1, "iac": 0, "config": 0}
+    assert result["files_scanned"] == {"source": 2, "ci_config": 1, "iac": 0, "config": 0, "certificate": 0}
     algorithms = {f["algorithm"] for f in result["source_code_findings"]}
     assert algorithms == {"RSA", "MD5", "SHA1"}
 
@@ -43,7 +43,7 @@ def test_scan_repo_excludes_vendor_and_git_dirs(tmp_path: Path):
 
     result = scan_repo(tmp_path)
 
-    assert result["files_scanned"] == {"source": 0, "ci_config": 0, "iac": 0, "config": 0}
+    assert result["files_scanned"] == {"source": 0, "ci_config": 0, "iac": 0, "config": 0, "certificate": 0}
     assert result["source_code_findings"] == []
 
 
@@ -52,7 +52,7 @@ def test_scan_repo_no_findings_in_clean_repo(tmp_path: Path):
 
     result = scan_repo(tmp_path)
 
-    assert result["files_scanned"] == {"source": 1, "ci_config": 0, "iac": 0, "config": 0}
+    assert result["files_scanned"] == {"source": 1, "ci_config": 0, "iac": 0, "config": 0, "certificate": 0}
     assert result["source_code_findings"] == []
     assert result["ci_pipeline_findings"] == []
     assert result["detected_algorithms"] == []
@@ -112,7 +112,7 @@ def test_scan_repo_detects_iac_findings_end_to_end(tmp_path: Path):
 
     result = scan_repo(tmp_path)
 
-    assert result["files_scanned"] == {"source": 0, "ci_config": 0, "iac": 2, "config": 0}
+    assert result["files_scanned"] == {"source": 0, "ci_config": 0, "iac": 2, "config": 0, "certificate": 0}
     assert {f["algorithm"] for f in result["iac_findings"]} == {"ECDSA"}
     assert len(result["embedded_key_findings"]) == 1
     assert result["detected_algorithms"] == ["ECDSA"]
