@@ -122,8 +122,14 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("X25519", "X25519 key agreement usage", re.compile(
         r"(?<![A-Za-z])x25519|(?<![A-Za-z])curve25519", re.IGNORECASE,
     )),
+    # Uppercase X448 is unambiguous. Lowercase x448 is not: Bitcoin Core lists
+    # node service flags in hex -- "x1, x5, x9, x408, x448, xc08" -- and three of
+    # those read as the curve. Lowercase therefore has to be attached to an
+    # identifier (asymmetric.x448, ossl_x448, param.x448) rather than standing
+    # alone in prose.
+    ("X448", "X448 key agreement usage", re.compile(r"(?<![A-Za-z])X448(?![0-9])")),
     ("X448", "X448 key agreement usage", re.compile(
-        r"(?<![A-Za-z])x448(?![0-9])", re.IGNORECASE,
+        r"(?<=[._/-])x448(?![0-9])|(?<![A-Za-z])x448(?=[._])",
     )),
     ("Ed25519", "Ed25519 usage", re.compile(
         r"\bed25519\b|tweetnacl|\bnacl\.sign\b|@solana/web3\.js|solana_program::|"
@@ -162,7 +168,15 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("Classic McEliece", "Classic McEliece usage", re.compile(
         r"(?<![A-Za-z])classic[-_ ]?mceliece|(?<![A-Za-z])mceliece", re.IGNORECASE,
     )),
-    ("NTRU", "NTRU usage", re.compile(r"(?<![A-Za-z])ntru|(?<![A-Za-z])sntrup\d+", re.IGNORECASE)),
+    # A trailing guard as well as a leading one: "ntrunc" (n truncated) is a
+    # variable in Bitcoin Core and matched 22 times. The real parameter sets are
+    # spelled ntruhps2048509 / ntruhrss701 / ntru_prime, so they are named rather
+    # than left to a boundary that cannot tell them from an ordinary word.
+    ("NTRU", "NTRU usage", re.compile(
+        r"(?<![A-Za-z])ntru(?:hps|hrss|prime|[-_\d]|(?![A-Za-z]))|"
+        r"(?<![A-Za-z])sntrup\d+",
+        re.IGNORECASE,
+    )),
     ("BIKE", "BIKE usage", re.compile(r"(?<![A-Za-z])bike[-_]?l[135]", re.IGNORECASE)),
     ("HQC", "HQC usage", re.compile(r"(?<![A-Za-z])hqc[-_]?(128|192|256)", re.IGNORECASE)),
     ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss", re.IGNORECASE)),
@@ -192,9 +206,14 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
     # Recognising these two is the point: both are post-quantum by design and
     # neither is safe to rely on. Unrecognised, they read as "nothing found".
+    # Parameterised or hyphenated forms, case-insensitively. The bare word is
+    # handled separately below: lowercase "sike" is a word in Venda, and matched
+    # a translation string in Bitcoin Core -- which would have reported the one
+    # broken scheme in the list as present in Bitcoin.
     ("SIKE", "SIKE usage (broken)", re.compile(
-        r"(?<![A-Za-z])sikep?\d{3}|(?<![A-Za-z])sike\b|(?<![A-Za-z])sike[-_]", re.IGNORECASE,
+        r"(?<![A-Za-z])sikep?\d{3}|(?<![A-Za-z])sike[-_]", re.IGNORECASE,
     )),
+    ("SIKE", "SIKE usage (broken)", re.compile(r"(?<![A-Za-z])SIKE(?![A-Za-z])")),
     ("HAWK", "HAWK usage (withdrawn)", re.compile(
         r"(?<![A-Za-z])hawk[-_]?(256|512|1024)", re.IGNORECASE,
     )),
@@ -281,20 +300,58 @@ def is_iac_file(path: Path, repo_path: Path, lines: list[str] | None = None) -> 
     return False
 
 
+# A cipher suite names what it excludes as well as what it allows: an OpenSSL
+# cipher string writes "!3DES !MD5 !RC4". Reporting those as usage does not pad
+# the answer, it inverts it -- the one configuration that took the trouble to ban
+# a primitive gets recorded as using it. Found in Certbot's Apache fixtures,
+# where eight of nine DES findings were the string "!3DES".
+#
+# This applies to CONFIGURATION ONLY. In C, "!" is logical negation, and applying
+# the rule to source deleted 190 real findings in OpenSSL alone -- if (!MD5_Init(&c)),
+# if (!EC_POINT_set_affine_coordinates(...)), if (!ml_kem_has(key, selection)).
+# A rule that hides real cryptography is the same failure as one that invents it.
+def _is_excluded(line: str, start: int) -> bool:
+    """True when the match is an exclusion in a cipher list, not a use of it."""
+    i = start - 1
+    # Step back over a leading digit, so "!3DES" is judged from the "!" and not
+    # from the "3" that the DES pattern happens to start on.
+    while i >= 0 and line[i].isdigit():
+        i -= 1
+    return i >= 0 and line[i] == "!"
+
+
 def scan_source_file(path: Path, rel_path: str,
-                     lines: list[str] | None = None) -> list[dict[str, Any]]:
+                     lines: list[str] | None = None,
+                     cipher_exclusions: bool = False) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     lines = (_read_lines(path) or []) if lines is None else lines
     for line_no, line in enumerate(lines, start=1):
+        # One line, one finding per algorithm. Several patterns can carry the same
+        # name -- ECDSA is matched both by its own name and by secp256k1, X448 by
+        # its upper and lower case forms -- and counting each pattern separately
+        # inflates the headline number by however many ways the line could be
+        # spotted, which is not a property of the code being scanned.
+        seen_on_line: set[str] = set()
         for algorithm, description, pattern in ALGORITHM_PATTERNS:
-            if pattern.search(line):
-                findings.append({
-                    "path": rel_path,
-                    "line": line_no,
-                    "algorithm": algorithm,
-                    "description": description,
-                    "excerpt": line.strip()[:200],
-                })
+            if algorithm in seen_on_line:
+                continue
+            # Every match on the line, not the first: a cipher string can both ban
+            # and allow the same family -- "ALL:!ECDH:ECDHE-RSA-AES256" -- and
+            # judging the line by its first match would throw the real use away
+            # along with the exclusion.
+            matches = list(pattern.finditer(line))
+            if not matches:
+                continue
+            if cipher_exclusions and all(_is_excluded(line, m.start()) for m in matches):
+                continue
+            seen_on_line.add(algorithm)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": algorithm,
+                "description": description,
+                "excerpt": line.strip()[:200],
+            })
     return findings
 
 
@@ -394,7 +451,8 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
             # cipher list reads like source, a key algorithm declaration reads like
             # infrastructure.
             files_scanned["config"] += 1
-            source_findings.extend(scan_source_file(path, rel_path, lines))
+            source_findings.extend(
+                scan_source_file(path, rel_path, lines, cipher_exclusions=True))
             algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
             iac_findings.extend(algo_findings)
             embedded_key_findings.extend(key_findings)
