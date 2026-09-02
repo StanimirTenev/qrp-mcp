@@ -46,36 +46,68 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
         r"Crypto\.PublicKey\.RSA|Crypto\.PublicKey\s+import\s+RSA|"
         r"hazmat\.primitives\.asymmetric\.rsa|crypto/rsa|"
-        r"KeyPairGenerator\.getInstance\(\s*[\"']RSA[\"']|openssl\s+genrsa|-newkey\s+rsa",
+        r"KeyPairGenerator\.getInstance\(\s*[\"']RSA[\"']|openssl\s+genrsa|-newkey\s+rsa|"
+        # C / OpenSSL: the library's own API, which is what a C tree actually contains.
+        r"\bRSA_new\b|\bRSA_generate_key\w*|\bRSA_public_encrypt\b|\bRSA_private_decrypt\b|"
+        r"\bEVP_PKEY_RSA\b|\bEVP_RSA_gen\b|\bPEM_read_\w*RSA\w*|\bd2i_RSA\w*|"
+        # .NET / PowerShell: a Windows estate keeps its certificate handling here.
+        r"\bRSACryptoServiceProvider\b|\bRSACng\b|\bRSAOpenSsl\b|\bRSA\.Create\b|"
+        r"\bRSACertificateExtensions\b|\bGetRSAPublicKey\b|\bGetRSAPrivateKey\b|"
+        r"-KeyAlgorithm\s+[\"']?RSA",
         re.IGNORECASE,
     )),
     ("DSA", "DSA usage", re.compile(
         r"Crypto\.PublicKey\s+import\s+DSA|"
         r"hazmat\.primitives\.asymmetric\.dsa|crypto/dsa|"
-        r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam",
+        r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
+        r"\bDSA_new\b|\bDSA_generate_key\w*|\bEVP_PKEY_DSA\b|"
+        r"\bDSACryptoServiceProvider\b|\bDSACng\b",
         re.IGNORECASE,
     )),
-    ("ECDSA", "ECDSA usage", re.compile(r"crypto/ecdsa|\bECDSA\b", re.IGNORECASE)),
+    ("ECDSA", "ECDSA usage", re.compile(
+        r"crypto/ecdsa|(?<![A-Za-z])ECDSA|"
+        # C / OpenSSL.
+        r"\bECDSA_do_sign\b|\bECDSA_sign\b|\bECDSA_verify\b|\bECDSA_SIG_\w+|"
+        # .NET spells it ECDsa, so \bECDSA\b does not reach ECDsaCng or
+        # ECDsaCertificateExtensions -- the exact call our own Windows agent makes.
+        r"\bECDsaCng\b|\bECDsaOpenSsl\b|\bECDsa\.Create\b|"
+        r"\bECDsaCertificateExtensions\b|\bGetECDsaPublicKey\b|\bGetECDsaPrivateKey\b",
+        re.IGNORECASE,
+    )),
     ("EC", "Elliptic curve usage", re.compile(
         r"hazmat\.primitives\.asymmetric\.ec\b|crypto/elliptic|"
-        r"KeyPairGenerator\.getInstance\(\s*[\"']EC[\"']|openssl\s+ecparam",
+        r"KeyPairGenerator\.getInstance\(\s*[\"']EC[\"']|openssl\s+ecparam|"
+        r"\bEC_KEY_new\w*|\bEC_GROUP_new\w*|\bEVP_PKEY_EC\b|\bEC_POINT_\w+|"
+        r"\bECCurve\.|\bECParameters\b",
         re.IGNORECASE,
     )),
     ("DH", "Diffie-Hellman usage", re.compile(
-        r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|Diffie[- ]?Hellman", re.IGNORECASE,
+        r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|Diffie[- ]?Hellman|"
+        r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
+        r"\bECDiffieHellmanCng\b|\bECDiffieHellman\.Create\b", re.IGNORECASE,
     )),
     ("MD5", "MD5 usage", re.compile(
         r"hashlib\.md5|crypto/md5|MessageDigest\.getInstance\(\s*[\"']MD5[\"']|"
-        r"createHash\(\s*[\"']md5[\"']|openssl\s+dgst\s+-md5",
+        r"createHash\(\s*[\"']md5[\"']|openssl\s+dgst\s+-md5|"
+        r"\bMD5_Init\b|\bMD5_Update\b|\bEVP_md5\b|"
+        r"\bMD5CryptoServiceProvider\b|\bMD5\.Create\b",
         re.IGNORECASE,
     )),
     ("SHA1", "SHA-1 usage", re.compile(
         r"hashlib\.sha1|crypto/sha1|MessageDigest\.getInstance\(\s*[\"']SHA-?1[\"']|"
-        r"createHash\(\s*[\"']sha1[\"']|openssl\s+dgst\s+-sha1",
+        r"createHash\(\s*[\"']sha1[\"']|openssl\s+dgst\s+-sha1|"
+        r"\bSHA1_Init\b|\bSHA1_Update\b|\bEVP_sha1\b|"
+        r"\bSHA1CryptoServiceProvider\b|\bSHA1Managed\b|\bSHA1\.Create\b",
         re.IGNORECASE,
     )),
-    ("RC4", "RC4 usage", re.compile(r"crypto/rc4|\bRC4\b", re.IGNORECASE)),
-    ("DES", "DES/3DES usage", re.compile(r"crypto/des\b|DESede|3DES|TripleDES", re.IGNORECASE)),
+    ("RC4", "RC4 usage", re.compile(
+        r"crypto/rc4|\bRC4\b|\bRC4_set_key\b|\bEVP_rc4\b", re.IGNORECASE,
+    )),
+    ("DES", "DES/3DES usage", re.compile(
+        r"crypto/des\b|DESede|3DES|TripleDES|"
+        r"\bDES_set_key\w*|\bDES_ecb_encrypt\b|\bEVP_des_\w+|"
+        r"\bDESCryptoServiceProvider\b|\bTripleDESCng\b", re.IGNORECASE,
+    )),
     # Blockchain / wallet signing. These map onto the same classical primitives -- a
     # secp256k1 signature is ECDSA, and Shor breaks it like any other elliptic curve.
     ("ECDSA", "secp256k1 (ECDSA) usage", re.compile(
