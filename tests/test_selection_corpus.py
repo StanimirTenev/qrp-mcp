@@ -90,3 +90,37 @@ def test_files_the_scanner_does_not_claim_are_not_counted_as_scanned(tmp_path):
     result = _build(tmp_path)
     assert sum(result["files_scanned"].values()) == 10
     assert result["unreadable_files"] == []
+
+
+# --- the denominator -------------------------------------------------------
+# files_scanned says how much was read. On its own it does not say how much
+# there was, and a coverage figure without a base is the shape of claim this
+# scanner exists to refuse -- so the tree is counted too.
+def test_the_three_outcomes_account_for_every_file_present(tmp_path):
+    _build(tmp_path)
+    (tmp_path / "etc" / "locked.conf").write_text("ssl_ciphers HIGH;\n")
+    (tmp_path / "etc" / "locked.conf").chmod(0o000)
+    result = scan_directory(str(tmp_path))
+
+    counted = sum(result["files_scanned"].values())
+    unread = len(result["unreadable_files"])
+    skipped = sum(result["files_skipped_by_type"].values())
+    assert counted + unread + skipped == result["files_present"]
+    assert result["files_present"] == len(TREE) + 1
+
+
+def test_skipped_types_are_named_not_merely_counted(tmp_path):
+    """So the reader can ask what is in them, rather than assume it is nothing."""
+    skipped = _build(tmp_path)["files_skipped_by_type"]
+    assert skipped == {".md": 1, ".png": 1}
+
+
+def test_excluded_directories_stay_out_of_the_denominator(tmp_path):
+    """Vendored and build trees would drown the figure without saying anything."""
+    _build(tmp_path)
+    vendored = tmp_path / "node_modules" / "pkg"
+    vendored.mkdir(parents=True)
+    for i in range(20):
+        (vendored / f"f{i}.js").write_text("const crypto = require('crypto')\n")
+    result = scan_directory(str(tmp_path))
+    assert result["files_present"] == len(TREE)

@@ -304,12 +304,21 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     files_scanned = {"source": 0, "ci_config": 0, "iac": 0, "config": 0}
 
     unreadable: list[str] = []
+    # The denominator. files_scanned says how much was read; on its own it does not
+    # say how much there was. A file skipped because the tool does not claim its
+    # type is not a failure, but leaving it uncounted turns coverage into a number
+    # with no base -- which is the thing this scanner exists to refuse.
+    files_present = 0
+    skipped_kinds: dict[str, int] = {}
 
     for path in iter_repo_files(repo_path):
+        files_present += 1
         rel_path = path.relative_to(repo_path).as_posix()
         is_ci = is_ci_config_file(path, repo_path)
         if not (is_ci or path.suffix in IAC_EXTENSIONS or path.suffix in SOURCE_EXTENSIONS
                 or path.suffix in {".yaml", ".yml"} or is_config_file(path)):
+            kind = path.suffix.lower() or "(no extension)"
+            skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
             continue
 
         # Read once, here: classification and scanning must see the same content, and a
@@ -348,6 +357,15 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
 
     return {
         "files_scanned": files_scanned,
+        # Files found under the path, excluding the vendored and build directories in
+        # EXCLUDED_DIRS. present = scanned + unreadable + skipped, always.
+        "files_present": files_present,
+        # Not read because this tool does not claim the file type, counted by
+        # extension. Not a gap in the scan -- a boundary of it, stated rather than
+        # left for the reader to assume away.
+        "files_skipped_by_type": dict(
+            sorted(skipped_kinds.items(), key=lambda kv: kv[1], reverse=True)
+        ),
         # Attempted and NOT read. files_scanned counts only files actually read, so
         # "0 findings" can be checked against a denominator instead of trusted.
         "unreadable_files": unreadable,
