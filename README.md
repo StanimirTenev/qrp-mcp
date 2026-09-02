@@ -70,7 +70,7 @@ your PATH, since `uvx` is what fetches and runs the server.
 **Chain and wallet code** — `secp256k1`, `ecrecover`, ethers, web3, bitcoinjs, `ECPair`,
 `btcec`, tweetnacl, `@solana/web3.js`, `solana_program`, `bls12-381`, blst, `@chainsafe/bls`,
 BIP340/Taproot Schnorr. Solidity (`.sol`), Rust (`.rs`), Move and Cairo are scanned alongside
-Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C# and shell.
+Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C# — headers included — PowerShell, Perl and shell.
 
 **Classical crypto anywhere else** — RSA, DSA, DH, ECDSA and elliptic-curve usage, plus MD5,
 SHA-1, RC4 and DES/3DES.
@@ -93,6 +93,12 @@ code-based, hash-based, isogeny-based, multivariate, symmetric-based) and where 
 standardised, selected, candidate, withdrawn, eliminated or broken. SIKE is reported as broken
 and HAWK as withdrawn rather than counted as quantum-resistant — "post-quantum" is a category,
 not an assessment.
+
+**Certificates and keys** — `.pem`, `.der`, `.crt`, `.cer`, `.cert`, `.csr`, `.key`, `.pub`,
+`.p12`, `.pfx`. Algorithms are resolved from the object identifiers inside the DER and from
+PEM labels and OpenSSH key types, and private key material is reported separately. This does
+not parse X.509: it keeps only the identifiers already in the classifier, so a malformed
+certificate yields nothing rather than nonsense.
 
 **Configuration** — `nginx.conf`, `sshd_config`, `openssl.cnf`, `.ini`, `.toml`,
 `.properties`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid group
@@ -143,7 +149,7 @@ A **free inventory tool**, not a readiness assessment. It deliberately does not 
 
 - risk scoring or prioritisation,
 - migration planning,
-- network, host or certificate scanning,
+- network or host scanning, or reading a system certificate store,
 - tracking change over time.
 
 Those live in the [Quantum Readiness Platform](https://quantumreadiness.eu), the product this
