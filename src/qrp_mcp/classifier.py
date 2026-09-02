@@ -26,6 +26,10 @@ CONTRACT_VERSION = "cfp-v1"
 #   unknown               -> could not be classified.
 
 Classification = Literal[
+    # Not an algorithm: a mechanism that confers quantum resistance without one.
+    # RFC 8784 is the case, and it is kept distinct from pqc_ready so that a
+    # preshared key is never counted as if it were ML-KEM.
+    "quantum_resistant_mechanism",
     "classical_vulnerable",
     "pqc_ready",
     "symmetric_reduced",
@@ -41,6 +45,12 @@ Usage = Literal["signature", "public_key", "key_exchange", "cipher", "explicit"]
 # longer one that was already here.
 # fields: token, family, classification, kind
 _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
+    # A mechanism rather than an algorithm. RFC 8784 mixes a preshared key into
+    # IKEv2 key derivation, so the session resists a quantum adversary without any
+    # post-quantum algorithm being present. A scanner that only reads algorithm
+    # names cannot see this by construction -- which is why a deployment that had
+    # done the work read as "classical_only" here until it was pointed out.
+    ("PPK", "PPK (RFC 8784)", "quantum_resistant_mechanism", "key_exchange"),
     # Post-quantum
     ("MLKEM", "ML-KEM", "pqc_ready", "key_exchange"),
     ("KYBER", "ML-KEM", "pqc_ready", "key_exchange"),
@@ -426,6 +436,30 @@ def classify_algorithm(
     if family_entry is not None:
         _token, family, classification, _kind = family_entry
 
+        if classification == "quantum_resistant_mechanism":
+            return Finding(
+                source=source,
+                location=location,
+                raw_value=raw_value,
+                algorithm_family=family,
+                also_present=also_present,
+                pqc_family="preshared secret",
+                pqc_status="standardised",
+                classification="quantum_resistant_mechanism",
+                quantum_vulnerable=False,
+                weak_key=False,
+                severity="info",
+                reason=(
+                    "RFC 8784 mixes a postquantum preshared key into IKEv2 key "
+                    "derivation, so the session resists a quantum adversary with no "
+                    "post-quantum algorithm present. This is not an algorithm and is "
+                    "not counted as one. Whether it actually holds depends on the "
+                    "entropy of the preshared key and on it being distributed out of "
+                    "band -- neither of which is visible from a file."
+                    f"{alongside}"
+                ),
+            )
+
         if classification == "pqc_ready":
             pqc_family, pqc_status = _PQC_SCHEMES[family]
 
@@ -710,8 +744,17 @@ def summarize(findings: list[Finding]) -> FingerprintSummary:
             highest = finding.severity
 
     crypto_findings = [f for f in findings if f.classification != "unknown"]
+    # A quantum-resistant mechanism carries no algorithm, so counting only
+    # algorithms reports a protected deployment as unprotected. RFC 8784 is the
+    # case: classical key exchange plus a preshared key, which is quantum-resistant
+    # and would otherwise read here as "classical_only" -- the strongest possible
+    # way of saying "you have not started" about someone who had finished.
+    mechanisms = sum(1 for f in findings
+                     if f.classification == "quantum_resistant_mechanism")
     if vulnerable and pqc:
         readiness = "hybrid_partial"
+    elif mechanisms:
+        readiness = "mechanism_protected"
     elif vulnerable:
         readiness = "classical_only"
     elif pqc:
