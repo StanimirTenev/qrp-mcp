@@ -18,6 +18,16 @@ TREE = {
     # source
     "app/wallet.py": 'from ecdsa import SigningKey, SECP256k1\n',
     "app/contract.sol": 'function verify() { ecrecover(h, v, r, s); }\n',
+    # C and C++ headers: found by scanning real trees. Reading .c but not .h
+    # under-reads a C codebase by roughly half its files.
+    "src/crypto.h": 'RSA *RSA_new(void);\n',
+    "src/key.hpp": '#include <openssl/ecdsa.h>\n',
+    # PowerShell: our own Windows agent reads RSA and ECDSA public keys out of
+    # X.509 certificates in a .ps1, and this scanner would not open the file.
+    "agent/collect.ps1": (
+        '[System.Security.Cryptography.X509Certificates.RSACertificateExtensions]'
+        '::GetRSAPublicKey($c)\n'
+    ),
     # configuration -- where cryptographic choices are made rather than written
     "etc/nginx.conf": 'ssl_ecdh_curve X25519MLKEM768;\n',
     "etc/sshd_config": 'KexAlgorithms mlkem768x25519-sha256,curve25519-sha256\n',
@@ -49,7 +59,7 @@ def _build(tmp_path):
 
 def test_every_file_class_lands_in_its_bucket(tmp_path):
     counted = _build(tmp_path)["files_scanned"]
-    assert counted == {"source": 2, "ci_config": 1, "iac": 2, "config": 5}
+    assert counted == {"source": 5, "ci_config": 1, "iac": 2, "config": 5}
 
 
 def test_configuration_files_are_read_at_all(tmp_path):
@@ -88,7 +98,7 @@ def test_nothing_opened_disappears(tmp_path):
 def test_files_the_scanner_does_not_claim_are_not_counted_as_scanned(tmp_path):
     """Coverage must not be inflated by files nobody promised to read."""
     result = _build(tmp_path)
-    assert sum(result["files_scanned"].values()) == 10
+    assert sum(result["files_scanned"].values()) == 13
     assert result["unreadable_files"] == []
 
 
@@ -124,3 +134,28 @@ def test_excluded_directories_stay_out_of_the_denominator(tmp_path):
         (vendored / f"f{i}.js").write_text("const crypto = require('crypto')\n")
     result = scan_directory(str(tmp_path))
     assert result["files_present"] == len(TREE)
+
+
+def test_c_headers_are_source_not_skipped(tmp_path):
+    """Reading .c but not .h reports part of a C tree as if it were all of it."""
+    result = _build(tmp_path)
+    assert ".h" not in result["files_skipped_by_type"]
+    assert ".hpp" not in result["files_skipped_by_type"]
+
+
+def test_powershell_is_source_not_skipped(tmp_path):
+    """.sh was already claimed, so omitting .ps1 was an oversight, not a boundary."""
+    result = _build(tmp_path)
+    assert ".ps1" not in result["files_skipped_by_type"]
+
+
+def test_generated_caches_stay_out_of_the_denominator(tmp_path):
+    """A cache is generated, like node_modules. Counting it pads the one number
+    this scanner exists to state honestly."""
+    before = _build(tmp_path)["files_present"]
+    for rel in (".pytest_cache/v/cache/nodeids", ".mypy_cache/x.json",
+                ".ruff_cache/content"):
+        target = tmp_path / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("generated\n", encoding="utf-8")
+    assert scan_directory(str(tmp_path))["files_present"] == before

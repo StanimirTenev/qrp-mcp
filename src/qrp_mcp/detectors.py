@@ -8,12 +8,24 @@ from typing import Any
 
 SOURCE_EXTENSIONS = {
     ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
+    # C and C++ headers. Declarations live here, and in a C codebase they are
+    # roughly half the tree -- reading .c but not .h reports a fraction of the
+    # file count as if it were the whole language.
+    ".h", ".hpp", ".hh", ".cc", ".cxx",
+    # PowerShell and Perl. .sh was already here, so leaving these out was an
+    # oversight rather than a scope decision: a Windows estate keeps its
+    # certificate handling in .ps1, and OpenSSL's build is Perl.
+    ".ps1", ".psm1", ".pl", ".pm",
     # Smart contracts and chain tooling
     ".sol", ".rs", ".move", ".cairo",
 }
 
 EXCLUDED_DIRS = {
     ".git", "node_modules", "venv", ".venv", "__pycache__", "vendor", "dist", "build", ".tox", "target",
+    # Test caches are generated, like the rest of this set. Counting them pads the
+    # denominator with files no reader cares about, which weakens the one number
+    # this scanner exists to state honestly.
+    ".pytest_cache", ".mypy_cache", ".ruff_cache",
 }
 
 CI_CONFIG_FILENAMES = {".gitlab-ci.yml", "Jenkinsfile", "azure-pipelines.yml"}
