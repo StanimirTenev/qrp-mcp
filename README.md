@@ -100,9 +100,18 @@ PEM labels and OpenSSH key types, and private key material is reported separatel
 not parse X.509: it keeps only the identifiers already in the classifier, so a malformed
 certificate yields nothing rather than nonsense.
 
-**Configuration** — `nginx.conf`, `sshd_config`, `openssl.cnf`, `.ini`, `.toml`,
-`.properties`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid group
-is chosen: `X25519MLKEM768` and `mlkem768x25519-sha256` are almost never strings in code.
+**Configuration** — `nginx.conf`, `sshd_config`, `openssl.cnf`, `swanctl.conf`, `.ini`,
+`.toml`, `.properties`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid
+group is chosen: `X25519MLKEM768` and `mlkem768x25519-sha256` are almost never strings in code.
+IKE proposal syntax is read here too — `ecp384` is NIST P-384, `modp2048` is group 14.
+
+**Quantum-resistant mechanisms, not only algorithms** — RFC 8784 mixes a postquantum preshared
+key into IKEv2 key derivation, so a tunnel resists a quantum adversary with no post-quantum
+algorithm present. A scanner matching algorithm names cannot see that by construction, and
+would report a protected deployment as `classical_only`. PPK is matched by the directives that
+switch it on and classified as `quantum_resistant_mechanism` — deliberately not `pqc_ready`,
+because a preshared key is not ML-KEM. Whether it holds depends on the entropy of the key and
+on out-of-band distribution, neither of which is visible in a file, and the finding says so.
 
 **CI/CD pipelines** — signing commands such as `gpg --sign`, `cosign sign`, `signtool`,
 `jarsigner`, `codesign`.
