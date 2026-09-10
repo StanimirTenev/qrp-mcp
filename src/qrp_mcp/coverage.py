@@ -250,6 +250,14 @@ def build(
                 "by_directory": excluded,
             },
             "files_present": present,
+            # Beside the size, so a reader can tell whether a figure describes the
+            # instrument or describes what the corpus is made of. The commit makes
+            # the number reproducible; this makes it interpretable. Named by
+            # Nguyen Xuan Dong, 10.09.2026.
+            "files_present_by_extension": dict(
+                sorted(scan_result["files_present_by_extension"].items(),
+                       key=lambda kv: (-kv[1], kv[0]))
+            ),
             "files_examined": examined,
             "files_not_examined": present - examined,
             "coverage_pct": round(100 * examined / present, 2) if present else None,

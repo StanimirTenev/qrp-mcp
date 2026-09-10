@@ -486,10 +486,18 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     # with no base -- which is the thing this scanner exists to refuse.
     files_present = 0
     skipped_kinds: dict[str, int] = {}
+    present_kinds: dict[str, int] = {}
     excluded_dir_counts: dict[str, int] = {}
 
     for path in iter_repo_files(repo_path, excluded_dir_counts):
         files_present += 1
+        # The composition of the denominator, not just its size. A coverage figure
+        # is a property of the tool crossed with what the corpus is made of: the
+        # same scanner over a tree of Go and over a tree of Ruby reports different
+        # numbers with nothing in the scanner changing. Size makes a figure
+        # reproducible; composition is what makes it interpretable.
+        kind = path.suffix.lower() or "(no extension)"
+        present_kinds[kind] = present_kinds.get(kind, 0) + 1
         rel_path = path.relative_to(repo_path).as_posix()
         is_ci = is_ci_config_file(path, repo_path)
         if not (is_ci or path.suffix in IAC_EXTENSIONS or path.suffix in SOURCE_EXTENSIONS
@@ -546,6 +554,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # Files found under the path, excluding the vendored and build directories in
         # EXCLUDED_DIRS. present = scanned + unreadable + skipped, always.
         "files_present": files_present,
+        "files_present_by_extension": present_kinds,
         # Not read because this tool does not claim the file type, counted by
         # extension. Not a gap in the scan -- a boundary of it, stated rather than
         # left for the reader to assume away.

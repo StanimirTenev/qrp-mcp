@@ -241,3 +241,24 @@ def test_a_missing_control_says_which_absence(scan):
     from qrp_mcp.coverage import CONTROL_ABSENT
     assert set(CONTROL_ABSENT) == {"none_held", "not_run", "stale"}
     assert all(v for v in CONTROL_ABSENT.values())
+
+
+def test_the_denominator_carries_its_composition_not_only_its_size(scan):
+    """Size makes a figure reproducible; composition makes it interpretable.
+
+    The same scanner over a tree of Go and over a tree of Ruby reports different
+    coverage with nothing in the scanner changing, so a reader holding only the
+    total cannot tell which of the two a figure describes.
+    """
+    scope = scan["coverage"]["scope"]
+    composition = scope["files_present_by_extension"]
+    assert composition, "no composition emitted"
+    assert sum(composition.values()) == scope["files_present"]
+    counts = list(composition.values())
+    assert counts == sorted(counts, reverse=True), "not ordered by size"
+
+
+def test_the_composition_travels_in_the_cbom(document, scan):
+    props = {p["name"]: p["value"] for p in document["properties"]}
+    for ext, n in scan["coverage"]["scope"]["files_present_by_extension"].items():
+        assert props[f"qrp:coverage:scope:files_present_by_extension:{ext}"] == str(n)
