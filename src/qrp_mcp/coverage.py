@@ -71,6 +71,35 @@ def _git_pin(repo_path: Path) -> dict[str, Any] | None:
     }
 
 
+def _tool_pin() -> dict[str, Any] | None:
+    """The commit of the tool itself, when it is running from a checkout.
+
+    A version string does not identify the instrument. This package reported
+    0.6.0 across two runs whose emitter differed by a commit, because the code
+    changed without the version changing -- so two documents can name the same
+    version and not be comparable, which is the exact failure the block exists
+    to make visible. Where the tool is running from a checkout, say which one.
+    None where it is not: an installed wheel has no commit, and inventing one
+    is worse than an honest absence.
+    """
+    root = Path(__file__).resolve().parent
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    commit = out.stdout.strip()
+    dirty = subprocess.run(
+        ["git", "-C", str(root), "status", "--porcelain"],
+        capture_output=True, text=True, timeout=10, check=False,
+    )
+    return {"commit": commit, "dirty": bool(dirty.stdout.strip())}
+
+
 def build(
     *,
     repo_path: Path,
@@ -111,6 +140,9 @@ def build(
         "instrument": {
             "tool": "qrp-mcp",
             "version": tool_version,
+            # The version alone does not pin the emitter; the code can change
+            # without it. Null when running from an installed wheel.
+            "source_commit": _tool_pin(),
             "ruleset": ruleset,
             "claimed_types": claimed_types,
             # Declared because it filters the denominator before anything is counted.
