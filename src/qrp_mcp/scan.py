@@ -8,15 +8,25 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import coverage, detectors
+from . import __version__, coverage, detectors
 from .classifier import FingerprintRequest, fingerprint
 
 
 def _version() -> str:
+    """The version that did the reading.
+
+    The package's own `__version__` is the answer, not the installed
+    distribution's: a run from a source checkout is still a run by a known
+    version, and reporting "unknown" there put a placeholder into an artefact
+    whose whole purpose is to say what produced it. Installed metadata is
+    consulted only to catch the two disagreeing.
+    """
+    declared = __version__
     try:
-        return _pkg_version("qrp-mcp")
+        installed = _pkg_version("qrp-mcp")
     except PackageNotFoundError:
-        return "unknown"
+        return declared
+    return declared if installed == declared else f"{declared} (installed: {installed})"
 
 
 def _now() -> str:

@@ -270,11 +270,23 @@ IAC_ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
 EMBEDDED_KEY_PATTERN = re.compile(r"-----BEGIN\s+(?:RSA|EC|DSA|OPENSSH|ENCRYPTED)?\s*PRIVATE KEY-----")
 
 
-def iter_repo_files(repo_path: Path):
+def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = None):
+    """Every file under the path, minus the vendored and generated directories.
+
+    The exclusion is counted rather than silent. A directory name dropped here
+    never reaches the denominator, so a filter that shapes the number and does
+    not declare itself is the same defect this scanner exists to refuse -- and
+    git will not tell you it happened, because build output is usually ignored
+    and an ignored file leaves the tree reporting clean.
+    """
     for path in sorted(repo_path.rglob("*")):
         if not path.is_file():
             continue
-        if any(part in EXCLUDED_DIRS for part in path.relative_to(repo_path).parts):
+        hit = next((part for part in path.relative_to(repo_path).parts
+                    if part in EXCLUDED_DIRS), None)
+        if hit is not None:
+            if excluded_counter is not None:
+                excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
             continue
         yield path
 
@@ -431,8 +443,9 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     # with no base -- which is the thing this scanner exists to refuse.
     files_present = 0
     skipped_kinds: dict[str, int] = {}
+    excluded_dir_counts: dict[str, int] = {}
 
-    for path in iter_repo_files(repo_path):
+    for path in iter_repo_files(repo_path, excluded_dir_counts):
         files_present += 1
         rel_path = path.relative_to(repo_path).as_posix()
         is_ci = is_ci_config_file(path, repo_path)
@@ -499,6 +512,12 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # Attempted and NOT read. files_scanned counts only files actually read, so
         # "0 findings" can be checked against a denominator instead of trusted.
         "unreadable_files": unreadable,
+        # Files removed by EXCLUDED_DIRS before files_present counted anything,
+        # by the directory name that removed them. Counted so the denominator
+        # can state what it left out instead of leaving it in the source.
+        "files_excluded_by_dir": dict(
+            sorted(excluded_dir_counts.items(), key=lambda kv: kv[1], reverse=True)
+        ),
         "source_code_findings": source_findings,
         "ci_pipeline_findings": ci_findings,
         "iac_findings": iac_findings,

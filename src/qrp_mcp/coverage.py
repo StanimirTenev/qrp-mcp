@@ -105,6 +105,8 @@ def build(
     ]
     accounted = examined + sum(r["count"] for r in not_examined)
 
+    excluded = scan_result.get("files_excluded_by_dir", {})
+
     return {
         "instrument": {
             "tool": "qrp-mcp",
@@ -126,6 +128,19 @@ def build(
             "seconds": round(seconds, 2),
         },
         "scope": {
+            # Removed by the directory exclusions before files_present counted
+            # anything. Declared with its size because git will not report it:
+            # build output is usually ignored, and an ignored file leaves the
+            # tree reporting clean, so the same tool at the same commit counts
+            # a different denominator in a working checkout than in a fresh
+            # clone with nothing said about it. Kept beside files_present rather
+            # than folded into it -- .git is in here too, and git metadata is
+            # not part of the estate, so neither total is the denominator on
+            # its own and the reader is given both.
+            "files_excluded_before_counting": {
+                "total": sum(excluded.values()),
+                "by_directory": excluded,
+            },
             "files_present": present,
             "files_examined": examined,
             "files_not_examined": present - examined,
