@@ -6,7 +6,13 @@ JSON from one run beside a CSV from another is the defect the page is about --
 it happened once already and was caught by the agent building the page rather
 than by us.
 
-Usage:  scripts/evidence_run.py /tmp/skan  out/
+The corpus lives at ~/qrp-evidence/corpus and not in /tmp, deliberately. The five
+clones are shallow at depth one, so each holds exactly the commit the published
+page cites and nothing else. A fresh shallow clone gets the current head instead,
+and recovering these commits would need a full clone of each repository. The
+artefact behind a cited claim cannot sit in a directory that a reboot empties.
+
+Usage:  scripts/evidence_run.py [corpus-root] [out-dir]
 """
 
 from __future__ import annotations
@@ -63,7 +69,7 @@ def row(name: str, block: dict) -> dict:
 
 
 def main() -> int:
-    root = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/skan")
+    root = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "qrp-evidence" / "corpus")
     out = Path(sys.argv[2] if len(sys.argv) > 2 else ".")
     out.mkdir(parents=True, exist_ok=True)
     stamp = date.today().isoformat().replace("-", "_")
