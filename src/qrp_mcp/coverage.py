@@ -211,3 +211,117 @@ def build(
         # rather than in a test, so a reader can check it without trusting us.
         "accounts_for_every_file": accounted == present,
     }
+
+
+# Why two runs are not comparable. A closed set, for the reason the other two in
+# this module are closed: "not comparable" on its own is `unknown` rebuilt at the
+# comparison layer, and a reader who cannot see which condition moved cannot tell
+# whether to re-run, re-clone or ignore the difference.
+INCOMPARABLE = {
+    "different_target": "the two runs read different directories",
+    "instrument_version_differs": "a different version of the tool did the reading",
+    "instrument_commit_differs": "the same version, built from different code; the "
+                                 "version does not pin the emitter",
+    "ruleset_differs": "the pattern counts differ, so a change in the number can come "
+                       "from the instrument rather than from the estate",
+    "claimed_types_differ": "the tool claimed different file types, which moves the "
+                            "denominator without the estate moving",
+    "excluded_dirs_differ": "different directories were filtered out before counting",
+    "corpus_commit_differs": "the corpus moved between the runs",
+    "corpus_dirty": "at least one run read a working tree with uncommitted changes, "
+                    "so what was read is not recoverable from the commit",
+    "corpus_depth_differs": "one run read a shallow clone and the other a full "
+                            "checkout; the same commit carries a different file count",
+}
+
+# Why comparability itself could not be established. Separate from INCOMPARABLE
+# because the repairs differ: an incomparable pair is a fact about two runs, an
+# unestablished one is a gap in what the documents carry.
+UNESTABLISHED = {
+    "instrument_unpinned": "at least one run does not name the commit of its own "
+                           "emitter, so two identical version strings cannot be "
+                           "shown to be the same code",
+    "corpus_unpinned": "at least one run read an unpinned directory, so no commit "
+                       "identifies what was read",
+}
+
+
+def _pin_of(block: dict[str, Any], *keys: str) -> dict[str, Any]:
+    node: Any = block
+    for key in keys:
+        node = (node or {}).get(key)
+    return node or {}
+
+
+def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
+    """Whether two coverage blocks describe runs whose numbers can be compared.
+
+    Three verdicts rather than a boolean, and the third is the point. `comparable`
+    and `not_comparable` are both answers; `unestablished` says the documents do
+    not carry enough to decide, which is a different situation with a different
+    repair and is the state a bare true/false silently absorbs.
+    """
+    unestablished: list[str] = []
+    reasons: list[str] = []
+
+    tool_a, tool_b = _pin_of(first, "instrument", "source_commit"), _pin_of(second, "instrument", "source_commit")
+    corpus_a, corpus_b = _pin_of(first, "corpus", "pinned_at"), _pin_of(second, "corpus", "pinned_at")
+
+    if not (tool_a.get("pinned") and tool_b.get("pinned")):
+        unestablished.append("instrument_unpinned")
+    elif tool_a["commit"] != tool_b["commit"]:
+        reasons.append("instrument_commit_differs")
+
+    if not (corpus_a.get("pinned") and corpus_b.get("pinned")):
+        unestablished.append("corpus_unpinned")
+    else:
+        if corpus_a["commit"] != corpus_b["commit"]:
+            reasons.append("corpus_commit_differs")
+        if corpus_a.get("dirty") or corpus_b.get("dirty"):
+            reasons.append("corpus_dirty")
+        if corpus_a.get("shallow") != corpus_b.get("shallow"):
+            reasons.append("corpus_depth_differs")
+
+    if first["corpus"]["target"] != second["corpus"]["target"]:
+        reasons.append("different_target")
+    if first["instrument"]["version"] != second["instrument"]["version"]:
+        reasons.append("instrument_version_differs")
+    if first["instrument"]["ruleset"] != second["instrument"]["ruleset"]:
+        reasons.append("ruleset_differs")
+    if first["instrument"]["claimed_types"] != second["instrument"]["claimed_types"]:
+        reasons.append("claimed_types_differ")
+    if first["instrument"]["excluded_dirs"] != second["instrument"]["excluded_dirs"]:
+        reasons.append("excluded_dirs_differ")
+
+    if reasons:
+        verdict = "not_comparable"
+    elif unestablished:
+        verdict = "unestablished"
+    else:
+        verdict = "comparable"
+
+    return {
+        "verdict": verdict,
+        "differences": [{"reason": r, "meaning": INCOMPARABLE[r]} for r in reasons],
+        "unestablished": [{"reason": r, "meaning": UNESTABLISHED[r]} for r in unestablished],
+        "coverage_pct": [first["scope"]["coverage_pct"], second["scope"]["coverage_pct"]],
+    }
+
+
+def verdict_line(block: dict[str, Any]) -> str:
+    """One sentence for the person who signs the report rather than runs the tool.
+
+    Derived from the block's own identity flag rather than recomputed from the
+    counts. Recomputing would let this sentence and the block disagree, which is
+    the version-versus-commit failure in miniature.
+    """
+    scope = block["scope"]
+    if not block["accounts_for_every_file"]:
+        return (f"This scan cannot account for every file: {scope['files_present']} were "
+                f"present and the reasons given do not add up to them.")
+    if scope["files_not_examined"] == 0:
+        return (f"This scan read every one of the {scope['files_present']} files it was "
+                f"given.")
+    return (f"This scan read {scope['files_examined']} of {scope['files_present']} files "
+            f"({scope['coverage_pct']}%); the remaining {scope['files_not_examined']} are "
+            f"listed with a reason each.")

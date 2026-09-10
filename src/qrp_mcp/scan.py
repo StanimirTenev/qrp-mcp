@@ -56,32 +56,37 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
     )
     response = fingerprint(request)
 
+    coverage_block = coverage.build(
+        repo_path=repo_path,
+        scan_result=scan_result,
+        started_at=started_at,
+        finished_at=finished_at,
+        seconds=seconds,
+        tool_version=_version(),
+        ruleset={
+            "algorithm_patterns": len(detectors.ALGORITHM_PATTERNS),
+            "iac_algorithm_patterns": len(detectors.IAC_ALGORITHM_PATTERNS),
+            "signing_command_patterns": len(detectors.SIGNING_COMMAND_PATTERNS),
+        },
+        claimed_types={
+            "source": sorted(detectors.SOURCE_EXTENSIONS),
+            "iac": sorted(detectors.IAC_EXTENSIONS),
+            "config": sorted(detectors.CONFIG_EXTENSIONS),
+            "config_filenames": sorted(detectors.CONFIG_FILENAMES),
+            "ci_filenames": sorted(detectors.CI_CONFIG_FILENAMES),
+        },
+        excluded_dirs=list(detectors.EXCLUDED_DIRS),
+    )
+
     return {
         "target": str(repo_path),
+        # One sentence for whoever signs the report rather than runs the tool.
+        # The block below is the evidence for it.
+        "verdict": coverage.verdict_line(coverage_block),
         # What was in scope, what was read, what was not and why, and what did the
         # reading. Emitted on every scan: a coverage figure without its conditions
         # is not comparable to another coverage figure.
-        "coverage": coverage.build(
-            repo_path=repo_path,
-            scan_result=scan_result,
-            started_at=started_at,
-            finished_at=finished_at,
-            seconds=seconds,
-            tool_version=_version(),
-            ruleset={
-                "algorithm_patterns": len(detectors.ALGORITHM_PATTERNS),
-                "iac_algorithm_patterns": len(detectors.IAC_ALGORITHM_PATTERNS),
-                "signing_command_patterns": len(detectors.SIGNING_COMMAND_PATTERNS),
-            },
-            claimed_types={
-                "source": sorted(detectors.SOURCE_EXTENSIONS),
-                "iac": sorted(detectors.IAC_EXTENSIONS),
-                "config": sorted(detectors.CONFIG_EXTENSIONS),
-                "config_filenames": sorted(detectors.CONFIG_FILENAMES),
-                "ci_filenames": sorted(detectors.CI_CONFIG_FILENAMES),
-            },
-            excluded_dirs=list(detectors.EXCLUDED_DIRS),
-        ),
+        "coverage": coverage_block,
         "files_scanned": scan_result["files_scanned"],
         "files_present": scan_result["files_present"],
         "files_skipped_by_type": scan_result["files_skipped_by_type"],

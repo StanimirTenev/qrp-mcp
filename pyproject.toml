@@ -34,4 +34,7 @@ qrp-mcp = "qrp_mcp.server:main"
 packages = ["src/qrp_mcp"]
 
 [dependency-groups]
-dev = ["pytest>=8.0", "fastapi>=0.110"]
+# jsonschema is a test dependency only. The emitted CBOM is validated against the
+# vendored CycloneDX schema in tests; the scanner itself hand-builds the document so
+# `uvx qrp-mcp` stays a small offline install.
+dev = ["pytest>=8.0", "fastapi>=0.110", "jsonschema>=4.20"]
