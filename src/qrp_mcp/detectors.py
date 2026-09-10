@@ -48,6 +48,14 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
         r"Crypto\.PublicKey\.RSA|Crypto\.PublicKey\s+import\s+RSA|"
         r"hazmat\.primitives\.asymmetric\.rsa|crypto/rsa|"
+        # The same library imported the way Python actually writes it. The dotted
+        # form above only reaches `asymmetric.rsa`; the common import is
+        # `from ... asymmetric import rsa`, with the module name after a space
+        # and often in a comma list. Measured on certbot: 5 lines used the
+        # import form and 6 called the module, and every one of them was
+        # invisible to this rule.
+        r"asymmetric\s+import\s+[^\n#]*\brsa\b|"
+        r"\brsa\.generate_private_key\b|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']RSA[\"']|openssl\s+genrsa|-newkey\s+rsa|"
         # C / OpenSSL: the library's own API, which is what a C tree actually contains.
         r"\bRSA_new\b|\bRSA_generate_key\w*|\bRSA_public_encrypt\b|\bRSA_private_decrypt\b|"
@@ -61,6 +69,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("DSA", "DSA usage", re.compile(
         r"Crypto\.PublicKey\s+import\s+DSA|"
         r"hazmat\.primitives\.asymmetric\.dsa|crypto/dsa|"
+        r"asymmetric\s+import\s+[^\n#]*\bdsa\b|\bdsa\.generate_private_key\b|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
         r"\bDSA_new\b|\bDSA_generate_key\w*|\bEVP_PKEY_DSA\b|"
         r"\bDSACryptoServiceProvider\b|\bDSACng\b",
@@ -78,6 +87,14 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
     ("EC", "Elliptic curve usage", re.compile(
         r"hazmat\.primitives\.asymmetric\.ec\b|crypto/elliptic|"
+        # The same library imported the way Python actually writes it. The dotted
+        # form above only reaches `asymmetric.ec`; the common import is
+        # `from ... asymmetric import ec`, with the module name after a space
+        # and often in a comma list. Measured on certbot: 10 lines used the
+        # import form and 16 called the module, and every one of them was
+        # invisible to this rule.
+        r"asymmetric\s+import\s+[^\n#]*\bec\b|"
+        r"\bec\.(?:generate_private_key|derive_private_key|SECP\w+|SECT\w+)\b|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']EC[\"']|openssl\s+ecparam|"
         r"\bEC_KEY_new\w*|\bEC_GROUP_new\w*|\bEVP_PKEY_EC\b|\bEC_POINT_\w+|"
         r"\bECCurve\.|\bECParameters\b|"
@@ -88,6 +105,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
     ("DH", "Diffie-Hellman usage", re.compile(
         r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|Diffie[- ]?Hellman|"
+        r"asymmetric\s+import\s+[^\n#]*\bdh\b|\bdh\.generate_parameters\b|"
         r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
         r"\bECDiffieHellmanCng\b|\bECDiffieHellman\.Create\b|"
         # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
@@ -150,6 +168,31 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("X448", "X448 key agreement usage", re.compile(r"(?<![A-Za-z])X448(?![0-9])")),
     ("X448", "X448 key agreement usage", re.compile(
         r"(?<=[._/-])x448(?![0-9])|(?<![A-Za-z])x448(?=[._])",
+    )),
+    # Three families the classifier table has always been able to explain and no
+    # rule could ever find: a scanner that answers "yes, I know Ed448" and then
+    # reports nothing in a tree carrying 315 mentions of it is hiding
+    # cryptography, which is the same defect as inventing it. Counts measured
+    # across OpenSSL, OpenSSH and certbot: ECDH 679, Ed448 315, EdDSA 65, and 23
+    # ecdh-sha2-nistp lines in SSH configuration where no library call appears.
+    ("ECDH", "ECDH key agreement usage", re.compile(
+        # ECDHE, the ephemeral form, is the one that actually appears in a cipher
+        # list: 1329 mentions across the three repositories against 679 bare ECDH.
+        # Excluding it would have left the most common spelling of the thing
+        # invisible while claiming the family was covered.
+        r"(?<![A-Za-z])ECDHE?(?![A-Za-z])|\bECDH_compute_key\b|\bEVP_PKEY_ECDH\b|"
+        r"\bec\.ECDH\b|(?<![A-Za-z])ecdh-sha2-nistp(?:256|384|521)",
+        re.IGNORECASE,
+    )),
+    ("Ed448", "Ed448 usage", re.compile(
+        r"(?<![A-Za-z])Ed448(?![0-9])|asymmetric\s+import\s+[^\n#]*\bed448\b|"
+        r"\bNID_ED448\b|\bEVP_PKEY_ED448\b",
+        re.IGNORECASE,
+    )),
+    ("EdDSA", "EdDSA usage", re.compile(
+        r"(?<![A-Za-z])EdDSA(?![A-Za-z])|"
+        r"KeyPairGenerator\.getInstance\(\s*[\"']EdDSA[\"']",
+        re.IGNORECASE,
     )),
     ("Ed25519", "Ed25519 usage", re.compile(
         r"\bed25519\b|tweetnacl|\bnacl\.sign\b|@solana/web3\.js|solana_program::|"

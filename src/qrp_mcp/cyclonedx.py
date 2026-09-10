@@ -18,7 +18,13 @@ Three things travel that a bare component list cannot say:
 
   compositions   how complete the component list is, in the schema's own vocabulary.
                  `complete` only when every file present was examined. Anything else
-                 is `incomplete`, which is a word the format has had since 1.3.
+                 is `incomplete`, which is a word the format has had since 1.3 and
+                 which the reference emitter never writes: checked on the
+                 sonar-cryptography tree, no code path constructs a Composition and
+                 the sample CBOM in its own README carries none. So the vocabulary
+                 for saying "this list is not everything" already exists and goes
+                 unused, which is a count anyone can repeat rather than an opinion
+                 about a gap.
   properties     the whole coverage block, flattened. Instrument, corpus, window,
                  scope, and every file not examined with its reason.
   evidence       where each asset was found: file, line and matched text, matching

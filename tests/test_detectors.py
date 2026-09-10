@@ -152,3 +152,64 @@ def test_a_file_that_cannot_be_read_is_reported_not_counted_as_clean(tmp_path: P
 
     assert after["unreadable_files"] == ["secrets_helper.py"]
     assert after["files_scanned"]["source"] == 1, "an unopened file must not count as scanned"
+
+
+def test_the_common_python_import_form_is_detected(tmp_path: Path):
+    """`from ... asymmetric import rsa` is how Python actually writes it.
+
+    The rules only reached the dotted `asymmetric.rsa`, so RSA, EC and DH were
+    invisible in the library that is the most common way to use them: measured on
+    certbot, five import lines and six calls, none of them reported. A rule that
+    hides cryptography is the same defect as a rule that invents it.
+    """
+    source = tmp_path / "keys.py"
+    source.write_text(
+        "from cryptography.hazmat.primitives.asymmetric import dsa, rsa, ec, ed448\n"
+        "from cryptography.hazmat.primitives.asymmetric import dh\n"
+        "key = rsa.generate_private_key(public_exponent=65537, key_size=2048)\n"
+        "curve = ec.generate_private_key(ec.SECP384R1())\n",
+        encoding="utf-8",
+    )
+    found = set(scan_repo(tmp_path)["detected_algorithms"])
+    assert {"RSA", "EC", "DH", "DSA", "Ed448"} <= found
+
+
+def test_a_module_that_is_not_an_algorithm_is_not_reported(tmp_path: Path):
+    """The import rule must not turn every name after `import` into a finding."""
+    source = tmp_path / "typing_only.py"
+    source.write_text(
+        "from cryptography.hazmat.primitives.asymmetric import types\n",
+        encoding="utf-8",
+    )
+    assert scan_repo(tmp_path)["detected_algorithms"] == []
+
+
+def test_every_family_the_classifier_explains_has_a_rule_that_can_find_it():
+    """The table and the rules must not disagree about what this tool covers.
+
+    `list_algorithms` answering "yes, I know Ed448" while no rule could ever
+    report it is a coverage claim the scan cannot honour -- the declared boundary
+    and the real one have to be the same boundary.
+    """
+    from qrp_mcp.classifier import known_algorithms
+    from qrp_mcp.detectors import ALGORITHM_PATTERNS
+
+    detectable = {name for name, _, _ in ALGORITHM_PATTERNS}
+    # The PPK rule reports the short name; the table carries the RFC alongside it
+    # and the classifier resolves one to the other.
+    detectable.add("PPK (RFC 8784)")
+    missing = {a["family"] for a in known_algorithms()} - detectable
+    assert not missing, f"claimed in the table, unfindable by any rule: {sorted(missing)}"
+
+
+def test_ecdh_is_found_in_a_cipher_list_and_in_ssh_configuration(tmp_path: Path):
+    """ECDHE in a cipher suite is the most common spelling of the family.
+
+    Across OpenSSL, OpenSSH and certbot: 1329 mentions of ECDHE against 679 of
+    bare ECDH, and 23 `ecdh-sha2-nistp` lines that carry no library call at all.
+    """
+    (tmp_path / "nginx.conf").write_text(
+        "ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256;\n", encoding="utf-8")
+    (tmp_path / "sshd_config").write_text(
+        "KexAlgorithms ecdh-sha2-nistp256\n", encoding="utf-8")
+    assert "ECDH" in scan_repo(tmp_path)["detected_algorithms"]
