@@ -35,30 +35,54 @@ REASONS = {
     "unreadable": "opened and could not be read; attempted and failed",
 }
 
+# The same discipline one level up, applied to the pins rather than the files.
+# A pin that is simply absent is the defect this block exists to prevent, arriving
+# in the field added to prevent it: `null` was standing for four different states
+# with four different repairs. Adding a fourth means adding it here first.
+PIN_ABSENT = {
+    "no_checkout": "installed rather than checked out; no commit exists to name, "
+                   "and the version is the only identifier available",
+    "not_a_repository": "a source tree not under version control; a commit could "
+                        "exist and does not",
+    "vcs_unavailable": "git could not be run here; a pin may exist and was not "
+                       "reachable from this run",
+}
 
-def _git_pin(repo_path: Path) -> dict[str, Any] | None:
-    """The commit under the path, if it is a checkout. None is a valid answer.
+
+def _absent(reason: str) -> dict[str, Any]:
+    return {"pinned": False, "reason": reason, "meaning": PIN_ABSENT[reason]}
+
+
+def _git_pin(repo_path: Path) -> dict[str, Any]:
+    """The commit under the path, if it is a checkout. An absence is a valid answer.
 
     Reported rather than assumed: a run over an unpinned directory is not
     recomputable by anyone, including its author, and the block has to say so
-    instead of leaving the reader to guess.
+    instead of leaving the reader to guess. An absence carries which absence,
+    because "not a repository" is repaired by putting the tree under version
+    control and "git is missing" is repaired by the environment.
     """
+    reachable = True
+
     def git(*args: str) -> str | None:
+        nonlocal reachable
         try:
             out = subprocess.run(
                 ["git", "-C", str(repo_path), *args],
                 capture_output=True, text=True, timeout=10, check=False,
             )
         except (OSError, subprocess.SubprocessError):
+            reachable = False
             return None
         return out.stdout.strip() if out.returncode == 0 else None
 
     commit = git("rev-parse", "HEAD")
     if not commit:
-        return None
+        return _absent("vcs_unavailable" if not reachable else "not_a_repository")
 
     shallow = (repo_path / ".git" / "shallow").exists()
     return {
+        "pinned": True,
         "kind": "git",
         "commit": commit,
         "committed_at": git("log", "-1", "--format=%cI"),
@@ -71,7 +95,7 @@ def _git_pin(repo_path: Path) -> dict[str, Any] | None:
     }
 
 
-def _tool_pin() -> dict[str, Any] | None:
+def _tool_pin() -> dict[str, Any]:
     """The commit of the tool itself, when it is running from a checkout.
 
     A version string does not identify the instrument. This package reported
@@ -79,25 +103,29 @@ def _tool_pin() -> dict[str, Any] | None:
     changed without the version changing -- so two documents can name the same
     version and not be comparable, which is the exact failure the block exists
     to make visible. Where the tool is running from a checkout, say which one.
-    None where it is not: an installed wheel has no commit, and inventing one
-    is worse than an honest absence.
+    Where it is not, say which absence: an installed wheel has no commit and
+    never will, a source tree outside version control could have one, and a
+    missing git leaves the question unanswered rather than answered "no". The
+    three want different repairs, so one `null` for all three is the collapse
+    this block was written against.
     """
     root = Path(__file__).resolve().parent
+    installed = any(part in ("site-packages", "dist-packages") for part in root.parts)
     try:
         out = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
             capture_output=True, text=True, timeout=10, check=False,
         )
     except (OSError, subprocess.SubprocessError):
-        return None
+        return _absent("no_checkout" if installed else "vcs_unavailable")
     if out.returncode != 0:
-        return None
+        return _absent("no_checkout" if installed else "not_a_repository")
     commit = out.stdout.strip()
     dirty = subprocess.run(
         ["git", "-C", str(root), "status", "--porcelain"],
         capture_output=True, text=True, timeout=10, check=False,
     )
-    return {"commit": commit, "dirty": bool(dirty.stdout.strip())}
+    return {"pinned": True, "commit": commit, "dirty": bool(dirty.stdout.strip())}
 
 
 def build(
