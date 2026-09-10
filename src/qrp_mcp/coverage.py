@@ -82,8 +82,9 @@ CONTROL_ABSENT = {
 }
 
 
-def _concentration(composition: dict[str, int], present: int) -> dict[str, Any]:
-    """How much of the denominator its largest kinds are.
+def _concentration(composition: dict[str, int], present: int,
+                   top: int = 2) -> dict[str, Any]:
+    """How much of a total its largest kinds are.
 
     An aggregate over a lopsided population describes its largest members and
     reads as describing all of them. Reported as a share rather than a breakdown
@@ -92,18 +93,19 @@ def _concentration(composition: dict[str, int], present: int) -> dict[str, Any]:
     kinds = list(composition.items())
     if not kinds or not present:
         return {"distinct_kinds": len(kinds), "largest": None, "largest_two": None}
-    top = kinds[:2]
+    kinds = sorted(kinds, key=lambda kv: (-kv[1], kv[0]))
+    head = kinds[:top]
     return {
         "distinct_kinds": len(kinds),
         "largest": {
-            "kind": top[0][0],
-            "files": top[0][1],
-            "share_pct": round(100 * top[0][1] / present, 2),
+            "kind": head[0][0],
+            "files": head[0][1],
+            "share_pct": round(100 * head[0][1] / present, 2),
         },
-        "largest_two": {
-            "kinds": [k for k, _ in top],
-            "files": sum(n for _, n in top),
-            "share_pct": round(100 * sum(n for _, n in top) / present, 2),
+        "largest_group": {
+            "kinds": [k for k, _ in head],
+            "files": sum(n for _, n in head),
+            "share_pct": round(100 * sum(n for _, n in head) / present, 2),
         },
     }
 
@@ -230,6 +232,11 @@ def build(
             "meaning": REASONS["type_not_claimed"],
             "count": sum(skipped.values()),
             "by_extension": skipped,
+            # Where the gap sits. The reader's question is what was missed, so the
+            # concentration that changes the reading is of the misses rather than
+            # of the total -- Govardhan Yadava's correction to my first attempt,
+            # which reported it of the denominator.
+            "concentration": _concentration(skipped, sum(skipped.values()), top=3),
         },
         {
             "reason": "unreadable",
@@ -292,7 +299,7 @@ def build(
             # document whose composition was one scroll away. The test he set is
             # whether it can be lifted along with the number by someone who is not
             # being careful.
-            "concentration": _concentration(composition, present),
+            "concentration": _concentration(composition, present, top=2),
             "files_examined": examined,
             "files_not_examined": present - examined,
             "coverage_pct": round(100 * examined / present, 2) if present else None,
@@ -422,16 +429,23 @@ def verdict_line(block: dict[str, Any]) -> str:
     if not block["accounts_for_every_file"]:
         return (f"This scan cannot account for every file: {scope['files_present']} were "
                 f"present and the reasons given do not add up to them.")
-    two = (scope.get("concentration") or {}).get("largest_two")
-    # Inside the parenthesis with the percentage, deliberately. A reader who lifts
-    # the figure alone has to cut into a bracket rather than decline to scroll,
-    # which is the only property that made this worth adding: a breakdown is left
-    # behind, a clause travels.
-    conc = (f", where {' and '.join(two['kinds'])} are {two['share_pct']}% of that "
-            f"denominator") if two else ""
     if scope["files_not_examined"] == 0:
         return (f"This scan read every one of the {scope['files_present']} files it was "
-                f"given{conc}.")
+                f"given.")
+    # One clause, naming where the mass of the gap sits. Not the breakdown: a
+    # breakdown is a table and gets left behind, a clause travels with the number
+    # and a reader who strips it has removed something visible from a sentence.
+    gap = next((r for r in block["not_examined"]
+                if r["count"] and (r.get("concentration") or {}).get("largest_group")), None)
+    clause = ""
+    if gap:
+        g = gap["concentration"]["largest_group"]
+        kinds = [("files with no extension" if k == "(no extension)" else k)
+                 for k in g["kinds"]]
+        named = kinds[0] if len(kinds) == 1 else f"{', '.join(kinds[:-1])} and {kinds[-1]}"
+        verb = "is" if len(kinds) == 1 else "are"
+        clause = f", of which {named} {verb} {g['share_pct']}%"
+    remaining = scope["files_not_examined"]
+    tail = "is listed with a reason" if remaining == 1 else "are listed with a reason each"
     return (f"This scan read {scope['files_examined']} of {scope['files_present']} files "
-            f"({scope['coverage_pct']}%{conc}); the remaining "
-            f"{scope['files_not_examined']} are listed with a reason each.")
+            f"({scope['coverage_pct']}%); the remaining {remaining} {tail}{clause}.")
