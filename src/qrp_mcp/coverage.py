@@ -53,6 +53,54 @@ def _absent(reason: str) -> dict[str, Any]:
     return {"pinned": False, "reason": reason, "meaning": PIN_ABSENT[reason]}
 
 
+# Which of two different kinds of claim a figure is. Dong Nguyen's distinction,
+# and it retires the search for a third state on the second axis: there is no
+# third state, because the second axis is not the instrument's to report.
+#
+# The asymmetry is structural rather than a gap in this tool. `reached` is
+# self-measurable -- the scanner knows whether it opened the file and can be held
+# to it, which is what `accounts_for_every_file` confesses when it fails.
+# `answered` never is: "no RSA found" and "no RSA present" are the same output,
+# and separating them requires knowing what was there, which is the question.
+# So a figure on the second axis is licensed by a control, not by the instrument.
+AXES = {
+    "reached": "whether the instrument opened the file; measurable by the instrument "
+               "about itself, and confessed when it fails",
+    "answered": "whether what was present was found; NOT measurable by the instrument "
+                "about itself, because a silent rule and an absent algorithm produce "
+                "the same output. Only a control licenses a figure on this axis",
+}
+
+# Why no control backs the figures. A closed set, and each member names a
+# different repair: build one, run it, re-run it against this instrument.
+CONTROL_ABSENT = {
+    "none_held": "no corpus with independently established contents exists for this "
+                 "instrument; nothing here claims the second axis",
+    "not_run": "a control exists and was not run in this window",
+    "stale": "the control was last run against a different instrument, so it does not "
+             "license figures produced by this one",
+}
+
+
+def _claims(control: dict[str, Any] | None) -> dict[str, Any]:
+    """What kind of claim every figure in this block is, stated rather than implied.
+
+    Every number this scanner produces is a reading claim. That was true before
+    this field existed and the document did not say so, which left a reader to
+    take the stronger reading from a correct number -- the failure this block was
+    written against, occurring inside the block itself.
+    """
+    if control is None:
+        control = {"held": False, "reason": "none_held",
+                   "meaning": CONTROL_ABSENT["none_held"]}
+    return {
+        "axis": "reached",
+        "meaning": AXES["reached"],
+        "second_axis_not_claimed": AXES["answered"],
+        "control": control,
+    }
+
+
 def _git_pin(repo_path: Path) -> dict[str, Any]:
     """The commit under the path, if it is a checkout. An absence is a valid answer.
 
@@ -206,6 +254,11 @@ def build(
             "files_not_examined": present - examined,
             "coverage_pct": round(100 * examined / present, 2) if present else None,
         },
+        # Every figure above is a reading claim. Said here rather than left to be
+        # inferred: a correct number invites the stronger reading, and nothing in
+        # a coverage figure distinguishes "I read this file" from "I found what
+        # was in it".
+        "claims": _claims(None),
         "not_examined": not_examined,
         # present == examined + every not-examined reason. Asserted in the output
         # rather than in a test, so a reader can check it without trusting us.

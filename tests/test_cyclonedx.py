@@ -214,3 +214,30 @@ def test_two_clones_of_one_commit_at_different_paths_are_comparable(scan):
     result = coverage.compare(first, second)
     assert result["verdict"] == "comparable"
     assert result["targets"] == [first["corpus"]["target"], "/somewhere/else/same-repo"]
+
+
+def test_the_block_says_which_axis_its_figures_sit_on(scan):
+    claims = scan["coverage"]["claims"]
+    assert claims["axis"] == "reached"
+    assert claims["control"]["held"] is False
+    assert claims["control"]["reason"] in coverage.CONTROL_ABSENT
+
+
+def test_the_axis_declaration_travels_in_the_cbom(document):
+    """A declaration a reader cannot see in the document is not a declaration."""
+    props = {p["name"]: p["value"] for p in document["properties"]}
+    assert props["qrp:coverage:claims:axis"] == "reached"
+    assert props["qrp:coverage:claims:control:held"] == "false"
+    assert props["qrp:coverage:claims:control:reason"] == "none_held"
+
+
+def test_a_missing_control_says_which_absence(scan):
+    """Same discipline as the pins: an absent control names its absence.
+
+    The three reasons take three different repairs -- build one, run it, re-run
+    it against this instrument -- so the set is finished by the state-vocabulary
+    test rather than by taste.
+    """
+    from qrp_mcp.coverage import CONTROL_ABSENT
+    assert set(CONTROL_ABSENT) == {"none_held", "not_run", "stale"}
+    assert all(v for v in CONTROL_ABSENT.values())
