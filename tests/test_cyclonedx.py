@@ -299,5 +299,13 @@ def test_the_signers_sentence_names_where_the_gap_is(scan):
     assert f"{g['share_pct']}%" in line
     assert str(gap["count"]) in line
     assert line.index(str(gap["count"])) < line.index(f"{g['share_pct']}%")
+    # The cardinality travels too: a share cannot be read as high or low without
+    # the number of kinds it is a share of.
+    assert f"of {gap['concentration']['distinct_kinds']} kinds" in line
+    # Bracketed mid-sentence rather than trailing, so it cannot be dropped by
+    # stopping early: the bracket opens before the clause that closes the sentence.
+    listed = line.index("listed with a reason")
+    bracket = line.index("(", line.index("%);"))
+    assert bracket < listed, "the clause trails the sentence instead of sitting inside it"
     assert ". " not in line and line.endswith("."), (
         "the clause must stay inside the sentence it qualifies, not become another")

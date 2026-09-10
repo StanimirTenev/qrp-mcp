@@ -439,13 +439,19 @@ def verdict_line(block: dict[str, Any]) -> str:
                 if r["count"] and (r.get("concentration") or {}).get("largest_group")), None)
     clause = ""
     if gap:
-        g = gap["concentration"]["largest_group"]
+        c = gap["concentration"]
+        g = c["largest_group"]
         kinds = [("files with no extension" if k == "(no extension)" else k)
                  for k in g["kinds"]]
         named = kinds[0] if len(kinds) == 1 else f"{', '.join(kinds[:-1])} and {kinds[-1]}"
-        verb = "is" if len(kinds) == 1 else "are"
-        clause = f", of which {named} {verb} {g['share_pct']}%"
+        # The cardinality is not a qualifier. It is the null the share is read
+        # against: three of 24 kinds at 69% is five times a flat split, three of
+        # five at 69% is barely more than one. Nguyen Xuan Dong, 10.09.2026.
+        # Bracketed mid-sentence, because a trailing clause can be dropped by
+        # stopping early and a bracket has to be cut into.
+        clause = (f" ({len(kinds)} of {c['distinct_kinds']} kinds — {named} — "
+                  f"being {g['share_pct']}% of them)")
     remaining = scope["files_not_examined"]
     tail = "is listed with a reason" if remaining == 1 else "are listed with a reason each"
     return (f"This scan read {scope['files_examined']} of {scope['files_present']} files "
-            f"({scope['coverage_pct']}%); the remaining {remaining} {tail}{clause}.")
+            f"({scope['coverage_pct']}%); the remaining {remaining}{clause} {tail}.")
