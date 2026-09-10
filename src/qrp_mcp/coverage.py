@@ -217,8 +217,14 @@ def build(
 # this module are closed: "not comparable" on its own is `unknown` rebuilt at the
 # comparison layer, and a reader who cannot see which condition moved cannot tell
 # whether to re-run, re-clone or ignore the difference.
+# `different_target` was here and was removed. A filesystem path is checkable --
+# it ships in the block -- and it licenses nothing: /srv/build/certbot on two
+# machines is the same string and not the same estate, and two clones of one
+# commit at different paths are comparable while it called them incomparable.
+# A pin that is true and does not support the conclusion, arriving in the table
+# built to enumerate that failure. Corpus identity is the commit; the path is an
+# operator convenience and is reported below rather than compared.
 INCOMPARABLE = {
-    "different_target": "the two runs read different directories",
     "instrument_version_differs": "a different version of the tool did the reading",
     "instrument_commit_differs": "the same version, built from different code; the "
                                  "version does not pin the emitter",
@@ -282,8 +288,6 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
         if corpus_a.get("shallow") != corpus_b.get("shallow"):
             reasons.append("corpus_depth_differs")
 
-    if first["corpus"]["target"] != second["corpus"]["target"]:
-        reasons.append("different_target")
     if first["instrument"]["version"] != second["instrument"]["version"]:
         reasons.append("instrument_version_differs")
     if first["instrument"]["ruleset"] != second["instrument"]["ruleset"]:
@@ -305,6 +309,9 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
         "differences": [{"reason": r, "meaning": INCOMPARABLE[r]} for r in reasons],
         "unestablished": [{"reason": r, "meaning": UNESTABLISHED[r]} for r in unestablished],
         "coverage_pct": [first["scope"]["coverage_pct"], second["scope"]["coverage_pct"]],
+        # Shown, not compared. Two paths differing says nothing about whether the
+        # runs read the same estate, and a reader who wants that reads the commits.
+        "targets": [first["corpus"]["target"], second["corpus"]["target"]],
     }
 
 

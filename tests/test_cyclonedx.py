@@ -197,3 +197,20 @@ def test_every_absence_reason_is_in_the_closed_set():
     from qrp_mcp.coverage import PIN_ABSENT, UNESTABLISHED, INCOMPARABLE
     for table in (PIN_ABSENT, UNESTABLISHED, INCOMPARABLE):
         assert all(isinstance(v, str) and v for v in table.values())
+
+
+def test_two_clones_of_one_commit_at_different_paths_are_comparable(scan):
+    """A path is checkable and licenses nothing.
+
+    The same commit checked out twice is the same corpus, and calling the pair
+    incomparable because the directories differ was a pin that is true and does
+    not support the conclusion -- in the table written to enumerate exactly that.
+    """
+    first = json.loads(json.dumps(scan["coverage"]))
+    first["corpus"]["pinned_at"]["dirty"] = False
+    second = json.loads(json.dumps(first))
+    second["corpus"]["target"] = "/somewhere/else/same-repo"
+
+    result = coverage.compare(first, second)
+    assert result["verdict"] == "comparable"
+    assert result["targets"] == [first["corpus"]["target"], "/somewhere/else/same-repo"]
