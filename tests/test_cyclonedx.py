@@ -262,3 +262,31 @@ def test_the_composition_travels_in_the_cbom(document, scan):
     props = {p["name"]: p["value"] for p in document["properties"]}
     for ext, n in scan["coverage"]["scope"]["files_present_by_extension"].items():
         assert props[f"qrp:coverage:scope:files_present_by_extension:{ext}"] == str(n)
+
+
+def test_the_aggregate_reports_how_concentrated_it_is(scan):
+    """A share travels with the number; a breakdown gets left behind.
+
+    Measured on the five published repositories, the two largest file kinds are
+    between 43 and 55 per cent of the denominator, so a coverage figure over any
+    of them is substantially a figure about two kinds of file.
+    """
+    c = scan["coverage"]["scope"]["concentration"]
+    present = scan["coverage"]["scope"]["files_present"]
+    assert c["distinct_kinds"] >= 1
+    assert c["largest"]["files"] <= present
+    assert c["largest_two"]["files"] >= c["largest"]["files"]
+    assert 0 < c["largest_two"]["share_pct"] <= 100
+
+
+def test_the_signers_sentence_carries_the_concentration_in_the_same_clause(scan):
+    """Dong Nguyen's test: can it be lifted along with the number by someone who
+    is not being careful. It sits inside the parenthesis holding the percentage,
+    so removing it means cutting into a bracket rather than not scrolling."""
+    line = coverage.verdict_line(scan["coverage"])
+    two = scan["coverage"]["scope"]["concentration"]["largest_two"]
+    assert f"{two['share_pct']}%" in line
+    for kind in two["kinds"]:
+        assert kind in line
+    percent = f"({scan['coverage']['scope']['coverage_pct']}%"
+    assert percent in line and line.index(percent) < line.index(f"{two['share_pct']}%")

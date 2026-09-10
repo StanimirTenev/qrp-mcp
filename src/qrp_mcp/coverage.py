@@ -82,6 +82,32 @@ CONTROL_ABSENT = {
 }
 
 
+def _concentration(composition: dict[str, int], present: int) -> dict[str, Any]:
+    """How much of the denominator its largest kinds are.
+
+    An aggregate over a lopsided population describes its largest members and
+    reads as describing all of them. Reported as a share rather than a breakdown
+    because a share survives being quoted and a breakdown does not.
+    """
+    kinds = list(composition.items())
+    if not kinds or not present:
+        return {"distinct_kinds": len(kinds), "largest": None, "largest_two": None}
+    top = kinds[:2]
+    return {
+        "distinct_kinds": len(kinds),
+        "largest": {
+            "kind": top[0][0],
+            "files": top[0][1],
+            "share_pct": round(100 * top[0][1] / present, 2),
+        },
+        "largest_two": {
+            "kinds": [k for k, _ in top],
+            "files": sum(n for _, n in top),
+            "share_pct": round(100 * sum(n for _, n in top) / present, 2),
+        },
+    }
+
+
 def _claims(control: dict[str, Any] | None) -> dict[str, Any]:
     """What kind of claim every figure in this block is, stated rather than implied.
 
@@ -190,6 +216,10 @@ def build(
 ) -> dict[str, Any]:
     """Assemble the block. Every number here is derived, none is asserted."""
     present = scan_result["files_present"]
+    composition = dict(
+        sorted(scan_result["files_present_by_extension"].items(),
+               key=lambda kv: (-kv[1], kv[0]))
+    )
     examined = sum(scan_result["files_scanned"].values())
     skipped = scan_result["files_skipped_by_type"]
     unreadable = scan_result["unreadable_files"]
@@ -254,10 +284,15 @@ def build(
             # instrument or describes what the corpus is made of. The commit makes
             # the number reproducible; this makes it interpretable. Named by
             # Nguyen Xuan Dong, 10.09.2026.
-            "files_present_by_extension": dict(
-                sorted(scan_result["files_present_by_extension"].items(),
-                       key=lambda kv: (-kv[1], kv[0]))
-            ),
+            "files_present_by_extension": composition,
+            # One figure a reader carries because it is a clause rather than a
+            # table. Nguyen Xuan Dong's point, 10.09.2026: a breakdown gets left
+            # behind, a concentration figure gets quoted with the number, and the
+            # failure we kept observing was a person lifting a headline out of a
+            # document whose composition was one scroll away. The test he set is
+            # whether it can be lifted along with the number by someone who is not
+            # being careful.
+            "concentration": _concentration(composition, present),
             "files_examined": examined,
             "files_not_examined": present - examined,
             "coverage_pct": round(100 * examined / present, 2) if present else None,
@@ -387,9 +422,16 @@ def verdict_line(block: dict[str, Any]) -> str:
     if not block["accounts_for_every_file"]:
         return (f"This scan cannot account for every file: {scope['files_present']} were "
                 f"present and the reasons given do not add up to them.")
+    two = (scope.get("concentration") or {}).get("largest_two")
+    # Inside the parenthesis with the percentage, deliberately. A reader who lifts
+    # the figure alone has to cut into a bracket rather than decline to scroll,
+    # which is the only property that made this worth adding: a breakdown is left
+    # behind, a clause travels.
+    conc = (f", where {' and '.join(two['kinds'])} are {two['share_pct']}% of that "
+            f"denominator") if two else ""
     if scope["files_not_examined"] == 0:
         return (f"This scan read every one of the {scope['files_present']} files it was "
-                f"given.")
+                f"given{conc}.")
     return (f"This scan read {scope['files_examined']} of {scope['files_present']} files "
-            f"({scope['coverage_pct']}%); the remaining {scope['files_not_examined']} are "
-            f"listed with a reason each.")
+            f"({scope['coverage_pct']}%{conc}); the remaining "
+            f"{scope['files_not_examined']} are listed with a reason each.")
