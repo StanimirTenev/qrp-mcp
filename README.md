@@ -62,7 +62,9 @@ your PATH, since `uvx` is what fetches and runs the server.
 
 | Tool | What it does |
 | --- | --- |
-| `scan_repo(path)` | Scans a directory's source, CI/CD configs and infrastructure-as-code; returns findings and a summary |
+| `scan_repo(path)` | Scans a directory's source, CI/CD configs and infrastructure-as-code; returns findings, a summary, and the coverage block below |
+| `export_cbom(path)` | The same reading as a CycloneDX 1.6 CBOM, with the coverage block inside it |
+| `compare_coverage(a, b)` | Whether two scans produced numbers that can be compared at all |
 | `list_algorithms()` | The algorithm families the server recognises and how each is classified |
 
 ## What it looks at
@@ -133,6 +135,56 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   }
 }
 ```
+
+## What the coverage block says
+
+Every scan carries one, because a coverage figure without its conditions is not comparable to
+another coverage figure. Four things, each answering something the percentage cannot:
+
+- **instrument** — the version *and the emitter's own commit*. Two runs of this package once
+  reported the same version from code that differed by a commit, so the version alone does not
+  identify what did the reading. Where the tool runs from an installed wheel there is no commit,
+  and the field says which absence rather than going quiet.
+- **corpus** — the commit that was read, whether the tree was dirty, and whether the clone was
+  shallow. A commit identifies a tracked tree; a scanner walks a filesystem, and the two are not
+  the same thing.
+- **window** — when it was read.
+- **scope** — the denominator, the numerator, and *every file that was in the first and not the
+  second, with a reason*. The reasons are a closed set: `type_not_claimed` is a boundary this
+  tool declares, `unreadable` is a failure it hit, and they are never collapsed. A reason with no
+  instances is reported at zero rather than omitted.
+
+It also states **which kind of claim the numbers are**. Coverage is a claim about reading, not
+about finding: a file can be opened, counted, and still be one this tool was blind in. Reaching
+a file is something a scanner can measure about itself; whether it found what was there is not,
+because a silent rule and an absent algorithm produce the same output. So the block reports
+`claims.axis: reached`, and declares that it holds no control — the corpus with independently
+established contents that would license the second claim — naming the absence rather than
+implying the stronger reading.
+
+And it reports **where the unread mass sits**, not only how large it is. Across five open-source
+repositories, three file kinds account for between 52 % and 89 % of everything not read. A total
+does not say that, and the number of distinct kinds is reported beside the share because it is
+the baseline the share means anything against.
+
+The published measurement, with the raw artefacts:
+[quantumreadiness.eu/evidence/scan-coverage](https://quantumreadiness.eu/evidence/scan-coverage/)
+
+## The CBOM it emits
+
+`export_cbom` produces a CycloneDX 1.6 document, validated against the published schema. Three
+things travel in it that a component list alone cannot say:
+
+- `compositions.aggregate` — `complete` only where every file present was examined, `incomplete`
+  otherwise, and `unknown` where the tool cannot account for its own reading.
+- `properties` — the whole coverage block. It travels there because the root object is
+  `additionalProperties: false` and the format has no field for it; the awkwardness is the point
+  rather than something to hide.
+- `evidence.occurrences` — file, line and matched text for every asset.
+
+Output is deterministic: the timestamp comes from the scan window and the serial number from the
+target and the two pins, so the same code over the same corpus produces the same document and
+different code does not.
 
 ## Why deterministic
 

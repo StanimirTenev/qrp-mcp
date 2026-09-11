@@ -211,7 +211,8 @@ def build(
     started_at: str,
     finished_at: str,
     seconds: float,
-    tool_version: str,
+    tool_version: str | None,
+    tool_name: str = "qrp-mcp",
     ruleset: dict[str, int],
     claimed_types: dict[str, list[str]],
     excluded_dirs: list[str],
@@ -251,7 +252,7 @@ def build(
 
     return {
         "instrument": {
-            "tool": "qrp-mcp",
+            "tool": tool_name,
             "version": tool_version,
             # The version alone does not pin the emitter; the code can change
             # without it. Null when running from an installed wheel.
