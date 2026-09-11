@@ -336,16 +336,16 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
 
 def is_ci_config_file(path: Path, repo_path: Path) -> bool:
     rel = path.relative_to(repo_path).as_posix()
-    if rel.startswith(".github/workflows/") and path.suffix in {".yml", ".yaml"}:
+    if rel.startswith(".github/workflows/") and path.suffix.lower() in {".yml", ".yaml"}:
         return True
-    if rel.startswith(".circleci/") and path.suffix in {".yml", ".yaml"}:
+    if rel.startswith(".circleci/") and path.suffix.lower() in {".yml", ".yaml"}:
         return True
     return path.name in CI_CONFIG_FILENAMES
 
 
 def is_config_file(path: Path) -> bool:
     """A configuration file, by extension or by one of the extensionless names."""
-    return path.suffix in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
+    return path.suffix.lower() in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
 
 
 def _read_lines(path: Path) -> list[str] | None:
@@ -363,9 +363,9 @@ def _read_lines(path: Path) -> list[str] | None:
 
 
 def is_iac_file(path: Path, repo_path: Path, lines: list[str] | None = None) -> bool:
-    if path.suffix in IAC_EXTENSIONS:
+    if path.suffix.lower() in IAC_EXTENSIONS:
         return True
-    if path.suffix in {".yaml", ".yml"}:
+    if path.suffix.lower() in {".yaml", ".yml"}:
         # Content-sniff for a Kubernetes manifest shape rather than trusting the extension
         # alone -- most .yaml files in a repo are not IaC.
         lines = (_read_lines(path) or []) if lines is None else lines
@@ -500,8 +500,17 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         present_kinds[kind] = present_kinds.get(kind, 0) + 1
         rel_path = path.relative_to(repo_path).as_posix()
         is_ci = is_ci_config_file(path, repo_path)
-        if not (is_ci or path.suffix in IAC_EXTENSIONS or path.suffix in SOURCE_EXTENSIONS
-                or path.suffix in {".yaml", ".yml"} or is_config_file(path)
+        # Every comparison is lowercased, and the reason is a defect this line
+        # produced. OpenSSL carries thirteen files with upper-case extensions --
+        # twelve .H and one .PL -- which failed a case-sensitive `in` against a
+        # lower-case set, were skipped, and were then reported under
+        # `path.suffix.lower()` as .h and .pl: types this tool does claim. So the
+        # declared boundary and the real one differed, the count said the tool
+        # does not claim these, and the lower-casing in the report concealed the
+        # case-sensitivity in the match.
+        if not (is_ci or path.suffix.lower() in IAC_EXTENSIONS
+                or path.suffix.lower() in SOURCE_EXTENSIONS
+                or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
                 or is_certificate_file(path)):
             kind = path.suffix.lower() or "(no extension)"
             skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
@@ -529,7 +538,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
             algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
             iac_findings.extend(algo_findings)
             embedded_key_findings.extend(key_findings)
-        elif path.suffix in SOURCE_EXTENSIONS:
+        elif path.suffix.lower() in SOURCE_EXTENSIONS:
             files_scanned["source"] += 1
             source_findings.extend(scan_source_file(path, rel_path, lines))
         else:

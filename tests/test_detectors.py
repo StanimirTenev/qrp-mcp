@@ -213,3 +213,38 @@ def test_ecdh_is_found_in_a_cipher_list_and_in_ssh_configuration(tmp_path: Path)
     (tmp_path / "sshd_config").write_text(
         "KexAlgorithms ecdh-sha2-nistp256\n", encoding="utf-8")
     assert "ECDH" in scan_repo(tmp_path)["detected_algorithms"]
+
+
+def test_an_upper_case_extension_is_the_type_it_claims(tmp_path: Path):
+    """A declared boundary the tool does not honour is not a boundary.
+
+    OpenSSL carries thirteen files with upper-case extensions -- twelve .H and
+    one .PL. They failed a case-sensitive membership test against a lower-case
+    set, were skipped, and were then reported under `suffix.lower()` as .h and
+    .pl: types this tool does claim. Three defects in one, and the third is the
+    worst, because the lower-casing in the report concealed the case-sensitivity
+    in the match.
+    """
+    (tmp_path / "PROLOGUE.H").write_text("RSA_new();\n", encoding="utf-8")
+    (tmp_path / "Makefile.PL").write_text("use Crypt::RSA;\n", encoding="utf-8")
+    (tmp_path / "main.YAML").write_text("apiVersion: v1\nkind: Secret\n", encoding="utf-8")
+    result = scan_repo(tmp_path)
+    assert result["files_skipped_by_type"] == {}, "a claimed type was reported as unclaimed"
+    assert sum(result["files_scanned"].values()) == 3
+    assert "RSA" in result["detected_algorithms"]
+
+
+def test_no_unread_kind_is_one_the_tool_claims(tmp_path: Path):
+    """The intersection of claimed extensions and unread kinds must be empty.
+
+    This is the check that would have caught the thirteen. It is an invariant
+    rather than a case: any future rule that skips a file whose type is claimed
+    fails here, whatever the cause.
+    """
+    from qrp_mcp.detectors import SOURCE_EXTENSIONS, IAC_EXTENSIONS, CONFIG_EXTENSIONS
+    (tmp_path / "a.H").write_text("x\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("x\n", encoding="utf-8")
+    (tmp_path / "c.md").write_text("x\n", encoding="utf-8")
+    claimed = SOURCE_EXTENSIONS | IAC_EXTENSIONS | CONFIG_EXTENSIONS | {".yaml", ".yml"}
+    unread = set(scan_repo(tmp_path)["files_skipped_by_type"])
+    assert not (unread & claimed), f"claimed and unread at once: {sorted(unread & claimed)}"
