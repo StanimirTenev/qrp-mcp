@@ -162,10 +162,41 @@ because a silent rule and an absent algorithm produce the same output. So the bl
 established contents that would license the second claim — naming the absence rather than
 implying the stronger reading.
 
-And it reports **where the unread mass sits**, not only how large it is. Across five open-source
-repositories, three file kinds account for between 52 % and 89 % of everything not read. A total
-does not say that, and the number of distinct kinds is reported beside the share because it is
-the baseline the share means anything against.
+### What the number is, and what it is not
+
+A coverage figure here is the overlap between the file types this tool claims and what the corpus
+is made of. It is not a discovery rate. A scanner claiming 32 extensions cannot reach 100 % against
+a tree holding 79 kinds, so a lower number means more file types left unclaimed rather than more
+cryptography left unfound — and the two read identically unless the page says which it is.
+
+The denominator stays conservative anyway: you cannot know a `.txt` holds no PEM block without
+opening it, and key files often carry no extension at all.
+
+### Concentration, and the partition it is measured over
+
+The block reports **where the mass sits**, not only how large a total is — because an aggregate
+over a lopsided population describes its largest members and reads as describing all of them.
+Measured across five open-source repositories: three file kinds account for **52 % to 89 %** of
+everything not read, and the two largest kinds present are **43 % to 55 %** of everything counted.
+
+Three values travel with every share, and the third is the one most tools omit:
+
+- **share** — how much the largest members are.
+- **cardinality** — how many kinds that share is out of. Three of 24 kinds at 69 % is five and a
+  half times a flat split; three of 63 at 68 % is fourteen times one. Without it the same share
+  means different things and cannot be read as high or low at all.
+- **partition** — what a kind *is*. A concentration is not a property of an aggregate but of the
+  aggregate crossed with the partition it was measured over: the same tree split by extension, by
+  directory, or by language gives different shares with nothing changing on disk. This block
+  partitions by file extension and says so beside every figure.
+
+The signer's sentence carries the same three inside the bracket holding the count, because a
+figure lifted out of a document without them is the failure the block exists to prevent:
+
+```
+This scan read 822 of 1250 files (65.76%); the remaining 428 (3 of 24, by extension —
+files with no extension, .rst and .txt — being 68.93% of them) are listed with a reason each.
+```
 
 The published measurement, with the raw artefacts:
 [quantumreadiness.eu/evidence/scan-coverage](https://quantumreadiness.eu/evidence/scan-coverage/)
