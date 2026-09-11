@@ -39,6 +39,11 @@ COLUMNS = [
     # whether a control licenses it. Without these the row states a reading
     # figure and invites the stronger reading.
     "claims_axis", "control_held", "control_absent_reason",
+    # Added 11.09.2026. The aggregate travels with its concentration or a reader
+    # takes the headline alone: where the mass of the gap sits, and how many kinds
+    # that share is out of, which is the null it is read against.
+    "gap_top_kinds", "gap_top_share_pct", "gap_distinct_kinds",
+    "present_top2_share_pct",
 ]
 
 
@@ -47,6 +52,8 @@ def row(name: str, block: dict) -> dict:
     scope = block["scope"]
     reasons = {r["reason"]: r for r in block["not_examined"]}
     control = block["claims"]["control"]
+    gapc = (reasons.get("type_not_claimed") or {}).get("concentration") or {}
+    gap = gapc if gapc.get("largest_group") else None
     return {
         "repository": name,
         "commit": pin["commit"],
@@ -65,6 +72,11 @@ def row(name: str, block: dict) -> dict:
         "claims_axis": block["claims"]["axis"],
         "control_held": control["held"],
         "control_absent_reason": control.get("reason", ""),
+        "gap_top_kinds": " ".join(gap["largest_group"]["kinds"]) if gap else "",
+        "gap_top_share_pct": gap["largest_group"]["share_pct"] if gap else "",
+        "gap_distinct_kinds": gapc.get("distinct_kinds", "") if gapc else "",
+        "present_top2_share_pct": (scope.get("concentration") or {})
+            .get("largest_group", {}).get("share_pct", ""),
     }
 
 
