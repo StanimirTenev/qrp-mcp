@@ -270,6 +270,10 @@ def test_the_denominator_reports_how_concentrated_it_is(scan):
     of them is substantially a figure about two kinds of file."""
     c = scan["coverage"]["scope"]["concentration"]
     present = scan["coverage"]["scope"]["files_present"]
+    # A share is a property of the aggregate crossed with the partition it was
+    # measured over. Without the partition named, "two kinds are 50 per cent"
+    # does not say what a kind is.
+    assert c["partition"] == "files by extension"
     assert c["distinct_kinds"] >= 1
     assert c["largest"]["files"] <= present
     assert c["largest_group"]["files"] >= c["largest"]["files"]
@@ -283,6 +287,7 @@ def test_the_gap_reports_where_its_mass_sits(scan):
     gap = next(r for r in scan["coverage"]["not_examined"]
                if r["reason"] == "type_not_claimed")
     c = gap["concentration"]
+    assert c["partition"] == "unread files by extension"
     assert sum(gap["by_extension"].values()) == gap["count"]
     assert c["largest_group"]["files"] <= gap["count"]
     assert 0 < c["largest_group"]["share_pct"] <= 100
@@ -301,7 +306,8 @@ def test_the_signers_sentence_names_where_the_gap_is(scan):
     assert line.index(str(gap["count"])) < line.index(f"{g['share_pct']}%")
     # The cardinality travels too: a share cannot be read as high or low without
     # the number of kinds it is a share of.
-    assert f"of {gap['concentration']['distinct_kinds']} kinds" in line
+    assert f"of {gap['concentration']['distinct_kinds']}, by extension" in line, (
+        "the sentence must say what a kind is, not only how many there are")
     # Bracketed mid-sentence rather than trailing, so it cannot be dropped by
     # stopping early: the bracket opens before the clause that closes the sentence.
     listed = line.index("listed with a reason")

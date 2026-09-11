@@ -42,7 +42,7 @@ COLUMNS = [
     # Added 11.09.2026. The aggregate travels with its concentration or a reader
     # takes the headline alone: where the mass of the gap sits, and how many kinds
     # that share is out of, which is the null it is read against.
-    "gap_top_kinds", "gap_top_share_pct", "gap_distinct_kinds",
+    "gap_partition", "gap_top_kinds", "gap_top_share_pct", "gap_distinct_kinds",
     "present_top2_share_pct",
 ]
 
@@ -72,6 +72,7 @@ def row(name: str, block: dict) -> dict:
         "claims_axis": block["claims"]["axis"],
         "control_held": control["held"],
         "control_absent_reason": control.get("reason", ""),
+        "gap_partition": gapc.get("partition", "") if gapc else "",
         "gap_top_kinds": " ".join(gap["largest_group"]["kinds"]) if gap else "",
         "gap_top_share_pct": gap["largest_group"]["share_pct"] if gap else "",
         "gap_distinct_kinds": gapc.get("distinct_kinds", "") if gapc else "",

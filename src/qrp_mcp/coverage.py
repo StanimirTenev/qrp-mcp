@@ -82,13 +82,27 @@ CONTROL_ABSENT = {
 }
 
 
-def _concentration(composition: dict[str, int], present: int,
+def _concentration(composition: dict[str, int], present: int, partition: str,
                    top: int = 2) -> dict[str, Any]:
-    """How much of a total its largest kinds are.
+    """How much of a total its largest members are, over a named partition.
 
     An aggregate over a lopsided population describes its largest members and
     reads as describing all of them. Reported as a share rather than a breakdown
     because a share survives being quoted and a breakdown does not.
+
+    Three values, not two, and the third is the one that was missing. A
+    concentration is not a property of an aggregate: it is a property of the
+    aggregate crossed with the partition it was measured over, and nothing in
+    "two kinds are 50 per cent" says what a kind is. The same five repositories
+    partitioned by directory, by language, or by vendored-or-not give different
+    shares with nothing changing on disk -- and .txt dominating Vault's unread
+    files is striking precisely because extension is a partition a reader does
+    not expect. Govardhan Yadava found this by computing his own two ways: the
+    same two sessions are 53.4 per cent of his test cases and 33.8 per cent of
+    his vector sets, because cases and sets partition one run differently.
+
+    Without the partition named beside the share, the field reproduces the defect
+    it was added to prevent, one level up.
     """
     kinds = list(composition.items())
     if not kinds or not present:
@@ -96,6 +110,8 @@ def _concentration(composition: dict[str, int], present: int,
     kinds = sorted(kinds, key=lambda kv: (-kv[1], kv[0]))
     head = kinds[:top]
     return {
+        # What a "kind" is. Not a qualifier: the share is only meaningful against it.
+        "partition": partition,
         "distinct_kinds": len(kinds),
         "largest": {
             "kind": head[0][0],
@@ -237,7 +253,8 @@ def build(
             # concentration that changes the reading is of the misses rather than
             # of the total -- Govardhan Yadava's correction to my first attempt,
             # which reported it of the denominator.
-            "concentration": _concentration(skipped, sum(skipped.values()), top=3),
+            "concentration": _concentration(skipped, sum(skipped.values()),
+                                           partition="unread files by extension", top=3),
         },
         {
             "reason": "unreadable",
@@ -300,7 +317,8 @@ def build(
             # document whose composition was one scroll away. The test he set is
             # whether it can be lifted along with the number by someone who is not
             # being careful.
-            "concentration": _concentration(composition, present, top=2),
+            "concentration": _concentration(composition, present,
+                                            partition="files by extension", top=2),
             "files_examined": examined,
             "files_not_examined": present - examined,
             "coverage_pct": round(100 * examined / present, 2) if present else None,
@@ -445,12 +463,15 @@ def verdict_line(block: dict[str, Any]) -> str:
         kinds = [("files with no extension" if k == "(no extension)" else k)
                  for k in g["kinds"]]
         named = kinds[0] if len(kinds) == 1 else f"{', '.join(kinds[:-1])} and {kinds[-1]}"
-        # The cardinality is not a qualifier. It is the null the share is read
-        # against: three of 24 kinds at 69% is five times a flat split, three of
-        # five at 69% is barely more than one. Nguyen Xuan Dong, 10.09.2026.
-        # Bracketed mid-sentence, because a trailing clause can be dropped by
-        # stopping early and a bracket has to be cut into.
-        clause = (f" ({len(kinds)} of {c['distinct_kinds']} kinds — {named} — "
+        # Three values, and each earns its room. The cardinality is the null the
+        # share is read against: three of 24 kinds at 69% is five times a flat
+        # split, three of five at 69% is barely more than one (Nguyen Xuan Dong).
+        # The partition says what a kind is, because the same repository split by
+        # directory or by language gives a different share with nothing changing
+        # on disk (Govardhan Yadava). Bracketed mid-sentence, because a trailing
+        # clause can be dropped by stopping early and a bracket has to be cut into.
+        unit = c["partition"].split()[-1] if c.get("partition") else "kinds"
+        clause = (f" ({len(kinds)} of {c['distinct_kinds']}, by {unit} — {named} — "
                   f"being {g['share_pct']}% of them)")
     remaining = scope["files_not_examined"]
     tail = "is listed with a reason" if remaining == 1 else "are listed with a reason each"
