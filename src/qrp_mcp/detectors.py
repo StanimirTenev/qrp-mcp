@@ -100,7 +100,14 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bECCurve\.|\bECParameters\b|"
         # IKE proposal syntax: ecp384 is NIST P-384 and lives in swanctl.conf,
         # where a scanner reading only library calls never meets it.
-        r"(?<![A-Za-z])ecp(?:192|224|256|384|521)(?![0-9])",
+        r"(?<![A-Za-z])ecp(?:192|224|256|384|521)(?![0-9])|"
+        # The same NIST curve under the name TLS configuration actually writes.
+        # `ec.SECP256R1` is seen, but `prime256v1` in an nginx `ssl_ecdh_curve`
+        # or an OpenSSL `Groups =` line is a different spelling of P-256 and was
+        # invisible -- found missing against the Olewinski et al. (ARES 2026)
+        # ground truth. `secp256r1` also reaches Java `ECGenParameterSpec`. The
+        # explicit r1/v1 suffix is what keeps secp256k1 routed to ECDSA below.
+        r"(?<![A-Za-z])(?:prime(?:192|256)v1|secp(?:192|224|256|384|521)r1)(?![0-9])",
         re.IGNORECASE,
     )),
     ("DH", "Diffie-Hellman usage", re.compile(

@@ -215,6 +215,30 @@ def test_ecdh_is_found_in_a_cipher_list_and_in_ssh_configuration(tmp_path: Path)
     assert "ECDH" in scan_repo(tmp_path)["detected_algorithms"]
 
 
+def test_nist_curve_config_names_are_found_and_do_not_catch_secp256k1(tmp_path: Path):
+    """`prime256v1` is P-256 under the name TLS configuration writes.
+
+    `ec.SECP256R1` was seen but the same curve as `prime256v1` in an
+    `ssl_ecdh_curve` or an OpenSSL `Groups =` line was invisible -- found missing
+    against the Olewinski et al. (ARES 2026) source-code ground truth. The second
+    assertion is the collision check: secp256k1 is Bitcoin's curve and must stay
+    ECDSA, so a rule that now finds the r1/v1 NIST names must not also claim it.
+    """
+    (tmp_path / "nginx.conf").write_text(
+        "ssl_ecdh_curve X25519:prime256v1;\n", encoding="utf-8")
+    (tmp_path / "openssl.cnf").write_text(
+        "Groups = X25519MLKEM768:X25519:secp384r1\n", encoding="utf-8")
+    assert "EC" in scan_repo(tmp_path)["detected_algorithms"]
+
+    (tmp_path / "nginx.conf").unlink()
+    (tmp_path / "openssl.cnf").unlink()
+    (tmp_path / "wallet.go").write_text(
+        "curve := secp256k1.S256()\n", encoding="utf-8")
+    found = scan_repo(tmp_path)["detected_algorithms"]
+    assert "ECDSA" in found
+    assert "EC" not in found, "secp256k1 is Bitcoin's curve; it must not read as a NIST EC name"
+
+
 def test_an_upper_case_extension_is_the_type_it_claims(tmp_path: Path):
     """A declared boundary the tool does not honour is not a boundary.
 
