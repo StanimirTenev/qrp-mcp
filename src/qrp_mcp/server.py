@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
+import hashlib
+import json
+import sys
+from pathlib import Path
 from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
@@ -144,7 +149,48 @@ def compare_coverage(
     return coverage.compare(first, second)
 
 
-def main() -> None:
+def _strip_excerpts(result: dict[str, Any]) -> dict[str, Any]:
+    """The 'trimmed' level: every occurrence keeps its file and line, but not the
+    line of code itself."""
+    for items in result.get("evidence", {}).values():
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict):
+                    item.pop("excerpt", None)
+    return result
+
+
+def scan_to_file(argv: list[str]) -> int:
+    """`qrp-mcp scan PATH --out FILE`: the same result as the scan_repo tool,
+    written to a file the owner can inspect and send on. Nothing leaves the machine."""
+    p = argparse.ArgumentParser(
+        prog="qrp-mcp scan",
+        description="Scan a directory and write the result as JSON. Nothing is sent anywhere.")
+    p.add_argument("path", help="directory to scan")
+    p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
+    p.add_argument("--level", choices=("full", "trimmed"), default="full",
+                   help="'trimmed' removes the lines of code quoted as evidence; "
+                        "files and line numbers stay")
+    a = p.parse_args(argv)
+
+    result = scan_directory(a.path)
+    if a.level == "trimmed":
+        result = _strip_excerpts(result)
+    data = (json.dumps(result, indent=2, ensure_ascii=False) + "\n").encode()
+    if a.out:
+        Path(a.out).write_bytes(data)
+        print(f"wrote {a.out} ({a.level})", file=sys.stderr)
+    else:
+        sys.stdout.buffer.write(data)
+    # The digest of the exact bytes written: what a recipient will quote back.
+    print(f"sha256 {hashlib.sha256(data).hexdigest()}", file=sys.stderr)
+    return 0
+
+
+def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["scan"]:
+        raise SystemExit(scan_to_file(argv[1:]))
     mcp.run()
 
 

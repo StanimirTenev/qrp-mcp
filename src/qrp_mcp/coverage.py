@@ -203,15 +203,27 @@ def _tool_pin() -> dict[str, Any]:
     """
     root = Path(__file__).resolve().parent
     installed = any(part in ("site-packages", "dist-packages") for part in root.parts)
+    if installed:
+        # Asking git from inside site-packages answers for whatever repository the
+        # environment happens to sit in -- a virtualenv inside the client's checkout
+        # reported the client's commit as this tool's. An installed wheel has no
+        # commit of its own, so git is not asked.
+        return _absent("no_checkout")
     try:
         out = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
             capture_output=True, text=True, timeout=10, check=False,
         )
+        tracked = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--error-unmatch", Path(__file__).name],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
     except (OSError, subprocess.SubprocessError):
-        return _absent("no_checkout" if installed else "vcs_unavailable")
-    if out.returncode != 0:
-        return _absent("no_checkout" if installed else "not_a_repository")
+        return _absent("vcs_unavailable")
+    if out.returncode != 0 or tracked.returncode != 0:
+        # Not a repository, or a repository that does not track this file: in the
+        # second case the commit would belong to someone else's tree.
+        return _absent("not_a_repository")
     commit = out.stdout.strip()
     dirty = subprocess.run(
         ["git", "-C", str(root), "status", "--porcelain"],

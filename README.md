@@ -58,6 +58,17 @@ The same server, packaged with a skill, so there is no config file to edit:
 Then `/qrp:pqc-scan` in any project. Both routes need [`uv`](https://docs.astral.sh/uv/) on
 your PATH, since `uvx` is what fetches and runs the server.
 
+### Without an agent: write the result to a file
+
+```
+uvx qrp-mcp scan ~/code/my-protocol --out result.json
+```
+
+This produces the same result as the `scan_repo` tool, written to a file you can read
+before it goes anywhere. Nothing is sent. `--level trimmed` removes the quoted lines of
+code but keeps each file and line number. The SHA-256 of the written bytes is printed,
+so anyone you send the file to can quote back exactly what they received.
+
 ## Tools
 
 | Tool | What it does |
