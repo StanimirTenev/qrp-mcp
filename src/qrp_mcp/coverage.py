@@ -24,6 +24,7 @@ and not-looked-at.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,8 @@ PIN_ABSENT = {
                         "exist and does not",
     "vcs_unavailable": "git could not be run here; a pin may exist and was not "
                        "reachable from this run",
+    "not_tracked": "inside a repository that does not track this directory (ignored "
+                   "or untracked); the repository's commit does not describe it",
 }
 
 
@@ -159,10 +162,7 @@ def _git_pin(repo_path: Path) -> dict[str, Any]:
     def git(*args: str) -> str | None:
         nonlocal reachable
         try:
-            out = subprocess.run(
-                ["git", "-C", str(repo_path), *args],
-                capture_output=True, text=True, timeout=10, check=False,
-            )
+            out = _run_git(repo_path, *args)
         except (OSError, subprocess.SubprocessError):
             reachable = False
             return None
@@ -171,20 +171,60 @@ def _git_pin(repo_path: Path) -> dict[str, Any]:
     commit = git("rev-parse", "HEAD")
     if not commit:
         return _absent("vcs_unavailable" if not reachable else "not_a_repository")
+    if not git("ls-files", "--", "."):
+        # An ignored build directory inside a checkout: HEAD exists, but nothing
+        # scanned here is in it.
+        return _absent("not_tracked")
 
-    shallow = (repo_path / ".git" / "shallow").exists()
+    # `git status` is the one call here that can run programs the scanned repository
+    # configured for itself: an fsmonitor hook, or a clean filter consulted while
+    # comparing a changed file. The scanned code is not the user's, so its
+    # configuration is not trusted. fsmonitor is switched off on every call; if the
+    # repository still names an external program, status is not run at all and the
+    # flag says it was not checked rather than guessing.
+    runs_programs = git("config", "--local", "--includes", "--get-regexp", _REPO_PROGRAM_KEYS)
+    dirty_state: dict[str, Any]
+    if runs_programs:
+        dirty_state = {
+            "dirty": None,
+            "dirty_not_checked": "the repository configures external programs "
+                                 "(filters or hooks); status was not run on it",
+        }
+    else:
+        dirty_state = {"dirty": bool(git("status", "--porcelain", "--", "."))}
+
+    shallow = git("rev-parse", "--is-shallow-repository") == "true"
     return {
         "pinned": True,
         "kind": "git",
         "commit": commit,
         "committed_at": git("log", "-1", "--format=%cI"),
-        "dirty": bool(git("status", "--porcelain")),
+        **dirty_state,
         # A shallow clone has no history and, more to the point here, none of the
         # build output or dependency trees a working checkout carries. The same
         # tool over the same commit counts a different denominator in the two,
         # which is a condition of collection rather than a property of the estate.
         "shallow": shallow,
     }
+
+
+# Repository-local keys under which git may start a program during status.
+_REPO_PROGRAM_KEYS = r"^(filter\..*\.(clean|smudge|process)|core\.fsmonitor|core\.hookspath)$"
+
+
+def _run_git(where: Path, *args: str) -> subprocess.CompletedProcess:
+    """git with the scanned repository's program hooks disarmed.
+
+    No pager, no prompt, no optional locks (a read must not write the index), and
+    fsmonitor off regardless of what the repository's own config says.
+    """
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0",
+               GIT_PAGER="cat", PAGER="cat")
+    return subprocess.run(
+        ["git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
+         "--no-optional-locks", "-C", str(where), *args],
+        capture_output=True, text=True, timeout=10, check=False, env=env,
+    )
 
 
 def _tool_pin() -> dict[str, Any]:
@@ -210,14 +250,8 @@ def _tool_pin() -> dict[str, Any]:
         # commit of its own, so git is not asked.
         return _absent("no_checkout")
     try:
-        out = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=10, check=False,
-        )
-        tracked = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "--error-unmatch", Path(__file__).name],
-            capture_output=True, text=True, timeout=10, check=False,
-        )
+        out = _run_git(root, "rev-parse", "HEAD")
+        tracked = _run_git(root, "ls-files", "--error-unmatch", Path(__file__).name)
     except (OSError, subprocess.SubprocessError):
         return _absent("vcs_unavailable")
     if out.returncode != 0 or tracked.returncode != 0:
@@ -225,10 +259,7 @@ def _tool_pin() -> dict[str, Any]:
         # second case the commit would belong to someone else's tree.
         return _absent("not_a_repository")
     commit = out.stdout.strip()
-    dirty = subprocess.run(
-        ["git", "-C", str(root), "status", "--porcelain"],
-        capture_output=True, text=True, timeout=10, check=False,
-    )
+    dirty = _run_git(root, "status", "--porcelain")
     return {"pinned": True, "commit": commit, "dirty": bool(dirty.stdout.strip())}
 
 
