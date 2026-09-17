@@ -230,3 +230,144 @@ def test_version_and_help_do_not_start_the_server(capsys, monkeypatch):
     with pytest.raises(SystemExit) as e:
         server.main(["--bogus"])
     assert e.value.code == 2
+
+
+# --- 6. things that look like cryptography and are not ---------------------------
+
+def _families(tmp_path, name, text):
+    (tmp_path / name).write_text(text)
+    return set(scan_directory(str(tmp_path))["detected_algorithms"])
+
+
+def test_kyberswap_is_not_ml_kem(tmp_path):
+    fam = _families(tmp_path, "swap.ts",
+                    "import { KyberSwapClient } from '@kyberswap/sdk';\n")
+    assert "ML-KEM" not in fam
+
+
+def test_kyber_with_a_parameter_set_is_still_ml_kem(tmp_path):
+    assert "ML-KEM" in _families(tmp_path, "k.c", "crypto_kem_keypair_kyber768(pk, sk);\n")
+
+
+def test_release_candidate_suffix_is_not_rc4(tmp_path):
+    fam = _families(tmp_path, "Cargo.toml", '[dependencies]\nhyper = "1.0.0-rc4"\n')
+    assert "RC4" not in fam
+
+
+def test_rc4_as_a_cipher_is_still_found(tmp_path):
+    assert "RC4" in _families(tmp_path, "c.py", "cipher = ARC4.new(key)  # RC4\n")
+
+
+def test_rc4_inside_a_cipher_suite_name_is_still_found(tmp_path):
+    # The first version of the release-suffix fix dropped these (found on OpenSSL).
+    assert "RC4" in _families(tmp_path, "tls1.h",
+                              '#define SSL3_TXT_RSA_RC4_40_MD5 "EXP-RC4-MD5"\n')
+
+
+def test_ppk_variable_in_source_is_not_a_preshared_key(tmp_path):
+    fam = _families(tmp_path, "k.py", "ppk = paramiko.RSAKey.from_private_key_file(p)\n")
+    assert "PPK" not in fam
+
+
+def test_ppk_directive_in_configuration_is_still_found(tmp_path):
+    assert "PPK" in _families(tmp_path, "swanctl.conf", "  ppk = my-ppk-id\n")
+
+
+def test_dotnet_ecdh_is_ecdh_not_finite_field_dh(tmp_path):
+    fam = _families(tmp_path, "k.cs", "using var e = ECDiffieHellman.Create();\n")
+    assert "ECDH" in fam and "DH" not in fam
+
+
+# --- 7. cryptography that was there and was missed ---------------------------------
+
+def test_terraform_ed25519_and_ml_dsa_are_found(tmp_path):
+    fam = _families(tmp_path, "main.tf",
+                    'resource "tls_private_key" "k" { algorithm = "ED25519" }\n'
+                    'customer_master_key_spec = "ML_DSA_65"\n')
+    assert {"Ed25519", "ML-DSA"} <= fam
+
+
+def test_kubernetes_manifest_with_tls_hybrid_group_is_found(tmp_path):
+    fam = _families(tmp_path, "cm.yaml",
+                    "apiVersion: v1\nkind: ConfigMap\ndata:\n"
+                    "  nginx.conf: |\n    ssl_ecdh_curve X25519MLKEM768;\n")
+    assert {"X25519", "ML-KEM"} <= fam
+
+
+def test_algorithm_in_a_ci_pipeline_is_found(tmp_path):
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "build.yml").write_text("steps:\n  - run: openssl req -newkey rsa:2048 -nodes\n")
+    assert "RSA" in set(scan_directory(str(tmp_path))["detected_algorithms"])
+
+
+def test_private_key_pasted_into_source_is_reported(tmp_path):
+    (tmp_path / "k.py").write_text('KEY = """-----BEGIN RSA PRIVATE KEY-----\nMIIB...\n"""\n')
+    r = scan_directory(str(tmp_path))
+    assert r["evidence"]["embedded_keys"]
+
+
+def test_utf16_powershell_script_is_read(tmp_path):
+    (tmp_path / "gen.ps1").write_bytes(
+        "$rsa = [System.Security.Cryptography.RSA]::Create(2048)\n".encode("utf-16"))
+    assert "RSA" in set(scan_directory(str(tmp_path))["detected_algorithms"])
+
+
+def test_config_line_matched_by_both_rule_sets_is_one_occurrence(tmp_path):
+    (tmp_path / "app.yaml").write_text("signing:\n  algorithm: ECDSA\n")
+    r = scan_directory(str(tmp_path))
+    located = [(e["path"], e["line"]) for kind in ("source_code", "iac")
+               for e in r["evidence"][kind] if e["algorithm"] == "ECDSA"]
+    assert located == [("app.yaml", 2)]
+
+
+# --- 8. the CBOM carries what the scan found, and only that -----------------------
+
+def _cbom(tmp_path):
+    from qrp_mcp import cyclonedx
+    return cyclonedx.build(scan_directory(str(tmp_path)))
+
+
+def test_ppk_component_keeps_its_locations(tmp_path):
+    (tmp_path / "swanctl.conf").write_text("  ppk_id = office\n")
+    doc = _cbom(tmp_path)
+    ppk = [c for c in doc["components"] if c["name"].startswith("PPK")][0]
+    assert ppk["evidence"]["occurrences"][0]["location"] == "swanctl.conf"
+
+
+def test_embedded_key_is_not_also_an_algorithm_component(tmp_path):
+    (tmp_path / "k.tf").write_text('key = "-----BEGIN RSA PRIVATE KEY-----"\n')
+    names = [c["name"] for c in _cbom(tmp_path)["components"]]
+    assert "private_key" not in names and "signing_command" not in names
+    assert names.count("Embedded private key material") == 1
+
+
+def test_occurrence_carries_the_matched_line(tmp_path):
+    (tmp_path / "a.py").write_text("h = hashlib.md5(data)\n")
+    occ = [c for c in _cbom(tmp_path)["components"]
+           if c["name"] == "MD5"][0]["evidence"]["occurrences"][0]
+    assert "hashlib.md5" in occ["additionalContext"]
+
+
+def test_unreadable_path_list_survives_a_comma_in_a_name():
+    from qrp_mcp.cyclonedx import _flatten
+    flat = dict(_flatten({"paths": ["a,b.c", "c.c"]}))
+    assert flat == {"paths:0": "a,b.c", "paths:1": "c.c"}
+
+
+def test_serial_changes_when_the_findings_change(tmp_path):
+    (tmp_path / "a.py").write_text("h = hashlib.md5(data)\n")
+    first = _cbom(tmp_path)["serialNumber"]
+    assert _cbom(tmp_path)["serialNumber"] == first
+    (tmp_path / "b.py").write_text("k = rsa.generate_private_key(65537, 2048)\n")
+    assert _cbom(tmp_path)["serialNumber"] != first
+
+
+def test_cbom_builds_when_keys_and_algorithms_are_both_present(tmp_path):
+    # Found on certbot: embedded-key evidence has no 'algorithm', and sorting the
+    # mixed evidence for the serial number raised TypeError.
+    (tmp_path / "a.py").write_text("h = hashlib.md5(data)\n")
+    (tmp_path / "b.py").write_text("h = hashlib.md5(data)\n")
+    (tmp_path / "k.tf").write_text('key = "-----BEGIN RSA PRIVATE KEY-----"\n')
+    (tmp_path / "k2.tf").write_text('key = "-----BEGIN EC PRIVATE KEY-----"\n')
+    assert _cbom(tmp_path)["serialNumber"].startswith("urn:uuid:")

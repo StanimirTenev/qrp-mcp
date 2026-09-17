@@ -57,6 +57,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # invisible to this rule.
         r"asymmetric\s+import\s+[^\n#]*\brsa\b|"
         r"\brsa\.generate_private_key\b|"
+        # .NET / PowerShell factory: RSA.Create() and [System.Security.Cryptography.RSA]::Create()
+        r"\bRSA\]?(?:::|\.)Create\s*\(|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']RSA[\"']|openssl\s+genrsa|-newkey\s+rsa|"
         # C / OpenSSL: the library's own API, which is what a C tree actually contains.
         r"\bRSA_new\b|\bRSA_generate_key\w*|\bRSA_public_encrypt\b|\bRSA_private_decrypt\b|"
@@ -112,10 +114,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         re.IGNORECASE,
     )),
     ("DH", "Diffie-Hellman usage", re.compile(
-        r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|Diffie[- ]?Hellman|"
+        # Not the tail of ECDiffieHellman, which is elliptic-curve and handled there.
+        r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|(?<!EC)Diffie[- ]?Hellman|"
         r"asymmetric\s+import\s+[^\n#]*\bdh\b|\bdh\.generate_parameters\b|"
         r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
-        r"\bECDiffieHellmanCng\b|\bECDiffieHellman\.Create\b|"
         # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
         # finite-field Diffie-Hellman.
         r"(?<![A-Za-z])modp(?:1024|1536|2048|3072|4096|6144|8192)(?![0-9])",
@@ -136,7 +138,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         re.IGNORECASE,
     )),
     ("RC4", "RC4 usage", re.compile(
-        r"crypto/rc4|\bRC4\b|\bRC4_set_key\b|\bEVP_rc4\b", re.IGNORECASE,
+        # Not a release suffix: "1.0.0-rc4" is a version. A cipher suite such as
+        # "EXP-RC4-MD5" also has a dash before it, so only a digit then a dash or dot
+        # marks a version (an earlier, wider exclusion dropped 13 OpenSSL suites).
+        r"crypto/rc4|(?<!\d[-.])\bRC4\b|\bRC4_set_key\b|\bEVP_rc4\b", re.IGNORECASE,
     )),
     ("DES", "DES/3DES usage", re.compile(
         r"crypto/des\b|DESede|3DES|TripleDES|"
@@ -157,7 +162,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # format, and a key file is not a postquantum preshared key.
     ("PPK", "RFC 8784 postquantum preshared key", re.compile(
         r"(?<![A-Za-z])ppk_(?:id|required|secret|dynamic)(?![A-Za-z])|"
-        r"(?<![A-Za-z])ppk[ \t]*=|@ppk(?![A-Za-z])|"
+        r"@ppk(?![A-Za-z])|"
         r"(?<![A-Za-z])ppk[ \t]+(?:manual|dynamic)(?![A-Za-z])|"
         r"RFC[ \t-]?8784",
         re.IGNORECASE,
@@ -189,7 +194,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # Excluding it would have left the most common spelling of the thing
         # invisible while claiming the family was covered.
         r"(?<![A-Za-z])ECDHE?(?![A-Za-z])|\bECDH_compute_key\b|\bEVP_PKEY_ECDH\b|"
-        r"\bec\.ECDH\b|(?<![A-Za-z])ecdh-sha2-nistp(?:256|384|521)",
+        r"\bec\.ECDH\b|(?<![A-Za-z])ecdh-sha2-nistp(?:256|384|521)|"
+        # .NET's elliptic-curve Diffie-Hellman; it was filed under finite-field DH.
+        r"\bECDiffieHellman(?:Cng|OpenSsl)?\b",
         re.IGNORECASE,
     )),
     ("Ed448", "Ed448 usage", re.compile(
@@ -225,7 +232,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # of the scheme. A word boundary refuses both. What does the protective work is
     # the lookbehind for a LETTER -- it is why "FXMSS" still does not match XMSS.
     ("ML-KEM", "ML-KEM (Kyber) usage", re.compile(
-        r"(?<![A-Za-z])ml[-_]?kem|(?<![A-Za-z])kyber|pqcrystals[-_]?kyber|crypto_kem_kyber", re.IGNORECASE,
+        r"(?<![A-Za-z])ml[-_]?kem|(?<![A-Za-z])kyber(?![A-Za-z])|pqcrystals[-_]?kyber|crypto_kem_kyber", re.IGNORECASE,
     )),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
         r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])dilithium|pqcrystals[-_]?dilithium", re.IGNORECASE,
@@ -316,6 +323,10 @@ IAC_ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
 ]
 
+# `ppk = ...` is a directive in a VPN configuration and an ordinary variable name in
+# source code (a paramiko key), so it is matched in configuration files only.
+PPK_CONFIG_ASSIGN = re.compile(r"(?<![A-Za-z])ppk[ \t]*=", re.IGNORECASE)
+
 # PEM private key block header, embedded directly in an IaC file (e.g. a test key checked
 # into a Terraform variable or a Kubernetes Secret manifest).
 EMBEDDED_KEY_PATTERN = re.compile(r"-----BEGIN\s+(?:RSA|EC|DSA|OPENSSH|ENCRYPTED)?\s*PRIVATE KEY-----")
@@ -404,9 +415,16 @@ def _read_lines(path: Path) -> list[str] | None:
     reports those paths separately, so a failed check cannot read as a pass.
     """
     try:
-        return path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        raw = path.read_bytes()
     except OSError:
         return None
+    # Windows PowerShell 5 writes UTF-16 by default; read as UTF-8 it is noise and
+    # the file would count as scanned-clean.
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16", errors="ignore").splitlines()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raw = raw[3:]
+    return raw.decode("utf-8", errors="ignore").splitlines()
 
 
 def is_iac_file(path: Path, repo_path: Path, lines: list[str] | None = None) -> bool:
@@ -474,7 +492,39 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": description,
                 "excerpt": line.strip()[:200],
             })
+        if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": "PPK",
+                "description": "RFC 8784 postquantum preshared key",
+                "excerpt": line.strip()[:200],
+            })
     return findings
+
+
+def scan_embedded_keys(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """PEM private-key headers in any text file. A key pasted into source code is
+    as exposed as one in a Terraform variable."""
+    return [
+        {"path": rel_path, "line": line_no,
+         "description": "Embedded private key material", "excerpt": line.strip()[:200]}
+        for line_no, line in enumerate(lines, start=1)
+        if EMBEDDED_KEY_PATTERN.search(line)
+    ]
+
+
+def _merge(into: list[dict[str, Any]], extra: list[dict[str, Any]],
+           already: list[dict[str, Any]] | None = None) -> None:
+    """Append findings not already reported for the same file, line and algorithm.
+    A config line such as `algorithm: ECDSA` is matched by both rule sets; it is
+    one occurrence, not two."""
+    seen = {(f["path"], f["line"], f["algorithm"]) for f in into + (already or [])}
+    for f in extra:
+        key = (f["path"], f["line"], f["algorithm"])
+        if key not in seen:
+            seen.add(key)
+            into.append(f)
 
 
 def scan_ci_file(path: Path, rel_path: str,
@@ -582,14 +632,22 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         elif is_ci:
             files_scanned["ci_config"] += 1
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
+            # A pipeline also names algorithms (`openssl req -newkey rsa:2048`).
+            source_findings.extend(
+                scan_source_file(path, rel_path, lines, cipher_exclusions=True))
         elif is_iac_file(path, repo_path, lines):
             files_scanned["iac"] += 1
             algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
+            # Terraform and manifests also carry Ed25519 keys, ML-DSA key specs and
+            # embedded TLS configuration; the two IaC rules alone missed them.
+            _merge(algo_findings,
+                   scan_source_file(path, rel_path, lines, cipher_exclusions=True))
             iac_findings.extend(algo_findings)
             embedded_key_findings.extend(key_findings)
         elif path.suffix.lower() in SOURCE_EXTENSIONS:
             files_scanned["source"] += 1
             source_findings.extend(scan_source_file(path, rel_path, lines))
+            embedded_key_findings.extend(scan_embedded_keys(rel_path, lines))
         else:
             # Configuration: the extensions above, and any YAML that is not a
             # manifest. This branch exists so that nothing can be opened and then
@@ -601,10 +659,10 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
             # cipher list reads like source, a key algorithm declaration reads like
             # infrastructure.
             files_scanned["config"] += 1
-            source_findings.extend(
-                scan_source_file(path, rel_path, lines, cipher_exclusions=True))
+            src = scan_source_file(path, rel_path, lines, cipher_exclusions=True)
+            source_findings.extend(src)
             algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
-            iac_findings.extend(algo_findings)
+            _merge(iac_findings, algo_findings, already=src)
             embedded_key_findings.extend(key_findings)
 
     # Entries the walk could see but not read count as present and unreadable, so the

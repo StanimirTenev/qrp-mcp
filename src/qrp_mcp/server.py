@@ -112,9 +112,10 @@ def export_cbom(
     `additionalProperties: false` and the format has no field for it. That is the point
     of emitting it this way rather than a limitation to work around.
 
-    Output is deterministic: the timestamp comes from the scan window and the serial
-    number from the target and the two pins, so two runs of the same code over the same
-    corpus produce the same document and two runs of different code do not.
+    The serial number is derived from the target, the two pins and a digest of the
+    findings, so two runs of the same code over the same corpus that find the same things
+    share it and a different result does not. The timestamp and coverage window record
+    when each run happened.
     """
     return cyclonedx.build(scan_directory(path))
 

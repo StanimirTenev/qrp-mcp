@@ -11,7 +11,8 @@ classifies each one: broken by a quantum computer, post-quantum, or neither.
 
 **Everything runs on your machine.** No network calls, no account, no API key, nothing
 uploaded. A tool that reads your keys' surroundings has no business phoning home, so this one
-makes zero outbound connections — enforced by a test, not promised in a paragraph.
+makes zero outbound connections — enforced by a test, not promised in a paragraph. The only process it
+starts is a local `git`, to pin what it read, with the scanned repository's own hooks and filters disarmed.
 
 ## Why this matters for chains and wallets
 
@@ -224,9 +225,10 @@ things travel in it that a component list alone cannot say:
   rather than something to hide.
 - `evidence.occurrences` — file, line and matched text for every asset.
 
-Output is deterministic: the timestamp comes from the scan window and the serial number from the
-target and the two pins, so the same code over the same corpus produces the same document and
-different code does not.
+Output is deterministic where it matters. The serial number is derived from the target, the two
+pins and a digest of what was found, so the same code over the same corpus that finds the same
+things gets the same serial, and a different result gets a different one. The timestamp and the
+coverage window record when the run happened, so those fields differ between runs.
 
 ## Why deterministic
 
@@ -245,7 +247,9 @@ manifests. It does not read documentation, binaries or images.
 Every file under the path is accounted for in one of three ways: **scanned**, **unreadable**,
 or **skipped because the tool does not claim that type** — the last counted by extension, so
 the coverage figure has a base. `files_scanned + unreadable_files + files_skipped_by_type`
-always equals `files_present`. A scan that read seven files out of nine is a different report
+always equals `files_present`. A directory the scan cannot enter or list is named in
+`unreadable_directories`; its files cannot be counted, so the scan then says it cannot account
+for every file instead of claiming it read them all. A scan that read seven files out of nine is a different report
 from one that read seven out of four hundred, and only one of them is worth trusting.
 
 A **free inventory tool**, not a readiness assessment. It deliberately does not do:

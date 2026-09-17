@@ -47,7 +47,7 @@ DOTNET_POWERSHELL = [
     # boundary refused both halves of that.
     ("New-SelfSignedCertificate -KeyAlgorithm ECDSA_nistP256", "ECDSA"),
     ("$k = [System.Security.Cryptography.ECDsaCng]::new()", "ECDSA"),
-    ("$dh = [System.Security.Cryptography.ECDiffieHellmanCng]::new()", "DH"),
+    ("$dh = [System.Security.Cryptography.ECDiffieHellmanCng]::new()", "ECDH"),
     ("$h = [System.Security.Cryptography.SHA1Managed]::new()", "SHA1"),
     ("$m = [System.Security.Cryptography.MD5CryptoServiceProvider]::new()", "MD5"),
 ]

@@ -32,9 +32,10 @@ Three things travel that a bare component list cannot say:
 
 Determinism is a requirement rather than a nicety, because the comparison tool in
 `coverage.compare` reads these documents. Two runs of the same instrument over the
-same corpus produce byte-identical output: the timestamp comes from the coverage
-window rather than from the clock, and the serial number is derived from the target
-and the two pins rather than drawn at random. Two runs whose instrument differs get
+same corpus that find the same things get the same serial number: it is derived from
+the target, the two pins and a digest of the findings and counts rather than drawn at
+random. The timestamp and the coverage window record when each run happened, so those
+fields differ between runs; everything else is identical. Two runs whose instrument differs get
 different serial numbers, which is the pin argument stated in one field.
 """
 
@@ -117,7 +118,10 @@ def _flatten(value: Any, path: str = "") -> list[tuple[str, str]]:
     if isinstance(value, list):
         if not value:
             return [(path, "")]
-        if all(not isinstance(item, (dict, list)) for item in value):
+        # A set of scalars is joined, unless an item itself contains the separator
+        # (a file called "a,b.c"); then it is indexed, so the list reads back exactly.
+        if (all(not isinstance(item, (dict, list)) for item in value)
+                and not any("," in str(item) for item in value)):
             return [(path, ",".join(str(item) for item in value))]
         out = []
         for index, item in enumerate(value):
@@ -130,7 +134,7 @@ def _flatten(value: Any, path: str = "") -> list[tuple[str, str]]:
     return [(path, str(value))]
 
 
-def _serial(coverage: dict[str, Any]) -> str:
+def _serial(coverage: dict[str, Any], findings_digest: str = "") -> str:
     """A serial number that is a function of the run, not of the moment.
 
     Same instrument over the same corpus gives the same document; a different
@@ -147,23 +151,53 @@ def _serial(coverage: dict[str, Any]) -> str:
         str(corpus_pin.get("commit") or corpus_pin.get("reason") or ""),
         instrument["version"],
         str(tool_pin.get("commit") or tool_pin.get("reason") or ""),
+        # What was found and how much was read: a directory that is not under git
+        # can change without any pin changing, and a different result must not
+        # share a serial with the old one.
+        findings_digest,
     ])
     return f"urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, seed)}"
 
 
-def _occurrences(findings: list[dict[str, Any]], family: str) -> list[dict[str, Any]]:
+def _occurrences(located: list[dict[str, Any]], family: str,
+                 family_of: dict[str, str]) -> list[dict[str, Any]]:
+    """Where a family was found. The detector names what it matched ("PPK"); the
+    classifier names the family ("PPK (RFC 8784)"), so the evidence is joined
+    through the findings' own raw_value -> family pairs rather than by string
+    equality, which silently dropped every PPK location."""
     return [
         {
             "location": item["path"],
             "line": item["line"],
-            # The call site or matched text. The reference emitter carries the
-            # same field for the same purpose, so a reader comparing the two
-            # documents is comparing like with like.
-            "additionalContext": item.get("description") or item.get("excerpt", ""),
+            # The matched line when the scan kept it (a 'trimmed' scan does not),
+            # otherwise what the rule looks for.
+            "additionalContext": item.get("excerpt") or item.get("description", ""),
         }
-        for item in findings
-        if item.get("algorithm") == family
+        for item in located
+        if family_of.get(item.get("algorithm"), item.get("algorithm")) == family
     ]
+
+
+# Findings that are not algorithms. Signing commands are counted in the document
+# properties; embedded keys become related-crypto-material below.
+_NOT_ALGORITHMS = {"signing_command", "private_key"}
+
+
+def _findings_digest(scan_result: dict[str, Any]) -> str:
+    import hashlib
+    import json
+    material = {
+        "findings": sorted((f["algorithm_family"], f["classification"])
+                           for f in scan_result["findings"]),
+        # Embedded-key items carry neither an algorithm nor a command type; every
+        # part is made a string so mixed items sort.
+        "evidence": sorted((str(e.get("path")), str(e.get("line")),
+                            str(e.get("algorithm") or e.get("command_type") or e.get("description")))
+                           for items in scan_result["evidence"].values() for e in items),
+        "scope": {k: scan_result["coverage"]["scope"].get(k)
+                  for k in ("files_present", "files_examined", "files_not_examined")},
+    }
+    return hashlib.sha256(json.dumps(material, sort_keys=True, default=str).encode()).hexdigest()
 
 
 def build(scan_result: dict[str, Any]) -> dict[str, Any]:
@@ -173,7 +207,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     instrument = coverage["instrument"]
 
     located = list(scan_result["evidence"]["source_code"]) + list(scan_result["evidence"]["iac"])
-    by_family = {f["algorithm_family"]: f for f in scan_result["findings"]}
+    by_family = {f["algorithm_family"]: f for f in scan_result["findings"]
+                 if f["algorithm_family"] not in _NOT_ALGORITHMS}
+    family_of = {f["raw_value"]: f["algorithm_family"] for f in scan_result["findings"]
+                 if f.get("raw_value") and f.get("algorithm_family")}
 
     components: list[dict[str, Any]] = []
     for family in sorted(by_family):
@@ -198,7 +235,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         for key in ("pqc_family", "pqc_status"):
             if finding.get(key):
                 component["properties"].append({"name": f"{NS}{key}", "value": finding[key]})
-        occurrences = _occurrences(located, family)
+        occurrences = _occurrences(located, family, family_of)
         if occurrences:
             component["evidence"] = {"occurrences": occurrences}
         components.append(component)
@@ -212,7 +249,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "cryptoProperties": {"assetType": "related-crypto-material"},
             "evidence": {"occurrences": [
                 {"location": k["path"], "line": k["line"],
-                 "additionalContext": k.get("description", "")}
+                 "additionalContext": k.get("excerpt") or k.get("description", "")}
                 for k in keys
             ]},
         })
@@ -231,7 +268,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     document: dict[str, Any] = {
         "bomFormat": "CycloneDX",
         "specVersion": SPEC_VERSION,
-        "serialNumber": _serial(coverage),
+        "serialNumber": _serial(coverage, _findings_digest(scan_result)),
         "version": 1,
         "metadata": {
             "timestamp": coverage["window"]["started_at"],
