@@ -172,6 +172,13 @@ def scan_to_file(argv: list[str]) -> int:
                    help="'trimmed' removes the lines of code quoted as evidence; "
                         "files and line numbers stay")
     a = p.parse_args(argv)
+    # A path or file name the console cannot encode must not fail the run after the
+    # scan has finished.
+    sys.stderr.reconfigure(errors="backslashreplace")
+    if not Path(a.path).expanduser().is_dir():
+        p.error(f"not a directory: {a.path}")
+    if a.out and not Path(a.out).expanduser().resolve().parent.is_dir():
+        p.error(f"the folder for --out does not exist: {Path(a.out).parent}")
 
     result = scan_directory(a.path)
     if a.level == "trimmed":
@@ -187,11 +194,29 @@ def scan_to_file(argv: list[str]) -> int:
     return 0
 
 
+USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MCP clients run)
+       qrp-mcp scan PATH [--out FILE] [--level full|trimmed]
+                               scan a directory and write the result as JSON
+       qrp-mcp --version
+"""
+
+
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
-    if argv[:1] == ["scan"]:
+    if not argv:
+        mcp.run()
+        return
+    if argv[0] == "scan":
         raise SystemExit(scan_to_file(argv[1:]))
-    mcp.run()
+    if argv[0] in ("-h", "--help", "help"):
+        print(USAGE, end="")
+        raise SystemExit(0)
+    if argv[0] in ("-V", "--version"):
+        print(f"qrp-mcp {__version__}")
+        raise SystemExit(0)
+    # Anything else used to start the server silently, which looks like a hang.
+    print(f"qrp-mcp: unknown argument {argv[0]!r}\n\n{USAGE}", end="", file=sys.stderr)
+    raise SystemExit(2)
 
 
 if __name__ == "__main__":

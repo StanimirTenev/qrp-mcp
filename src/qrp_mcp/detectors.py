@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -320,7 +321,18 @@ IAC_ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
 EMBEDDED_KEY_PATTERN = re.compile(r"-----BEGIN\s+(?:RSA|EC|DSA|OPENSSH|ENCRYPTED)?\s*PRIVATE KEY-----")
 
 
-def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = None):
+def display_path(rel: str) -> str:
+    """A relative path that can always be printed and serialised.
+
+    A file name that is not valid UTF-8 comes back from the filesystem with
+    surrogate escapes; JSON and MCP serialisation reject those, which used to fail
+    the whole scan. The bytes are kept visible as backslash escapes instead.
+    """
+    return os.fsencode(rel).decode("utf-8", "backslashreplace")
+
+
+def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = None,
+                    problems: list[tuple[str, str]] | None = None):
     """Every file under the path, minus the vendored and generated directories.
 
     The exclusion is counted rather than silent. A directory name dropped here
@@ -328,17 +340,45 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
     not declare itself is the same defect this scanner exists to refuse -- and
     git will not tell you it happened, because build output is usually ignored
     and an ignored file leaves the tree reporting clean.
+
+    What the walk cannot see is reported in ``problems`` as ("dir", path) for a
+    directory it could not enter or list, and ("file", path) for an entry that is
+    not a readable regular file (a broken link, a permission error on stat).
+    Before this, such directories vanished and the scan still said it had read
+    every file. Only directory names exclude: a *file* called ``build`` is a file.
     """
-    for path in sorted(repo_path.rglob("*")):
-        if not path.is_file():
-            continue
-        hit = next((part for part in path.relative_to(repo_path).parts
-                    if part in EXCLUDED_DIRS), None)
-        if hit is not None:
-            if excluded_counter is not None:
-                excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
-            continue
-        yield path
+    def rel(p: str) -> str:
+        return display_path(Path(p).relative_to(repo_path).as_posix())
+
+    def onerror(err: OSError) -> None:
+        if problems is not None and err.filename:
+            problems.append(("dir", rel(err.filename)))
+
+    found: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(repo_path, onerror=onerror):
+        dirnames.sort()
+        dir_parts = Path(dirpath).relative_to(repo_path).parts
+        hit = next((part for part in dir_parts if part in EXCLUDED_DIRS), None)
+        for name in filenames:
+            path = Path(dirpath) / name
+            if hit is not None:
+                if excluded_counter is not None:
+                    excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
+                continue
+            try:
+                regular = path.is_file()
+                broken = not regular and (path.is_symlink() or not path.exists())
+            except OSError:
+                # Listed but not stat-able: a directory that can be read but not entered.
+                regular, broken = False, True
+            if not regular:
+                # Sockets, FIFOs and devices are not files the tool reads; a broken or
+                # unreachable entry is a file it could not read, and says so.
+                if broken and problems is not None:
+                    problems.append(("file", rel(str(path))))
+                continue
+            found.append(path)
+    yield from sorted(found)
 
 
 def is_ci_config_file(path: Path, repo_path: Path) -> bool:
@@ -496,7 +536,9 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     present_kinds: dict[str, int] = {}
     excluded_dir_counts: dict[str, int] = {}
 
-    for path in iter_repo_files(repo_path, excluded_dir_counts):
+    walk_problems: list[tuple[str, str]] = []
+    unreadable_dirs: list[str] = []
+    for path in iter_repo_files(repo_path, excluded_dir_counts, walk_problems):
         files_present += 1
         # The composition of the denominator, not just its size. A coverage figure
         # is a property of the tool crossed with what the corpus is made of: the
@@ -505,7 +547,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # reproducible; composition is what makes it interpretable.
         kind = path.suffix.lower() or "(no extension)"
         present_kinds[kind] = present_kinds.get(kind, 0) + 1
-        rel_path = path.relative_to(repo_path).as_posix()
+        rel_path = display_path(path.relative_to(repo_path).as_posix())
         is_ci = is_ci_config_file(path, repo_path)
         # Every comparison is lowercased, and the reason is a defect this line
         # produced. OpenSSL carries thirteen files with upper-case extensions --
@@ -565,8 +607,22 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
             iac_findings.extend(algo_findings)
             embedded_key_findings.extend(key_findings)
 
+    # Entries the walk could see but not read count as present and unreadable, so the
+    # invariant still holds. Directories it could not enter have an unknown number of
+    # files in them; they are listed separately and the scan cannot claim to account
+    # for every file.
+    for kind, rel in walk_problems:
+        if kind == "file":
+            files_present += 1
+            present_kinds["(unreadable entry)"] = present_kinds.get("(unreadable entry)", 0) + 1
+            unreadable.append(rel)
+        else:
+            unreadable_dirs.append(rel + "/")
+
     return {
         "files_scanned": files_scanned,
+        # Directories that could not be entered or listed; their files are unknown.
+        "unreadable_directories": sorted(set(unreadable_dirs)),
         # Files found under the path, excluding the vendored and build directories in
         # EXCLUDED_DIRS. present = scanned + unreadable + skipped, always.
         "files_present": files_present,

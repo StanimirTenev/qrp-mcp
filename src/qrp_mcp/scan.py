@@ -50,7 +50,8 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
     # (The gateway's ingest contract routes them through package_metadata instead, which
     # deliberately leaves them unclassified for server-side correlation -- not useful here.)
     request = FingerprintRequest(
-        asset_name=repo_path.name,
+        # A filesystem root has no name ("/" or "D:\\"); the model requires one.
+        asset_name=detectors.display_path(repo_path.name or str(repo_path)),
         algorithms=scan_result["detected_algorithms"],
         crypto_evidence={"repo_scan": scan_result},
     )
@@ -79,7 +80,7 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
     )
 
     return {
-        "target": str(repo_path),
+        "target": detectors.display_path(str(repo_path)),
         # One sentence for whoever signs the report rather than runs the tool.
         # The block below is the evidence for it.
         "verdict": coverage.verdict_line(coverage_block),
@@ -91,6 +92,7 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
         "files_present": scan_result["files_present"],
         "files_skipped_by_type": scan_result["files_skipped_by_type"],
         "unreadable_files": scan_result["unreadable_files"],
+        "unreadable_directories": scan_result["unreadable_directories"],
         "detected_algorithms": scan_result["detected_algorithms"],
         "findings": [f.model_dump() for f in response.findings],
         "summary": response.summary.model_dump(),

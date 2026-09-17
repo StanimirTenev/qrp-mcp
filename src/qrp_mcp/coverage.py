@@ -307,6 +307,7 @@ def build(
         },
     ]
     accounted = examined + sum(r["count"] for r in not_examined)
+    dirs_not_entered = scan_result.get("unreadable_directories", [])
 
     excluded = scan_result.get("files_excluded_by_dir", {})
 
@@ -372,9 +373,18 @@ def build(
         # was in it".
         "claims": _claims(None),
         "not_examined": not_examined,
-        # present == examined + every not-examined reason. Asserted in the output
-        # rather than in a test, so a reader can check it without trusting us.
-        "accounts_for_every_file": accounted == present,
+        # Directories the walk could not enter. Their files are not in any count
+        # above, because nobody knows how many there are.
+        "directories_not_entered": {
+            "count": len(dirs_not_entered),
+            "paths": dirs_not_entered,
+            "meaning": "could not be entered or listed; the files inside are unknown "
+                       "and are not in files_present",
+        },
+        # present == examined + every not-examined reason, and nothing was hidden
+        # from the walk. Asserted in the output rather than in a test, so a reader
+        # can check it without trusting us.
+        "accounts_for_every_file": accounted == present and not dirs_not_entered,
     }
 
 
@@ -409,6 +419,8 @@ INCOMPARABLE = {
 # because the repairs differ: an incomparable pair is a fact about two runs, an
 # unestablished one is a gap in what the documents carry.
 UNESTABLISHED = {
+    "block_incomplete": "at least one block lacks fields the comparison needs, so "
+                        "whether the runs can be compared is not known from them",
     "instrument_unpinned": "at least one run does not name the commit of its own "
                            "emitter, so two identical version strings cannot be "
                            "shown to be the same code",
@@ -453,14 +465,16 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
         if corpus_a.get("shallow") != corpus_b.get("shallow"):
             reasons.append("corpus_depth_differs")
 
-    if first["instrument"]["version"] != second["instrument"]["version"]:
-        reasons.append("instrument_version_differs")
-    if first["instrument"]["ruleset"] != second["instrument"]["ruleset"]:
-        reasons.append("ruleset_differs")
-    if first["instrument"]["claimed_types"] != second["instrument"]["claimed_types"]:
-        reasons.append("claimed_types_differ")
-    if first["instrument"]["excluded_dirs"] != second["instrument"]["excluded_dirs"]:
-        reasons.append("excluded_dirs_differ")
+    inst_a, inst_b = _pin_of(first, "instrument"), _pin_of(second, "instrument")
+    for field, reason in (("version", "instrument_version_differs"),
+                          ("ruleset", "ruleset_differs"),
+                          ("claimed_types", "claimed_types_differ"),
+                          ("excluded_dirs", "excluded_dirs_differ")):
+        if field not in inst_a or field not in inst_b:
+            if "block_incomplete" not in unestablished:
+                unestablished.append("block_incomplete")
+        elif inst_a[field] != inst_b[field]:
+            reasons.append(reason)
 
     if reasons:
         verdict = "not_comparable"
@@ -473,10 +487,12 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
         "verdict": verdict,
         "differences": [{"reason": r, "meaning": INCOMPARABLE[r]} for r in reasons],
         "unestablished": [{"reason": r, "meaning": UNESTABLISHED[r]} for r in unestablished],
-        "coverage_pct": [first["scope"]["coverage_pct"], second["scope"]["coverage_pct"]],
+        "coverage_pct": [_pin_of(first, "scope").get("coverage_pct"),
+                         _pin_of(second, "scope").get("coverage_pct")],
         # Shown, not compared. Two paths differing says nothing about whether the
         # runs read the same estate, and a reader who wants that reads the commits.
-        "targets": [first["corpus"]["target"], second["corpus"]["target"]],
+        "targets": [_pin_of(first, "corpus").get("target"),
+                    _pin_of(second, "corpus").get("target")],
     }
 
 
@@ -488,6 +504,11 @@ def verdict_line(block: dict[str, Any]) -> str:
     the version-versus-commit failure in miniature.
     """
     scope = block["scope"]
+    hidden = (block.get("directories_not_entered") or {}).get("count", 0)
+    if hidden:
+        return (f"This scan cannot account for every file: {hidden} "
+                f"director{'y' if hidden == 1 else 'ies'} could not be entered, so the "
+                f"{scope['files_present']} files counted are not all there were.")
     if not block["accounts_for_every_file"]:
         return (f"This scan cannot account for every file: {scope['files_present']} were "
                 f"present and the reasons given do not add up to them.")
