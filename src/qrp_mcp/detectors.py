@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .certificates import is_certificate_file, scan_certificate_file
+from .certificates import is_certificate_file, looks_like_key_file, scan_certificate_file
 
 SOURCE_EXTENSIONS = {
     ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
@@ -70,6 +70,18 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # invisible to this rule.
         r"asymmetric\s+import\s+[^\n#]*\brsa\b|"
         r"\brsa\.generate_private_key\b|"
+        # Where the algorithm is actually used. Measured against Cryben: RSA
+        # scored 0 of 11 on the exact line, because only the import was read.
+        # Go's standard library, and the x509 helpers named after PKCS#1.
+        r"\brsa\.(?:GenerateKey|GenerateMultiPrimeKey|EncryptOAEP|DecryptOAEP|"
+        r"EncryptPKCS1v15|DecryptPKCS1v15|SignPSS|VerifyPSS|SignPKCS1v15|VerifyPKCS1v15)\b|"
+        r"\bx509\.(?:Parse|Marshal)PKCS1(?:Private|Public)Key\b|"
+        # Ruby, Java, Node, Rust, PKCS#11.
+        r"OpenSSL::PKey::RSA\b|"
+        r"\w*withRSA(?:andMGF1)?\b|Cipher\.getInstance\(\s*[\"']RSA[/\"']|"
+        r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']rsa[\"']|"
+        r"\bRsaPrivateKey\b|\bRsaPublicKey\b|"
+        r"\bCKM_RSA_\w+|"
         # The names protocols and APIs use for the key type itself. OpenSSH's default
         # algorithm list, sshd_config, Vault's key types and AWS key specs name RSA
         # this way and nothing else here reached them: every other family on those
@@ -79,6 +91,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bRSA_(?:1024|2048|3072|4096|8192)\b|"
         # .NET / PowerShell factory: RSA.Create() and [System.Security.Cryptography.RSA]::Create()
         r"\bRSA\]?(?:::|\.)Create\s*\(|"
+        # OpenSSL's low-level accessors, which a C tree uses far more than the
+        # constructors: RSA_get0_key, RSA_set0_crt_params, EVP_PKEY_get1_RSA.
+        r"\bRSA_(?:get|set)[01]_\w+|\bEVP_PKEY_get[01]_RSA\b|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']RSA[\"']|openssl\s+genrsa|-newkey\s+rsa|"
         # C / OpenSSL: the library's own API, which is what a C tree actually contains.
         r"\bRSA_new\b|\bRSA_generate_key\w*|\bRSA_public_encrypt\b|\bRSA_private_decrypt\b|"
@@ -93,6 +108,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"Crypto\.PublicKey\s+import\s+DSA|"
         r"hazmat\.primitives\.asymmetric\.dsa|crypto/dsa|"
         r"asymmetric\s+import\s+[^\n#]*\bdsa\b|\bdsa\.generate_private_key\b|"
+        # The call sites, as for RSA above. "withDSA" cannot reach withECDSA:
+        # that text has no "withDSA" in it.
+        r"\bdsa\.(?:GenerateKey|GenerateParameters|Sign|Verify)\b|"
+        r"OpenSSL::PKey::DSA\b|\w*withDSA\b|\bDsa::generate\b|\bDSA\.generate\b|"
+        r"\bCKM_DSA_\w+|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
         r"\bDSA_new\b|\bDSA_generate_key\w*|\bEVP_PKEY_DSA\b|"
         r"\bDSACryptoServiceProvider\b|\bDSACng\b|"
@@ -103,6 +123,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"crypto/ecdsa|(?<![A-Za-z])ECDSA|"
         # C / OpenSSL.
         r"\bECDSA_do_sign\b|\bECDSA_sign\b|\bECDSA_verify\b|\bECDSA_SIG_\w+|"
+        r"\w*withECDSA\b|"
         # .NET spells it ECDsa, so \bECDSA\b does not reach ECDsaCng or
         # ECDsaCertificateExtensions -- the exact call our own Windows agent makes.
         r"\bECDsaCng\b|\bECDsaOpenSsl\b|\bECDsa\.Create\b|"
@@ -120,7 +141,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"asymmetric\s+import\s+[^\n#]*\bec\b|"
         r"\bec\.(?:generate_private_key|derive_private_key|SECP\w+|SECT\w+)\b|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']EC[\"']|openssl\s+ecparam|"
-        r"\bEC_KEY_new\w*|\bEC_GROUP_new\w*|\bEVP_PKEY_EC\b|\bEC_POINT_\w+|"
+        r"\bEC_KEY_new\w*|\bEC_KEY_generate_key\b|\bEC_GROUP_new\w*|\bEVP_PKEY_EC\b|\bEC_POINT_\w+|"
+        r"OpenSSL::PKey::EC\b|\bgenerateKeyPair(?:Sync)?\(\s*[\"']ec[\"']|"
+        r"\bx509\.(?:Parse|Marshal)ECPrivateKey\b|"
         r"\bECCurve\.|\bECParameters\b|"
         # IKE proposal syntax: ecp384 is NIST P-384 and lives in swanctl.conf,
         # where a scanner reading only library calls never meets it.
@@ -131,7 +154,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # invisible -- found missing against the Olewinski et al. (ARES 2026)
         # ground truth. `secp256r1` also reaches Java `ECGenParameterSpec`. The
         # explicit r1/v1 suffix is what keeps secp256k1 routed to ECDSA below.
-        r"(?<![A-Za-z])(?:prime(?:192|256)v1|secp(?:192|224|256|384|521)r1)(?![0-9])",
+        r"(?<![A-Za-z])(?:prime(?:192|256)v1|secp(?:192|224|256|384|521)r1)(?![0-9])|"
+        # The bare names OpenSSH and Java write for the same curves.
+        r"(?<![A-Za-z])nistp(?:256|384|521)(?![0-9])",
         re.IGNORECASE,
     )),
     ("DH", "Diffie-Hellman usage", re.compile(
@@ -170,10 +195,31 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # marks a version (an earlier, wider exclusion dropped 13 OpenSSL suites).
         r"crypto/rc4|(?<!\d[-.])\bRC4\b|\bRC4_set_key\b|\bEVP_rc4\b", re.IGNORECASE,
     )),
-    ("DES", "DES/3DES usage", re.compile(
-        r"crypto/des\b|DESede|3DES|TripleDES|"
-        r"\bDES_set_key\w*|\bDES_ecb_encrypt\b|\bEVP_des_\w+|"
-        r"\bDESCryptoServiceProvider\b|\bTripleDESCng\b", re.IGNORECASE,
+    # JOSE / JWT. The algorithm is named nowhere else: a service that signs its
+    # tokens with RS256 has RSA in it, and the only trace is a four-character
+    # string in a quoted argument. Measured: 35 such lines in Vault, 1 in certbot,
+    # 9 in the qscan corpus. Quoted or as a library constant, so that the word in
+    # a sentence stays what it is -- a word in a sentence.
+    ("RSA", "RSA named as a JOSE/JWT algorithm", re.compile(
+        r"[\"'](?:RS|PS)(?:256|384|512)[\"']|"
+        r"\bSigningMethod(?:RS|PS)(?:256|384|512)\b|\bAlgorithm::(?:RS|PS)(?:256|384|512)\b|"
+        r"[\"']?RSA-OAEP(?:-(?:256|384|512))?[\"']?|[\"']RSA1_5[\"']",
+    )),
+    ("ECDSA", "ECDSA named as a JOSE/JWT algorithm", re.compile(
+        r"[\"']ES(?:256|384|512)K?[\"']|"
+        r"\bSigningMethodES(?:256|384|512)\b|\bAlgorithm::ES(?:256|384|512)\b",
+    )),
+    ("3DES", "3DES (triple DES) usage", re.compile(
+        # No word boundaries: the real spellings are glued into identifiers
+        # (OPT_3DES_WRAP, OIDEncryptionAlgorithmDESEDE3CBC, NewTripleDESCipher).
+        r"3DES|DES[-_]?EDE3?|TripleDES|EVP_des_ede3\w*",
+        re.IGNORECASE,
+    )),
+    ("DES", "DES usage", re.compile(
+        # Single DES only: the triple-DES spellings have their own rule above, and
+        # the EVP_des_ede* family (two- and three-key) must not fall in here.
+        r"crypto/des\b|\bDES_set_key\w*|\bDES_ecb_encrypt\b|"
+        r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b", re.IGNORECASE,
     )),
     # Blockchain / wallet signing. These map onto the same classical primitives -- a
     # secp256k1 signature is ECDSA, and Shor breaks it like any other elliptic curve.
@@ -359,7 +405,7 @@ _SUITE_COMPONENT = {
     "RSA": "RSA", "ARSA": "RSA", "KRSA": "RSA",
     "DSS": "DSA", "ADSS": "DSA", "DSA": "DSA",
     "ECDSA": "ECDSA", "AECDSA": "ECDSA",
-    "3DES": "DES", "DES": "DES", "CBC3": "DES", "DES40": "DES",
+    "3DES": "3DES", "CBC3": "3DES", "EDE3": "3DES", "DES": "DES", "DES40": "DES",
     "RC4": "RC4", "MD5": "MD5",
 }
 # A line is read as a cipher list only when it carries a suite-shaped token: at least
@@ -395,7 +441,7 @@ _FETCH_NAME_FAMILY = {
     "ML-DSA": "ML-DSA", "ML-DSA-44": "ML-DSA", "ML-DSA-65": "ML-DSA", "ML-DSA-87": "ML-DSA",
     "SLH-DSA": "SLH-DSA", "LMS": "HSS/LMS", "XMSS": "XMSS",
     "SHA1": "SHA1", "SHA-1": "SHA1", "MD5": "MD5",
-    "DES-EDE3-CBC": "DES", "DES-CBC": "DES", "RC4": "RC4",
+    "DES-EDE3-CBC": "3DES", "DES-EDE3": "3DES", "DES-CBC": "DES", "RC4": "RC4",
 }
 
 
@@ -426,10 +472,13 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
             and any(part.startswith(_SUITE_MODE_OR_MAC) for part in upper))
         if not looks_like_suite:
             continue
-        for part in parts:
-            family = _SUITE_COMPONENT.get(part.upper())
-            if family:
-                out.append((family, pos))
+        families = [_SUITE_COMPONENT.get(part.upper()) for part in parts]
+        families = [family for family in families if family]
+        # DES-CBC3-SHA decomposes to DES and CBC3. The suite is triple DES; the
+        # bare DES part is the same cipher named twice, not a second one.
+        if "3DES" in families:
+            families = [family for family in families if family != "DES"]
+        out.extend((family, pos) for family in families)
     return out
 
 
@@ -793,10 +842,14 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # declared boundary and the real one differed, the count said the tool
         # does not claim these, and the lower-casing in the report concealed the
         # case-sensitivity in the match.
-        if not (is_ci or path.suffix.lower() in IAC_EXTENSIONS
-                or path.suffix.lower() in SOURCE_EXTENSIONS
-                or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
-                or is_certificate_file(path)):
+        claimed = (is_ci or path.suffix.lower() in IAC_EXTENSIONS
+                   or path.suffix.lower() in SOURCE_EXTENSIONS
+                   or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
+                   or is_certificate_file(path))
+        # Only a file no declared type claims is peeked at for key material; a .py or
+        # a .tf that happens to contain a PEM block stays source and infrastructure.
+        peeked_key = False if claimed else looks_like_key_file(path)
+        if not (claimed or peeked_key):
             kind = path.suffix.lower() or "(no extension)"
             skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
             continue
@@ -808,7 +861,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
             unreadable.append(rel_path)
             continue
 
-        if is_certificate_file(path):
+        if is_certificate_file(path) or peeked_key:
             # Certificates and keys are read as bytes, not lines: a .der carries no
             # lines at all, and a .pem that fails to decode must still be counted.
             files_scanned["certificate"] += 1

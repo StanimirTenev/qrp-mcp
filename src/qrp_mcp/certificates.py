@@ -104,6 +104,37 @@ def _iter_oids(der: bytes) -> set[str]:
     return found
 
 
+# Key material is often kept in a file with no extension at all (id_rsa,
+# id_ed25519) or with one this tool does not claim (.prv). Recognising it by
+# extension alone left 45 such files unread in the OpenSSH tree -- found by
+# comparing against CBOMkit-theia. So a small file is peeked at instead: the
+# header is on the first line, and the size cap keeps this from turning into a
+# reason to open every blob in the tree.
+KEY_PEEK_MAX_BYTES = 64 * 1024
+_KEY_HEADER = re.compile(rb"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----", re.M)
+# A header on its own is documentation: OpenSSL's PEM_read.pod prints the markers
+# with the body elided ("MIICdg...."). Key material carries real base64, and the
+# smallest private key there is runs to several hundred characters of it. Summed
+# over lines rather than measured on one, because wrap width varies by writer.
+_KEY_BODY_LINE = re.compile(rb"^[ \t]*[A-Za-z0-9+/]{16,}={0,2}[ \t]*$", re.M)
+KEY_BODY_MIN_CHARS = 100
+
+
+def looks_like_key_file(path: Path) -> bool:
+    """True when an unclaimed file begins with key material."""
+    try:
+        if path.stat().st_size > KEY_PEEK_MAX_BYTES:
+            return False
+        with path.open("rb") as fh:
+            head = fh.read(4096)
+    except OSError:
+        return False
+    if not _KEY_HEADER.search(head):
+        return False
+    body = sum(len(m.group().strip()) for m in _KEY_BODY_LINE.finditer(head))
+    return body >= KEY_BODY_MIN_CHARS
+
+
 def is_certificate_file(path: Path) -> bool:
     return path.suffix.lower() in CERTIFICATE_EXTENSIONS
 

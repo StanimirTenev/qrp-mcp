@@ -60,7 +60,9 @@ def test_apache_cipher_suite_line(tmp_path):
     fam = families(tmp_path, "options-ssl-apache.conf",
                    "SSLCipherSuite ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256:"
                    "DHE-DSS-AES128-GCM-SHA256:DES-CBC3-SHA\n")
-    assert {"ECDH", "RSA", "DH", "DSA", "DES"} <= fam
+    # DES-CBC3-SHA is triple DES: the suite names DES once, not twice.
+    assert {"ECDH", "RSA", "DH", "DSA", "3DES"} <= fam
+    assert "DES" not in fam
 
 
 def test_openssl_header_suite_constant(tmp_path):
