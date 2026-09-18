@@ -659,18 +659,17 @@ def scan_source_file(path: Path, rel_path: str,
         # Suite names appear in configuration and in code alike: OpenSSL's headers
         # define them as C constants. The `!` exclusion only means anything in a
         # cipher list, and _is_excluded already requires it.
-        if True:
-            for family, pos in scan_cipher_suites(line):
-                if family in seen_on_line or _is_excluded(line, pos) or _in_blob(pos, blobs):
-                    continue
-                seen_on_line.add(family)
-                findings.append({
-                    "path": rel_path,
-                    "line": line_no,
-                    "algorithm": family,
-                    "description": f"{family} named in a cipher suite",
-                    "excerpt": line.strip()[:200],
-                })
+        for family, pos in scan_cipher_suites(line):
+            if family in seen_on_line or _is_excluded(line, pos) or _in_blob(pos, blobs):
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} named in a cipher suite",
+                "excerpt": line.strip()[:200],
+            })
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
             findings.append({
                 "path": rel_path,
