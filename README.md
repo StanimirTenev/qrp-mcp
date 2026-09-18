@@ -87,7 +87,20 @@ BIP340/Taproot Schnorr. Solidity (`.sol`), Rust (`.rs`), Move and Cairo are scan
 Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C# — headers included — PowerShell, Perl and shell.
 
 **Classical crypto anywhere else** — RSA, DSA, DH, ECDSA and elliptic-curve usage, plus MD5,
-SHA-1, RC4 and DES/3DES.
+SHA-1, RC4 and DES/3DES. Not only through library calls: the names the protocols themselves use
+(`ssh-rsa`, `rsa-sha2-512`, `ssh-dss`, key types such as `rsa-2048` and `RSA_4096`), the modern
+OpenSSL 3 form where the algorithm is a string argument (`EVP_PKEY_Q_keygen(libctx, propq,
+"RSA", bits)`, the `EVP_*_fetch` calls), and the hash idioms people actually write
+(`hashes.MD5()`, `hashlib.new('md5')`, `MD5Init`, `<sha1.h>`, Go `sha1.Sum`).
+
+**Cipher suites, decomposed** — `ECDHE-RSA-AES128-GCM-SHA256` is ECDH *and* RSA, and
+`DHE-DSS-…` and `DES-CBC3-SHA` name families that reading the suite as one word never sees.
+IANA `TLS_*` names are read the same way. A banned component is not a use: `!MD5` and `!3DES`
+in a cipher list are exclusions, and they are treated as such.
+
+**Key sizes** — a size named on the line (`key_size=1024`, `rsa:1024`, `genrsa 1024`,
+`GenerateKey(..., 1024)`) travels with the family, so a weak RSA key is reported as weak rather
+than as one more RSA. The smallest size seen per family is in `algorithm_key_sizes`.
 
 **Hybrids and composites** — the RFC 10024 TLS groups `X25519MLKEM768`,
 `SecP256r1MLKEM768` and `SecP384r1MLKEM1024`, OpenSSH 10's default `mlkem768x25519-sha256`,
@@ -115,7 +128,7 @@ not parse X.509: it keeps only the identifiers already in the classifier, so a m
 certificate yields nothing rather than nonsense.
 
 **Configuration** — `nginx.conf`, `sshd_config`, `openssl.cnf`, `swanctl.conf`, `.ini`,
-`.toml`, `.properties`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid
+`.toml`, `.properties`, `.hcl`, `.json`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid
 group is chosen: `X25519MLKEM768` and `mlkem768x25519-sha256` are almost never strings in code.
 IKE proposal syntax is read here too — `ecp384` is NIST P-384, `modp2048` is group 14.
 
@@ -132,6 +145,21 @@ on out-of-band distribution, neither of which is visible in a file, and the find
 
 **Infrastructure as code** — Terraform and Kubernetes key algorithms, and private key material
 committed by mistake.
+
+**Build files, includes, test recipes and key inventories** — `Makefile`, `CMakeLists.txt`,
+`.in`, `.cmake` (a build file enumerates which algorithms a tree implements at all), `.inc`
+(the assembly and C fragments of implementations — OpenSSL keeps its ML-DSA there), `.t` (Perl
+test recipes: tests are code, and skipping them quietly is exactly what this tool argues
+against), and `known_hosts` / `authorized_keys`, where the key type is named on every line.
+
+**Not read, on purpose** — documentation: `.txt`, `.md`, `.pod`, `.rst`. Measured across five
+real repositories, reading them would have added more than 11,000 "findings" from help texts
+and changelogs. An algorithm mentioned in prose is not a deployment. The boundary is pinned by
+a test, so it is a declared scope rather than a silent skip — the same standard this tool asks
+of others. Binaries and images are not read either.
+
+**Accidents of the alphabet are not findings** — a match inside a long hexadecimal or base64
+run does not count. A NIST test vector in OpenSSH spells `ed448` inside its message bytes.
 
 Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/openzeppelin-contracts)
 (711 files, about five seconds):
@@ -165,6 +193,12 @@ another coverage figure. Four things, each answering something the percentage ca
   second, with a reason*. The reasons are a closed set: `type_not_claimed` is a boundary this
   tool declares, `unreadable` is a failure it hit, and they are never collapsed. A reason with no
   instances is reported at zero rather than omitted.
+
+Measured across five real repositories (certbot, OpenSSH, Vault, Bitcoin, OpenSSL), the scan
+reads **67% of the files present** — 73% of OpenSSL, 80% of OpenSSH. The rest is counted and
+named with a reason. A directory that cannot be entered or listed is reported in
+`unreadable_directories`; its files cannot be counted, so the scan then says it cannot account
+for every file instead of claiming it read them all.
 
 It also states **which kind of claim the numbers are**. Coverage is a claim about reading, not
 about finding: a file can be opened, counted, and still be one this tool was blind in. Reaching
@@ -218,8 +252,12 @@ The published measurement, with the raw artefacts:
 `export_cbom` produces a CycloneDX 1.6 document, validated against the published schema. Three
 things travel in it that a component list alone cannot say:
 
-- `compositions.aggregate` — `complete` only where every file present was examined, `incomplete`
-  otherwise, and `unknown` where the tool cannot account for its own reading.
+- `compositions.aggregate` — `incomplete` where files were not examined, and `unknown` where
+  the tool cannot account for its own reading. Reading every file is *not* enough for
+  `complete`: that word claims every asset present was found, which is the second axis, and
+  only a held control licenses it. The document used to say `complete` on the strength of the
+  denominator alone; comparing against other scanners showed findings missed inside files that
+  had been read.
 - `properties` — the whole coverage block. It travels there because the root object is
   `additionalProperties: false` and the format has no field for it; the awkwardness is the point
   rather than something to hide.
@@ -229,6 +267,29 @@ Output is deterministic where it matters. The serial number is derived from the 
 pins and a digest of what was found, so the same code over the same corpus that finds the same
 things gets the same serial, and a different result gets a different one. The timestamp and the
 coverage window record when the run happened, so those fields differ between runs.
+
+## Measured against the other free scanners
+
+In September 2026 the three free tools that do the same job — CryptoScan, CBOMkit-hyperion
+(sonar-cryptography) and CBOMkit-theia — were run over the same repositories and the findings
+compared line by line. What they found and this tool did not became the 0.8.0 and 0.8.1
+releases, and what this tool does that they do not is on the same list:
+
+- Only this scanner reports **what it did not read, and why**. CryptoScan silently skips
+  `testdata/` and similar (231 of 1,202 files in certbot); hyperion excludes tests by default;
+  neither says so in its output.
+- Only this scanner separates **reading from finding**, and now refuses to say `complete`
+  without a control.
+- **sntrup761**, the default hybrid in OpenSSH since 9.0, has no rule in CryptoScan; this tool
+  reports 145 lines of it in the OpenSSH tree.
+- An excluded cipher (`!MD5`) is counted as a *use* by CryptoScan; here it is an exclusion.
+- On certbot, this scanner finds algorithms in 26 files against hyperion's 7, and hyperion's
+  one extra finding is wrong (`RSA-96` where certbot defaults to 2048).
+
+Still missing here, stated rather than hidden: private keys are recognised by file extension
+rather than by content (theia finds 45 key files in OpenSSH that this tool does not), 3DES is
+reported under `DES`, and a finding carries no confidence level, so a bare word in a comment and
+a real call site look alike.
 
 ## Why deterministic
 
@@ -241,8 +302,9 @@ a deterministic inventory can actually reason about it.
 
 ## What it is not
 
-It reads source, configuration, CI pipelines, infrastructure-as-code and Kubernetes
-manifests. It does not read documentation, binaries or images.
+It reads source, configuration, CI pipelines, infrastructure-as-code, Kubernetes manifests,
+build files, certificates and key inventories. It does not read documentation, binaries or
+images.
 
 Every file under the path is accounted for in one of three ways: **scanned**, **unreadable**,
 or **skipped because the tool does not claim that type** — the last counted by extension, so
