@@ -135,14 +135,20 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"hashlib\.md5|crypto/md5|MessageDigest\.getInstance\(\s*[\"']MD5[\"']|"
         r"createHash\(\s*[\"']md5[\"']|openssl\s+dgst\s+-md5|"
         r"\bMD5_Init\b|\bMD5_Update\b|\bEVP_md5\b|"
-        r"\bMD5CryptoServiceProvider\b|\bMD5\.Create\b",
+        r"\bMD5CryptoServiceProvider\b|\bMD5\.Create\b|"
+        # The idioms the comparison found in the wild: pyca objects, hashlib.new,
+        # the BSD-style C calls and headers, and Go used without its import line.
+        r"hashes\.MD5\s*\(|hashlib\.new\(\s*[\"']md5[\"']|"
+        r"\bMD5(?:Init|Update|Final|Transform)\b|<md5\.h>|\bmd5\.(?:New|Sum)\b",
         re.IGNORECASE,
     )),
     ("SHA1", "SHA-1 usage", re.compile(
         r"hashlib\.sha1|crypto/sha1|MessageDigest\.getInstance\(\s*[\"']SHA-?1[\"']|"
         r"createHash\(\s*[\"']sha1[\"']|openssl\s+dgst\s+-sha1|"
         r"\bSHA1_Init\b|\bSHA1_Update\b|\bEVP_sha1\b|"
-        r"\bSHA1CryptoServiceProvider\b|\bSHA1Managed\b|\bSHA1\.Create\b",
+        r"\bSHA1CryptoServiceProvider\b|\bSHA1Managed\b|\bSHA1\.Create\b|"
+        r"hashes\.SHA1\s*\(|hashlib\.new\(\s*[\"']sha-?1[\"']|"
+        r"\bSHA1(?:Init|Update|Final|Transform)\b|<sha1\.h>|\bsha1\.(?:New|Sum)\b",
         re.IGNORECASE,
     )),
     ("RC4", "RC4 usage", re.compile(
@@ -355,6 +361,39 @@ _SUITE_TOKEN = re.compile(
 # DSA, and a French translation ("Remplacer-par-des-frais") read as DES.
 _SUITE_CIPHER = ("AES", "CAMELLIA", "CHACHA", "SEED", "IDEA", "RC4", "DES", "3DES", "NULL")
 _SUITE_MODE_OR_MAC = ("CBC", "GCM", "CCM", "POLY1305", "SHA", "MD5", "UMAC")
+
+
+# OpenSSL 3 names the algorithm in a string rather than in the function name:
+# EVP_PKEY_Q_keygen(libctx, propq, "RSA", bits). The old rules knew RSA_new and
+# EVP_PKEY_RSA, so a file called EVP_PKEY_RSA_keygen.c produced no findings at all.
+_FETCH_CALL = re.compile(
+    r"\bEVP_(?:PKEY_Q_keygen|PKEY_CTX_new_from_name|PKEY_is_a|PKEY_CTX_is_a|"
+    r"SIGNATURE_fetch|KEYMGMT_fetch|KEM_fetch|KEYEXCH_fetch|MD_fetch|CIPHER_fetch|"
+    r"ASYM_CIPHER_fetch)\s*\([^)\n]*?[\"']([A-Za-z0-9][A-Za-z0-9._\-]*)[\"']")
+
+# Only names this scanner already claims as families. An unrecognised name is left
+# alone rather than turned into a family nobody can check.
+_FETCH_NAME_FAMILY = {
+    "RSA": "RSA", "RSA-PSS": "RSA", "RSASSA-PSS": "RSA",
+    "EC": "EC", "ECDSA": "ECDSA", "ECDH": "ECDH", "SM2": "EC",
+    "ED25519": "Ed25519", "ED448": "Ed448", "X25519": "X25519", "X448": "X448",
+    "DSA": "DSA", "DH": "DH", "DHX": "DH",
+    "ML-KEM": "ML-KEM", "ML-KEM-512": "ML-KEM", "ML-KEM-768": "ML-KEM", "ML-KEM-1024": "ML-KEM",
+    "ML-DSA": "ML-DSA", "ML-DSA-44": "ML-DSA", "ML-DSA-65": "ML-DSA", "ML-DSA-87": "ML-DSA",
+    "SLH-DSA": "SLH-DSA", "LMS": "HSS/LMS", "XMSS": "XMSS",
+    "SHA1": "SHA1", "SHA-1": "SHA1", "MD5": "MD5",
+    "DES-EDE3-CBC": "DES", "DES-CBC": "DES", "RC4": "RC4",
+}
+
+
+def scan_openssl3_names(line: str) -> list[tuple[str, int]]:
+    """Families named as a string argument to an OpenSSL 3 fetch or keygen call."""
+    out: list[tuple[str, int]] = []
+    for m in _FETCH_CALL.finditer(line):
+        family = _FETCH_NAME_FAMILY.get(m.group(1).upper())
+        if family:
+            out.append((family, m.start()))
+    return out
 
 
 def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
@@ -577,6 +616,18 @@ def scan_source_file(path: Path, rel_path: str,
             if size:
                 item["key_size"] = size
             findings.append(item)
+        for family, pos in scan_openssl3_names(line):
+            if family in seen_on_line:
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} named in an OpenSSL 3 fetch or keygen call",
+                "excerpt": line.strip()[:200],
+            })
+
         # Suite names appear in configuration and in code alike: OpenSSL's headers
         # define them as C constants. The `!` exclusion only means anything in a
         # cipher list, and _is_excluded already requires it.

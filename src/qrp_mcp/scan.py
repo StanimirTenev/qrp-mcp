@@ -8,8 +8,8 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import __version__, coverage, detectors
-from .classifier import FingerprintRequest, fingerprint
+from . import __version__, certificates, coverage, detectors
+from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint
 
 
 def _version() -> str:
@@ -74,6 +74,13 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
             "algorithm_patterns": len(detectors.ALGORITHM_PATTERNS),
             "iac_algorithm_patterns": len(detectors.IAC_ALGORITHM_PATTERNS),
             "signing_command_patterns": len(detectors.SIGNING_COMMAND_PATTERNS),
+            # Rules that are not line patterns and were missing from this count: the
+            # object identifiers resolved inside certificates and the PEM labels that
+            # name an algorithm on their own.
+            "certificate_oid_names": len(_OID_FAMILIES),
+            "pem_labels": len(certificates._LABEL_ALGORITHMS),
+            "cipher_suite_components": len(detectors._SUITE_COMPONENT),
+            "openssl3_fetch_names": len(detectors._FETCH_NAME_FAMILY),
         },
         claimed_types={
             "source": sorted(detectors.SOURCE_EXTENSIONS),
@@ -81,6 +88,9 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
             "config": sorted(detectors.CONFIG_EXTENSIONS),
             "config_filenames": sorted(detectors.CONFIG_FILENAMES),
             "ci_filenames": sorted(detectors.CI_CONFIG_FILENAMES),
+            # Read as bytes rather than lines, and missing from this list while the
+            # scan was reporting findings from them.
+            "certificate": sorted(certificates.CERTIFICATE_EXTENSIONS),
         },
         excluded_dirs=list(detectors.EXCLUDED_DIRS),
     )

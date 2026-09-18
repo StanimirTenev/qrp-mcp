@@ -258,7 +258,15 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # count rather than to the run finishing without error. Anything short of
     # every present file examined is `incomplete` -- a word the schema has had
     # since 1.3 and which almost nothing populates from a measurement.
-    aggregate = "complete" if scope["files_not_examined"] == 0 else "incomplete"
+    # `complete` is a claim on the second axis -- that every asset present was found --
+    # and nothing in a reading figure licenses it. Reading every file says the
+    # denominator is whole, not that the list of components is. So a held control is
+    # what makes `complete` sayable; without one the honest word is `unknown`.
+    control_held = bool((coverage.get("claims", {}).get("control") or {}).get("held"))
+    if scope["files_not_examined"] == 0:
+        aggregate = "complete" if control_held else "unknown"
+    else:
+        aggregate = "incomplete"
     if not coverage["accounts_for_every_file"]:
         # The identity present == examined + not examined failed, so the tool
         # cannot say how complete the list is. `unknown` is the honest value and

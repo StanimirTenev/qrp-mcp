@@ -99,9 +99,19 @@ def test_aggregate_is_incomplete_when_files_were_not_examined(scan, document):
     assert document["compositions"][0]["aggregate"] == "incomplete"
 
 
-def test_aggregate_is_complete_only_when_every_file_was_examined(scan):
+def test_reading_every_file_is_not_a_complete_component_list(scan):
+    # Reading every file settles the denominator, not whether every asset present was
+    # found. Comparing against other scanners showed us missing findings in files we
+    # had read, while our own document said "complete".
     full = json.loads(json.dumps(scan))
     full["coverage"]["scope"]["files_not_examined"] = 0
+    assert cyclonedx.build(full)["compositions"][0]["aggregate"] == "unknown"
+
+
+def test_aggregate_is_complete_only_when_a_control_licenses_it(scan):
+    full = json.loads(json.dumps(scan))
+    full["coverage"]["scope"]["files_not_examined"] = 0
+    full["coverage"]["claims"]["control"] = {"held": True, "corpus": "example"}
     assert cyclonedx.build(full)["compositions"][0]["aggregate"] == "complete"
 
 
