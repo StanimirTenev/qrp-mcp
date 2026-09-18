@@ -291,8 +291,16 @@ _SSH_PROTOCOL = re.compile(
 # An SSH public key line names the algorithm and the transport both: `ssh-rsa`
 # in an authorized_keys is RSA, and it is RSA reached over SSH.
 _SSH_KEY_LINE = re.compile(
-    r"^\s*(?:ssh-(?:rsa|dss|ed25519|mldsa\w*)|ecdsa-sha2-nistp\d+|sk-\S+)"
+    # authorized_keys starts with the type; known_hosts starts with the host, so
+    # the type may be the second field. Both end in base64 key material.
+    r"^\s*(?:\S+\s+)?(?:ssh-(?:rsa|dss|ed25519|mldsa\w*)|ecdsa-sha2-nistp\d+|sk-\S+)"
     r"(?:-cert-v01@openssh\.com)?(?:@openssh\.com)?\s+[A-Za-z0-9+/]{20,}")
+
+# OpenSSL's version macros are unambiguous identifiers: nothing but a protocol
+# version is spelled SSL3_VERSION, so they carry their own context. The oldest
+# two have no minor digit, which is why a pattern requiring one read TLS 1.1
+# through 1.3 in that tree and neither of the deprecated ones.
+_VERSION_MACRO = re.compile(r"(?<![A-Za-z0-9_])(SSL[23]|TLS1(?:_[0-3])?)_VERSION(?![A-Za-z0-9_])")
 
 _DEPRECATED_TLS = {"SSLv2", "SSLv3", "TLSv1.0", "TLSv1.1"}
 
@@ -312,8 +320,22 @@ def _tls_version_name(match: re.Match) -> str:
 def scan_protocols(line: str) -> list[dict[str, Any]]:
     """Protocol versions pinned on this line, as assets with no algorithm claim."""
     out: list[dict[str, Any]] = []
+    seen: set[tuple[str, bool]] = set()
+    for macro in _VERSION_MACRO.finditer(line):
+        raw = macro.group(1)
+        name = (f"SSLv{raw[3]}" if raw.startswith("SSL")
+                else f"TLSv1.{raw[5]}" if len(raw) > 4 else "TLSv1.0")
+        seen.add((name, False))
+        out.append({
+            "protocol": "tls",
+            "version": name,
+            "banned": False,
+            "basis": "configured_protocol",
+            "deprecated": name in _DEPRECATED_TLS,
+            "description": (f"{name} is named here. Which algorithms it negotiates "
+                            f"is not stated by the version."),
+        })
     if _TLS_CONTEXT.search(line):
-        seen: set[tuple[str, bool]] = set()
         for match in _TLS_VERSION.finditer(line):
             name = _tls_version_name(match)
             # `SSLProtocol all -SSLv2 -SSLv3` forbids SSL 2 and SSL 3. A ban is

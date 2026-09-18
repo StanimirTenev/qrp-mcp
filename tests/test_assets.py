@@ -214,3 +214,30 @@ def test_a_banned_protocol_version_is_not_a_used_one(tmp_path, line, used, banne
     found = scan_directory(tmp_path)["evidence"]["protocols"]
     assert sorted(a["version"] for a in found if not a.get("banned")) == sorted(used)
     assert sorted(a["version"] for a in found if a.get("banned")) == sorted(banned)
+
+
+@pytest.mark.parametrize("line,version", [
+    ("  ctx->min_proto_version = SSL3_VERSION;", "SSLv3"),
+    ("  SSL_CTX_set_min_proto_version(ctx, TLS1_VERSION);", "TLSv1.0"),
+    ("  if (v == SSL2_VERSION) return 0;", "SSLv2"),
+])
+def test_openssl_spells_the_oldest_versions_without_a_minor(tmp_path, line, version):
+    """OpenSSL writes TLS1_VERSION and SSL3_VERSION, not TLS1_0_VERSION.
+
+    The first pattern required a minor digit, so it read TLS 1.1 through 1.3 in
+    that tree and missed exactly the two deprecated ones -- 95 protocol assets in
+    OpenSSL and not one of them SSLv3 or TLSv1.0, which is what gave it away.
+    """
+    (tmp_path / "a.c").write_text(line + "\n")
+    found = scan_directory(tmp_path)["evidence"]["protocols"]
+    assert [a["version"] for a in found] == [version]
+    assert found[0]["deprecated"] is True
+
+
+def test_a_known_hosts_line_is_an_ssh_asset(tmp_path):
+    """known_hosts puts the host first, so the key type is not at line start."""
+    (tmp_path / "known_hosts").write_text(
+        "git.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyMaterial\n")
+    result = scan_directory(tmp_path)
+    assert "Ed25519" in result["detected_algorithms"]
+    assert any(a["protocol"] == "ssh" for a in result["evidence"]["protocols"])
