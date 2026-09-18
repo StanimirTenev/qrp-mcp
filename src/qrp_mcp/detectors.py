@@ -57,6 +57,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # invisible to this rule.
         r"asymmetric\s+import\s+[^\n#]*\brsa\b|"
         r"\brsa\.generate_private_key\b|"
+        # The names protocols and APIs use for the key type itself. OpenSSH's default
+        # algorithm list, sshd_config, Vault's key types and AWS key specs name RSA
+        # this way and nothing else here reached them: every other family on those
+        # lines was reported and RSA was not.
+        r"(?<![A-Za-z])ssh-rsa(?![A-Za-z])|(?<![A-Za-z])rsa-sha2-(?:256|512)(?![0-9])|"
+        r"(?<![A-Za-z])rsa[-_](?:1024|2048|3072|4096|7680|8192|15360)(?![0-9])|"
+        r"\bRSA_(?:1024|2048|3072|4096|8192)\b|"
         # .NET / PowerShell factory: RSA.Create() and [System.Security.Cryptography.RSA]::Create()
         r"\bRSA\]?(?:::|\.)Create\s*\(|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']RSA[\"']|openssl\s+genrsa|-newkey\s+rsa|"
@@ -75,7 +82,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"asymmetric\s+import\s+[^\n#]*\bdsa\b|\bdsa\.generate_private_key\b|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
         r"\bDSA_new\b|\bDSA_generate_key\w*|\bEVP_PKEY_DSA\b|"
-        r"\bDSACryptoServiceProvider\b|\bDSACng\b",
+        r"\bDSACryptoServiceProvider\b|\bDSACng\b|"
+        r"(?<![A-Za-z])ssh-dss(?![A-Za-z])",
         re.IGNORECASE,
     )),
     ("ECDSA", "ECDSA usage", re.compile(
@@ -323,6 +331,79 @@ IAC_ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
 ]
 
+# A TLS cipher suite names its families in one token: ECDHE-RSA-AES128-GCM-SHA256 is
+# ECDH *and* RSA. Reading the suite as a word found ECDHE and missed the rest, so an
+# Apache or nginx line reported elliptic-curve exchange and no RSA, DH, DSA or 3DES.
+_SUITE_COMPONENT = {
+    "DHE": "DH", "EDH": "DH", "ADH": "DH", "KDHE": "DH", "DH": "DH",
+    "ECDHE": "ECDH", "ECDH": "ECDH", "EECDH": "ECDH", "AECDH": "ECDH",
+    "RSA": "RSA", "ARSA": "RSA", "KRSA": "RSA",
+    "DSS": "DSA", "ADSS": "DSA", "DSA": "DSA",
+    "ECDSA": "ECDSA", "AECDSA": "ECDSA",
+    "3DES": "DES", "DES": "DES", "CBC3": "DES", "DES40": "DES",
+    "RC4": "RC4", "MD5": "MD5",
+}
+# A line is read as a cipher list only when it carries a suite-shaped token: at least
+# three dash-joined parts, or an IANA TLS_ name. "rsa-2048" is not a suite.
+_SUITE_TOKEN = re.compile(
+    r"(?<![A-Za-z0-9])(?:TLS_[A-Z0-9_]+|[A-Za-z0-9]+(?:-[A-Za-z0-9]+){2,})(?![A-Za-z0-9])")
+
+
+# What makes a dash-joined token a cipher suite rather than an ordinary hyphenated
+# string: it names a bulk cipher AND a mode or MAC. Anything looser produced real
+# false positives on real trees: "ML-DSA-65" read as DSA, "slh-dsa-sha2-128s" read as
+# DSA, and a French translation ("Remplacer-par-des-frais") read as DES.
+_SUITE_CIPHER = ("AES", "CAMELLIA", "CHACHA", "SEED", "IDEA", "RC4", "DES", "3DES", "NULL")
+_SUITE_MODE_OR_MAC = ("CBC", "GCM", "CCM", "POLY1305", "SHA", "MD5", "UMAC")
+
+
+def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
+    """Families named inside cipher-suite tokens, with the position that named them.
+
+    The position matters: a component preceded by `!` is a ban, not a use, and that
+    distinction is checked by the caller exactly as it is for ordinary matches.
+    """
+    out: list[tuple[str, int]] = []
+    for token in _SUITE_TOKEN.finditer(line):
+        text = token.group(0)
+        pos = token.start()
+        parts = re.split(r"[-_+]", text)
+        upper = [part.upper() for part in parts]
+        looks_like_suite = text.upper().startswith("TLS_") or (
+            any(part.startswith(_SUITE_CIPHER) for part in upper)
+            and any(part.startswith(_SUITE_MODE_OR_MAC) for part in upper))
+        if not looks_like_suite:
+            continue
+        for part in parts:
+            family = _SUITE_COMPONENT.get(part.upper())
+            if family:
+                out.append((family, pos))
+    return out
+
+
+# --- key sizes named on the same line as the algorithm ---
+_KEY_SIZE = re.compile(
+    r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|"
+    r"(?<![A-Za-z])rsa[:\-_](\d{3,5})(?![0-9])|\bRSA_(\d{3,5})\b|"
+    r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
+    r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
+    r"\bgenrsa\b[^\n]*?(\d{3,5})|"
+    r"EVP_PKEY_Q_keygen\([^)]*?(\d{3,5})\s*\)",
+    re.IGNORECASE)
+
+
+def key_size_on_line(line: str) -> int | None:
+    """The key size named on this line, if any. Only used for RSA, where a size below
+    the minimum is itself the finding."""
+    m = _KEY_SIZE.search(line)
+    if not m:
+        return None
+    for group in m.groups():
+        if group:
+            return int(group)
+    return None
+
+
 # `ppk = ...` is a directive in a VPN configuration and an ordinary variable name in
 # source code (a paramiko key), so it is matched in configuration files only.
 PPK_CONFIG_ASSIGN = re.compile(r"(?<![A-Za-z])ppk[ \t]*=", re.IGNORECASE)
@@ -485,13 +566,32 @@ def scan_source_file(path: Path, rel_path: str,
             if cipher_exclusions and all(_is_excluded(line, m.start()) for m in matches):
                 continue
             seen_on_line.add(algorithm)
-            findings.append({
+            item = {
                 "path": rel_path,
                 "line": line_no,
                 "algorithm": algorithm,
                 "description": description,
                 "excerpt": line.strip()[:200],
-            })
+            }
+            size = key_size_on_line(line) if algorithm == "RSA" else None
+            if size:
+                item["key_size"] = size
+            findings.append(item)
+        # Suite names appear in configuration and in code alike: OpenSSL's headers
+        # define them as C constants. The `!` exclusion only means anything in a
+        # cipher list, and _is_excluded already requires it.
+        if True:
+            for family, pos in scan_cipher_suites(line):
+                if family in seen_on_line or _is_excluded(line, pos):
+                    continue
+                seen_on_line.add(family)
+                findings.append({
+                    "path": rel_path,
+                    "line": line_no,
+                    "algorithm": family,
+                    "description": f"{family} named in a cipher suite",
+                    "excerpt": line.strip()[:200],
+                })
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
             findings.append({
                 "path": rel_path,
@@ -567,6 +667,14 @@ def scan_iac_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
             })
     return algorithm_findings, embedded_key_findings
+
+
+def _sizes_by_algorithm(findings: list[dict[str, Any]]) -> dict[str, list[int]]:
+    out: dict[str, list[int]] = {}
+    for f in findings:
+        if isinstance(f.get("key_size"), int):
+            out.setdefault(f["algorithm"], []).append(f["key_size"])
+    return out
 
 
 def scan_repo(repo_path: Path) -> dict[str, Any]:
@@ -705,4 +813,11 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         "iac_findings": iac_findings,
         "embedded_key_findings": embedded_key_findings,
         "detected_algorithms": sorted({f["algorithm"] for f in source_findings + iac_findings}),
+        # The smallest size seen for a family, so a weak key anywhere is visible. A
+        # size is a property of the key, not of the name, and without it every RSA
+        # reads the same whether it is 1024 or 4096 bits.
+        "algorithm_key_sizes": {
+            alg: min(sizes)
+            for alg, sizes in _sizes_by_algorithm(source_findings + iac_findings).items()
+        },
     }

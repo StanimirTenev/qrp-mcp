@@ -422,6 +422,13 @@ def classify_algorithm(
     branch on it.
     """
     squashed = _squash(raw_value or "")
+    if key_size is None:
+        # "RSA-1024" carries its own size. The scanner appends it when it read the
+        # size on the same line as the algorithm.
+        m = re.search(r"(?:^|[^A-Za-z0-9])RSA[-_ ]?(\d{3,5})(?![0-9])", raw_value or "",
+                      re.IGNORECASE)
+        if m:
+            key_size = int(m.group(1))
     weak = _find_weak_token(squashed)
     families = _all_public_key_families(squashed, raw_value or "")
     family_entry = families[0] if families else None

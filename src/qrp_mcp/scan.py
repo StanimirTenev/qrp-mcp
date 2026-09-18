@@ -49,10 +49,16 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
     # Detected algorithms are passed as explicit algorithms so each one is classified.
     # (The gateway's ingest contract routes them through package_metadata instead, which
     # deliberately leaves them unclassified for server-side correlation -- not useful here.)
+    # A family whose key size was read on the line travels with it, so the classifier
+    # can call a 1024-bit RSA weak instead of reporting every RSA the same way.
+    sizes = scan_result.get("algorithm_key_sizes", {})
+    named = [f"{alg}-{sizes[alg]}" if alg in sizes else alg
+             for alg in scan_result["detected_algorithms"]]
+
     request = FingerprintRequest(
         # A filesystem root has no name ("/" or "D:\\"); the model requires one.
         asset_name=detectors.display_path(repo_path.name or str(repo_path)),
-        algorithms=scan_result["detected_algorithms"],
+        algorithms=named,
         crypto_evidence={"repo_scan": scan_result},
     )
     response = fingerprint(request)
@@ -94,6 +100,9 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
         "unreadable_files": scan_result["unreadable_files"],
         "unreadable_directories": scan_result["unreadable_directories"],
         "detected_algorithms": scan_result["detected_algorithms"],
+        # The smallest key size read for a family, where a line named one. A number
+        # nobody can see is a number nobody can check.
+        "algorithm_key_sizes": scan_result.get("algorithm_key_sizes", {}),
         "findings": [f.model_dump() for f in response.findings],
         "summary": response.summary.model_dump(),
         "evidence": {
