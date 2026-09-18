@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .assets import is_manifest, scan_manifest, scan_protocols
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
                            scan_certificate_file)
 
@@ -817,6 +818,11 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     unreadable: list[str] = []
     # Claimed file types that were opened and gave up nothing nameable.
     undecoded: list[str] = []
+    # Assets present without an algorithm being written down. Separate from
+    # the findings above because everything downstream keys on `algorithm`,
+    # and these deliberately have none.
+    protocol_findings: list[dict[str, Any]] = []
+    dependency_findings: list[dict[str, Any]] = []
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -850,7 +856,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         claimed = (is_ci or path.suffix.lower() in IAC_EXTENSIONS
                    or path.suffix.lower() in SOURCE_EXTENSIONS
                    or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
-                   or is_certificate_file(path))
+                   or is_certificate_file(path) or is_manifest(path))
         # Only a file no declared type claims is peeked at for key material; a .py or
         # a .tf that happens to contain a PEM block stays source and infrastructure.
         peeked_key = False if claimed else looks_like_key_file(path)
@@ -865,6 +871,15 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         if lines is None:
             unreadable.append(rel_path)
             continue
+
+        for number, text_line in enumerate(lines, 1):
+            for asset in scan_protocols(text_line):
+                asset["path"] = rel_path
+                asset["line"] = number
+                asset["excerpt"] = text_line.strip()[:200]
+                protocol_findings.append(asset)
+        if is_manifest(path):
+            dependency_findings.extend(scan_manifest(path, rel_path, lines))
 
         if is_certificate_file(path) or peeked_key:
             # Certificates and keys are read as bytes, not lines: a .der carries no
@@ -941,6 +956,8 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # "0 findings" can be checked against a denominator instead of trusted.
         "unreadable_files": unreadable,
         "claimed_but_not_decoded": undecoded,
+        "protocol_findings": protocol_findings,
+        "dependency_findings": dependency_findings,
         # Files removed by EXCLUDED_DIRS before files_present counted anything,
         # by the directory name that removed them. Counted so the denominator
         # can state what it left out instead of leaving it in the source.

@@ -121,5 +121,10 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
             "ci_pipeline": scan_result["ci_pipeline_findings"],
             "iac": scan_result["iac_findings"],
             "embedded_keys": scan_result["embedded_key_findings"],
+            # Assets with no algorithm of their own. Kept apart from the
+            # findings above so that nothing downstream reads a protocol
+            # version or an installed library as an observed algorithm.
+            "protocols": scan_result["protocol_findings"],
+            "dependencies": scan_result["dependency_findings"],
         },
     }

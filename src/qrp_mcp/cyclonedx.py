@@ -254,6 +254,76 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             ]},
         })
 
+    # Protocols. CycloneDX has assetType "protocol" for exactly this, and a
+    # version pin is the one thing it can honestly carry: which algorithms get
+    # negotiated is not in the line that pins the version.
+    protocols = scan_result["evidence"].get("protocols", [])
+    # Banned and configured are kept apart: `-SSLv3` and `ssl_protocols SSLv3`
+    # are opposite facts, and merging them would report a ban as a use.
+    by_protocol: dict[tuple[str, str | None, bool], list[dict[str, Any]]] = {}
+    for asset in protocols:
+        by_protocol.setdefault(
+            (asset["protocol"], asset.get("version"), bool(asset.get("banned"))),
+            []).append(asset)
+    for (name, version, banned), group in sorted(by_protocol.items(),
+                                                 key=lambda kv: str(kv[0])):
+        label = (version or name.upper()) + (" (forbidden)" if banned else "")
+        properties = [
+            {"name": f"{NS}basis", "value": "configured_protocol"},
+            {"name": f"{NS}deprecated",
+             "value": "true" if any(a.get("deprecated") for a in group) else "false"},
+            # A version listed to forbid it is evidence of hardening, not of use.
+            {"name": f"{NS}forbidden", "value": "true" if banned else "false"},
+        ]
+        components.append({
+            "type": "cryptographic-asset",
+            "bom-ref": _ref("protocol", label),
+            "name": label,
+            "cryptoProperties": {
+                "assetType": "protocol",
+                "protocolProperties": {"type": name,
+                                       **({"version": version} if version else {})},
+            },
+            "properties": properties,
+            "evidence": {"occurrences": [
+                {"location": a["path"], "line": a["line"],
+                 "additionalContext": a.get("excerpt", "")}
+                for a in group
+            ]},
+        })
+
+    # Dependencies are libraries, not cryptographic assets: what is installed is
+    # not what is called. They travel as `library` components carrying the
+    # families they implement, and the basis says the difference out loud.
+    # One component per library, however many manifests declare it: a monorepo
+    # names the same dependency in every module, and a repeated bom-ref breaks
+    # the uniqueness the schema requires of compositions.assemblies.
+    by_library: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for dependency in scan_result["evidence"].get("dependencies", []):
+        by_library.setdefault((dependency["ecosystem"], dependency["package"]),
+                              []).append(dependency)
+    for (ecosystem, package), group in sorted(by_library.items()):
+        families: list[str] = []
+        for dependency in group:
+            for family in dependency["families"]:
+                if family not in families:
+                    families.append(family)
+        components.append({
+            "type": "library",
+            "bom-ref": _ref("dependency", f"{ecosystem}:{package}"),
+            "name": package,
+            "properties": [
+                {"name": f"{NS}basis", "value": "declared_dependency"},
+                {"name": f"{NS}ecosystem", "value": ecosystem},
+                {"name": f"{NS}implements", "value": ", ".join(families)},
+            ],
+            "evidence": {"occurrences": [
+                {"location": dependency["path"], "line": dependency["line"],
+                 "additionalContext": dependency["description"]}
+                for dependency in group
+            ]},
+        })
+
     # `complete` is a claim about the component list, so it is tied to the file
     # count rather than to the run finishing without error. Anything short of
     # every present file examined is `incomplete` -- a word the schema has had

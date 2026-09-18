@@ -183,7 +183,7 @@ def test_filesystem_root_name_does_not_break_the_request(monkeypatch):
              "iac_findings": [], "embedded_key_findings": [], "files_scanned": {},
              "files_present": 0, "files_present_by_extension": {}, "files_skipped_by_type": {},
              "unreadable_files": [], "unreadable_directories": [], "files_excluded_by_dir": {},
-             "claimed_but_not_decoded": []}
+             "claimed_but_not_decoded": [], "protocol_findings": [], "dependency_findings": []}
     monkeypatch.setattr(scan_mod.detectors, "scan_repo", lambda p: empty)
     monkeypatch.setattr(scan_mod.coverage, "build", lambda **kw: {"stub": True})
     monkeypatch.setattr(scan_mod.coverage, "verdict_line", lambda b: "stub")
