@@ -39,3 +39,54 @@ def test_a_readable_key_is_not_listed_as_undecoded(tmp_path):
     result = scan_directory(tmp_path)
     assert result["coverage"]["examined_without_result"]["paths"] == []
     assert result["evidence"]["embedded_keys"]
+
+
+# --- SSH certificates -------------------------------------------------------
+
+def test_ssh_certificate_names_its_key_type(tmp_path):
+    """openssh keeps 41 of these; every one read as nothing.
+
+    An SSH certificate is a public key line whose type carries the suffix
+    -cert-v01@openssh.com. The key type in front of it is the algorithm, and it
+    is the same algorithm whether the key is certified or not.
+    """
+    (tmp_path / "id_rsa-cert.pub").write_text(
+        "ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20A\n")
+    result = scan_directory(tmp_path)
+    assert "RSA" in result["detected_algorithms"]
+    assert result["coverage"]["examined_without_result"]["paths"] == []
+
+
+def test_ssh_certificate_ed25519(tmp_path):
+    (tmp_path / "a.cert").write_text(
+        "ssh-ed25519-cert-v01@openssh.com AAAAIHNzaC1lZDI1NTE5LWNlcnQtdjAxQG9w\n")
+    assert "Ed25519" in scan_directory(tmp_path)["detected_algorithms"]
+
+
+def test_openssh_hybrid_key_type_with_the_domain_suffix(tmp_path):
+    """ssh-mldsa44-ed25519@openssh.com -- the hybrid, missed for the suffix.
+
+    The bare spelling was known and the one OpenSSH actually writes was not, so
+    three post-quantum host keys read as nothing. Post-quantum detection is this
+    scanner's strongest claim, which makes this the worst place to have a gap.
+    """
+    (tmp_path / "hybrid.pub").write_text(
+        "ssh-mldsa44-ed25519@openssh.com AAAAH3NzaC1tbGRzYTQ0LWVkMjU1MTlAb3Blbn\n")
+    families = scan_directory(tmp_path)["detected_algorithms"]
+    assert "ML-DSA" in families
+
+
+def test_ssh_protocol_1_public_key(tmp_path):
+    """`bits exponent modulus` -- an RSA key, and the size is the first field."""
+    (tmp_path / "rsa1.pub").write_text(
+        "1024 65537 1538954316036770739258903145485667049484467769583341952800\n")
+    result = scan_directory(tmp_path)
+    assert "RSA" in result["detected_algorithms"]
+    assert result["algorithm_key_sizes"].get("RSA") == 1024  # weak, and named as such
+
+
+def test_ssh_protocol_1_key_with_a_trailing_comment(tmp_path):
+    """The real files carry one; the first pattern anchored to end of line."""
+    (tmp_path / "rsa1.pub").write_text(
+        "1024 65537 " + "1" * 60 + " RSA1 #1\n")
+    assert "RSA" in scan_directory(tmp_path)["detected_algorithms"]

@@ -47,6 +47,9 @@ _LABEL_ALGORITHMS = {
 
 _PRIVATE_KEY_LABEL = re.compile(r"PRIVATE KEY$")
 
+# "1024 65537 15389543160... RSA1 #1" -- bits, exponent, modulus, comment.
+_SSH1_KEY = re.compile(r"^(\d{3,5})\s+\d{1,10}\s+\d{50,}(?:\s+\S.*)?$")
+
 # OpenSSH public keys and known_hosts lines name their algorithm in the clear.
 _SSH_KEY_TYPES = {
     "ssh-rsa": "RSA",
@@ -60,6 +63,9 @@ _SSH_KEY_TYPES = {
     "ssh-mldsa44": "ML-DSA",
     "ssh-mldsa65": "ML-DSA",
     "ssh-mldsa44-ed25519": "ML-DSA",
+    "ssh-mldsa44@openssh.com": "ML-DSA",
+    "ssh-mldsa65@openssh.com": "ML-DSA",
+    "ssh-mldsa44-ed25519@openssh.com": "ML-DSA",
     "sntrup761x25519-sha512": "NTRU",
     "sntrup761x25519-sha512@openssh.com": "NTRU",
     "mlkem768x25519-sha256": "ML-KEM",
@@ -205,10 +211,28 @@ def scan_certificate_file(path: Path, rel_path: str) -> tuple[list[dict[str, Any
         blobs.append(raw)
 
     for line_no, line in enumerate(text.splitlines(), start=1):
+        # SSH protocol 1 public key: bits, exponent, modulus, all in decimal.
+        # OpenSSH keeps six of these and every one read as nothing.
+        proto1 = _SSH1_KEY.match(line)
+        if proto1:
+            record("RSA", f"RSA in an SSH protocol 1 public key of {proto1.group(1)} bits",
+                   line_no, line[:80])
+            if algorithms and algorithms[-1]["algorithm"] == "RSA":
+                algorithms[-1]["key_size"] = int(proto1.group(1))
+            continue
         head = line.split(" ", 1)[0].strip()
+        # An SSH certificate is a public key line whose type carries the suffix
+        # -cert-v01@openssh.com. The algorithm is the same one, certified; openssh
+        # keeps 41 such files and every one of them read as nothing.
+        certified = head.endswith("-cert-v01@openssh.com")
+        if certified:
+            head = head[:-len("-cert-v01@openssh.com")]
+            if head.startswith("sk-"):
+                head += "@openssh.com"
         named = _SSH_KEY_TYPES.get(head)
         if named:
-            record(named, f"{named} in an SSH key of type {head}", line_no, line)
+            record(named, f"{named} in an SSH {'certificate' if certified else 'key'} "
+                   f"of type {head}", line_no, line)
 
     for blob in blobs:
         for oid in _iter_oids(blob):
