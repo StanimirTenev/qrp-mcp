@@ -15,6 +15,12 @@ SOURCE_EXTENSIONS = {
     # roughly half the tree -- reading .c but not .h reports a fraction of the
     # file count as if it were the whole language.
     ".h", ".hpp", ".hh", ".cc", ".cxx",
+    # Measured on five real trees: these carried 1,600 findings the scan never saw.
+    # `.inc` holds the assembly and C fragments of implementations (OpenSSL's ML-DSA
+    # among them), `.t` is a Perl test recipe -- tests are code, and skipping them
+    # silently is the practice this scanner argues against -- and `.in`/`.cmake`
+    # are build files that enumerate which algorithms the tree implements at all.
+    ".inc", ".t", ".in", ".cmake",
     # PowerShell and Perl. .sh was already here, so leaving these out was an
     # oversight rather than a scope decision: a Windows estate keeps its
     # certificate handling in .ps1, and OpenSSL's build is Perl.
@@ -39,10 +45,17 @@ IAC_EXTENSIONS = {".tf", ".tfvars"}
 # hybrid group -- X25519MLKEM768, mlkem768x25519-sha256 -- is almost never a
 # string in code; it is a line in nginx.conf or sshd_config. Scanning only source
 # meant the whole RFC 10024 vocabulary could be deployed and stay invisible.
-CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg"}
+CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
+                     # HCL configures Vault and Terraform; JSON carries cipher-suite
+                     # lists and algorithm names in service configuration.
+                     ".hcl", ".json"}
 
 # The same files that carry no extension at all.
-CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf"}
+CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
+                    # Build files list the algorithm sources a tree compiles.
+                    "Makefile", "makefile", "GNUmakefile", "CMakeLists.txt",
+                    # SSH key inventories: the key type is named on every line.
+                    "known_hosts", "authorized_keys"}
 
 # (algorithm, description, compiled regex matched against a single source line)
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
@@ -580,6 +593,20 @@ def _is_excluded(line: str, start: int) -> bool:
     return i >= 0 and line[i] == "!"
 
 
+# A long hexadecimal or base64 blob can spell an algorithm name by accident: a NIST
+# test vector in OpenSSH contains "ed448" inside the message bytes. A match that
+# starts inside such a run is an accident of the alphabet, not a use.
+_BLOB = re.compile(r"(?:[0-9a-fA-F]{32,}|[A-Za-z0-9+/]{40,}={0,2})")
+
+
+def _blob_spans(line: str) -> list[tuple[int, int]]:
+    return [(m.start(), m.end()) for m in _BLOB.finditer(line)]
+
+
+def _in_blob(pos: int, spans: list[tuple[int, int]]) -> bool:
+    return any(start <= pos < end for start, end in spans)
+
+
 def scan_source_file(path: Path, rel_path: str,
                      lines: list[str] | None = None,
                      cipher_exclusions: bool = False) -> list[dict[str, Any]]:
@@ -592,6 +619,7 @@ def scan_source_file(path: Path, rel_path: str,
         # inflates the headline number by however many ways the line could be
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
+        blobs = _blob_spans(line)
         for algorithm, description, pattern in ALGORITHM_PATTERNS:
             if algorithm in seen_on_line:
                 continue
@@ -599,7 +627,7 @@ def scan_source_file(path: Path, rel_path: str,
             # and allow the same family -- "ALL:!ECDH:ECDHE-RSA-AES256" -- and
             # judging the line by its first match would throw the real use away
             # along with the exclusion.
-            matches = list(pattern.finditer(line))
+            matches = [m for m in pattern.finditer(line) if not _in_blob(m.start(), blobs)]
             if not matches:
                 continue
             if cipher_exclusions and all(_is_excluded(line, m.start()) for m in matches):
@@ -617,7 +645,7 @@ def scan_source_file(path: Path, rel_path: str,
                 item["key_size"] = size
             findings.append(item)
         for family, pos in scan_openssl3_names(line):
-            if family in seen_on_line:
+            if family in seen_on_line or _in_blob(pos, blobs):
                 continue
             seen_on_line.add(family)
             findings.append({
@@ -633,7 +661,7 @@ def scan_source_file(path: Path, rel_path: str,
         # cipher list, and _is_excluded already requires it.
         if True:
             for family, pos in scan_cipher_suites(line):
-                if family in seen_on_line or _is_excluded(line, pos):
+                if family in seen_on_line or _is_excluded(line, pos) or _in_blob(pos, blobs):
                     continue
                 seen_on_line.add(family)
                 findings.append({
