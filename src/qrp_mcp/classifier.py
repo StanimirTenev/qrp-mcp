@@ -275,6 +275,10 @@ _OID_FAMILIES: list[tuple[str, str, str, str]] = [
     # Classical. PKCS#1, ANSI X9.62 / X9.57, the EdDSA arc, and the SECG and
     # brainpool named-curve arcs.
     ("1.2.840.113549.1.1", "RSA", "classical_vulnerable", "public_key"),
+    # PKCS#3. Three DH keys in OpenSSL's test tree read as nothing without it.
+    ("1.2.840.113549.1.3.1", "DH", "classical_vulnerable", "key_exchange"),
+    ("1.2.840.10046.2.1", "DH", "classical_vulnerable", "key_exchange"),  # X9.42
+
     ("1.2.840.10045.4", "ECDSA", "classical_vulnerable", "signature"),
     ("1.2.840.10045.2.1", "EC", "classical_vulnerable", "public_key"),
     ("1.2.840.10045.3", "EC", "classical_vulnerable", "public_key"),

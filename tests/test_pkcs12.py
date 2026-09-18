@@ -90,3 +90,16 @@ def test_ssh_protocol_1_key_with_a_trailing_comment(tmp_path):
     (tmp_path / "rsa1.pub").write_text(
         "1024 65537 " + "1" * 60 + " RSA1 #1\n")
     assert "RSA" in scan_directory(tmp_path)["detected_algorithms"]
+
+
+def test_diffie_hellman_key_by_object_identifier(tmp_path):
+    """OpenSSL keeps three DH keys the OID table did not know.
+
+    Found by the examined_without_result field, not by a test: the files were
+    claimed, read, and reported as nothing.
+    """
+    import shutil
+    # OpenSSL's own test/recipes/30-test_evp_pkey_provided/DH.priv.der, copied in:
+    # a hand-built DER would test the pattern rather than the file.
+    shutil.copy(Path(__file__).parent / "fixtures" / "dh-key.der", tmp_path / "DH.priv.der")
+    assert "DH" in scan_directory(tmp_path)["detected_algorithms"]
