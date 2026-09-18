@@ -7,7 +7,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .certificates import is_certificate_file, looks_like_key_file, scan_certificate_file
+from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
+                           scan_certificate_file)
 
 SOURCE_EXTENSIONS = {
     ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
@@ -110,7 +111,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"asymmetric\s+import\s+[^\n#]*\bdsa\b|\bdsa\.generate_private_key\b|"
         # The call sites, as for RSA above. "withDSA" cannot reach withECDSA:
         # that text has no "withDSA" in it.
-        r"\bdsa\.(?:GenerateKey|GenerateParameters|Sign|Verify)\b|"
+        # Not ML-DSA.Sign() or SLH-DSA.Sign(): those are the post-quantum
+        # replacements, and naming them DSA is the worst way to be wrong.
+        r"(?<![A-Za-z-])dsa\.(?:GenerateKey|GenerateParameters|Sign|Verify)\b|"
         r"OpenSSL::PKey::DSA\b|\w*withDSA\b|\bDsa::generate\b|\bDSA\.generate\b|"
         r"\bCKM_DSA_\w+|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
@@ -812,6 +815,8 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     files_scanned = {"source": 0, "ci_config": 0, "iac": 0, "config": 0, "certificate": 0}
 
     unreadable: list[str] = []
+    # Claimed file types that were opened and gave up nothing nameable.
+    undecoded: list[str] = []
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -868,6 +873,8 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
             algo_findings, key_findings = scan_certificate_file(path, rel_path)
             source_findings.extend(algo_findings)
             embedded_key_findings.extend(key_findings)
+            if is_undecoded(algo_findings, key_findings):
+                undecoded.append(rel_path)
         elif is_ci:
             files_scanned["ci_config"] += 1
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
@@ -933,6 +940,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # Attempted and NOT read. files_scanned counts only files actually read, so
         # "0 findings" can be checked against a denominator instead of trusted.
         "unreadable_files": unreadable,
+        "claimed_but_not_decoded": undecoded,
         # Files removed by EXCLUDED_DIRS before files_present counted anything,
         # by the directory name that removed them. Counted so the denominator
         # can state what it left out instead of leaving it in the source.

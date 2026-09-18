@@ -69,6 +69,26 @@ def test_jose_algorithm_names(tmp_path, name, line, family):
 
 
 def test_a_word_in_prose_is_still_not_a_finding(tmp_path):
-    """The call-site rules must not turn every mention into a use."""
-    fam = families_on(tmp_path, "notes.md", "We should migrate away from RSA soon.\n")
+    """The call-site rules must not turn every mention into a use.
+
+    A .py file, because a .md is not scanned at all and would make this pass
+    whatever the rules said.
+    """
+    fam = families_on(tmp_path, "a.py", "# we should migrate away from RSA soon\n")
     assert fam == set()
+
+
+@pytest.mark.parametrize("line", [
+    "     * See FIPS 204 Section 5.2 Algorithm 2 ML-DSA.Sign()",
+    "  ML-DSA.Verify(pk, M, sigma)",
+    "  SLH-DSA.Sign(SK, M)",
+])
+def test_post_quantum_signature_is_not_classical_dsa(tmp_path, line):
+    """Found in OpenSSL's crypto/ml_dsa/ by the corpus sweep, not by a unit test.
+
+    The Go call-site rule dsa.Sign is case-insensitive and reached ML-DSA.Sign:
+    a post-quantum algorithm reported as the classical one it replaces, which is
+    the worst direction for this scanner to be wrong in.
+    """
+    (tmp_path / "a.c").write_text(line + "\n")
+    assert "DSA" not in scan_directory(tmp_path)["detected_algorithms"]

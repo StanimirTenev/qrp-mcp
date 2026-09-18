@@ -34,6 +34,9 @@ from typing import Any
 REASONS = {
     "type_not_claimed": "the tool does not claim this file type; a declared boundary, not a failure",
     "unreadable": "opened and could not be read; attempted and failed",
+    "claimed_but_not_decoded": ("a claimed file type that was read and gave up no "
+                                "algorithm: encrypted content, or a structure this "
+                                "tool does not parse"),
 }
 
 # The same discipline one level up, applied to the pins rather than the files.
@@ -285,6 +288,7 @@ def build(
     examined = sum(scan_result["files_scanned"].values())
     skipped = scan_result["files_skipped_by_type"]
     unreadable = scan_result["unreadable_files"]
+    undecoded = scan_result.get("claimed_but_not_decoded", [])
 
     not_examined = [
         {
@@ -307,6 +311,15 @@ def build(
         },
     ]
     accounted = examined + sum(r["count"] for r in not_examined)
+    # Counted as read -- it was read -- and named anyway: a claimed type that
+    # yields nothing is exactly the silent skip this block exists to refuse, and
+    # staying silent about our own would be the same defect under our own roof.
+    read_but_empty = {
+        "reason": "claimed_but_not_decoded",
+        "meaning": REASONS["claimed_but_not_decoded"],
+        "count": len(undecoded),
+        "paths": undecoded,
+    }
     dirs_not_entered = scan_result.get("unreadable_directories", [])
 
     excluded = scan_result.get("files_excluded_by_dir", {})
@@ -373,6 +386,8 @@ def build(
         # was in it".
         "claims": _claims(None),
         "not_examined": not_examined,
+        # Read, counted as read, and empty anyway.
+        "examined_without_result": read_but_empty,
         # Directories the walk could not enter. Their files are not in any count
         # above, because nobody knows how many there are.
         "directories_not_entered": {

@@ -135,6 +135,13 @@ def looks_like_key_file(path: Path) -> bool:
     return body >= KEY_BODY_MIN_CHARS
 
 
+# The PKCS#12 bag identifiers that mean "a private key is in here".
+_PKCS12_KEY_BAGS = {
+    "1.2.840.113549.1.12.10.1.1",  # keyBag
+    "1.2.840.113549.1.12.10.1.2",  # pkcs8ShroudedKeyBag
+}
+
+
 def is_certificate_file(path: Path) -> bool:
     return path.suffix.lower() in CERTIFICATE_EXTENSIONS
 
@@ -210,4 +217,26 @@ def scan_certificate_file(path: Path, rel_path: str) -> tuple[list[dict[str, Any
                 record(entry[1], f"{entry[1]} identified by object identifier {oid}",
                        1, oid)
 
+    # PKCS#12. The wrapper is not encrypted even when everything inside it is, so
+    # it still names its bags: a shrouded key bag means a private key is in the
+    # file, and saying only that is more honest than saying nothing. Cryben's
+    # benchmark-server.p12 is a claimed extension that produced neither a finding
+    # nor a note -- the silent skip this scanner argues against, in this scanner.
+    if not algorithms and not keys:
+        wrapper = _iter_oids(raw)
+        if wrapper & _PKCS12_KEY_BAGS:
+            keys.append({
+                "path": rel_path,
+                "line": 1,
+                "type": "PKCS#12 shrouded key bag",
+                "description": ("private key material in a PKCS#12 key bag; the bag is "
+                                "encrypted and was not decoded, so the algorithm is unknown"),
+            })
+
     return algorithms, keys
+
+
+def is_undecoded(algorithms: list, keys: list) -> bool:
+    """A claimed file that gave up nothing an algorithm can be named from."""
+    return not algorithms and not any(
+        key.get("type") != "PKCS#12 shrouded key bag" for key in keys)
