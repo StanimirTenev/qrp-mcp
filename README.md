@@ -268,23 +268,34 @@ pins and a digest of what was found, so the same code over the same corpus that 
 things gets the same serial, and a different result gets a different one. The timestamp and the
 coverage window record when the run happened, so those fields differ between runs.
 
-## Measured against the other free scanners
+## Measured against the other scanners
 
-In September 2026 the three free tools that do the same job — CryptoScan, CBOMkit-hyperion
+In September 2026 three free tools that do the same job — CryptoScan, CBOMkit-hyperion
 (sonar-cryptography) and CBOMkit-theia — were run over the same repositories and the findings
 compared line by line. What they found and this tool did not became the 0.8.0 and 0.8.1
-releases, and what this tool does that they do not is on the same list:
+releases. Of what this tool does that they did not, one claim needed narrowing when a wider
+survey was done, and it is corrected here:
 
-- Only this scanner reports **what it did not read, and why**. CryptoScan silently skips
-  `testdata/` and similar (231 of 1,202 files in certbot); hyperion excludes tests by default;
-  neither says so in its output.
-- Only this scanner separates **reading from finding**, and now refuses to say `complete`
-  without a control.
+- **Coverage inside the document.** Several tools do report what they skipped: QuantaKrypto's
+  `qscan` counts scanned and unread files, IBM Quantum Safe Explorer logs each excluded file
+  with a reason, SandboxAQ shows missed locations. What we have not found elsewhere is the
+  coverage travelling **inside the CycloneDX CBOM** — a reason per group of unread files, the
+  paths that could not be read, the directories that could not be entered, and
+  `accounts_for_every_file`. `qscan` computes the counts and drops them on export, so it is one
+  flag away from the same thing.
+- This scanner separates **reading from finding** in the document itself, and refuses to say
+  `complete` without a control that licenses the stronger claim. Reading is self-measurable;
+  finding is not.
 - **sntrup761**, the default hybrid in OpenSSH since 9.0, has no rule in CryptoScan; this tool
   reports 145 lines of it in the OpenSSH tree.
 - An excluded cipher (`!MD5`) is counted as a *use* by CryptoScan; here it is an exclusion.
 - On certbot, this scanner finds algorithms in 26 files against hyperion's 7, and hyperion's
   one extra finding is wrong (`RSA-96` where certbot defaults to 2048).
+
+The nearest tool of the same kind is **QuantaKrypto's `qscan`**: lexical like this one, by its
+own changelog, and it publishes a detection-completeness figure (0.847) on its own corpus. This
+tool publishes no such figure, because it holds no control corpus — which is what the
+`claims.control.held: false` field in every scan says.
 
 Still missing here, stated rather than hidden: private keys are recognised by file extension
 rather than by content (theia finds 45 key files in OpenSSH that this tool does not), 3DES is
