@@ -98,6 +98,18 @@ OpenSSL 3 form where the algorithm is a string argument (`EVP_PKEY_Q_keygen(libc
 IANA `TLS_*` names are read the same way. A banned component is not a use: `!MD5` and `!3DES`
 in a cipher list are exclusions, and they are treated as such.
 
+**Protocols and dependencies, counted without inventing an algorithm** — a pinned TLS version
+(`MinVersion: tls.VersionTLS12`, `ssl_protocols`, `SslProtocols.Tls12`, `SSL3_VERSION`), an SSH
+transport line, and a cryptographic library declared in `package.json`, `go.mod`,
+`requirements.txt`, `Cargo.toml`, `pom.xml` or a `Gemfile`. These are real facts about a
+repository and they are reported — in their own buckets, never in `detected_algorithms`. Each
+carries a `basis`: `configured_protocol` or `declared_dependency`, never `observed_call`, because
+an installed library is not a line of code that calls it. A version is not a verdict either:
+TLSv1.0 is marked deprecated, and quantum vulnerability is not claimed from a version number,
+since TLS 1.3 is vulnerable over X25519 and is not over X25519MLKEM768. `-SSLv3` in an
+`SSLProtocol` line is a ban, and is recorded as one. Manifests are parsed structurally, so a
+library named in a comment is not a dependency.
+
 **Key sizes** — a size named on the line (`key_size=1024`, `rsa:1024`, `genrsa 1024`,
 `GenerateKey(..., 1024)`) travels with the family, so a weak RSA key is reported as weak rather
 than as one more RSA. The smallest size seen per family is in `algorithm_key_sizes`.
@@ -272,8 +284,8 @@ coverage window record when the run happened, so those fields differ between run
 
 In September 2026 three free tools that do the same job — CryptoScan, CBOMkit-hyperion
 (sonar-cryptography) and CBOMkit-theia — were run over the same repositories and the findings
-compared line by line. What they found and this tool did not became the 0.8.0 and 0.8.1
-releases. Of what this tool does that they did not, one claim needed narrowing when a wider
+compared line by line. What they found and this tool did not became the 0.8.0, 0.8.1 and
+0.9.0 releases. Of what this tool does that they did not, one claim needed narrowing when a wider
 survey was done, and it is corrected here:
 
 - **Coverage inside the document.** Several tools do report what they skipped: QuantaKrypto's
@@ -288,19 +300,57 @@ survey was done, and it is corrected here:
   finding is not.
 - **sntrup761**, the default hybrid in OpenSSH since 9.0, has no rule in CryptoScan; this tool
   reports 145 lines of it in the OpenSSH tree.
+- **Private keys are recognised by content**, not by file name: the 45 key files CBOMkit-theia
+  found in OpenSSH and this tool did not are read from 0.9.0, and a PEM header with the body
+  elided — documentation — is not one.
 - An excluded cipher (`!MD5`) is counted as a *use* by CryptoScan; here it is an exclusion.
 - On certbot, this scanner finds algorithms in 26 files against hyperion's 7, and hyperion's
   one extra finding is wrong (`RSA-96` where certbot defaults to 2048).
 
-The nearest tool of the same kind is **QuantaKrypto's `qscan`**: lexical like this one, by its
-own changelog, and it publishes a detection-completeness figure (0.847) on its own corpus. This
-tool publishes no such figure, because it holds no control corpus — which is what the
-`claims.control.held: false` field in every scan says.
+## Measured on a corpus this project did not write
 
-Still missing here, stated rather than hidden: private keys are recognised by file extension
-rather than by content (theia finds 45 key files in OpenSSH that this tool does not), 3DES is
-reported under `DES`, and a finding carries no confidence level, so a bare word in a comment and
-a real call site look alike.
+The nearest tool of the same kind is **QuantaKrypto's `qscan`** — lexical like this one by its
+own changelog, and the only other tool in this class that publishes a detection figure. In
+September 2026 both were run against **Cryben** (Näther & Hirsch, arXiv 2608.04857): an
+independent corpus with its own reference CBOM and its own scorer, written by neither of us.
+The scripts and the raw output are reproducible; the method matters more than the number.
+
+| | qscan 0.12.0 | this tool 0.8.1 | this tool 0.9.0 |
+|---|---|---|---|
+| Cryben, in the scope this tool declares | 30/37 | 22/37 | **35/37** |
+| Cryben, in the scope both tools declare | 30/31 | 17/31 | **30/31** |
+| qscan's own corpus, qscan's own metric | 0.847 | 0.511 | **0.847** |
+| the same, with no wildcard credit | — | ≥ 0.489 | **0.847** |
+| qscan's corpus without its structural labels | 0.802 | 0.714 | **0.881** |
+| Vault, wall clock | 7.9 s | 173 s | 219 s |
+
+Three things that number does not mean, said here rather than left to be assumed:
+
+- **Cryben is 37 cases in this tool's scope.** A figure from 37 cases has a wide interval. It is
+  a floor worth publishing, not a precision claim.
+- **The scorer is theirs.** qscan's metric matches per file, not per line, and credits a finding
+  that names no algorithm. This tool's 0.847 is the same with that credit and without it, because
+  every label a family-less finding could have covered was covered by one that names its family.
+  Same number, stricter rule.
+- **A per-scan control is still not held.** `claims.control.held` stays `false` in your scan
+  unless you run one, and it should: a figure measured here says nothing about your repository.
+
+`qscan` is faster by a factor of about 24, and reads more of the languages it parses deeply.
+This tool reads more kinds of file, says what it did not read, and does not invent a family for
+an asset that names none.
+
+## What is still missing here
+
+Stated rather than hidden, and each of these is a known gap rather than a suspicion:
+
+- **A finding carries no confidence level.** A bare word in a comment and a real call site look
+  alike. In a hand-checked sample of 20 new findings on Vault, one was in a comment.
+- **SSH and TLS assets are read at 8/14 and 7/11** on qscan's corpus; X448 at 4/8.
+- **Speed.** Reading key material by content costs about 26% over 0.8.1 on a large tree.
+- **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
+  scope by design.** This tool reports what a cryptographically relevant quantum computer would
+  break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,
+  and that is the scope working, not failing.
 
 ## Why deterministic
 
