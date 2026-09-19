@@ -107,6 +107,7 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
         "files_scanned": scan_result["files_scanned"],
         "files_present": scan_result["files_present"],
         "files_skipped_by_type": scan_result["files_skipped_by_type"],
+        "named_only_in_comments": scan_result["named_only_in_comments"],
         "unreadable_files": scan_result["unreadable_files"],
         "symlinks_not_followed": scan_result["symlinks_not_followed"],
         "claimed_but_not_decoded": scan_result["claimed_but_not_decoded"],

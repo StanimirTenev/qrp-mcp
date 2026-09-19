@@ -30,6 +30,13 @@ SOURCE_EXTENSIONS = {
     ".ps1", ".psm1", ".pl", ".pm",
     # Smart contracts and chain tooling
     ".sol", ".rs", ".move", ".cairo",
+    # JVM languages other than Java, and the ES-module spellings of JavaScript.
+    # Measured on a rival's labelled corpus: eight of its 176 labels sit in .kt and
+    # .mjs files, and this scanner opened none of them -- the single largest hole in
+    # its recall, and a reading gap rather than a detection one. Its own
+    # files_skipped_by_type named them all along.
+    ".kt", ".kts", ".scala", ".sc", ".groovy",
+    ".mjs", ".cjs", ".mts", ".cts",
 }
 
 EXCLUDED_DIRS = {
@@ -83,6 +90,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"OpenSSL::PKey::RSA\b|"
         r"\w*withRSA(?:andMGF1)?\b|Cipher\.getInstance\(\s*[\"']RSA[/\"']|"
         r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']rsa[\"']|"
+        r"\bcreate(?:Sign|Verify)\(\s*[\"'](?:RSA-)?SHA\d+[\"']|"
+        r"\bcreate(?:Sign|Verify)\(\s*[\"']RSA[-\w]*[\"']|"
         r"\bRsaPrivateKey\b|\bRsaPublicKey\b|"
         r"\bCKM_RSA_\w+|"
         # The names protocols and APIs use for the key type itself. OpenSSH's default
@@ -149,6 +158,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bEC_KEY_new\w*|\bEC_KEY_generate_key\b|\bEC_GROUP_new\w*|\bEVP_PKEY_EC\b|\bEC_POINT_\w+|"
         r"OpenSSL::PKey::EC\b|\bgenerateKeyPair(?:Sync)?\(\s*[\"']ec[\"']|"
         r"\bx509\.(?:Parse|Marshal)ECPrivateKey\b|"
+        # Go names its NIST curves in crypto/elliptic; the curve is the algorithm.
+        r"\belliptic\.P(?:224|256|384|521)\b|\becdh\.P(?:256|384|521)\b|"
         r"\bECCurve\.|\bECParameters\b|"
         # IKE proposal syntax: ecp384 is NIST P-384 and lives in swanctl.conf,
         # where a scanner reading only library calls never meets it.
@@ -169,6 +180,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|(?<!EC)Diffie[- ]?Hellman|"
         r"asymmetric\s+import\s+[^\n#]*\bdh\b|\bdh\.generate_parameters\b|"
         r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
+        # Ruby, the Rust openssl crate, and BouncyCastle -- the vocabulary a rival
+        # reads and this scanner did not. Fix #9 of the September comparison.
+        r"\bdh\.compute_key\b|\bDh::generate_params\b|\bDh::from_params\b|"
+        r"\bDHBasicAgreement\b|\bDHKeyPairGenerator\b|\bDHParametersGenerator\b|"
         # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
         # finite-field Diffie-Hellman.
         r"(?<![A-Za-z])modp(?:1024|1536|2048|3072|4096|6144|8192)(?![0-9])",
@@ -224,7 +239,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # Single DES only: the triple-DES spellings have their own rule above, and
         # the EVP_des_ede* family (two- and three-key) must not fall in here.
         r"crypto/des\b|\bDES_set_key\w*|\bDES_ecb_encrypt\b|"
-        r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b", re.IGNORECASE,
+        r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b|\bdes\.NewCipher\b", re.IGNORECASE,
     )),
     # Blockchain / wallet signing. These map onto the same classical primitives -- a
     # secp256k1 signature is ECDSA, and Shor breaks it like any other elliptic curve.
@@ -258,7 +273,12 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # alone in prose.
     ("X448", "X448 key agreement usage", re.compile(r"(?<![A-Za-z])X448(?![0-9])")),
     ("X448", "X448 key agreement usage", re.compile(
-        r"(?<=[._/-])x448(?![0-9])|(?<![A-Za-z])x448(?=[._])",
+        # `::` closes the Rust crate path: `use x448::{PublicKey, Secret}` matched
+        # neither alternative, because :: is not in [._/-] and not in [._].
+        r"(?<=[._/-])x448(?![0-9])|(?<![A-Za-z])x448(?=[._]|::)",
+    )),
+    ("X448", "X448 key agreement usage", re.compile(
+        r"\bX448(?:Agreement|KeyPairGenerator|PrivateKeyParameters|PublicKeyParameters)\b",
     )),
     # Three families the classifier table has always been able to explain and no
     # rule could ever find: a scanner that answers "yes, I know Ed448" and then
@@ -279,7 +299,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
     ("Ed448", "Ed448 usage", re.compile(
         r"(?<![A-Za-z])Ed448(?![0-9])|asymmetric\s+import\s+[^\n#]*\bed448\b|"
-        r"\bNID_ED448\b|\bEVP_PKEY_ED448\b",
+        r"\bNID_ED448\b|\bEVP_PKEY_ED448\b|\bEd448(?:Signer|KeyPairGenerator)\b",
         re.IGNORECASE,
     )),
     ("EdDSA", "EdDSA usage", re.compile(
@@ -289,7 +309,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
     ("Ed25519", "Ed25519 usage", re.compile(
         r"\bed25519\b|tweetnacl|\bnacl\.sign\b|@solana/web3\.js|solana_program::|"
-        r"sodium_crypto_sign",
+        r"sodium_crypto_sign|\bEd25519(?:Signer|KeyPairGenerator)\b",
         re.IGNORECASE,
     )),
     ("Schnorr", "Schnorr signature usage", re.compile(
@@ -714,12 +734,79 @@ def _in_blob(pos: int, spans: list[tuple[int, int]]) -> bool:
     return any(start <= pos < end for start, end in spans)
 
 
+# What kind of evidence a line is. Asked for by an external audit and by a
+# measured precision gap: a bare word in a comment and a real call site looked
+# alike, and the same algorithm was reported twice -- once where its module is
+# imported and once where it is called. A rival strips comments before matching;
+# this scanner keeps them and says what they are, which is more information
+# rather than less, provided the report says which is which.
+# `#` opens a comment in shell, Python, Ruby, YAML and most configuration, and
+# opens a preprocessor directive in C. `#define SSH_HOSTKEY_ALGS "ssh-ed25519"`
+# is code, and calling it a comment hid a real finding -- caught by the suite
+# rather than by reasoning about it.
+_C_DIRECTIVE = re.compile(
+    r"^\s*#\s*(?:define|include|if|ifdef|ifndef|elif|else|endif|pragma|undef|error|line)\b")
+_COMMENT_LINE = re.compile(
+    r"^\s*(?:#|//|--(?!\s*\w+\s*=)|;|/\*|\*(?!/)|<!--|\.\.\s|%|\bREM\b)", re.IGNORECASE)
+_IMPORT_LINE = re.compile(
+    r"^\s*(?:import\b|from\s+\S+\s+import\b|#\s*include\b|use\s+\S+;|require\s*\(|"
+    r"using\s+\S+;|package\s+\S+;|\s*\"[\w./-]+\"\s*$)")
+_CALL_SHAPE = re.compile(r"\w\s*\(")
+
+
+def _evidence_kind(line: str, inside_block_comment: bool) -> str:
+    stripped = line.strip()
+    if _C_DIRECTIVE.match(line):
+        return "declaration"
+    if inside_block_comment or _COMMENT_LINE.match(line):
+        return "comment"
+    if _IMPORT_LINE.match(line):
+        return "import"
+    if _CALL_SHAPE.search(stripped):
+        return "call"
+    if "=" in stripped or ":" in stripped:
+        return "declaration"
+    return "reference"
+
+
+def _block_comment_state(line: str, inside: bool) -> bool:
+    """Whether the NEXT line is inside a /* */ block."""
+    if inside:
+        return "*/" not in line
+    opened = line.rfind("/*")
+    return opened != -1 and "*/" not in line[opened:]
+
+
+def _families_named(findings: list[dict[str, Any]]) -> set[str]:
+    return {f["algorithm"] for f in findings}
+
+
+def _families_in_use(findings: list[dict[str, Any]]) -> set[str]:
+    """Families with at least one piece of evidence that is not a comment."""
+    return {f["algorithm"] for f in findings if f.get("evidence_kind") != "comment"}
+
+
+def _drop_imports_covered_by_a_call(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """An import is not a second row when the call it enables is in the file.
+
+    Measured on Cryben: 20 of 24 rows the reference did not place were import
+    lines within two lines of the call. An import on its own is kept -- a module
+    in the build is evidence, and dropping it would trade a duplicate for a miss.
+    """
+    called = {f["algorithm"] for f in findings if f.get("evidence_kind") == "call"}
+    return [f for f in findings
+            if not (f.get("evidence_kind") == "import" and f["algorithm"] in called)]
+
+
 def scan_source_file(path: Path, rel_path: str,
                      lines: list[str] | None = None,
                      cipher_exclusions: bool = False) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     lines = (_read_lines(path) or []) if lines is None else lines
+    inside_block = False
     for line_no, line in enumerate(lines, start=1):
+        kind = _evidence_kind(line, inside_block)
+        inside_block = _block_comment_state(line, inside_block)
         # One line, one finding per algorithm. Several patterns can carry the same
         # name -- ECDSA is matched both by its own name and by secp256k1, X448 by
         # its upper and lower case forms -- and counting each pattern separately
@@ -746,6 +833,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "algorithm": algorithm,
                 "description": description,
                 "excerpt": line.strip()[:200],
+                "evidence_kind": kind,
             }
             size = key_size_on_line(line) if algorithm == "RSA" else None
             if size:
@@ -761,6 +849,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "algorithm": family,
                 "description": f"{family} named in an OpenSSL 3 fetch or keygen call",
                 "excerpt": line.strip()[:200],
+                "evidence_kind": kind,
             })
 
         # Suite names appear in configuration and in code alike: OpenSSL's headers
@@ -776,6 +865,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "algorithm": family,
                 "description": f"{family} named in a cipher suite",
                 "excerpt": line.strip()[:200],
+                "evidence_kind": kind,
             })
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
             findings.append({
@@ -785,7 +875,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": "RFC 8784 postquantum preshared key",
                 "excerpt": line.strip()[:200],
             })
-    return findings
+    return _drop_imports_covered_by_a_call(findings)
 
 
 def scan_embedded_keys(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
@@ -1069,7 +1159,17 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         "ci_pipeline_findings": ci_findings,
         "iac_findings": iac_findings,
         "embedded_key_findings": embedded_key_findings,
-        "detected_algorithms": sorted({f["algorithm"] for f in source_findings + iac_findings}),
+        # A family named only in comments is not a family the code uses. It stays
+        # in the evidence, marked as a comment, because a comment saying "we must
+        # drop ECDSA" is worth reading -- but it does not put ECDSA in the
+        # inventory or make the verdict quantum-vulnerable. Measured: the nearest
+        # rival strips comments before matching, and this scanner's precision on
+        # an independent corpus was 0.542 against its 0.93.
+        "detected_algorithms": sorted(_families_in_use(source_findings + iac_findings)),
+        # Named, and named apart: what the repository talks about but does not do.
+        "named_only_in_comments": sorted(
+            _families_named(source_findings + iac_findings)
+            - _families_in_use(source_findings + iac_findings)),
         # The smallest size seen for a family, so a weak key anywhere is visible. A
         # size is a property of the key, not of the name, and without it every RSA
         # reads the same whether it is 1024 or 4096 bits.

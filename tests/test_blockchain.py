@@ -49,7 +49,11 @@ def test_solana_ed25519_is_detected(tmp_path: Path) -> None:
 
 
 def test_bls_and_schnorr_are_classified_as_vulnerable(tmp_path: Path) -> None:
-    _write(tmp_path, "consensus.go", "// aggregate via bls12-381\n// verify BIP340 schnorr sigs\n")
+    # Real calls, not comments: from 0.11.0 a family named only in a comment is
+    # reported as talked about rather than used, and this test is about
+    # classification.
+    _write(tmp_path, "consensus.go",
+           "sig := bls12381.Aggregate(parts)\nok := schnorr.Verify(bip340, msg, sig)\n")
     result = scan_directory(tmp_path)
 
     assert "BLS" in result["detected_algorithms"]

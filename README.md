@@ -206,8 +206,9 @@ another coverage figure. Four things, each answering something the percentage ca
   tool declares, `unreadable` is a failure it hit, and they are never collapsed. A reason with no
   instances is reported at zero rather than omitted.
 
-Measured across five real repositories (certbot, OpenSSH, Vault, Bitcoin, OpenSSL), the scan
-reads **67% of the files present** — 73% of OpenSSL, 80% of OpenSSH. The rest is counted and
+Measured across five real repositories (certbot, OpenSSH, Vault, Bitcoin, OpenSSL) at this
+release, the scan reads **67% of the files present** — 74% of OpenSSL, 85% of OpenSSH, 66% of
+certbot, 77% of Bitcoin, 58% of Vault. The rest is counted and
 named with a reason. A directory that cannot be entered or listed is reported in
 `unreadable_directories`; its files cannot be counted, so the scan then says it cannot account
 for every file instead of claiming it read them all.
@@ -298,8 +299,9 @@ survey was done, and it is corrected here:
 - This scanner separates **reading from finding** in the document itself, and refuses to say
   `complete` without a control that licenses the stronger claim. Reading is self-measurable;
   finding is not.
-- **sntrup761**, the default hybrid in OpenSSH since 9.0, has no rule in CryptoScan; this tool
-  reports 145 lines of it in the OpenSSH tree.
+- **sntrup761**, the default hybrid in OpenSSH from 9.0 to 9.9 — OpenSSH 10 defaults to
+  `mlkem768x25519-sha256` — has no rule in CryptoScan; this tool reports 145 lines of it in the
+  OpenSSH tree.
 - **Private keys are recognised by content**, not by file name: the 45 key files CBOMkit-theia
   found in OpenSSH and this tool did not are read from 0.9.0, and a PEM header with the body
   elided — documentation — is not one.
@@ -320,24 +322,34 @@ The scripts and the raw output are reproducible; the method matters more than th
 | Cryben, in the scope this tool declares | 30/37 | 22/37 | **35/37** |
 | Cryben, in the scope both tools declare | 30/31 | 17/31 | **30/31** |
 | qscan's own corpus, qscan's own metric | 0.847 | 0.511 | **0.847** |
-| the same, with no wildcard credit | — | ≥ 0.489 | **0.847** |
+| the same, no wildcard credit for either tool | **0.790** | — | **0.818** |
 | qscan's corpus without its structural labels | 0.802 | 0.714 | **0.881** |
+| Cryben, full 197 findings, precision | **0.93** | — | 0.542 |
 | Vault, wall clock | 7.9 s | 173 s | 219 s |
 
-Three things that number does not mean, said here rather than left to be assumed:
+Four things those numbers do not mean, said here rather than left to be assumed:
 
 - **Cryben is 37 cases in this tool's scope.** A figure from 37 cases has a wide interval. It is
   a floor worth publishing, not a precision claim.
 - **The scorer is theirs.** qscan's metric matches per file, not per line, and credits a finding
-  that names no algorithm. This tool's 0.847 is the same with that credit and without it, because
-  every label a family-less finding could have covered was covered by one that names its family.
-  Same number, stricter rule.
+  that names no algorithm. An earlier version of this section claimed the figure was unchanged
+  with that credit withdrawn. It was wrong: the switch that withdrew it dropped only one bucket,
+  while elliptic-curve findings kept the credit unconditionally. Withdrawn properly, **and applied
+  to both tools**, the numbers are **0.818 for this tool and 0.790 for qscan**. The conclusion
+  survived the correction; the sentence did not.
 - **A per-scan control is still not held.** `claims.control.held` stays `false` in your scan
   unless you run one, and it should: a figure measured here says nothing about your repository.
+- **Recall is not the axis this tool is weakest on — precision is.** On Cryben's full 197
+  findings, scored by its authors' own tool, this scanner's precision is 0.542 against qscan's
+  0.93. Reaching a rival's recall while reporting more that the reference does not is not the
+  same as being the better inventory, and it would be dishonest to publish the first number
+  without the second.
 
-`qscan` is faster by a factor of about 24, and reads more of the languages it parses deeply.
-This tool reads more kinds of file, says what it did not read, and does not invent a family for
-an asset that names none.
+`qscan` is faster by a factor of about 24. It is not deeper: it is lexical, by its own changelog,
+as this section already says. Measured per language on its own corpus it leads in none by more
+than three labels and trails this tool by five in Go; its real edge is in TLS, SSH and dependency
+lines rather than in any language. This tool reads more kinds of file, says what it did not read,
+and does not invent a family for an asset that names none.
 
 ## What is still missing here
 

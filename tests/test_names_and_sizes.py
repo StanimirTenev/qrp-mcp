@@ -108,7 +108,7 @@ def test_hyphenated_prose_is_not_a_cipher_suite(tmp_path):
 def test_pqc_parameter_names_are_not_classical_dsa(tmp_path):
     # vault path_keys.go: "slh-dsa-sha2-128s" read as DSA; "ML-DSA-65" likewise.
     fam = families(tmp_path, "path_keys.go",
-                   '"slh-dsa-sha2-128s", "slh-dsa-shake128f",\n// ML-DSA-65 only\n')
+                   '"slh-dsa-sha2-128s", "slh-dsa-shake128f",\nkeyType = "ML-DSA-65"\n')
     assert "DSA" not in fam and {"SLH-DSA", "ML-DSA"} <= fam
 
 

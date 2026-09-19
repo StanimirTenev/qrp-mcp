@@ -155,7 +155,22 @@ MANIFEST_FILENAMES: dict[str, str] = {
     "build.gradle.kts": "maven",
     "Gemfile": "rubygems",
     "composer.json": "composer",
+    # A manifest says what was asked for; a lockfile says what shipped. For a
+    # register of what is installed, the lockfile is the honest one, and this
+    # scanner read none of them.
+    "package-lock.json": "npm",
+    "yarn.lock": "npm",
+    "pnpm-lock.yaml": "npm",
+    "Cargo.lock": "cargo",
+    "Gemfile.lock": "rubygems",
+    "composer.lock": "composer",
+    "Pipfile.lock": "pypi",
+    "poetry.lock": "pypi",
 }
+
+# NuGet has no fixed filename: the project file is named after the project.
+_NUGET_SUFFIXES = (".csproj", ".vbproj", ".fsproj")
+_NUGET_FILENAMES = {"packages.config", "Directory.Packages.props"}
 
 # A dependency is read from the structure of the manifest, never from the text
 # anywhere in it: qscan reports RSA for a comment line in a go.mod, which is the
@@ -166,11 +181,62 @@ _CARGO_DEP = re.compile(r'^\s*([A-Za-z0-9][\w-]*)\s*=\s*[{"\d]')
 _MAVEN_ARTIFACT = re.compile(r"<artifactId>\s*([^<\s]+)\s*</artifactId>")
 _GRADLE_DEP = re.compile(r"""['"][\w.-]+:([\w.-]+):""")
 _GEM = re.compile(r"""^\s*gem\s+['"]([^'"]+)['"]""")
+_NUGET_PACKAGE = re.compile(r"""<(?:PackageReference|PackageVersion|package)\s[^>]*?(?:Include|id)\s*=\s*["']([^"']+)["']""")
+_LOCK_NPM_PATH = re.compile(r'^\s*"node_modules/((?:@[^/"]+/)?[^/"]+)"\s*:')
+_LOCK_YARN = re.compile(r'^"?((?:@[^/@"]+/)?[^@"\s][^@"]*)@[^"\s]+"?\s*:\s*$')
+_LOCK_TOML_NAME = re.compile(r'^\s*name\s*=\s*"([^"]+)"')
+_LOCK_GEM = re.compile(r"^\s{4}([A-Za-z0-9._-]+)\s*\(")
+
+
+def _names_from_lockfile(name: str, lines: list[str]) -> list[tuple[str, int]]:
+    """Package names out of a lockfile, read by its own shape."""
+    out: list[tuple[str, int]] = []
+    if name in {"package-lock.json", "Pipfile.lock"}:
+        # JSON, so parsed rather than matched: a lockfile is often one long line.
+        try:
+            data = json.loads("\n".join(lines))
+        except (ValueError, TypeError):
+            data = None
+        if isinstance(data, dict):
+            for key in ("packages", "dependencies", "default", "develop"):
+                block = data.get(key)
+                if not isinstance(block, dict):
+                    continue
+                for raw in block:
+                    package = raw.split("node_modules/")[-1] if raw else ""
+                    if not package:
+                        continue
+                    line = next((n for n, text in enumerate(lines, 1) if raw in text), 1)
+                    out.append((package, line))
+        if out:
+            return out
+        for number, text in enumerate(lines, 1):
+            match = _LOCK_NPM_PATH.match(text)
+            if match:
+                out.append((match.group(1), number))
+    elif name in {"yarn.lock", "pnpm-lock.yaml"}:
+        for number, text in enumerate(lines, 1):
+            match = _LOCK_YARN.match(text) or _LOCK_NPM_PATH.match(text)
+            if match:
+                out.append((match.group(1), number))
+    elif name in {"Cargo.lock", "poetry.lock"}:
+        for number, text in enumerate(lines, 1):
+            match = _LOCK_TOML_NAME.match(text)
+            if match:
+                out.append((match.group(1), number))
+    elif name in {"Gemfile.lock", "composer.lock"}:
+        for number, text in enumerate(lines, 1):
+            match = _LOCK_GEM.match(text)
+            if match:
+                out.append((match.group(1), number))
+    return out
 
 
 def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tuple[str, int]]:
     """(package name, line number) pairs, read structurally."""
     out: list[tuple[str, int]] = []
+    if name.endswith(".lock") or name == "package-lock.json":
+        return _names_from_lockfile(name, lines)
     if ecosystem == "npm" or (ecosystem == "composer" and name == "composer.json"):
         try:
             data = json.loads("\n".join(lines))
@@ -188,6 +254,9 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
                     out.append((package, line))
         return out
 
+    if ecosystem == "nuget":
+        return [(m.group(1), n) for n, text in enumerate(lines, 1)
+                for m in _NUGET_PACKAGE.finditer(text)]
     inside_cargo_deps = False
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
@@ -223,12 +292,20 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
 
 
 def is_manifest(path: Path) -> bool:
-    return path.name in MANIFEST_FILENAMES
+    return (path.name in MANIFEST_FILENAMES
+            or path.name in _NUGET_FILENAMES
+            or path.suffix in _NUGET_SUFFIXES)
+
+
+def _ecosystem_of(path: Path) -> str | None:
+    if path.name in _NUGET_FILENAMES or path.suffix in _NUGET_SUFFIXES:
+        return "nuget"
+    return MANIFEST_FILENAMES.get(path.name)
 
 
 def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     """Dependencies that carry classical cryptography, as declared assets."""
-    ecosystem = MANIFEST_FILENAMES.get(path.name)
+    ecosystem = _ecosystem_of(path)
     if ecosystem is None:
         return []
     table = DEPENDENCY_FAMILIES.get(ecosystem, {})
@@ -292,8 +369,11 @@ _SSH_PROTOCOL = re.compile(
 # in an authorized_keys is RSA, and it is RSA reached over SSH.
 _SSH_KEY_LINE = re.compile(
     # authorized_keys starts with the type; known_hosts starts with the host, so
-    # the type may be the second field. Both end in base64 key material.
-    r"^\s*(?:\S+\s+)?(?:ssh-(?:rsa|dss|ed25519|mldsa\w*)|ecdsa-sha2-nistp\d+|sk-\S+)"
+    # the type may be the second field; and source code keeps the same line inside
+    # a string literal, where the opening quote sits exactly where the type must
+    # be. Anchoring at the start of the line missed 8 such lines in OpenSSH and
+    # Vault, and matched one only because the host field absorbed the quote.
+    r"(?:^|[\s\"'`(\[{,=:])(?:ssh-(?:rsa|dss|ed25519|mldsa\w*)|ecdsa-sha2-nistp\d+|sk-\S+)"
     r"(?:-cert-v01@openssh\.com)?(?:@openssh\.com)?\s+[A-Za-z0-9+/]{20,}")
 
 # OpenSSL's version macros are unambiguous identifiers: nothing but a protocol
@@ -359,7 +439,7 @@ def scan_protocols(line: str) -> list[dict[str, Any]]:
                                 f"{name} is configured here. Which algorithms it "
                                 f"negotiates is not stated by the version."),
             })
-    if _SSH_KEY_LINE.match(line):
+    if _SSH_KEY_LINE.search(line):
         out.append({
             "protocol": "ssh",
             "version": None,

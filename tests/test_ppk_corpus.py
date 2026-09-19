@@ -75,7 +75,11 @@ def test_the_classical_half_is_still_named(tmp_path):
     ("ppk_secret = 0x00112233", True),
     ("@ppk : PPKS 0xdeadbeef", True),
     ("crypto ikev2 policy ppk manual", True),
-    ("# quantum resistance per RFC 8784", True),
+    # A comment naming RFC 8784 is the configuration being discussed, not
+    # enabled. From 0.11.0 such a line lands in named_only_in_comments, for
+    # the same reason a comment about ECDSA does not put ECDSA in the
+    # inventory -- the rule has to hold for a mitigation as well as a risk.
+    ("# quantum resistance per RFC 8784", False),
     ("RFC-8784 postquantum preshared key", True),
     # .ppk is PuTTY's private key format. A key file is not a preshared key, and
     # matching the bare word would report every PuTTY user as quantum-resistant.
