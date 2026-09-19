@@ -317,14 +317,15 @@ September 2026 both were run against **Cryben** (Näther & Hirsch, arXiv 2608.04
 independent corpus with its own reference CBOM and its own scorer, written by neither of us.
 The scripts and the raw output are reproducible; the method matters more than the number.
 
-| | qscan 0.12.0 | this tool 0.8.1 | this tool 0.10.0 |
+| | qscan 0.12.0 | this tool 0.8.1 | this tool 0.11.0 |
 |---|---|---|---|
-| Cryben, in the scope this tool declares | 30/37 | 22/37 | **35/37** |
-| Cryben, in the scope both tools declare | 30/31 | 17/31 | **30/31** |
-| qscan's own corpus, qscan's own metric | 0.847 | 0.511 | **0.847** |
-| the same, no wildcard credit for either tool | **0.790** | — | **0.818** |
-| qscan's corpus without its structural labels | 0.802 | 0.714 | **0.881** |
-| Cryben, full 197 findings, precision | **0.93** | — | 0.542 |
+| Cryben, in the scope this tool declares | 30/37 | 22/37 | **36/37** |
+| qscan's own corpus, qscan's own metric | 0.847 | 0.511 | **0.909** |
+| the same, no wildcard credit for either tool | 0.790 | — | **0.881** |
+| qscan's corpus without its structural labels | 0.802 | 0.714 | **0.944** |
+| Cryben, full 197 findings, precision | **0.93** | — | 0.667 |
+| Cryben, full 197 findings, F1 | 0.34 | — | **0.346** |
+| a negative corpus, 200 files with no such cryptography | — | — | **200 clean** |
 | Vault, wall clock | 7.9 s | 173 s | 219 s |
 
 Four things those numbers do not mean, said here rather than left to be assumed:
@@ -340,16 +341,45 @@ Four things those numbers do not mean, said here rather than left to be assumed:
 - **A per-scan control is still not held.** `claims.control.held` stays `false` in your scan
   unless you run one, and it should: a figure measured here says nothing about your repository.
 - **Recall is not the axis this tool is weakest on — precision is.** On Cryben's full 197
-  findings, scored by its authors' own tool, this scanner's precision is 0.542 against qscan's
-  0.93. Reaching a rival's recall while reporting more that the reference does not is not the
-  same as being the better inventory, and it would be dishonest to publish the first number
-  without the second.
+  findings, scored by its authors' own tool, this scanner's precision is 0.667 against qscan's
+  0.93. It was 0.542 one release ago. Reaching a rival's recall while reporting more that the
+  reference does not is not the same as being the better inventory, and it would be dishonest to
+  publish the first number without the second.
 
 `qscan` is faster by a factor of about 24. It is not deeper: it is lexical, by its own changelog,
 as this section already says. Measured per language on its own corpus it leads in none by more
 than three labels and trails this tool by five in Go; its real edge is in TLS, SSH and dependency
 lines rather than in any language. This tool reads more kinds of file, says what it did not read,
 and does not invent a family for an asset that names none.
+
+## The corpus that measures the other direction
+
+A corpus of labelled findings can only ever say what a tool misses. It says nothing about the
+twenty lines in the same file that are not cryptography. So this release is measured against one
+written for the opposite question:
+
+- **200 files with no quantum-vulnerable cryptography at all** — ordinary code in fifteen
+  languages, configuration, CI, infrastructure, manifests, lockfiles, data and documentation.
+  Any finding on one of them is a false positive.
+- **100 near misses** — cryptography named, banned, discussed, tested against or imitated, but
+  not used: an `SSLProtocol` line removing SSLv3, a policy listing forbidden algorithms, a lint
+  rule quoting the pattern it forbids, a test asserting an algorithm is rejected, a docstring
+  explaining why RSA was dropped, base64 that is a JWT payload rather than a key.
+
+Every file was written and labelled **before** the scanner was run over it, and the corpus was
+written by someone who had not read the scanner's rules. A corpus assembled by looking at what a
+tool reported measures the tool against itself, which is the circularity this document criticises
+elsewhere.
+
+**Result: 200 of the 200 negative files are clean** — no finding of any kind. On the 100 near
+misses, this release reports 83 findings the labels say should not read as a use, down from 136.
+What remains is one shape: a file whose whole purpose is to forbid. A lint rule quoting
+`hashlib.md5(...)` as the thing it bans is, line by line, indistinguishable from code calling it;
+telling them apart needs file-level context this release does not attempt.
+
+The corpus is a floor, not a measurement. It was written by the same hands that wrote the tool,
+so a construct nobody here thought of is in neither. Its honest use is as a difference between
+two releases.
 
 ## What is still missing here
 
