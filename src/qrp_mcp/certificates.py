@@ -235,7 +235,10 @@ def scan_certificate_file(path: Path, rel_path: str) -> tuple[list[dict[str, Any
                    f"of type {head}", line_no, line)
 
     for blob in blobs:
-        for oid in _iter_oids(blob):
+        # Sorted: _iter_oids returns a set, so the order of the evidence list
+        # changed between interpreters with different hash seeds. A report whose
+        # own field order moves between runs cannot be diffed.
+        for oid in sorted(_iter_oids(blob)):
             entry = _find_oid_family(oid)
             if entry is not None:
                 record(entry[1], f"{entry[1]} identified by object identifier {oid}",

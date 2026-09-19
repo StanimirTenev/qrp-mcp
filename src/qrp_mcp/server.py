@@ -178,16 +178,24 @@ def scan_to_file(argv: list[str]) -> int:
     sys.stderr.reconfigure(errors="backslashreplace")
     if not Path(a.path).expanduser().is_dir():
         p.error(f"not a directory: {a.path}")
-    if a.out and not Path(a.out).expanduser().resolve().parent.is_dir():
-        p.error(f"the folder for --out does not exist: {Path(a.out).parent}")
+    # Normalised once, then used for the check, the write and the message. Checking
+    # the expanded path and writing the raw one meant `--out ~/x.json`, quoted so the
+    # shell never saw the tilde, passed the check and then raised FileNotFoundError.
+    out_path = Path(a.out).expanduser() if a.out else None
+    if out_path is not None and not out_path.resolve().parent.is_dir():
+        p.error(f"the folder for --out does not exist: {out_path.parent}")
 
     result = scan_directory(a.path)
     if a.level == "trimmed":
         result = _strip_excerpts(result)
     data = (json.dumps(result, indent=2, ensure_ascii=False) + "\n").encode()
-    if a.out:
-        Path(a.out).write_bytes(data)
-        print(f"wrote {a.out} ({a.level})", file=sys.stderr)
+    if out_path is not None:
+        try:
+            out_path.write_bytes(data)
+        except OSError as err:
+            print(f"qrp-mcp: could not write {out_path}: {err.strerror}", file=sys.stderr)
+            return 1
+        print(f"wrote {out_path} ({a.level})", file=sys.stderr)
     else:
         sys.stdout.buffer.write(data)
     # The digest of the exact bytes written: what a recipient will quote back.

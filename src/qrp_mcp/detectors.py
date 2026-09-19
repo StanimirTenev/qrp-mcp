@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from pathlib import Path
@@ -528,6 +529,36 @@ def display_path(rel: str) -> str:
     return os.fsencode(rel).decode("utf-8", "backslashreplace")
 
 
+def _link_target(repo_path: Path, rel: str) -> str:
+    """Where the link points, said without leaking a path outside the root."""
+    try:
+        resolved = (repo_path / rel).resolve(strict=False)
+        inside = resolved.relative_to(repo_path.resolve(strict=False))
+    except (OSError, ValueError, RuntimeError):
+        return "outside the scanned directory"
+    return display_path(inside.as_posix())
+
+
+def _is_link(path: Path) -> bool:
+    """A symlink, or a Windows junction, which is_symlink() does not report."""
+    # On OSError the answer is False rather than True: lstat fails only when the
+    # parent cannot be traversed, and then is_file() fails too, so the entry is
+    # already reported as unreadable. Calling it a link instead would relabel a
+    # permission problem as a policy decision and hide it.
+    try:
+        if path.is_symlink():
+            return True
+    except OSError:
+        return False
+    junction = getattr(os.path, "isjunction", None)
+    if junction is None:
+        return False
+    try:
+        return bool(junction(path))
+    except OSError:
+        return False
+
+
 def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = None,
                     problems: list[tuple[str, str]] | None = None):
     """Every file under the path, minus the vendored and generated directories.
@@ -541,6 +572,14 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
     What the walk cannot see is reported in ``problems`` as ("dir", path) for a
     directory it could not enter or list, and ("file", path) for an entry that is
     not a readable regular file (a broken link, a permission error on stat).
+
+    Symlinks are not followed, and are reported as ("symlink", path) for a file
+    and ("symlink_dir", path) for a directory. A link is a path out of the
+    directory the caller named, and following one lets the scanned tree decide
+    what this tool reads: an external audit of 0.9.0 found a link called
+    linked.py returning the contents of a file next to the repository, presented
+    as linked.py. The excerpt travels to an MCP client and into an exported CBOM,
+    so that is the declared boundary failing rather than a cosmetic error.
     Before this, such directories vanished and the scan still said it had read
     every file. Only directory names exclude: a *file* called ``build`` is a file.
     """
@@ -556,11 +595,26 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
         dirnames.sort()
         dir_parts = Path(dirpath).relative_to(repo_path).parts
         hit = next((part for part in dir_parts if part in EXCLUDED_DIRS), None)
+        # os.walk already declines to descend into a linked directory; without this
+        # it simply vanished, and the scan still said it had read every file.
+        if hit is None:
+            for name in list(dirnames):
+                candidate = Path(dirpath) / name
+                if _is_link(candidate):
+                    if problems is not None:
+                        problems.append(("symlink_dir", rel(str(candidate))))
+                    dirnames.remove(name)
         for name in filenames:
             path = Path(dirpath) / name
             if hit is not None:
                 if excluded_counter is not None:
                     excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
+                continue
+            if _is_link(path):
+                # Not read, and named. A broken link is reported the same way: it
+                # is still a link, and its target is still outside this tool's say.
+                if problems is not None:
+                    problems.append(("symlink", rel(str(path))))
                 continue
             try:
                 regular = path.is_file()
@@ -818,6 +872,12 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     unreadable: list[str] = []
     # Claimed file types that were opened and gave up nothing nameable.
     undecoded: list[str] = []
+    # What this run actually read, and what it deliberately did not. A commit does
+    # not identify either: two subdirectories of one commit are different corpora,
+    # and a git-ignored file the scan reads leaves the tree reporting clean. So the
+    # identity of the corpus is a digest of its contents -- an external audit of
+    # 0.9.0 found all three ways the commit alone got this wrong.
+    content_parts: list[str] = []
     # Assets present without an algorithm being written down. Separate from
     # the findings above because everything downstream keys on `algorithm`,
     # and these deliberately have none.
@@ -863,6 +923,13 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         if not (claimed or peeked_key):
             kind = path.suffix.lower() or "(no extension)"
             skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
+            # Not read, so not hashed: its size is what is known about it without
+            # opening a file this tool has declared it does not claim.
+            try:
+                size = path.stat().st_size
+            except OSError:
+                size = -1
+            content_parts.append(f"{rel_path}\0skipped:{size}")
             continue
 
         # Read once, here: classification and scanning must see the same content, and a
@@ -870,7 +937,14 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         lines = _read_lines(path)
         if lines is None:
             unreadable.append(rel_path)
+            content_parts.append(f"{rel_path}\0unread")
             continue
+        # The digest is over the text the scanner saw, not over the bytes on disk:
+        # what the numbers describe is what was read. No extra I/O -- this is the
+        # content _read_lines just returned.
+        content_parts.append(
+            rel_path + "\0" + hashlib.sha256(
+                "\n".join(lines).encode("utf-8", "surrogatepass")).hexdigest())
 
         for number, text_line in enumerate(lines, 1):
             for asset in scan_protocols(text_line):
@@ -930,18 +1004,45 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
     # invariant still holds. Directories it could not enter have an unknown number of
     # files in them; they are listed separately and the scan cannot claim to account
     # for every file.
+    symlinks: list[dict[str, str]] = []
     for kind, rel in walk_problems:
         if kind == "file":
             files_present += 1
             present_kinds["(unreadable entry)"] = present_kinds.get("(unreadable entry)", 0) + 1
             unreadable.append(rel)
+        elif kind in {"symlink", "symlink_dir"}:
+            # A linked file is one of the files present -- it was seen -- and it was
+            # not read, so it keeps the identity present = scanned + unreadable +
+            # skipped + links. A linked directory holds an unknown number of files,
+            # exactly like one that could not be entered, so it is not counted.
+            is_dir = kind == "symlink_dir"
+            if not is_dir:
+                files_present += 1
+                present_kinds["(symlink)"] = present_kinds.get("(symlink)", 0) + 1
+            symlinks.append({
+                "path": rel + ("/" if is_dir else ""),
+                "kind": "directory" if is_dir else "file",
+                "target": _link_target(repo_path, rel),
+                "reason": "symlink_not_followed",
+            })
         else:
             unreadable_dirs.append(rel + "/")
+        content_parts.append(f"{rel}\0{kind}")
 
     return {
         "files_scanned": files_scanned,
         # Directories that could not be entered or listed; their files are unknown.
         "unreadable_directories": sorted(set(unreadable_dirs)),
+        # Seen, not followed. Where the target sits is stated; the target path
+        # itself is only given when it is inside the scanned directory, because
+        # printing an outside path leaks the same thing reading it would.
+        "symlinks_not_followed": sorted(symlinks, key=lambda entry: entry["path"]),
+        # One value standing for everything above: the files read and their content,
+        # the files not read and their size, and the entries skipped with the reason.
+        # Two runs with the same digest read the same corpus, whatever it is called
+        # and wherever it sits.
+        "corpus_digest": "sha256:" + hashlib.sha256(
+            "\n".join(sorted(content_parts)).encode("utf-8", "surrogatepass")).hexdigest(),
         # Files found under the path, excluding the vendored and build directories in
         # EXCLUDED_DIRS. present = scanned + unreadable + skipped, always.
         "files_present": files_present,

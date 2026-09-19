@@ -166,15 +166,31 @@ def test_a_different_emitter_commit_changes_the_serial_number(scan):
     assert cyclonedx.build(other)["serialNumber"] != cyclonedx.build(scan)["serialNumber"]
 
 
-def test_comparing_a_clean_run_with_itself_is_comparable(scan):
+def pinned_block(scan):
+    """A coverage block with both pins set, whatever the tool was installed from.
+
+    The pins are supplied here instead of read from the environment. Three tests
+    used to take them from the tool's own checkout and so passed from a git clone
+    and failed from the published tarball -- found by an external audit of 0.9.0,
+    which ran the suite from the ZIP and saw `unestablished` three times. What the
+    comparison does when a pin is missing is a separate question, and the test
+    below named for it is the one that asks it.
+    """
     block = json.loads(json.dumps(scan["coverage"]))
-    block["corpus"]["pinned_at"]["dirty"] = False
+    block["instrument"]["source_commit"] = {"pinned": True, "commit": "a" * 40,
+                                            "dirty": False}
+    block["corpus"]["pinned_at"] = {"pinned": True, "commit": "b" * 40,
+                                    "dirty": False, "shallow": False}
+    return block
+
+
+def test_comparing_a_clean_run_with_itself_is_comparable(scan):
+    block = pinned_block(scan)
     assert coverage.compare(block, block)["verdict"] == "comparable"
 
 
 def test_a_changed_emitter_commit_is_not_comparable_at_the_same_version(scan):
-    first = json.loads(json.dumps(scan["coverage"]))
-    first["corpus"]["pinned_at"]["dirty"] = False
+    first = pinned_block(scan)
     second = json.loads(json.dumps(first))
     second["instrument"]["source_commit"]["commit"] = "0" * 40
     result = coverage.compare(first, second)
@@ -184,8 +200,7 @@ def test_a_changed_emitter_commit_is_not_comparable_at_the_same_version(scan):
 
 
 def test_an_unpinned_emitter_leaves_comparability_unestablished(scan):
-    first = json.loads(json.dumps(scan["coverage"]))
-    first["corpus"]["pinned_at"]["dirty"] = False
+    first = pinned_block(scan)
     second = json.loads(json.dumps(first))
     second["instrument"]["source_commit"] = {
         "pinned": False, "reason": "no_checkout", "meaning": "installed",
@@ -216,8 +231,7 @@ def test_two_clones_of_one_commit_at_different_paths_are_comparable(scan):
     incomparable because the directories differ was a pin that is true and does
     not support the conclusion -- in the table written to enumerate exactly that.
     """
-    first = json.loads(json.dumps(scan["coverage"]))
-    first["corpus"]["pinned_at"]["dirty"] = False
+    first = pinned_block(scan)
     second = json.loads(json.dumps(first))
     second["corpus"]["target"] = "/somewhere/else/same-repo"
 
@@ -325,3 +339,18 @@ def test_the_signers_sentence_names_where_the_gap_is(scan):
     assert bracket < listed, "the clause trails the sentence instead of sitting inside it"
     assert ". " not in line and line.endswith("."), (
         "the clause must stay inside the sentence it qualifies, not become another")
+
+
+def test_an_unpinned_tool_is_unestablished_however_it_was_installed(scan):
+    """The behaviour the fixture above deliberately steps around.
+
+    Running from a wheel or a tarball there is no checkout to name, and the
+    comparison must say so rather than pretend. This is the test that has to keep
+    working from the published artefact, and it needs no pins to do it.
+    """
+    block = json.loads(json.dumps(scan["coverage"]))
+    block["instrument"]["source_commit"] = {"pinned": False, "reason": "no_checkout",
+                                            "meaning": "installed, not a checkout"}
+    result = coverage.compare(block, json.loads(json.dumps(block)))
+    assert result["verdict"] == "unestablished"
+    assert any(u["reason"] == "instrument_unpinned" for u in result["unestablished"])

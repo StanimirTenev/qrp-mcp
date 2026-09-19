@@ -34,6 +34,8 @@ from typing import Any
 REASONS = {
     "type_not_claimed": "the tool does not claim this file type; a declared boundary, not a failure",
     "unreadable": "opened and could not be read; attempted and failed",
+    "symlink_not_followed": ("a symbolic link, not followed: its target is chosen by "
+                             "the scanned tree rather than by the caller"),
     "claimed_but_not_decoded": ("a claimed file type that was read and gave up no "
                                 "algorithm: encrypted content, or a structure this "
                                 "tool does not parse"),
@@ -321,6 +323,10 @@ def build(
         "paths": undecoded,
     }
     dirs_not_entered = scan_result.get("unreadable_directories", [])
+    links = scan_result.get("symlinks_not_followed", [])
+    # A linked directory was not entered, so how many files it holds is
+    # unknown -- the same state as one that could not be read.
+    linked_dirs = [e for e in links if e.get("kind") == "directory"]
 
     excluded = scan_result.get("files_excluded_by_dir", {})
 
@@ -341,6 +347,10 @@ def build(
         "corpus": {
             "target": str(repo_path),
             "pinned_at": _git_pin(repo_path),
+            # What identifies the corpus. The commit above is provenance a reader
+            # can check; it is not identity -- two subdirectories share a commit,
+            # and an ignored file the scan reads leaves the tree reporting clean.
+            "content_digest": scan_result.get("corpus_digest"),
         },
         "window": {
             "started_at": started_at,
@@ -388,6 +398,16 @@ def build(
         "not_examined": not_examined,
         # Read, counted as read, and empty anyway.
         "examined_without_result": read_but_empty,
+        # Seen and deliberately not followed. A link is a path the scanned tree
+        # chose, not one the caller gave, so following it would let the corpus
+        # decide what this tool reads.
+        "symlinks_not_followed": {
+            "reason": REASONS["symlink_not_followed"],
+            "count": len(links),
+            "files": len(links) - len(linked_dirs),
+            "directories": len(linked_dirs),
+            "paths": links,
+        },
         # Directories the walk could not enter. Their files are not in any count
         # above, because nobody knows how many there are.
         "directories_not_entered": {
@@ -399,7 +419,8 @@ def build(
         # present == examined + every not-examined reason, and nothing was hidden
         # from the walk. Asserted in the output rather than in a test, so a reader
         # can check it without trusting us.
-        "accounts_for_every_file": accounted == present and not dirs_not_entered,
+        "accounts_for_every_file": (accounted == present and not dirs_not_entered
+                                    and not linked_dirs),
     }
 
 
@@ -428,6 +449,11 @@ INCOMPARABLE = {
                     "so what was read is not recoverable from the commit",
     "corpus_depth_differs": "one run read a shallow clone and the other a full "
                             "checkout; the same commit carries a different file count",
+    "corpus_content_differs": "the two runs did not read the same content: the digest "
+                              "over the files read, their contents, and the entries "
+                              "deliberately not read is not the same",
+    "instrument_dirty": "at least one run used an emitter with uncommitted changes, so "
+                        "the commit it names does not describe the code that ran",
 }
 
 # Why comparability itself could not be established. Separate from INCOMPARABLE
@@ -441,14 +467,29 @@ UNESTABLISHED = {
                            "shown to be the same code",
     "corpus_unpinned": "at least one run read an unpinned directory, so no commit "
                        "identifies what was read",
+    "corpus_content_unknown": "at least one block carries no content digest, so what "
+                              "was read cannot be compared",
+    "instrument_cleanliness_unknown": "at least one run could not check whether its "
+                                      "own emitter had uncommitted changes",
+    "corpus_cleanliness_unknown": "at least one run could not check whether the "
+                                  "scanned directory had uncommitted changes",
 }
 
 
 def _pin_of(block: dict[str, Any], *keys: str) -> dict[str, Any]:
+    """The nested pin, or {} for anything that is not a mapping all the way down.
+
+    A coverage block arrives from a file or another tool. One whose `instrument` is
+    a string used to raise AttributeError out of the public comparison; a missing
+    `commit` raised KeyError. Neither is an answer, and this comparison has a word
+    for "the documents do not say" already.
+    """
     node: Any = block
     for key in keys:
-        node = (node or {}).get(key)
-    return node or {}
+        if not isinstance(node, dict):
+            return {}
+        node = node.get(key)
+    return node if isinstance(node, dict) else {}
 
 
 def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
@@ -462,21 +503,52 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
     unestablished: list[str] = []
     reasons: list[str] = []
 
-    tool_a, tool_b = _pin_of(first, "instrument", "source_commit"), _pin_of(second, "instrument", "source_commit")
-    corpus_a, corpus_b = _pin_of(first, "corpus", "pinned_at"), _pin_of(second, "corpus", "pinned_at")
+    tool_a, tool_b = (_pin_of(first, "instrument", "source_commit"),
+                      _pin_of(second, "instrument", "source_commit"))
+    corpus_a, corpus_b = (_pin_of(first, "corpus", "pinned_at"),
+                          _pin_of(second, "corpus", "pinned_at"))
+
+    def cleanliness(a: dict[str, Any], b: dict[str, Any],
+                    dirty_reason: str, unknown_reason: str) -> None:
+        """True, False and None are three answers, and None is not False.
+
+        `dirty: None` means the check could not be run -- a repository configuring
+        filters or hooks, which this tool declines to trigger. Reading it as clean
+        is the defect an audit of 0.9.0 found on both pins at once.
+        """
+        states = [a.get("dirty"), b.get("dirty")]
+        if any(state is True for state in states):
+            reasons.append(dirty_reason)
+        elif any(state is None for state in states):
+            unestablished.append(unknown_reason)
 
     if not (tool_a.get("pinned") and tool_b.get("pinned")):
         unestablished.append("instrument_unpinned")
-    elif tool_a["commit"] != tool_b["commit"]:
-        reasons.append("instrument_commit_differs")
+    elif not (tool_a.get("commit") and tool_b.get("commit")):
+        unestablished.append("block_incomplete")
+    else:
+        if tool_a["commit"] != tool_b["commit"]:
+            reasons.append("instrument_commit_differs")
+        cleanliness(tool_a, tool_b, "instrument_dirty",
+                    "instrument_cleanliness_unknown")
+
+    # What was read, before where it came from. A commit is provenance; the digest
+    # is identity, and it is the digest that licenses comparing two numbers.
+    digest_a = _pin_of(first, "corpus").get("content_digest")
+    digest_b = _pin_of(second, "corpus").get("content_digest")
+    if not (isinstance(digest_a, str) and isinstance(digest_b, str)):
+        unestablished.append("corpus_content_unknown")
+    elif digest_a != digest_b:
+        reasons.append("corpus_content_differs")
 
     if not (corpus_a.get("pinned") and corpus_b.get("pinned")):
         unestablished.append("corpus_unpinned")
+    elif not (corpus_a.get("commit") and corpus_b.get("commit")):
+        unestablished.append("block_incomplete")
     else:
         if corpus_a["commit"] != corpus_b["commit"]:
             reasons.append("corpus_commit_differs")
-        if corpus_a.get("dirty") or corpus_b.get("dirty"):
-            reasons.append("corpus_dirty")
+        cleanliness(corpus_a, corpus_b, "corpus_dirty", "corpus_cleanliness_unknown")
         if corpus_a.get("shallow") != corpus_b.get("shallow"):
             reasons.append("corpus_depth_differs")
 
@@ -524,6 +596,12 @@ def verdict_line(block: dict[str, Any]) -> str:
         return (f"This scan cannot account for every file: {hidden} "
                 f"director{'y' if hidden == 1 else 'ies'} could not be entered, so the "
                 f"{scope['files_present']} files counted are not all there were.")
+    linked_dirs = (block.get("symlinks_not_followed") or {}).get("directories", 0)
+    if linked_dirs:
+        return (f"This scan cannot account for every file: {linked_dirs} linked "
+                f"director{'y' if linked_dirs == 1 else 'ies'} were not followed, so how "
+                f"many files they hold is unknown; {scope['files_present']} were counted "
+                f"outside them.")
     if not block["accounts_for_every_file"]:
         return (f"This scan cannot account for every file: {scope['files_present']} were "
                 f"present and the reasons given do not add up to them.")

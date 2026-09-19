@@ -143,14 +143,21 @@ def test_directory_that_cannot_be_read_is_reported_not_silent(tmp_path):
 
 
 @posix_only
-def test_broken_symlink_is_counted_as_unreadable(tmp_path):
+def test_broken_symlink_is_counted_as_a_link_not_followed(tmp_path):
+    """Reclassified in 0.10.0: a broken link is still a link.
+
+    It used to be counted as unreadable, which described the attempt rather than
+    the policy. Nothing is attempted on a link now, so it belongs in the category
+    that says so -- and the file count still has to add up.
+    """
     (tmp_path / "ok.py").write_text("x = 1\n")
     (tmp_path / "gone.py").symlink_to(tmp_path / "does-not-exist.py")
     r = scan_directory(str(tmp_path))
-    assert "gone.py" in r["unreadable_files"]
+    assert [e["path"] for e in r["symlinks_not_followed"]] == ["gone.py"]
     fs = sum(r["files_scanned"].values())
+    links = len([e for e in r["symlinks_not_followed"] if e["kind"] == "file"])
     assert fs + len(r["unreadable_files"]) + sum(r["files_skipped_by_type"].values()) \
-        == r["files_present"]
+        + links == r["files_present"]
 
 
 def test_a_file_named_like_an_excluded_directory_is_scanned(tmp_path):
@@ -183,7 +190,8 @@ def test_filesystem_root_name_does_not_break_the_request(monkeypatch):
              "iac_findings": [], "embedded_key_findings": [], "files_scanned": {},
              "files_present": 0, "files_present_by_extension": {}, "files_skipped_by_type": {},
              "unreadable_files": [], "unreadable_directories": [], "files_excluded_by_dir": {},
-             "claimed_but_not_decoded": [], "protocol_findings": [], "dependency_findings": []}
+             "claimed_but_not_decoded": [], "protocol_findings": [], "dependency_findings": [],
+             "symlinks_not_followed": []}
     monkeypatch.setattr(scan_mod.detectors, "scan_repo", lambda p: empty)
     monkeypatch.setattr(scan_mod.coverage, "build", lambda **kw: {"stub": True})
     monkeypatch.setattr(scan_mod.coverage, "verdict_line", lambda b: "stub")
