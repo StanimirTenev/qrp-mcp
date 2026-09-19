@@ -62,6 +62,10 @@ CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
 
 # The same files that carry no extension at all.
 CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
+                    # The JDK's own policy file: it names algorithms, and
+                    # jdk.tls.disabledAlgorithms is where a Java estate records
+                    # what it has switched off.
+                    "java.security", "java.policy",
                     # Build files list the algorithm sources a tree compiles.
                     "Makefile", "makefile", "GNUmakefile", "CMakeLists.txt",
                     # SSH key inventories: the key type is named on every line.
@@ -777,13 +781,73 @@ def _block_comment_state(line: str, inside: bool) -> bool:
     return opened != -1 and "*/" not in line[opened:]
 
 
+# A ban is not a use. This scanner already refused to count `!MD5` in a cipher
+# list and `-SSLv3` in an SSLProtocol line; a negative corpus written for this
+# release found the same idea in a dozen shapes that were all counted as uses --
+# an SSH directive removing an algorithm with a minus, a policy file listing what
+# is forbidden, jdk.tls.disabledAlgorithms, a lint rule whose purpose is to
+# forbid the pattern it quotes, a BANNED_CIPHERS set.
+#
+# Two triggers, both narrow. The line has to say denial, or the token itself has
+# to be removed with a leading - or !. "enabledAlgorithms" must stay a use, so
+# the words are matched whole and the negative forms are listed rather than
+# guessed at.
+# The word is matched case-insensitively and the boundary after it is not: a
+# camelCase identifier keeps the word whole (blockedAlgorithms, rejectedSuites),
+# while a lower-case letter after it means a different word. Compiling the whole
+# pattern with IGNORECASE made [a-z] match "A" and broke exactly that.
+_DENIAL_WORDS = re.compile(
+    r"(?<![A-Za-z])"
+    r"(?i:disabled|disallow(?:ed)?|banned|blocked|blocklist|blacklist|"
+    r"forbidden|prohibited|denied|deny|reject(?:ed)?|excluded|unsupported|"
+    r"not[-_ ]?allowed|must[-_ ]?not|no[-_ ]?longer|removed|insecure|weak)"
+    r"(?![a-z])")
+# Where a leading - or ! strikes an entry out rather than opening a command-line
+# flag. `openssl req -newkey rsa:2048` is a use; `HostKeyAlgorithms -ssh-rsa` is a
+# ban, and only the directive tells them apart.
+_ALGORITHM_LIST_LINE = re.compile(
+    r"(?<![A-Za-z])(?:HostKeyAlgorithms|KexAlgorithms|PubkeyAcceptedAlgorithms|"
+    r"PubkeyAcceptedKeyTypes|HostbasedAcceptedAlgorithms|CASignatureAlgorithms|"
+    r"Ciphers|MACs|SSLCipherSuite|SSLProtocol|ssl_ciphers|ssl_protocols|"
+    r"cipher[-_]?(?:list|suites?)|\w*[Aa]lgorithms)\s*[:=]?\s", re.IGNORECASE)
+
+
+def _opens_a_denial_block(line: str) -> bool:
+    """`forbiddenAlgorithms:` on its own line, with the names indented below it.
+
+    A configuration file writes a ban as a block far more often than as a list on
+    one line, and a line-by-line reader sees the names without the word that
+    governs them.
+    """
+    stripped = line.rstrip()
+    return bool(stripped.endswith((":", "= [", "=[", "{", "(", "[")) 
+                and _DENIAL_WORDS.search(stripped))
+
+
+def _is_banned_here(line: str, position: int, in_denial_block: bool = False) -> bool:
+    """Whether the algorithm at this position is being forbidden rather than used."""
+    if in_denial_block or _DENIAL_WORDS.search(line):
+        return True
+    # Work in entries, not characters. A hyphen inside a name belongs to it --
+    # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
+    # out only when it opens one. So find the entry containing this position and
+    # ask whether that entry begins with - or !.
+    if not _ALGORITHM_LIST_LINE.search(line):
+        return False
+    start = position
+    while start > 0 and line[start - 1] not in ",;:=([{ \t\"'":
+        start -= 1
+    return line[start:start + 1] in {"-", "!"}
+
+
 def _families_named(findings: list[dict[str, Any]]) -> set[str]:
     return {f["algorithm"] for f in findings}
 
 
 def _families_in_use(findings: list[dict[str, Any]]) -> set[str]:
-    """Families with at least one piece of evidence that is not a comment."""
-    return {f["algorithm"] for f in findings if f.get("evidence_kind") != "comment"}
+    """Families with evidence that is neither a comment nor a ban."""
+    return {f["algorithm"] for f in findings
+            if f.get("evidence_kind") not in {"comment", "ban"}}
 
 
 def _drop_imports_covered_by_a_call(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -804,9 +868,16 @@ def scan_source_file(path: Path, rel_path: str,
     findings: list[dict[str, Any]] = []
     lines = (_read_lines(path) or []) if lines is None else lines
     inside_block = False
+    denial_block_indent: int | None = None
     for line_no, line in enumerate(lines, start=1):
         kind = _evidence_kind(line, inside_block)
         inside_block = _block_comment_state(line, inside_block)
+        indent = len(line) - len(line.lstrip())
+        if denial_block_indent is not None and line.strip() and indent <= denial_block_indent:
+            denial_block_indent = None
+        in_denial = denial_block_indent is not None
+        if _opens_a_denial_block(line):
+            denial_block_indent = indent
         # One line, one finding per algorithm. Several patterns can carry the same
         # name -- ECDSA is matched both by its own name and by secp256k1, X448 by
         # its upper and lower case forms -- and counting each pattern separately
@@ -827,13 +898,17 @@ def scan_source_file(path: Path, rel_path: str,
             if cipher_exclusions and all(_is_excluded(line, m.start()) for m in matches):
                 continue
             seen_on_line.add(algorithm)
+            # Per match, not per line: a hardened configuration bans one algorithm
+            # and enables another on the same line, and reading the whole line as a
+            # ban would hide the live one.
+            banned = all(_is_banned_here(line, m.start(), in_denial) for m in matches)
             item = {
                 "path": rel_path,
                 "line": line_no,
                 "algorithm": algorithm,
                 "description": description,
                 "excerpt": line.strip()[:200],
-                "evidence_kind": kind,
+                "evidence_kind": "ban" if banned else kind,
             }
             size = key_size_on_line(line) if algorithm == "RSA" else None
             if size:
@@ -849,7 +924,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "algorithm": family,
                 "description": f"{family} named in an OpenSSL 3 fetch or keygen call",
                 "excerpt": line.strip()[:200],
-                "evidence_kind": kind,
+                "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
             })
 
         # Suite names appear in configuration and in code alike: OpenSSL's headers
@@ -865,7 +940,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "algorithm": family,
                 "description": f"{family} named in a cipher suite",
                 "excerpt": line.strip()[:200],
-                "evidence_kind": kind,
+                "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
             })
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
             findings.append({
@@ -1166,8 +1241,10 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # rival strips comments before matching, and this scanner's precision on
         # an independent corpus was 0.542 against its 0.93.
         "detected_algorithms": sorted(_families_in_use(source_findings + iac_findings)),
-        # Named, and named apart: what the repository talks about but does not do.
-        "named_only_in_comments": sorted(
+        # Named, and named apart: what the repository talks about or forbids but
+        # does not do. A comment and a ban are different facts and both belong
+        # here rather than in the inventory.
+        "named_but_not_used": sorted(
             _families_named(source_findings + iac_findings)
             - _families_in_use(source_findings + iac_findings)),
         # The smallest size seen for a family, so a weak key anywhere is visible. A

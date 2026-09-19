@@ -104,7 +104,7 @@ def test_a_comment_match_is_not_a_use(tmp_path):
     assert result["evidence"]["source_code"][0]["evidence_kind"] == "comment"
     assert result["summary"]["quantum_vulnerable_count"] == 0
     assert result["detected_algorithms"] == []
-    assert result["named_only_in_comments"] == ["ECDSA"]
+    assert result["named_but_not_used"] == ["ECDSA"]
 
 
 # --- Go call sites whose absence left the import standing alone ---------------
