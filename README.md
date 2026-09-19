@@ -315,7 +315,7 @@ September 2026 both were run against **Cryben** (Näther & Hirsch, arXiv 2608.04
 independent corpus with its own reference CBOM and its own scorer, written by neither of us.
 The scripts and the raw output are reproducible; the method matters more than the number.
 
-| | qscan 0.12.0 | this tool 0.8.1 | this tool 0.9.0 |
+| | qscan 0.12.0 | this tool 0.8.1 | this tool 0.10.0 |
 |---|---|---|---|
 | Cryben, in the scope this tool declares | 30/37 | 22/37 | **35/37** |
 | Cryben, in the scope both tools declare | 30/31 | 17/31 | **30/31** |
@@ -347,10 +347,44 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
   alike. In a hand-checked sample of 20 new findings on Vault, one was in a comment.
 - **SSH and TLS assets are read at 8/14 and 7/11** on qscan's corpus; X448 at 4/8.
 - **Speed.** Reading key material by content costs about 26% over 0.8.1 on a large tree.
+- **A symlink is never read.** Where a tree reaches content only through a link whose target
+  sits in a directory this tool excludes, that content is not scanned. It is named as a link
+  rather than silently skipped, but it is not read.
 - **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
   scope by design.** This tool reports what a cryptographically relevant quantum computer would
   break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,
   and that is the scope working, not failing.
+
+## What an outside review found
+
+0.9.0 was reviewed by someone who did not write it, from the published ZIP, and reported nine
+defects. All nine reproduced here before anything was changed, and all nine are fixed in 0.10.0.
+Two of them were about the claims this tool makes for itself, which is the worst place to be wrong:
+
+- **A symlink carried the scan outside the directory it was given.** A link inside the tree
+  pointing at a file beside it was read, and reported under the link's name. This tool is pointed
+  at code its user did not write, and the excerpt travels into an agent's context and into any
+  exported CBOM, so that was the declared boundary failing. Links are no longer followed. Each is
+  named in `symlinks_not_followed`, with a relative path when the target is inside the root and
+  the words "outside the scanned directory" otherwise -- printing an outside path would leak what
+  reading it did. A linked directory sets `accounts_for_every_file` to false.
+  On certbot, which uses 48 of them, coverage falls from 68.9% to 65.8%: the links are now counted
+  as present and not read. No algorithm is lost, because each target is still read at its own path.
+- **`compare_coverage` keyed on a commit, and a commit is not what was read.** A dirty emitter
+  still compared; an unverified corpus compared because `None` read as False; two different
+  subdirectories of one commit compared at 100% and 0% coverage; a git-ignored file that the scan
+  reads changed the corpus while both pins stayed clean. Comparability now keys on
+  `corpus.content_digest` -- a hash over the files read and the text read from them, the files
+  skipped with their sizes, and every entry not read with its reason. The git pin stays as
+  provenance a reader can follow; it no longer carries the conclusion. `dirty` is three answers,
+  and `None` means nobody checked.
+
+The rest: a malformed coverage block returned an exception instead of `unestablished`; certificate
+evidence came off a set, so its order moved between interpreters; `--out ~/file` passed its check
+and failed its write; and three tests read the tool's own git pins from the environment, so they
+passed from a clone and **failed from the published tarball** -- which anyone who downloaded 0.9.0
+and ran its tests saw, and we had not, because we always ran in the checkout. Extracting the
+release and running its tests in a fresh environment is now part of shipping one.
 
 ## Why deterministic
 
