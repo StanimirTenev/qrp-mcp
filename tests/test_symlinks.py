@@ -152,5 +152,5 @@ def test_the_verdict_names_the_linked_directory_as_the_reason(tmp_path):
     (outside / "a.py").write_text("x = 1\n")
     (repo / "linked_dir").symlink_to(outside, target_is_directory=True)
     verdict = scan_directory(repo)["verdict"]
-    assert "linked director" in verdict
+    assert "1 linked directory was not followed" in verdict
     assert "do not add up" not in verdict

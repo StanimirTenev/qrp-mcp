@@ -598,8 +598,9 @@ def verdict_line(block: dict[str, Any]) -> str:
                 f"{scope['files_present']} files counted are not all there were.")
     linked_dirs = (block.get("symlinks_not_followed") or {}).get("directories", 0)
     if linked_dirs:
-        return (f"This scan cannot account for every file: {linked_dirs} linked "
-                f"director{'y' if linked_dirs == 1 else 'ies'} were not followed, so how "
+        subject = ("1 linked directory was" if linked_dirs == 1
+                   else f"{linked_dirs} linked directories were")
+        return (f"This scan cannot account for every file: {subject} not followed, so how "
                 f"many files they hold is unknown; {scope['files_present']} were counted "
                 f"outside them.")
     if not block["accounts_for_every_file"]:
