@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "eu.quantumreadiness/qrp-mcp",
   "title": "Quantum Readiness Scan",
-  "description": "A local cryptographic inventory for developers and AI agents that carries verifiable coverage and its own limits inside the CBOM.",
+  "description": "Local crypto inventory for developers and AI agents; coverage and limits inside the CBOM.",
   "repository": {
     "url": "https://github.com/StanimirTenev/qrp-mcp",
     "source": "github"
