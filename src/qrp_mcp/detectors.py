@@ -548,6 +548,47 @@ PPK_CONFIG_ASSIGN = re.compile(r"(?<![A-Za-z])ppk[ \t]*=", re.IGNORECASE)
 # into a Terraform variable or a Kubernetes Secret manifest).
 EMBEDDED_KEY_PATTERN = re.compile(r"-----BEGIN\s+(?:RSA|EC|DSA|OPENSSH|ENCRYPTED)?\s*PRIVATE KEY-----")
 
+# A base64 body line, which is what actually follows a PEM header when a key is
+# really there. Long, and only the base64 alphabet.
+_PEM_BODY = re.compile(r"^[A-Za-z0-9+/=]{32,}\s*$")
+
+
+def _is_embedded_key(lines: list[str], index: int) -> bool:
+    """Whether the PEM header on this line opens a key, or merely names one.
+
+    `PEM_HEADER = "-----BEGIN RSA PRIVATE KEY-----"` is a parser's constant, not
+    key material, and an independent comparison counted it against this tool as
+    key-material evidence in a file labelled clean. A real block has its header
+    alone on the line and base64 beneath it; a constant has the header inside
+    quotes with code around it and nothing beneath.
+
+    Both conditions, because either alone is too weak: a header alone on a line
+    with no body is a truncated example, and a body with no header is not a key.
+    """
+    line = lines[index]
+    match = EMBEDDED_KEY_PATTERN.search(line)
+    if not match:
+        return False
+    after = line[match.end():].strip()
+    # A constant closes its string on the same line:
+    #   PEM_HEADER = "-----BEGIN RSA PRIVATE KEY-----"
+    # A real block does not -- the base64 follows on the lines beneath, and
+    # the quote, if there is one, closes far below:
+    #   KEY = """-----BEGIN RSA PRIVATE KEY-----
+    # So the question is only whether the string ends right after the header.
+    if after[:1] in ("\"", "'", "`"):
+        # The string ends right after the header, so this line holds a header
+        # and nothing else. It is key material only if the key is somewhere:
+        # on the lines beneath, or escaped into this same line with its end
+        # marker, which is how a key gets into a Terraform variable.
+        for follower in lines[index + 1:index + 3]:
+            if _PEM_BODY.match(follower.strip()):
+                return True
+        return False
+    if "END" in after and "PRIVATE KEY" in after:
+        return True
+    return True
+
 
 def display_path(rel: str) -> str:
     """A relative path that can always be printed and serialised.
@@ -812,6 +853,46 @@ _HASH_COMMENT_EXT = {
     ".tf", ".tfvars", ".r", ".cmake", ".mk", ".t", ".env", ".gitignore",
 }
 _DASH_COMMENT_EXT = {".sql", ".lua", ".hs", ".adb", ".ads"}
+# Languages whose triple-quoted strings are used as documentation. A docstring
+# is a string to the interpreter and a comment to every reader, and an
+# independent comparison counted an example call inside one as a use. Treated
+# as a comment here for the same reason `#` is: nothing in it runs.
+_DOCSTRING_EXT = {".py", ".pyi"}
+_TRIPLE = ('"""', "'''")
+
+
+def _docstring_spans(line: str, inside: str) -> tuple[list[tuple[int, int]], str]:
+    "Triple-quoted regions on this line, and which delimiter is still open."
+    # Almost every line has no triple quote in it. Asking that once is a string
+    # search; asking it per character through a generator cost 13% of a scan.
+    if not inside and (chr(34) * 3) not in line and (chr(39) * 3) not in line:
+        return [], ""
+    spans: list[tuple[int, int]] = []
+    i, n = 0, len(line)
+    if inside:
+        end = line.find(inside)
+        if end == -1:
+            return [(0, n)], inside
+        spans.append((0, end + 3))
+        i = end + 3
+    while i < n:
+        opener = next((q for q in _TRIPLE if line.startswith(q, i)), "")
+        if not opener:
+            i += 1
+            continue
+        # A docstring opens a statement. `KEY = """-----BEGIN RSA PRIVATE
+        # KEY-----` opens a value, and a private key pasted into one is
+        # exactly what this scanner is for. Anything before the delimiter
+        # other than indentation means this is a string, not documentation.
+        if line[:i].strip():
+            return spans, inside
+        end = line.find(opener, i + 3)
+        if end == -1:
+            spans.append((i, n))
+            return spans, opener
+        spans.append((i, end + 3))
+        i = end + 3
+    return spans, ""
 
 
 def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[int, int]], bool]:
@@ -1022,10 +1103,14 @@ def scan_source_file(path: Path, rel_path: str,
     lines = (_read_lines(path) or []) if lines is None else lines
     ext = path.suffix.lower()
     inside_block = False
+    inside_doc = ""
     denial_block_indent: int | None = None
     for line_no, line in enumerate(lines, start=1):
-        was_inside = inside_block
+        was_inside = inside_block or bool(inside_doc)
         spans, inside_block = _comment_spans(line, ext, inside_block)
+        if ext in _DOCSTRING_EXT:
+            doc_spans, inside_doc = _docstring_spans(line, inside_doc)
+            spans = spans + doc_spans
         code = _code_only(line, spans)
         kind = _evidence_kind(line, was_inside, code)
         indent = len(line) - len(line.lstrip())
@@ -1126,7 +1211,7 @@ def scan_embedded_keys(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         {"path": rel_path, "line": line_no,
          "description": "Embedded private key material", "excerpt": line.strip()[:200]}
         for line_no, line in enumerate(lines, start=1)
-        if EMBEDDED_KEY_PATTERN.search(line)
+        if _is_embedded_key(lines, line_no - 1)
     ]
 
 
@@ -1175,7 +1260,7 @@ def scan_iac_file(path: Path, rel_path: str,
                     "description": description,
                     "excerpt": line.strip()[:200],
                 })
-        if EMBEDDED_KEY_PATTERN.search(line):
+        if _is_embedded_key(lines, line_no - 1):
             embedded_key_findings.append({
                 "path": rel_path,
                 "line": line_no,

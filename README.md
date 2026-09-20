@@ -321,7 +321,7 @@ The scripts and the raw output are reproducible; the method matters more than th
 |---|---|---|---|
 | Cryben, in the scope this tool declares | 30/37 | 22/37 | **36/37** |
 | qscan's own corpus, qscan's own metric | 0.847 | 0.511 | **0.909** |
-| the same, no wildcard credit for either tool | 0.790 | — | **0.881** |
+| the same, no wildcard credit for either tool | 0.790 | — | **0.818** (see below) |
 | qscan's corpus without its structural labels | 0.802 | 0.714 | **0.944** |
 | Cryben, full 197 findings, precision | **0.93** | — | 0.667 |
 | Cryben, full 197 findings, F1 | 0.34 | — | **0.346** |
@@ -335,12 +335,31 @@ key into a ban and dropped it from the inventory. Fixing that necessarily moves 
 precision, in directions this table cannot state until the corpora are run again. The numbers
 below are the previous release's, labelled as such rather than quietly carried forward.
 
+**Three denominators appear in that table and they are not the same question.** 37 is the number
+of Cryben cases inside this tool's declared scope; 176 is the label count in qscan's recall corpus;
+197 is Cryben's full finding set. A recall figure over one of them cannot be read against an F1 over
+another, and earlier versions of this section invited exactly that. Each row belongs to one task and
+one denominator; none of them combine.
+
+**`200 clean` is not a precision figure.** Its denominator is negative files, not emitted findings.
+It says the scanner stayed silent on 200 files that contain nothing; it says nothing about how many
+of the findings it *does* emit are right. Precision is the row two lines above it, and it is the row
+this tool loses.
+
+**The independent control is not published.** The Cryben corpus, its scorer and the raw runs behind
+`36/37`, `0.667` and `0.346` are not in this repository. Until they are, those three are this
+author's claims rather than something a reader can check, and an external comparison said so in
+those words. Publishing the artefacts is the repair; restating the numbers is not.
+
 Four things those numbers do not mean, said here rather than left to be assumed:
 
 - **Cryben is 37 cases in this tool's scope.** A figure from 37 cases has a wide interval. It is
   a floor worth publishing, not a precision claim.
-- **The scorer is theirs.** qscan's metric matches per file, not per line, and credits a finding
-  that names no algorithm. An earlier version of this section claimed the figure was unchanged
+- **The scorer is theirs, and it credits a finding that names nothing.** qscan's metric matches
+  per file, not per line, and 10 of its hits name no algorithm at all. A tool that reports
+  "something cryptographic is here" scores the same on those as one that says which family it is,
+  so detection and family classification have to be published apart. They are not, here, yet.
+  An earlier version of this section claimed the figure was unchanged
   with that credit withdrawn. It was wrong: the switch that withdrew it dropped only one bucket,
   while elliptic-curve findings kept the credit unconditionally. Withdrawn properly, **and applied
   to both tools**, the numbers are **0.818 for this tool and 0.790 for qscan**. The conclusion
@@ -353,7 +372,13 @@ Four things those numbers do not mean, said here rather than left to be assumed:
   reference does not is not the same as being the better inventory, and it would be dishonest to
   publish the first number without the second.
 
-`qscan` is faster by a factor of about 24. It is not deeper: it is lexical, by its own changelog,
+`qscan` is faster: 7.9 s against 219 s on Vault, a factor of **27.7**, and a factor of
+**10.6** on the median of five warm runs over a smaller corpus in an independent comparison.
+Measured here after 0.13.0: **26.1 s for 823 files of certbot, 31.7 ms per file**, of which the
+bulk is 47 algorithm patterns run over every line -- about 4.5 million pattern searches on that
+tree. A prefilter would cut it and would also change what is detected, so it is a task of its own
+rather than a line in this one.
+The figure was written here as "about 24" and was arithmetic nobody had done: 219 / 7.9 is 27.7. It is not deeper: it is lexical, by its own changelog,
 as this section already says. Measured per language on its own corpus it leads in none by more
 than three labels and trails this tool by five in Go; its real edge is in TLS, SSH and dependency
 lines rather than in any language. This tool reads more kinds of file, says what it did not read,
@@ -392,8 +417,13 @@ two releases.
 
 Stated rather than hidden, and each of these is a known gap rather than a suspicion:
 
-- **A finding carries no confidence level.** A bare word in a comment and a real call site look
-  alike. In a hand-checked sample of 20 new findings on Vault, one was in a comment.
+- **A finding carries a kind, not a confidence level.** Since 0.11.0 every finding says whether
+  it is a call, an import, a comment, a declaration, a reference or a ban, and 0.12.0 decides that
+  by the position of the match rather than by the line it sits on. What is still missing is a
+  graded confidence. Two contexts that were read as code and are not -- a Python docstring, and a
+  string constant holding a PEM header -- were reported by an independent comparison and are fixed
+  in 0.13.0, with the controls that keep the fix narrow: a key pasted into a triple-quoted value is
+  still key material, and a cipher suite named in a string is still configuration.
 - **SSH and TLS assets are read at 8/14 and 7/11** on qscan's corpus; X448 at 4/8.
 - **Speed.** Reading key material by content costs about 26% over 0.8.1 on a large tree.
 - **A symlink is never read.** Where a tree reaches content only through a link whose target

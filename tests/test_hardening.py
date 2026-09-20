@@ -345,7 +345,17 @@ def test_ppk_component_keeps_its_locations(tmp_path):
 
 
 def test_embedded_key_is_not_also_an_algorithm_component(tmp_path):
-    (tmp_path / "k.tf").write_text('key = "-----BEGIN RSA PRIVATE KEY-----"\n')
+    """The key has to be present, not merely named.
+
+    This test used to paste a bare header with no key beneath it and expect key
+    material to be reported. An independent comparison found the same shape --
+    `PEM_HEADER = "-----BEGIN RSA PRIVATE KEY-----"`, a parser's constant -- in a
+    file labelled clean, and counted it against this tool. A header with no body
+    contains no key in either file. The fixture now holds a key.
+    """
+    (tmp_path / "k.tf").write_text(
+        'key = "-----BEGIN RSA PRIVATE KEY-----\\nMIIEow...\\n'
+        '-----END RSA PRIVATE KEY-----"\n')
     names = [c["name"] for c in _cbom(tmp_path)["components"]]
     assert "private_key" not in names and "signing_command" not in names
     assert names.count("Embedded private key material") == 1

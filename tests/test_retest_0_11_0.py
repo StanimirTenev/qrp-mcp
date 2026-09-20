@@ -233,3 +233,49 @@ def test_arc4_is_detected_from_the_call_and_not_from_a_comment(tmp_path):
     reading the comment. `\\bRC4\\b` never matched PyCryptodome's own spelling."""
     result = _scan(tmp_path, "c.py", "cipher = ARC4.new(key)\n")
     assert "RC4" in result["detected_algorithms"]
+
+
+# --- from an independent comparison of 0.11.0 against qScan ------------------
+# Two of its five negative files survived the position fix above, for two
+# different reasons. Both are here with the controls that keep the fix narrow.
+
+def test_an_example_call_inside_a_python_docstring_is_not_a_use(tmp_path):
+    result = _scan(tmp_path, "app.py",
+                   '"""\nExample: rsa.generate_private_key(key_size=2048)\n"""\nx = 1\n')
+    assert result["detected_algorithms"] == []
+    assert "RSA" in result["named_but_not_used"]
+
+
+def test_a_key_pasted_into_a_triple_quoted_value_is_still_found(tmp_path):
+    """A docstring opens a statement. `KEY = \"\"\"-----BEGIN ...` opens a value,
+    and a private key pasted into one is exactly what this scanner is for."""
+    result = _scan(tmp_path, "k.py",
+                   'KEY = """-----BEGIN RSA PRIVATE KEY-----\nMIIB...\n"""\n')
+    assert result["evidence"]["embedded_keys"]
+
+
+def test_a_constant_naming_a_pem_header_is_not_key_material(tmp_path):
+    result = _scan(tmp_path, "parser.ts",
+                   'const PEM_HEADER = "-----BEGIN RSA PRIVATE KEY-----";\n')
+    assert result["evidence"]["embedded_keys"] == []
+
+
+def test_a_real_pem_block_is_still_key_material(tmp_path):
+    result = _scan(tmp_path, "id_rsa.pem",
+                   "-----BEGIN RSA PRIVATE KEY-----\n"
+                   "MIIEowIBAAKCAQEAwJ8kZ3vL9qT2mN4pR7sX1yB6cD0fH5gJ2kL8mN3pQ7rS9tU1vW\n"
+                   "-----END RSA PRIVATE KEY-----\n")
+    assert result["evidence"]["embedded_keys"]
+
+
+def test_a_one_line_key_in_a_terraform_variable_is_still_found(tmp_path):
+    result = _scan(tmp_path, "k.tf",
+                   'key = "-----BEGIN RSA PRIVATE KEY-----\\nMIIB...\\n'
+                   '-----END RSA PRIVATE KEY-----"\n')
+    assert result["evidence"]["embedded_keys"]
+
+
+def test_a_cipher_suite_in_a_string_is_still_configuration(tmp_path):
+    """Strings stay code on purpose: a suite named in one is the configuration."""
+    result = _scan(tmp_path, "app.py", 'suites = "ECDHE-RSA-AES128-GCM-SHA256"\n')
+    assert "ECDH" in result["detected_algorithms"]
