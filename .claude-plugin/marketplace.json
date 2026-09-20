@@ -11,8 +11,8 @@
       "name": "qrp",
       "displayName": "QRP cryptographic inventory",
       "source": "./plugin",
-      "description": "Scans a local directory for cryptography that Shor's algorithm defeats, classifies each post-quantum scheme by family and standardisation status, and reports the files it could not read. No network calls, no account.",
-      "version": "0.13.0",
+      "description": "A local cryptographic inventory for developers and AI agents that carries verifiable coverage and its own limits inside the CBOM.",
+      "version": "0.13.1",
       "author": {
         "name": "Stanimir Tenev",
         "url": "https://quantumreadiness.eu"

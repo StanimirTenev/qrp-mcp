@@ -1,7 +1,7 @@
 {
   "name": "qrp",
-  "description": "Find cryptography a quantum computer would break — secp256k1, Ed25519, BLS, Schnorr, RSA — in a local codebase, and report what the scan could not read. Runs entirely on your machine.",
-  "version": "0.13.0",
+  "description": "A local cryptographic inventory for developers and AI agents that carries verifiable coverage and its own limits inside the CBOM.",
+  "version": "0.13.1",
   "author": {
     "name": "Stanimir Tenev",
     "url": "https://quantumreadiness.eu"

@@ -2,8 +2,13 @@
 
 <!-- mcp-name: eu.quantumreadiness/qrp-mcp -->
 
-**Every signature in your wallet, contract and validator rests on elliptic-curve cryptography.
-A large quantum computer breaks it. This tells your AI agent exactly where yours is.**
+**A local cryptographic inventory for developers and AI agents that carries verifiable coverage
+and its own limits inside the CBOM.**
+
+Every signature in your wallet, contract and validator rests on elliptic-curve cryptography, and
+a large quantum computer breaks it. Plenty of tools will tell you what they found. This one also
+tells you what it read, what it could not read, and which question it is not answering — in the
+document itself, where an auditor can check it rather than take your word.
 
 An MCP server that scans a local directory for cryptography that Shor's algorithm defeats —
 secp256k1, Ed25519, BLS, Schnorr, RSA — plus weak primitives and CI signing commands, and

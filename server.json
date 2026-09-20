@@ -2,18 +2,18 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "eu.quantumreadiness/qrp-mcp",
   "title": "Quantum Readiness Scan",
-  "description": "Offline scanner for quantum-vulnerable crypto; reports its coverage and emits a CycloneDX CBOM.",
+  "description": "A local cryptographic inventory for developers and AI agents that carries verifiable coverage and its own limits inside the CBOM.",
   "repository": {
     "url": "https://github.com/StanimirTenev/qrp-mcp",
     "source": "github"
   },
-  "version": "0.13.0",
+  "version": "0.13.1",
   "websiteUrl": "https://quantumreadiness.eu",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "qrp-mcp",
-      "version": "0.13.0",
+      "version": "0.13.1",
       "transport": {
         "type": "stdio"
       }
