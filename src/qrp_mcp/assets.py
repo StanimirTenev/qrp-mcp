@@ -186,6 +186,20 @@ _LOCK_NPM_PATH = re.compile(r'^\s*"node_modules/((?:@[^/"]+/)?[^/"]+)"\s*:')
 _LOCK_YARN = re.compile(r'^"?((?:@[^/@"]+/)?[^@"\s][^@"]*)@[^"\s]+"?\s*:\s*$')
 _LOCK_TOML_NAME = re.compile(r'^\s*name\s*=\s*"([^"]+)"')
 _LOCK_GEM = re.compile(r"^\s{4}([A-Za-z0-9._-]+)\s*\(")
+# pnpm writes its package keys two ways across lockfile versions:
+#   v9:  `  node-forge@1.3.1:`   ·  scoped `  @scope/pkg@1.2.3:`
+#   v6:  `  /node-forge/1.3.1:`  ·  scoped `  /@scope/pkg/1.2.3:`
+_LOCK_PNPM = re.compile(
+    r"^\s+/?((?:@[^/@\s]+/)?[^/@\s]+)[@/]\d[^\s:]*:\s*$")
+
+# Every lockfile this tool claims, routed by its exact name. Routing by the
+# `.lock` suffix sent `pnpm-lock.yaml` to a JSON parser and `composer.lock` --
+# which is JSON -- to a Ruby regex; both were counted as read while their
+# dependencies were silently dropped. An external retest of 0.11.0 found both.
+_LOCKFILES = {
+    "package-lock.json", "Pipfile.lock", "yarn.lock", "pnpm-lock.yaml",
+    "Cargo.lock", "poetry.lock", "Gemfile.lock", "composer.lock",
+}
 
 
 def _names_from_lockfile(name: str, lines: list[str]) -> list[tuple[str, int]]:
@@ -214,7 +228,12 @@ def _names_from_lockfile(name: str, lines: list[str]) -> list[tuple[str, int]]:
             match = _LOCK_NPM_PATH.match(text)
             if match:
                 out.append((match.group(1), number))
-    elif name in {"yarn.lock", "pnpm-lock.yaml"}:
+    elif name == "pnpm-lock.yaml":
+        for number, text in enumerate(lines, 1):
+            match = _LOCK_PNPM.match(text)
+            if match:
+                out.append((match.group(1), number))
+    elif name == "yarn.lock":
         for number, text in enumerate(lines, 1):
             match = _LOCK_YARN.match(text) or _LOCK_NPM_PATH.match(text)
             if match:
@@ -224,7 +243,21 @@ def _names_from_lockfile(name: str, lines: list[str]) -> list[tuple[str, int]]:
             match = _LOCK_TOML_NAME.match(text)
             if match:
                 out.append((match.group(1), number))
-    elif name in {"Gemfile.lock", "composer.lock"}:
+    elif name == "composer.lock":
+        # JSON, with the names under `packages[]` and `packages-dev[]`.
+        try:
+            data = json.loads("\n".join(lines))
+        except (ValueError, TypeError):
+            return out
+        if isinstance(data, dict):
+            for key in ("packages", "packages-dev"):
+                for entry in data.get(key) or []:
+                    package = entry.get("name") if isinstance(entry, dict) else None
+                    if not package:
+                        continue
+                    line = next((n for n, text in enumerate(lines, 1) if package in text), 1)
+                    out.append((package, line))
+    elif name == "Gemfile.lock":
         for number, text in enumerate(lines, 1):
             match = _LOCK_GEM.match(text)
             if match:
@@ -235,7 +268,7 @@ def _names_from_lockfile(name: str, lines: list[str]) -> list[tuple[str, int]]:
 def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tuple[str, int]]:
     """(package name, line number) pairs, read structurally."""
     out: list[tuple[str, int]] = []
-    if name.endswith(".lock") or name == "package-lock.json":
+    if name in _LOCKFILES:
         return _names_from_lockfile(name, lines)
     if ecosystem == "npm" or (ecosystem == "composer" and name == "composer.json"):
         try:

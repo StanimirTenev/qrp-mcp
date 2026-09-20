@@ -328,6 +328,13 @@ The scripts and the raw output are reproducible; the method matters more than th
 | a negative corpus, 200 files with no such cryptography | — | — | **200 clean** |
 | Vault, wall clock | 7.9 s | 173 s | 219 s |
 
+⚠️ **Every figure in that table was measured on 0.11.0 and has not been re-measured since.**
+0.12.0 changes what counts as a use: an external retest found that a denial word anywhere on a
+line -- including inside a comment, including the word `weak` in a variable name -- turned a real
+key into a ban and dropped it from the inventory. Fixing that necessarily moves both recall and
+precision, in directions this table cannot state until the corpora are run again. The numbers
+below are the previous release's, labelled as such rather than quietly carried forward.
+
 Four things those numbers do not mean, said here rather than left to be assumed:
 
 - **Cryben is 37 cases in this tool's scope.** A figure from 37 cases has a wide interval. It is

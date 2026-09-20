@@ -25,6 +25,7 @@ and not-looked-at.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -312,6 +313,21 @@ def build(
             "paths": unreadable,
         },
     ]
+    # File links are present, deliberately not read, and were missing from the
+    # breakdown: the block knew exactly why the file was skipped and still
+    # reported that its own arithmetic did not close. An external retest of
+    # 0.11.0 found a tree of one linked file reporting files_not_examined=1 with
+    # every reason at zero. Directory links stay out of this count on purpose --
+    # how many files they hold is unknown, which is a different claim.
+    file_links = [e for e in (scan_result.get("symlinks_not_followed") or [])
+                  if e.get("kind") != "directory"]
+    if file_links:
+        not_examined.append({
+            "reason": "symlink_not_followed",
+            "meaning": REASONS["symlink_not_followed"],
+            "count": len(file_links),
+            "paths": [e.get("path") for e in file_links],
+        })
     accounted = examined + sum(r["count"] for r in not_examined)
     # Counted as read -- it was read -- and named anyway: a claimed type that
     # yields nothing is exactly the silent skip this block exists to refuse, and
@@ -492,6 +508,16 @@ def _pin_of(block: dict[str, Any], *keys: str) -> dict[str, Any]:
     return node if isinstance(node, dict) else {}
 
 
+# The shape a content digest has to have to identify anything: the algorithm it
+# was made with, and a full-length hex digest. An empty string passed an
+# isinstance check and licensed a comparison that rested on nothing.
+_DIGEST_SHAPE = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+def _is_digest(value: Any) -> bool:
+    return isinstance(value, str) and bool(_DIGEST_SHAPE.match(value))
+
+
 def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
     """Whether two coverage blocks describe runs whose numbers can be compared.
 
@@ -521,6 +547,12 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
             reasons.append(dirty_reason)
         elif any(state is None for state in states):
             unestablished.append(unknown_reason)
+        elif any(not isinstance(state, bool) for state in states):
+            # A value that is neither True, False nor None is not an answer. The
+            # string "true" fell through every check above and was read as clean,
+            # which an external retest of 0.11.0 found: a block can say anything,
+            # and what it says has to be a value this field is allowed to take.
+            unestablished.append(unknown_reason)
 
     if not (tool_a.get("pinned") and tool_b.get("pinned")):
         unestablished.append("instrument_unpinned")
@@ -536,7 +568,9 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
     # is identity, and it is the digest that licenses comparing two numbers.
     digest_a = _pin_of(first, "corpus").get("content_digest")
     digest_b = _pin_of(second, "corpus").get("content_digest")
-    if not (isinstance(digest_a, str) and isinstance(digest_b, str)):
+    if not (_is_digest(digest_a) and _is_digest(digest_b)):
+        # An empty string is a string. It identifies nothing, and accepting it let
+        # a block claim identity it had not established.
         unestablished.append("corpus_content_unknown")
     elif digest_a != digest_b:
         reasons.append("corpus_content_differs")

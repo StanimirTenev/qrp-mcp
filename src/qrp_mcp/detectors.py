@@ -217,7 +217,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # Not a release suffix: "1.0.0-rc4" is a version. A cipher suite such as
         # "EXP-RC4-MD5" also has a dash before it, so only a digit then a dash or dot
         # marks a version (an earlier, wider exclusion dropped 13 OpenSSL suites).
-        r"crypto/rc4|(?<!\d[-.])\bRC4\b|\bRC4_set_key\b|\bEVP_rc4\b", re.IGNORECASE,
+        # `ARC4` is PyCryptodome's spelling and has no word boundary before RC4,
+        # so `\bRC4\b` never matched the one call an application actually writes.
+        # A test pinned `cipher = ARC4.new(key)  # RC4` as found, and it was --
+        # by reading the comment. Labelling evidence by position took the comment
+        # away and left the gap visible, which is what it was there to hide.
+        r"crypto/rc4|(?<!\d[-.])\bRC4\b|\bARC4\b|\bRC4_set_key\b|\bEVP_rc4\b",
+        re.IGNORECASE,
     )),
     # JOSE / JWT. The algorithm is named nowhere else: a service that signs its
     # tokens with RS256 has RSA in it, and the only trace is a four-character
@@ -670,6 +676,48 @@ def is_config_file(path: Path) -> bool:
     return path.suffix.lower() in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
 
 
+def _read_file(path: Path) -> tuple[bytes, list[str]] | None:
+    """The file's bytes and its lines, read once, or None when it could not be read.
+
+    One snapshot, two uses. The text scan, the binary parsers and the corpus digest
+    all have to describe the same read: taking the bytes twice let a file change
+    between them, and digesting the decoded text rather than the bytes let two
+    different files agree. An external retest of 0.11.0 found both -- two DER blobs
+    differing in one byte, one detected as RSA and one not, sharing a digest.
+
+    The open refuses to follow a link at the final component (`O_NOFOLLOW`). The
+    check that a path is a link happens while walking the tree, and the read comes
+    after it; between the two, the entry can be replaced with a link to somewhere
+    outside the root, which the same retest demonstrated. Opening without following
+    closes that window.
+
+    It does not close all of it: a PARENT directory swapped for a link after the
+    walk is still followed, because each component would have to be opened relative
+    to the last. That is stated here rather than implied away -- the tool says what
+    it does not cover.
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+            raw = handle.read()
+    except OSError:
+        return None
+    return raw, _decode(raw)
+
+
+def _decode(raw: bytes) -> list[str]:
+    """Bytes to lines, with the encodings a repository actually contains."""
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16", errors="ignore").splitlines()
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raw = raw[3:]
+    return raw.decode("utf-8", errors="ignore").splitlines()
+
+
 def _read_lines(path: Path) -> list[str] | None:
     """Lines of the file, or None when it could not be read.
 
@@ -678,17 +726,8 @@ def _read_lines(path: Path) -> list[str] | None:
     would make that indistinguishable from a file that WAS read and is clean. scan_repo
     reports those paths separately, so a failed check cannot read as a pass.
     """
-    try:
-        raw = path.read_bytes()
-    except OSError:
-        return None
-    # Windows PowerShell 5 writes UTF-16 by default; read as UTF-8 it is noise and
-    # the file would count as scanned-clean.
-    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
-        return raw.decode("utf-16", errors="ignore").splitlines()
-    if raw.startswith(b"\xef\xbb\xbf"):
-        raw = raw[3:]
-    return raw.decode("utf-8", errors="ignore").splitlines()
+    read = _read_file(path)
+    return None if read is None else read[1]
 
 
 def is_iac_file(path: Path, repo_path: Path, lines: list[str] | None = None) -> bool:
@@ -758,11 +797,112 @@ _IMPORT_LINE = re.compile(
 _CALL_SHAPE = re.compile(r"\w\s*\(")
 
 
-def _evidence_kind(line: str, inside_block_comment: bool) -> str:
-    stripped = line.strip()
+# Which comment markers a file actually uses. Applying all of them everywhere is
+# how `;` in C or `#` in a preprocessor line becomes a comment that is not there,
+# so an unknown extension gets no mid-line comment detection at all and keeps the
+# older whole-line behaviour.
+_SLASH_COMMENT_EXT = {
+    ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".cs", ".java", ".js",
+    ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".go", ".rs", ".swift", ".kt",
+    ".kts", ".scala", ".sc", ".php", ".m", ".mm", ".groovy", ".dart", ".proto",
+}
+_HASH_COMMENT_EXT = {
+    ".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".pm", ".ps1", ".psm1",
+    ".yaml", ".yml", ".toml", ".conf", ".cnf", ".cfg", ".ini", ".properties",
+    ".tf", ".tfvars", ".r", ".cmake", ".mk", ".t", ".env", ".gitignore",
+}
+_DASH_COMMENT_EXT = {".sql", ".lua", ".hs", ".adb", ".ads"}
+
+
+def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[int, int]], bool]:
+    """Where the comments are on this line, and whether the next line continues one.
+
+    Deciding comment-or-code for a whole line is what made `marker = "/*"` in
+    Python silence every call beneath it, and made the text of
+    `x = 1  # rsa.generate_private_key(...)` count as a use. Both were found by an
+    external retest of 0.11.0. A quote-aware walk fixes both directions at once:
+    a marker inside a string opens nothing, and a match after a marker is comment
+    text rather than code.
+
+    String contents stay code on purpose. A cipher suite or an algorithm name in a
+    string literal is usually the configuration itself, and calling it a comment
+    would lose the very lines a configuration scan is for.
+    """
+    slash, hash_, dash = ext in _SLASH_COMMENT_EXT, ext in _HASH_COMMENT_EXT, ext in _DASH_COMMENT_EXT
+    spans: list[tuple[int, int]] = []
+    n, i, quote = len(line), 0, ""
+    if inside_block:
+        end = line.find("*/")
+        if end == -1:
+            return [(0, n)], True
+        spans.append((0, end + 2))
+        i = end + 2
+    while i < n:
+        c = line[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == quote:
+                quote = ""
+            i += 1
+            continue
+        if c in "\"'":
+            quote = c
+            i += 1
+            continue
+        if slash and line.startswith("//", i):
+            spans.append((i, n))
+            return spans, False
+        if slash and line.startswith("/*", i):
+            end = line.find("*/", i + 2)
+            if end == -1:
+                spans.append((i, n))
+                return spans, True
+            spans.append((i, end + 2))
+            i = end + 2
+            continue
+        if hash_ and c == "#":
+            spans.append((i, n))
+            return spans, False
+        if dash and line.startswith("--", i):
+            spans.append((i, n))
+            return spans, False
+        i += 1
+    return spans, False
+
+
+def _in_spans(position: int, spans: list[tuple[int, int]]) -> bool:
+    return any(start <= position < end for start, end in spans)
+
+
+def _code_only(line: str, spans: list[tuple[int, int]]) -> str:
+    """The line with its comments blanked out, so a search cannot read them.
+
+    Blanked rather than removed: positions have to keep meaning for the caller.
+    """
+    if not spans:
+        return line
+    chars = list(line)
+    for start, end in spans:
+        for i in range(start, min(end, len(chars))):
+            chars[i] = " "
+    return "".join(chars)
+
+
+def _evidence_kind(line: str, inside_block_comment: bool, code: str | None = None) -> str:
+    """The kind of evidence the CODE on this line carries.
+
+    `code` is the line with comments blanked out; when it is given, the shape of
+    the line is judged from the code alone, so a comment cannot turn an
+    assignment into a call or the other way round.
+    """
+    stripped = (line if code is None else code).strip()
     if _C_DIRECTIVE.match(line):
         return "declaration"
     if inside_block_comment or _COMMENT_LINE.match(line):
+        return "comment"
+    if not stripped:
         return "comment"
     if _IMPORT_LINE.match(line):
         return "import"
@@ -792,6 +932,12 @@ def _block_comment_state(line: str, inside: bool) -> bool:
 # to be removed with a leading - or !. "enabledAlgorithms" must stay a use, so
 # the words are matched whole and the negative forms are listed rather than
 # guessed at.
+#
+# `weak` and `insecure` were here and are not any more. They describe a risk, not
+# a prohibition: `weak_key = rsa.generate_private_key(key_size=1024)` is the very
+# thing an inventory exists to find, and naming the variable honestly made this
+# scanner drop it. An external retest of 0.11.0 found it, and a rule that hides
+# cryptography is the same defect as a rule that invents it.
 # The word is matched case-insensitively and the boundary after it is not: a
 # camelCase identifier keeps the word whole (blockedAlgorithms, rejectedSuites),
 # while a lower-case letter after it means a different word. Compiling the whole
@@ -800,7 +946,7 @@ _DENIAL_WORDS = re.compile(
     r"(?<![A-Za-z])"
     r"(?i:disabled|disallow(?:ed)?|banned|blocked|blocklist|blacklist|"
     r"forbidden|prohibited|denied|deny|reject(?:ed)?|excluded|unsupported|"
-    r"not[-_ ]?allowed|must[-_ ]?not|no[-_ ]?longer|removed|insecure|weak)"
+    r"not[-_ ]?allowed|must[-_ ]?not|no[-_ ]?longer|removed)"
     r"(?![a-z])")
 # Where a leading - or ! strikes an entry out rather than opening a command-line
 # flag. `openssl req -newkey rsa:2048` is a use; `HostKeyAlgorithms -ssh-rsa` is a
@@ -820,13 +966,20 @@ def _opens_a_denial_block(line: str) -> bool:
     governs them.
     """
     stripped = line.rstrip()
-    return bool(stripped.endswith((":", "= [", "=[", "{", "(", "[")) 
+    return bool(stripped.endswith((":", "= [", "=[", "{", "(", "["))
                 and _DENIAL_WORDS.search(stripped))
 
 
-def _is_banned_here(line: str, position: int, in_denial_block: bool = False) -> bool:
-    """Whether the algorithm at this position is being forbidden rather than used."""
-    if in_denial_block or _DENIAL_WORDS.search(line):
+def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
+                    code: str | None = None) -> bool:
+    """Whether the algorithm at this position is being forbidden rather than used.
+
+    `code` is the line with its comments blanked out. A denial word in a comment
+    describes the code; it does not govern it. `key = generate(1024)  # weak key,
+    kept for compatibility` is a use, and reading the comment made it a ban.
+    """
+    searchable = line if code is None else code
+    if in_denial_block or _DENIAL_WORDS.search(searchable):
         return True
     # Work in entries, not characters. A hyphen inside a name belongs to it --
     # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
@@ -867,16 +1020,19 @@ def scan_source_file(path: Path, rel_path: str,
                      cipher_exclusions: bool = False) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     lines = (_read_lines(path) or []) if lines is None else lines
+    ext = path.suffix.lower()
     inside_block = False
     denial_block_indent: int | None = None
     for line_no, line in enumerate(lines, start=1):
-        kind = _evidence_kind(line, inside_block)
-        inside_block = _block_comment_state(line, inside_block)
+        was_inside = inside_block
+        spans, inside_block = _comment_spans(line, ext, inside_block)
+        code = _code_only(line, spans)
+        kind = _evidence_kind(line, was_inside, code)
         indent = len(line) - len(line.lstrip())
         if denial_block_indent is not None and line.strip() and indent <= denial_block_indent:
             denial_block_indent = None
         in_denial = denial_block_indent is not None
-        if _opens_a_denial_block(line):
+        if _opens_a_denial_block(code):
             denial_block_indent = indent
         # One line, one finding per algorithm. Several patterns can carry the same
         # name -- ECDSA is matched both by its own name and by secp256k1, X448 by
@@ -901,14 +1057,24 @@ def scan_source_file(path: Path, rel_path: str,
             # Per match, not per line: a hardened configuration bans one algorithm
             # and enables another on the same line, and reading the whole line as a
             # ban would hide the live one.
-            banned = all(_is_banned_here(line, m.start(), in_denial) for m in matches)
+            banned = all(_is_banned_here(line, m.start(), in_denial, code) for m in matches)
+            # Position decides, not the line. A match that sits inside a comment is
+            # comment evidence even where the code around it is a call, and a match
+            # in the code is not a comment merely because the line ends in one.
+            in_comment = all(_in_spans(m.start(), spans) for m in matches)
+            if banned:
+                evidence = "ban"
+            elif in_comment:
+                evidence = "comment"
+            else:
+                evidence = kind
             item = {
                 "path": rel_path,
                 "line": line_no,
                 "algorithm": algorithm,
                 "description": description,
                 "excerpt": line.strip()[:200],
-                "evidence_kind": "ban" if banned else kind,
+                "evidence_kind": evidence,
             }
             size = key_size_on_line(line) if algorithm == "RSA" else None
             if size:
@@ -1099,17 +1265,19 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
 
         # Read once, here: classification and scanning must see the same content, and a
         # file that cannot be read has to leave a mark rather than pass as scanned-clean.
-        lines = _read_lines(path)
-        if lines is None:
+        read = _read_file(path)
+        if read is None:
             unreadable.append(rel_path)
             content_parts.append(f"{rel_path}\0unread")
             continue
-        # The digest is over the text the scanner saw, not over the bytes on disk:
-        # what the numbers describe is what was read. No extra I/O -- this is the
-        # content _read_lines just returned.
+        raw, lines = read
+        # The digest is over the BYTES this read returned. Over the decoded text it
+        # was not identity at all: `decode(errors="ignore")` drops what it cannot
+        # read, so two files differing exactly where the scanner looks -- an object
+        # identifier inside a DER blob -- produced the same digest while producing
+        # different findings. No extra I/O; these are the bytes already in hand.
         content_parts.append(
-            rel_path + "\0" + hashlib.sha256(
-                "\n".join(lines).encode("utf-8", "surrogatepass")).hexdigest())
+            rel_path + "\0" + hashlib.sha256(raw).hexdigest())
 
         for number, text_line in enumerate(lines, 1):
             for asset in scan_protocols(text_line):
@@ -1250,8 +1418,17 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # The smallest size seen for a family, so a weak key anywhere is visible. A
         # size is a property of the key, not of the name, and without it every RSA
         # reads the same whether it is 1024 or 4096 bits.
+        #
+        # Measured over usable evidence only, the same filter the inventory uses.
+        # An external retest of 0.11.0 found a file whose comment mentioned an old
+        # 1024-bit example above a real 4096-bit key: the family was correctly kept
+        # out of the comment's reach and the size was not, so the scan reported a
+        # weak key that did not exist. Evidence excluded from the finding cannot be
+        # allowed back in to grade it.
         "algorithm_key_sizes": {
             alg: min(sizes)
-            for alg, sizes in _sizes_by_algorithm(source_findings + iac_findings).items()
+            for alg, sizes in _sizes_by_algorithm(
+                [f for f in source_findings + iac_findings
+                 if f.get("evidence_kind") not in {"comment", "ban"}]).items()
         },
     }
