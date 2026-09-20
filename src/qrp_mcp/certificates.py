@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import re
+import os
 from pathlib import Path
 from typing import Any
 
@@ -152,13 +153,36 @@ def is_certificate_file(path: Path) -> bool:
     return path.suffix.lower() in CERTIFICATE_EXTENSIONS
 
 
-def scan_certificate_file(path: Path, rel_path: str) -> tuple[list[dict[str, Any]],
-                                                              list[dict[str, Any]]]:
+def _read_bytes_once(path: Path) -> bytes | None:
+    """Read without following a link at the final component, as the scan does."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        return None
+    try:
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+            return handle.read()
+    except OSError:
+        return None
+
+
+def scan_certificate_file(path: Path, rel_path: str,
+                          raw: bytes | None = None) -> tuple[list[dict[str, Any]],
+                                                             list[dict[str, Any]]]:
     """Returns (algorithm_findings, embedded_key_findings) for one file.
 
     Never raises: a corpus of certificates is a corpus of edge cases, and a file
     that cannot be understood has to leave the scan as nothing found rather than
     as an exception.
+
+    `raw` is the snapshot the caller already read. It has to be passed, because
+    opening the path a second time reads a file that may no longer be the one that
+    was hashed: an independent analysis replaced the path between the two reads and
+    got a finding that the corpus digest did not describe, and replaced it with a
+    symlink to get an algorithm from outside the tree with no link reported. One
+    read feeds the digest, the parse and the evidence, or they are describing
+    different bytes.
     """
     from .classifier import _find_oid_family  # local: avoids an import cycle
 
@@ -166,7 +190,8 @@ def scan_certificate_file(path: Path, rel_path: str) -> tuple[list[dict[str, Any
     keys: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    def record(algorithm: str, description: str, line: int, excerpt: str) -> None:
+    def record(algorithm: str, description: str, line: int, excerpt: str,
+               kind: str = "declaration") -> None:
         if algorithm in seen:
             return
         seen.add(algorithm)
@@ -176,12 +201,18 @@ def scan_certificate_file(path: Path, rel_path: str) -> tuple[list[dict[str, Any
             "algorithm": algorithm,
             "description": description,
             "excerpt": excerpt[:200],
+            "evidence_kind": kind,
         })
 
-    try:
-        raw = path.read_bytes()
-    except OSError:
-        return [], []
+    if raw is None:
+        # No snapshot supplied: this is a direct call, so read once here. The
+        # scan path always supplies one.
+        try:
+            raw = _read_bytes_once(path)
+        except OSError:
+            return [], []
+        if raw is None:
+            return [], []
 
     blobs: list[bytes] = []
     text = raw.decode("utf-8", errors="replace")
@@ -241,8 +272,16 @@ def scan_certificate_file(path: Path, rel_path: str) -> tuple[list[dict[str, Any
         for oid in sorted(_iter_oids(blob)):
             entry = _find_oid_family(oid)
             if entry is not None:
-                record(entry[1], f"{entry[1]} identified by object identifier {oid}",
-                       1, oid)
+                # What this says, exactly: the identifier's bytes are in the file.
+                # It does not say the file decoded as a certificate. An independent
+                # analysis put a valid RSA identifier into arbitrary bytes in a .der
+                # and got an RSA finding, which is correct for what was measured and
+                # was described here in words that claimed more. The narrow sentence
+                # is the true one.
+                record(entry[1],
+                       f"{entry[1]} object identifier {oid} observed in the file; "
+                       f"the file was not decoded as a certificate",
+                       1, oid, kind="reference")
 
     # PKCS#12. The wrapper is not encrypted even when everything inside it is, so
     # it still names its bags: a shrouded key bag means a private key is in the

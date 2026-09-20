@@ -141,8 +141,13 @@ not an assessment.
 **Certificates and keys** — `.pem`, `.der`, `.crt`, `.cer`, `.cert`, `.csr`, `.key`, `.pub`,
 `.p12`, `.pfx`. Algorithms are resolved from the object identifiers inside the DER and from
 PEM labels and OpenSSH key types, and private key material is reported separately. This does
-not parse X.509: it keeps only the identifiers already in the classifier, so a malformed
-certificate yields nothing rather than nonsense.
+not parse X.509: it matches the object identifiers already in the classifier against the bytes.
+A file that is not a certificate but contains an identifier's bytes **is** reported, and the
+finding says so — "observed in the file; the file was not decoded as a certificate". An earlier
+version of this paragraph promised that a malformed certificate yields nothing; an independent
+analysis put a valid RSA identifier into arbitrary bytes and got a finding, which is what the
+code measures. For a certificate register — issuer, validity, the device — this tool is the wrong
+instrument and says so: that data comes from a structural parser or an external inventory.
 
 **Configuration** — `nginx.conf`, `sshd_config`, `openssl.cnf`, `swanctl.conf`, `.ini`,
 `.toml`, `.properties`, `.hcl`, `.json`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid

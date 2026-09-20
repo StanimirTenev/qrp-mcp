@@ -185,7 +185,11 @@ def scan_to_file(argv: list[str]) -> int:
     if out_path is not None and not out_path.resolve().parent.is_dir():
         p.error(f"the folder for --out does not exist: {out_path.parent}")
 
-    result = scan_directory(a.path)
+    # The result must not become part of the next run's input. Writing it inside
+    # the scanned tree made a second run see one more file, quote the findings out
+    # of its own output and produce a different corpus digest for an unchanged
+    # tree. Excluding the same path every run keeps two runs comparable.
+    result = scan_directory(a.path, out_path)
     if a.level == "trimmed":
         result = _strip_excerpts(result)
     data = (json.dumps(result, indent=2, ensure_ascii=False) + "\n").encode()

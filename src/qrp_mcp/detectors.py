@@ -717,7 +717,68 @@ def is_config_file(path: Path) -> bool:
     return path.suffix.lower() in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
 
 
-def _read_file(path: Path) -> tuple[bytes, list[str]] | None:
+# Returned when the platform cannot open relative to a directory descriptor, to
+# tell "this machine cannot do the chained open" apart from "the chained open
+# refused". Falling back on a refusal would re-open the very path that was
+# rejected, through the parent that was just swapped -- which is how the first
+# version of this guard let an external file in while looking like it worked.
+_NO_DIRFD = object()
+
+
+def _read_within(root: Path, path: Path) -> bytes | None | object:
+    """Read a file, refusing to leave `root` by any component of the path.
+
+    `O_NOFOLLOW` on the final component closes the common window; it does not
+    close the one an independent analysis used, which replaced a PARENT directory
+    with a link after the walk and got content from outside the tree. Each
+    component is opened relative to the one before it, with the link check applied
+    at every step, so a directory swapped after the walk fails the open instead of
+    redirecting it.
+
+    Linux and the other platforms that carry `dir_fd`. Where the interpreter has no
+    `dir_fd` support -- Windows -- this falls back to the single-component
+    protection, and that limit is stated rather than implied away.
+    """
+    if not (os.open in os.supports_dir_fd and getattr(os, "O_NOFOLLOW", 0)):
+        return _NO_DIRFD
+    try:
+        relative = path.resolve().relative_to(root.resolve())
+    except (OSError, ValueError):
+        return None
+    parts = relative.parts
+    if not parts:
+        return None
+    flags = os.O_RDONLY | os.O_NOFOLLOW
+    opened: list[int] = []
+    try:
+        current = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        opened.append(current)
+        for name in parts[:-1]:
+            nxt = os.open(name, flags | getattr(os, "O_DIRECTORY", 0), dir_fd=current)
+            opened.append(nxt)
+            current = nxt
+        descriptor = os.open(parts[-1], flags, dir_fd=current)
+    except OSError:
+        for fd in opened:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        return None
+    try:
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+            return handle.read()
+    except OSError:
+        return None
+    finally:
+        for fd in opened:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
+def _read_file(path: Path, root: Path | None = None) -> tuple[bytes, list[str]] | None:
     """The file's bytes and its lines, read once, or None when it could not be read.
 
     One snapshot, two uses. The text scan, the binary parsers and the corpus digest
@@ -737,6 +798,14 @@ def _read_file(path: Path) -> tuple[bytes, list[str]] | None:
     to the last. That is stated here rather than implied away -- the tool says what
     it does not cover.
     """
+    if root is not None:
+        raw = _read_within(root, path)
+        if raw is _NO_DIRFD:
+            pass  # no dir_fd on this platform: the single-component read below
+        elif raw is None:
+            return None  # the chained open refused. It does not get a second try.
+        else:
+            return raw, _decode(raw)
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
     try:
         descriptor = os.open(path, flags)
@@ -1278,7 +1347,16 @@ def _sizes_by_algorithm(findings: list[dict[str, Any]]) -> dict[str, list[int]]:
     return out
 
 
-def scan_repo(repo_path: Path) -> dict[str, Any]:
+def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
+    """`exclude` is a single path left out of the scan and named in the scope.
+
+    The one caller that needs it is the CLI writing its own result inside the
+    directory it just scanned: the second run then reads the first run's output,
+    reports the findings quoted in it, and produces a different corpus digest for
+    an unchanged tree. An independent analysis ran exactly that and saw one file
+    become two. Excluding the same path on every run makes the runs comparable
+    again, and the scope says the file was left out rather than not noticed.
+    """
     source_findings: list[dict[str, Any]] = []
     ci_findings: list[dict[str, Any]] = []
     iac_findings: list[dict[str, Any]] = []
@@ -1310,7 +1388,21 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
 
     walk_problems: list[tuple[str, str]] = []
     unreadable_dirs: list[str] = []
+    left_out: list[str] = []
+    resolved_exclude = None
+    if exclude is not None:
+        try:
+            resolved_exclude = Path(exclude).expanduser().resolve()
+        except OSError:
+            resolved_exclude = None
     for path in iter_repo_files(repo_path, excluded_dir_counts, walk_problems):
+        if resolved_exclude is not None:
+            try:
+                if path.resolve() == resolved_exclude:
+                    left_out.append(str(path.relative_to(repo_path)))
+                    continue
+            except (OSError, ValueError):
+                pass
         files_present += 1
         # The composition of the denominator, not just its size. A coverage figure
         # is a property of the tool crossed with what the corpus is made of: the
@@ -1350,7 +1442,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
 
         # Read once, here: classification and scanning must see the same content, and a
         # file that cannot be read has to leave a mark rather than pass as scanned-clean.
-        read = _read_file(path)
+        read = _read_file(path, repo_path)
         if read is None:
             unreadable.append(rel_path)
             content_parts.append(f"{rel_path}\0unread")
@@ -1377,7 +1469,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
             # Certificates and keys are read as bytes, not lines: a .der carries no
             # lines at all, and a .pem that fails to decode must still be counted.
             files_scanned["certificate"] += 1
-            algo_findings, key_findings = scan_certificate_file(path, rel_path)
+            algo_findings, key_findings = scan_certificate_file(path, rel_path, raw)
             source_findings.extend(algo_findings)
             embedded_key_findings.extend(key_findings)
             if is_undecoded(algo_findings, key_findings):
@@ -1468,6 +1560,7 @@ def scan_repo(repo_path: Path) -> dict[str, Any]:
         # Not read because this tool does not claim the file type, counted by
         # extension. Not a gap in the scan -- a boundary of it, stated rather than
         # left for the reader to assume away.
+        "files_left_out": left_out,
         "files_skipped_by_type": dict(
             sorted(skipped_kinds.items(), key=lambda kv: kv[1], reverse=True)
         ),

@@ -33,7 +33,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def scan_directory(path: str | Path) -> dict[str, Any]:
+def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, Any]:
     """Scan a directory for classical crypto usage and classify what was found.
 
     Everything runs locally: no network calls, no data leaves the machine.
@@ -43,7 +43,10 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
         raise NotADirectoryError(f"not a directory: {repo_path}")
 
     started_at, clock = _now(), time.monotonic()
-    scan_result = detectors.scan_repo(repo_path)
+    # Passed only when there is one, so every existing caller -- and every test
+    # that substitutes this function -- keeps the one-argument shape it had.
+    scan_result = (detectors.scan_repo(repo_path, exclude) if exclude is not None
+                   else detectors.scan_repo(repo_path))
     seconds, finished_at = time.monotonic() - clock, _now()
 
     # Detected algorithms are passed as explicit algorithms so each one is classified.
@@ -106,6 +109,10 @@ def scan_directory(path: str | Path) -> dict[str, Any]:
         "coverage": coverage_block,
         "files_scanned": scan_result["files_scanned"],
         "files_present": scan_result["files_present"],
+        # Named, not silently dropped: the one file a run is told to leave out is
+        # its own output, and a scan that quietly omits a file is the defect this
+        # tool spends its time finding in others.
+        "files_left_out": scan_result.get("files_left_out", []),
         "files_skipped_by_type": scan_result["files_skipped_by_type"],
         "named_but_not_used": scan_result["named_but_not_used"],
         "unreadable_files": scan_result["unreadable_files"],
