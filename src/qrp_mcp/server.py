@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Annotated, Any
@@ -161,6 +162,49 @@ def _strip_excerpts(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _mask_excerpt(excerpt: str, algorithm: str) -> str:
+    """Keep what names the algorithm; turn everything else into asterisks.
+
+    Between `full`, which sends the line of code, and `trimmed`, which sends
+    nothing, there is a third thing a reader actually needs: enough shape to see
+    that this is a call rather than a string, without the contents of the line.
+
+    A rival tool does this by position -- first twelve characters, then stars --
+    which keeps whatever the line happens to begin with. A line that begins with a
+    token, a key or a password would give up its first characters. Here the rule is
+    the other way round: only the characters that spell the algorithm survive, and
+    every other letter and digit becomes a star. Punctuation and spacing stay,
+    because the shape of a call is not a secret and is the whole reason to keep an
+    excerpt at all.
+    """
+    if not excerpt:
+        return excerpt
+    keep = [False] * len(excerpt)
+    if algorithm:
+        # Every spelling of the family that appears, not just the first.
+        for match in re.finditer(re.escape(algorithm), excerpt, re.IGNORECASE):
+            for i in range(match.start(), match.end()):
+                keep[i] = True
+    out = []
+    for index, character in enumerate(excerpt):
+        if keep[index] or not character.isalnum():
+            out.append(character)
+        else:
+            out.append("*")
+    return "".join(out)
+
+
+def _mask_excerpts(result: dict[str, Any]) -> dict[str, Any]:
+    """The 'masked' level: the line is kept in shape, emptied of its content."""
+    for items in result.get("evidence", {}).values():
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict) and item.get("excerpt"):
+                    item["excerpt"] = _mask_excerpt(
+                        str(item["excerpt"]), str(item.get("algorithm") or ""))
+    return result
+
+
 def scan_to_file(argv: list[str]) -> int:
     """`qrp-mcp scan PATH --out FILE`: the same result as the scan_repo tool,
     written to a file the owner can inspect and send on. Nothing leaves the machine."""
@@ -169,9 +213,11 @@ def scan_to_file(argv: list[str]) -> int:
         description="Scan a directory and write the result as JSON. Nothing is sent anywhere.")
     p.add_argument("path", help="directory to scan")
     p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
-    p.add_argument("--level", choices=("full", "trimmed"), default="full",
-                   help="'trimmed' removes the lines of code quoted as evidence; "
-                        "files and line numbers stay")
+    p.add_argument("--level", choices=("full", "masked", "trimmed"), default="full",
+                   help="what the quoted line of evidence carries: 'full' the line "
+                        "itself, 'masked' its shape with everything but the algorithm "
+                        "name starred out, 'trimmed' nothing. Files and line numbers "
+                        "stay in all three")
     a = p.parse_args(argv)
     # A path or file name the console cannot encode must not fail the run after the
     # scan has finished.
@@ -192,6 +238,8 @@ def scan_to_file(argv: list[str]) -> int:
     result = scan_directory(a.path, out_path)
     if a.level == "trimmed":
         result = _strip_excerpts(result)
+    elif a.level == "masked":
+        result = _mask_excerpts(result)
     data = (json.dumps(result, indent=2, ensure_ascii=False) + "\n").encode()
     if out_path is not None:
         try:

@@ -12,7 +12,7 @@
       "displayName": "QRP cryptographic inventory",
       "source": "./plugin",
       "description": "A local cryptographic inventory for developers and AI agents that carries verifiable coverage and its own limits inside the CBOM.",
-      "version": "0.14.0",
+      "version": "0.15.0",
       "author": {
         "name": "Stanimir Tenev",
         "url": "https://quantumreadiness.eu"

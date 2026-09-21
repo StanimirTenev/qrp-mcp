@@ -382,6 +382,19 @@ Four things those numbers do not mean, said here rather than left to be assumed:
   reference does not is not the same as being the better inventory, and it would be dishonest to
   publish the first number without the second.
 
+**Three levels of evidence, because a quoted line of code is not always safe to send.**
+`--level full` carries the line itself. `--level masked` keeps its shape with everything but the
+algorithm name starred out — `*** = rsa.********_*******_***(***_****=****)` — so a reader sees a
+call rather than a string without seeing the contents. `--level trimmed` carries no line at all.
+The file and the line number stay in all three.
+
+The masking rule is inverted from the obvious one. A rival tool masks by position, keeping the
+first characters and starring the rest, which keeps whatever the line happens to begin with — a
+token, a key, a password. Here only the characters that spell the algorithm survive; every other
+letter and digit becomes a star, and punctuation stays because the shape of a call is not a secret.
+An independent analysis of this scanner found a synthetic token sitting on the same line as a
+finding, which is what prompted the level.
+
 `qscan` is faster: 7.9 s against 219 s on Vault, a factor of **27.7**, and a factor of
 **10.6** on the median of five warm runs over a smaller corpus in an independent comparison.
 Measured here after 0.13.0: **26.1 s for 823 files of certbot, 31.7 ms per file**, of which the

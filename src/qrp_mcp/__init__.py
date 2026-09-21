@@ -1,3 +1,3 @@
 """qrp-mcp: a local, deterministic quantum-vulnerability scan for your codebase."""
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"
