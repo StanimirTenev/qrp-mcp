@@ -8,7 +8,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
@@ -44,6 +44,17 @@ def scan_repo(
             )
         ),
     ],
+    level: Annotated[
+        Literal["full", "masked", "trimmed"],
+        Field(
+            description=(
+                "How much of each matched line to return. `masked` (the default) keeps "
+                "the characters that spell the algorithm and stars every other letter "
+                "and digit; `full` returns the line as written; `trimmed` returns no "
+                "line at all. File and line number are the same at every level."
+            )
+        ),
+    ] = "masked",
 ) -> dict[str, Any]:
     """Inventory the cryptography inside one local directory tree, file by file.
 
@@ -67,8 +78,16 @@ def scan_repo(
 
     Cost scales with the size of the tree, so a large monorepo takes proportionally
     longer; there is no cache and no partial mode.
+
+    Quoted lines are masked by default. Reading happens on this machine, but this
+    result does not stay on it: it is returned to a model, which is a place the
+    scanned line has not been before. A secret sharing a line with a finding -- a
+    token in the call that names the cipher -- would travel with it. Masking keeps
+    what a reader needs (the algorithm, the file, the line number, the shape of the
+    call) and removes what nobody asked for. Pass `level="full"` when the line
+    itself is the thing being examined.
     """
-    return scan_directory(path)
+    return _at_level(scan_directory(path), level)
 
 
 @mcp.tool(annotations=_READ_ONLY)
@@ -96,6 +115,15 @@ def export_cbom(
         str,
         Field(description="Directory to scan and export, same argument as `scan_repo`."),
     ],
+    level: Annotated[
+        Literal["full", "masked", "trimmed"],
+        Field(
+            description=(
+                "How much of each matched line to carry in `evidence.occurrences`. "
+                "Same three levels and the same default as `scan_repo`."
+            )
+        ),
+    ] = "masked",
 ) -> dict[str, Any]:
     """Scan one directory and return a CycloneDX 1.6 CBOM that carries its own coverage.
 
@@ -117,8 +145,13 @@ def export_cbom(
     findings, so two runs of the same code over the same corpus that find the same things
     share it and a different result does not. The timestamp and coverage window record
     when each run happened.
+
+    The matched text in `evidence.occurrences` is masked by default, for the reason
+    given on `scan_repo` and one more: this document is the one built to be sent.
+    An auditor needs the algorithm, the file and the line; the contents of the line
+    are not part of the claim being made.
     """
-    return cyclonedx.build(scan_directory(path))
+    return cyclonedx.build(_at_level(scan_directory(path), level))
 
 
 @mcp.tool(annotations=_READ_ONLY)
@@ -205,6 +238,25 @@ def _mask_excerpts(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _at_level(result: dict[str, Any], level: str) -> dict[str, Any]:
+    """One place that turns a level into what the result carries.
+
+    There were two paths out of this scan and only one of them had a level. The
+    export to a file, the rare one, could mask; the tools, which run on every agent
+    call and hand their result to a model, always sent the line as written. The
+    control had been built for the path we thought left the machine rather than the
+    one that leaves on every call.
+
+    So the levels live here, and both paths ask this function rather than spelling
+    the rule out again. A second spelling is how the two drift apart.
+    """
+    if level == "trimmed":
+        return _strip_excerpts(result)
+    if level == "masked":
+        return _mask_excerpts(result)
+    return result
+
+
 def scan_to_file(argv: list[str]) -> int:
     """`qrp-mcp scan PATH --out FILE`: the same result as the scan_repo tool,
     written to a file the owner can inspect and send on. Nothing leaves the machine."""
@@ -236,10 +288,7 @@ def scan_to_file(argv: list[str]) -> int:
     # of its own output and produce a different corpus digest for an unchanged
     # tree. Excluding the same path every run keeps two runs comparable.
     result = scan_directory(a.path, out_path)
-    if a.level == "trimmed":
-        result = _strip_excerpts(result)
-    elif a.level == "masked":
-        result = _mask_excerpts(result)
+    result = _at_level(result, a.level)
     data = (json.dumps(result, indent=2, ensure_ascii=False) + "\n").encode()
     if out_path is not None:
         try:
@@ -256,7 +305,7 @@ def scan_to_file(argv: list[str]) -> int:
 
 
 USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MCP clients run)
-       qrp-mcp scan PATH [--out FILE] [--level full|trimmed]
+       qrp-mcp scan PATH [--out FILE] [--level full|masked|trimmed]
                                scan a directory and write the result as JSON
        qrp-mcp --version
 """

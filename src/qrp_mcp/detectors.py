@@ -1063,14 +1063,6 @@ def _evidence_kind(line: str, inside_block_comment: bool, code: str | None = Non
     return "reference"
 
 
-def _block_comment_state(line: str, inside: bool) -> bool:
-    """Whether the NEXT line is inside a /* */ block."""
-    if inside:
-        return "*/" not in line
-    opened = line.rfind("/*")
-    return opened != -1 and "*/" not in line[opened:]
-
-
 # A ban is not a use. This scanner already refused to count `!MD5` in a cipher
 # list and `-SSLv3` in an SSLProtocol line; a negative corpus written for this
 # release found the same idea in a dozen shapes that were all counted as uses --

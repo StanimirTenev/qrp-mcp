@@ -71,8 +71,9 @@ uvx qrp-mcp scan ~/code/my-protocol --out result.json
 ```
 
 This produces the same result as the `scan_repo` tool, written to a file you can read
-before it goes anywhere. Nothing is sent. `--level trimmed` removes the quoted lines of
-code but keeps each file and line number. The SHA-256 of the written bytes is printed,
+before it goes anywhere. Nothing is sent. `--level masked` stars out everything in the quoted
+line but the algorithm name, and `--level trimmed` removes the line altogether; both keep each
+file and line number. The SHA-256 of the written bytes is printed,
 so anyone you send the file to can quote back exactly what they received.
 
 ## Tools
@@ -394,6 +395,17 @@ token, a key, a password. Here only the characters that spell the algorithm surv
 letter and digit becomes a star, and punctuation stays because the shape of a call is not a secret.
 An independent analysis of this scanner found a synthetic token sitting on the same line as a
 finding, which is what prompted the level.
+
+**From 0.16.0 the tools mask by default.** The level existed on `qrp-mcp scan --out` -- the path
+that writes a file for you to read before you send it -- and nowhere else. The `scan_repo` and
+`export_cbom` tools returned every matched line as written, and those are the path that runs on
+every agent call and hands its result to a model. `export_cbom` says in its own description that
+it is for "when the result has to leave the machine", and it carried each line verbatim into
+`evidence.occurrences`. The control had been built for the path we thought left the machine
+rather than the one that leaves on every call. Both tools now take the same `level` and default
+to `masked`; `level="full"` returns the lines. Reading is unchanged -- masking decides how a
+finding is quoted, never whether it is found, and no detection figure in this file moves because
+of it.
 
 `qscan` is faster: 7.9 s against 219 s on Vault, a factor of **27.7**, and a factor of
 **10.6** on the median of five warm runs over a smaller corpus in an independent comparison.
