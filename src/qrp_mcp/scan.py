@@ -123,6 +123,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
         # The smallest key size read for a family, where a line named one. A number
         # nobody can see is a number nobody can check.
         "algorithm_key_sizes": scan_result.get("algorithm_key_sizes", {}),
+        "algorithm_key_sizes_observed": scan_result.get("algorithm_key_sizes_observed", {}),
         "findings": [f.model_dump() for f in response.findings],
         "summary": response.summary.model_dump(),
         "evidence": {

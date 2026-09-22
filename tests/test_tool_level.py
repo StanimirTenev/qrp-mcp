@@ -102,9 +102,21 @@ def test_trimmed_carries_no_line_at_all(tree):
 def test_counts_do_not_move_with_the_level(tree):
     """A privacy level must not change what was found, only how it is quoted.
     If coverage or the family list moved, two scans of one tree would disagree
-    for a reason that has nothing to do with the tree."""
+    for a reason that has nothing to do with the tree.
+
+    ⚠️ `coverage.window` is excluded on purpose, and the exclusion is the point:
+    it holds `started_at`, `finished_at` and `seconds`, which differ between any
+    two runs. The first version of this test compared the whole coverage block and
+    passed by luck — two scans happened to land in the same fraction of a second.
+    A test that fails at random is worse than no test, because it teaches everyone
+    to disregard a red suite, and then the real failure goes unread too.
+    """
     full = _tool(scan_repo)(str(tree), level="full")
     masked = _tool(scan_repo)(str(tree))
-    for field in ("coverage", "files_scanned", "files_present", "detected_algorithms",
-                  "algorithm_key_sizes", "verdict"):
+    for field in ("files_scanned", "files_present", "detected_algorithms",
+                  "algorithm_key_sizes", "algorithm_key_sizes_observed", "verdict"):
         assert full[field] == masked[field], field
+    for block in ("scope", "claims", "not_examined", "examined_without_result"):
+        assert full["coverage"][block] == masked["coverage"][block], block
+    assert (full["coverage"]["corpus"]["content_digest"]
+            == masked["coverage"]["corpus"]["content_digest"])

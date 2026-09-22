@@ -1601,4 +1601,19 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 [f for f in source_findings + iac_findings
                  if f.get("evidence_kind") not in {"comment", "ban"}]).items()
         },
+        # Every size seen, not only the smallest. The minimum above answers "is
+        # anything weak here"; this answers "which sizes are in use", and they are
+        # different questions. The second one became the operational one when
+        # RSA-896 was factored on a data-centre fleet: an auditor asking where
+        # RSA-1024 still runs cannot be answered by a figure that reports the
+        # minimum, nor by a family name with no size at all.
+        #
+        # Same filter as above, for the same reason: a size that was excluded from
+        # the finding cannot come back in to describe it.
+        "algorithm_key_sizes_observed": {
+            alg: sorted(set(sizes))
+            for alg, sizes in _sizes_by_algorithm(
+                [f for f in source_findings + iac_findings
+                 if f.get("evidence_kind") not in {"comment", "ban"}]).items()
+        },
     }

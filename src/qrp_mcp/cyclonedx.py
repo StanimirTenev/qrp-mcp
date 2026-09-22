@@ -209,6 +209,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     located = list(scan_result["evidence"]["source_code"]) + list(scan_result["evidence"]["iac"])
     by_family = {f["algorithm_family"]: f for f in scan_result["findings"]
                  if f["algorithm_family"] not in _NOT_ALGORITHMS}
+    # Measured on the line and, until 0.17.0, dropped on the way out: the document
+    # named the family and said nothing about the modulus.
+    observed_sizes: dict[str, list[int]] = scan_result.get("algorithm_key_sizes_observed", {})
     family_of = {f["raw_value"]: f["algorithm_family"] for f in scan_result["findings"]
                  if f.get("raw_value") and f.get("algorithm_family")}
 
@@ -221,7 +224,19 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "name": family,
             "cryptoProperties": {
                 "assetType": "algorithm",
-                "algorithmProperties": {"primitive": _primitive(family)},
+                "algorithmProperties": {
+                    "primitive": _primitive(family),
+                    # The schema's own example for this field is the key length:
+                    # "in AES128, '128' identifies the key length in bits".
+                    #
+                    # Stated only where ONE size was observed. Where several were,
+                    # the field is left out and every size is named in a property
+                    # instead: choosing one of them would publish a number that
+                    # looks measured and is not, and a reader cannot tell the
+                    # difference. A string, because the schema says string.
+                    **({"parameterSetIdentifier": str(observed_sizes[family][0])}
+                       if len(observed_sizes.get(family, [])) == 1 else {}),
+                },
             },
             # The classification and the post-quantum family have no field in the
             # schema, so they travel as properties for the same reason coverage
@@ -232,6 +247,12 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                  "value": "true" if finding["quantum_vulnerable"] else "false"},
             ],
         }
+        # More than one size for the same family: all of them, none chosen.
+        if len(observed_sizes.get(family, [])) > 1:
+            component["properties"].append({
+                "name": f"{NS}observedKeySizes",
+                "value": ", ".join(str(s) for s in observed_sizes[family]),
+            })
         for key in ("pqc_family", "pqc_status"):
             if finding.get(key):
                 component["properties"].append({"name": f"{NS}{key}", "value": finding[key]})
