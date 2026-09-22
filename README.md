@@ -118,7 +118,16 @@ library named in a comment is not a dependency.
 
 **Key sizes** — a size named on the line (`key_size=1024`, `rsa:1024`, `genrsa 1024`,
 `GenerateKey(..., 1024)`) travels with the family, so a weak RSA key is reported as weak rather
-than as one more RSA. The smallest size seen per family is in `algorithm_key_sizes`.
+than as one more RSA. `algorithm_key_sizes` holds the **smallest** size seen per family — the
+figure that answers *is anything weak here* — and `algorithm_key_sizes_observed` holds **every**
+size seen, which is a different question and became the operational one when RSA-896 was factored
+on a data-centre fleet: *where is RSA-1024 still in use?*
+
+From 0.17.0 the size reaches the CBOM component. Where one size was observed it is stated as
+`cryptoProperties.algorithmProperties.parameterSetIdentifier` — the field whose own example in the
+schema is a key length. Where several were, that field is **left out** and all of them are named
+in `qrp:observedKeySizes` instead: choosing one would put a number in the document that looks
+measured and is not, and a reader could not tell the difference.
 
 **Hybrids and composites** — the RFC 10024 TLS groups `X25519MLKEM768`,
 `SecP256r1MLKEM768` and `SecP384r1MLKEM1024`, OpenSSH 10's default `mlkem768x25519-sha256`,
