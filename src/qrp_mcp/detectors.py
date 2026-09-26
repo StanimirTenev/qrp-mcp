@@ -72,6 +72,38 @@ CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
                     "known_hosts", "authorized_keys"}
 
 # (algorithm, description, compiled regex matched against a single source line)
+# Test code, named rather than judged. Measured 2026-09-26: comparing this scanner
+# against a calibrated classifier on certbot gave 42 disagreements and **33 sat in test
+# code**. Neither reference corpus can settle whether a fixture is an asset -- qscan's
+# recall benchmark and the cryben corpus of Näther & Hirsch are both 100% synthetic
+# fixtures with no test/production distinction -- so there is no convention to follow
+# and the scanner does not invent one.
+#
+# A fixture's RSA key is real RSA and stays in the inventory. Whether it belongs in a
+# particular migration plan is the reader's call, and they can only make it if the
+# document says which is which. Same answer as coverage: name it, do not drop it.
+#
+# ⚠️ The rule is path shape, which is a convention and not a fact. It is reported with
+# the counts, so a number can be read together with what produced it.
+TEST_PATH_RULE = ("a path component named test/tests/testing/spec/specs/fixtures/"
+                  "testdata, or a file named test_*, conftest, *_test, *.test.*, "
+                  "*Test, *Tests, *_spec, *.spec")
+_TEST_DIRS = {"test", "tests", "testing", "spec", "specs", "fixtures", "testdata"}
+_TEST_FILE = re.compile(r"^(?:test_|conftest$)|(?:_test|\.test|Test|Tests|_spec|\.spec)$")
+
+
+def in_test_code(rel_path: str) -> bool:
+    """Whether a path is test code by `TEST_PATH_RULE`. Declared, not guessed silently."""
+    parts = rel_path.replace("\\", "/").split("/")
+    # A directory is judged by the same shape as a file, so .NET's `App.Tests/` and
+    # Go's `pkg/testdata/` both land, and `src/latest/` does not.
+    if any(part.lower() in _TEST_DIRS or _TEST_FILE.search(part) for part in parts[:-1]):
+        return True
+    name = parts[-1]
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    return bool(_TEST_FILE.search(stem))
+
+
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
         r"Crypto\.PublicKey\.RSA|Crypto\.PublicKey\s+import\s+RSA|"
@@ -233,11 +265,30 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA named as a JOSE/JWT algorithm", re.compile(
         r"[\"'](?:RS|PS)(?:256|384|512)[\"']|"
         r"\bSigningMethod(?:RS|PS)(?:256|384|512)\b|\bAlgorithm::(?:RS|PS)(?:256|384|512)\b|"
+        # Reached as an attribute rather than a string: `jose.RS256`, `Algorithms.PS512`.
+        # certbot's own default (`alg: jose.JWASignature = jose.RS256`) in acme/client.py
+        # and acme/challenges.py was missed because the rule required quotes. qscan's
+        # recall corpus labels this shape under `aliased`, so an external reference
+        # counts it -- and `RS256` is not an English word, which is why a bare token is
+        # safe here and a bare `RSA` is not.
+        r"(?<![A-Za-z0-9_])(?:RS|PS)(?:256|384|512)(?![0-9A-Za-z_])|"
         r"[\"']?RSA-OAEP(?:-(?:256|384|512))?[\"']?|[\"']RSA1_5[\"']",
+    )),
+    # A configuration value that names the algorithm is an occurrence: qscan's recall
+    # corpus has a whole `config` difficulty class for exactly this
+    # (`diffie-hellman-group14-sha256 kex`). certbot sets its project-wide default in
+    # one assignment -- `rsa_key_size=2048` in constants.py -- and exposes
+    # `--rsa-key-size` on the CLI; neither was a finding, and "this tool defaults to
+    # RSA 2048" is the most actionable thing an inventory can say about it.
+    ("RSA", "RSA key size named as a setting", re.compile(
+        r"\brsa[_-]?(?:key[_-]?(?:size|bits|length)|modulus[_-]?(?:size|bits|length))\b",
+        re.IGNORECASE,
     )),
     ("ECDSA", "ECDSA named as a JOSE/JWT algorithm", re.compile(
         r"[\"']ES(?:256|384|512)K?[\"']|"
-        r"\bSigningMethodES(?:256|384|512)\b|\bAlgorithm::ES(?:256|384|512)\b",
+        r"\bSigningMethodES(?:256|384|512)\b|\bAlgorithm::ES(?:256|384|512)\b|"
+        # Same shape, same reason: `jose.ES384` is how certbot's own tests reach it.
+        r"(?<![A-Za-z0-9_])ES(?:256|384|512)K?(?![0-9A-Za-z_])",
     )),
     ("3DES", "3DES (triple DES) usage", re.compile(
         # No word boundaries: the real spellings are glued into identifiers
@@ -1221,6 +1272,8 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": description,
                 "excerpt": line.strip()[:200],
                 "evidence_kind": evidence,
+                # Named, not judged -- see TEST_PATH_RULE. A fixture's RSA is real RSA.
+                "in_test_code": in_test_code(rel_path),
             }
             size = key_size_on_line(line) if algorithm == "RSA" else None
             if size:
@@ -1582,6 +1635,19 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # Named, and named apart: what the repository talks about or forbids but
         # does not do. A comment and a ban are different facts and both belong
         # here rather than in the inventory.
+        # Test code, counted apart and never dropped. The rule is a path convention,
+        # so it travels with the numbers it produced -- a reader who disagrees with the
+        # rule can see exactly what it caught. Measured on certbot: 33 of 42
+        # scanner-vs-classifier disagreements sat here, and no external corpus can
+        # settle whether a fixture is an asset, because both are pure fixtures.
+        "test_code": {
+            "rule": TEST_PATH_RULE,
+            "meaning": "whether the finding sits in test code; named, not excluded",
+            "findings_in_test_code": sum(
+                1 for f in source_findings + iac_findings if f.get("in_test_code")),
+            "findings_in_other_code": sum(
+                1 for f in source_findings + iac_findings if not f.get("in_test_code")),
+        },
         "named_but_not_used": sorted(
             _families_named(source_findings + iac_findings)
             - _families_in_use(source_findings + iac_findings)),

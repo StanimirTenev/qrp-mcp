@@ -301,6 +301,48 @@ pins and a digest of what was found, so the same code over the same corpus that 
 things gets the same serial, and a different result gets a different one. The timestamp and the
 coverage window record when the run happened, so those fields differ between runs.
 
+## What kind of place a finding sits in
+
+Two things about a match are not the match itself, and both now travel with it — in the
+scan result and in the exported CBOM.
+
+**Evidence kind.** `scan_repo` grades every match: `call`, `declaration`, `import`,
+`reference`, `ban`, `comment`. Comment evidence is kept out of the inventory, and the
+reason is measured — the nearest rival strips comments before matching and scored 0.542
+precision on an independent corpus against this scanner's 0.93. The exported document
+used to drop that grade, so a sentence about certificates reached an auditor looking
+exactly like a signature: **78 of 465 occurrences on certbot (17%) and 1174 of 7142 on
+OpenSSH (16%)**, including 493 ML-DSA and 429 ML-KEM mentions in OpenSSH, which is a lot
+of prose to present as post-quantum adoption. An occurrence whose evidence is a comment
+now says `[comment]`.
+
+⚠️ A banned algorithm is not marked, it is **absent**: `!RC4` in a cipher list never
+becomes a component. What the line forbids is not inventory; what it enables is.
+
+**Test code.** A finding says whether it sits in test code, and the scan declares the
+rule it used:
+
+```json
+"test_code": {
+  "rule": "a path component named test/tests/testing/spec/specs/fixtures/testdata, or a file named test_*, conftest, *_test, *.test.*, *Test, *Tests, *_spec, *.spec",
+  "meaning": "whether the finding sits in test code; named, not excluded",
+  "findings_in_test_code": 144,
+  "findings_in_other_code": 301
+}
+```
+
+Those are certbot's real numbers: **almost a third of its findings are in fixtures.**
+Nothing is dropped — a fixture's RSA key is real RSA. Whether it belongs in a particular
+migration plan is the reader's call, and they can only make it if the document says which
+is which. Occurrences in test code carry `[test]`, and a comment inside a fixture carries
+both.
+
+⚠️ **There is no external convention for this, which is why it is declared rather than
+decided.** The two public corpora that could settle it — qscan's recall benchmark and the
+cryben corpus of Näther & Hirsch — are 100% synthetic fixtures with no test/production
+distinction. The rule here is a path convention, not a fact, so it is printed with the
+numbers it produced; a reader who disagrees with the rule can see exactly what it caught.
+
 ## Measured against the other scanners
 
 In September 2026 three free tools that do the same job — CryptoScan, CBOMkit-hyperion

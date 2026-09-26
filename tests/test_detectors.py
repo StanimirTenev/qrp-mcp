@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from qrp_mcp.detectors import is_ci_config_file, is_iac_file, scan_iac_file, scan_repo
+from qrp_mcp.detectors import is_ci_config_file, is_iac_file, scan_iac_file, scan_repo, scan_source_file
 
 
 def test_scan_repo_detects_source_algorithms_and_signing_commands(tmp_path: Path):
@@ -272,3 +272,101 @@ def test_no_unread_kind_is_one_the_tool_claims(tmp_path: Path):
     claimed = SOURCE_EXTENSIONS | IAC_EXTENSIONS | CONFIG_EXTENSIONS | {".yaml", ".yml"}
     unread = set(scan_repo(tmp_path)["files_skipped_by_type"])
     assert not (unread & claimed), f"claimed and unread at once: {sorted(unread & claimed)}"
+
+
+def test_rs256_reached_through_an_attribute_is_still_rsa(tmp_path):
+    """`alg: jose.JWASignature = jose.RS256` — certbot's own default, missed.
+
+    The JOSE pattern required quotes (`'RS256'`) or a known prefix
+    (`Algorithm::RS256`, `SigningMethodRS256`). certbot reaches it as a dotted
+    attribute, so `acme/challenges.py` and `acme/client.py` declare an RSA signature
+    default that no rule saw.
+
+    qscan's recall corpus labels exactly this shape under `aliased` —
+    "jwt.sign algorithm 'RS256'" — so an external reference counts it. `RS256` is not
+    an English word, unlike `RSA`, which is why a bare token is safe here and is not
+    safe there.
+    """
+    src = tmp_path / "client.py"
+    src.write_text(
+        "import jose\n"
+        "\n"
+        "def post(self, url, obj, alg: jose.JWASignature = jose.RS256):\n"
+        "    return self._post(url, obj, alg)\n",
+        encoding="utf-8")
+    findings = scan_source_file(src, "client.py")
+    families = {f["algorithm"] for f in findings}
+    assert "RSA" in families, f"jose.RS256 is an RSA signature algorithm, got {families}"
+
+
+def test_an_rsa_key_size_setting_is_an_rsa_declaration(tmp_path):
+    """`rsa_key_size=2048` in a defaults module, and `--rsa-key-size` on the CLI.
+
+    certbot's `constants.py` sets the project's default key algorithm and size in one
+    assignment, and its CLI exposes the flag; neither was a finding. qscan's corpus
+    has a whole `config` difficulty class for values of this kind
+    (`diffie-hellman-group14-sha256 kex`), so a configuration value that names an
+    algorithm is an occurrence by the external convention.
+    """
+    for name, text in (
+        ("constants.py", "CLI_DEFAULTS = dict(\n    rsa_key_size=2048,\n)\n"),
+        ("cli.py", 'add("security", "--rsa-key-size", type=int, metavar="N")\n'),
+        ("Settings.cs", "public int RsaKeySize { get; set; } = 3072;\n"),
+    ):
+        src = tmp_path / name
+        src.write_text(text, encoding="utf-8")
+        findings = scan_source_file(src, name)
+        assert "RSA" in {f["algorithm"] for f in findings}, f"{name}: {text.strip()!r}"
+
+
+def test_a_finding_says_whether_it_sits_in_test_code(tmp_path):
+    """Neither external reference answers this, so the scan declares it instead.
+
+    Measured 2026-09-26: comparing this scanner against a calibrated classifier on
+    certbot produced 42 disagreements, and **33 of them were in test code**. Both
+    reference corpora that could settle it -- qscan's recall benchmark and the cryben
+    corpus of Näther & Hirsch -- are 100% synthetic fixtures with no test/production
+    distinction, so there is no external convention to follow.
+
+    So the scan does not decide for the reader. It marks, the way coverage names what
+    it did not open rather than quietly excluding it. A test fixture's RSA key is real
+    RSA and belongs in the inventory; whether it belongs in *this* customer's migration
+    plan is their call, and they can only make it if the document says which is which.
+    """
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "signer.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+        "key = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n",
+        encoding="utf-8")
+    (tmp_path / "tests" / "test_signer.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+        "FIXTURE = rsa.generate_private_key(public_exponent=65537, key_size=1024)\n",
+        encoding="utf-8")
+    result = scan_repo(tmp_path)
+    by_path = {f["path"]: f for f in result["source_code_findings"]}
+    assert "src/signer.py" in by_path and "tests/test_signer.py" in by_path, by_path.keys()
+    assert by_path["src/signer.py"]["in_test_code"] is False
+    assert by_path["tests/test_signer.py"]["in_test_code"] is True
+
+    declared = result["test_code"]
+    assert declared["findings_in_test_code"] == 1
+    assert declared["findings_in_other_code"] == 1
+    assert "rule" in declared and "test" in declared["rule"].lower(), declared
+
+
+def test_the_test_path_rule_reads_directories_by_the_same_shape_as_files():
+    """.NET puts fixtures in `App.Tests/`, Go in `pkg/testdata/`, and neither is an
+    exact name. Judging a directory only by an exact-match list missed both.
+
+    The negatives matter as much: `src/latest/` and `a/protest/` end in `test` and are
+    not test code, which is why the rule requires a separator or a capitalised `Test`.
+    """
+    from qrp_mcp.detectors import in_test_code
+    for path in ("tests/x.py", "a/test/b.py", "App.Tests/X.cs", "My.UnitTests/A.cs",
+                 "pkg/testdata/key.pem", "x_test.go", "foo.test.ts", "MyTest.java",
+                 "conftest.py", "spec/a.rb"):
+        assert in_test_code(path), path
+    for path in ("src/signer.py", "src/latest.py", "src/latest/x.py", "a/protest/b.py",
+                 "contest.py", "greatest.go", "lib/manifest.json"):
+        assert not in_test_code(path), path

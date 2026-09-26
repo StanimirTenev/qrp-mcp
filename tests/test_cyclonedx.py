@@ -418,3 +418,43 @@ def test_a_banned_algorithm_never_becomes_a_component_at_all(tmp_path):
     assert "RC4" not in names and "3DES" not in names, (
         f"a forbidden algorithm is not an asset, got: {sorted(n for n in names if n)}")
     assert {"RSA", "ECDH"} <= names, "what the line ENABLES is still inventory"
+
+
+def test_the_test_code_marker_reaches_every_path_that_leaves_the_tool(tmp_path):
+    """Three outputs leave qrp-mcp, and a field built in one of them reaches nobody.
+
+    This is the defect that cost the most on 2026-09-21: a check was written, tested,
+    and never called, because it was added to one exit and not the other two. So this
+    test walks the exits -- `scan --out`, the MCP scan result, and the exported CBOM --
+    rather than the function.
+    """
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "app.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+        "key = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n",
+        encoding="utf-8")
+    (tmp_path / "tests" / "test_app.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import ec\n"
+        "FIXTURE = ec.generate_private_key(ec.SECP384R1())\n",
+        encoding="utf-8")
+
+    from qrp_mcp.server import export_cbom, scan_repo as scan_tool
+    result = scan_tool(str(tmp_path))
+    assert "test_code" in result, "the MCP scan result must declare it"
+    assert result["test_code"]["findings_in_test_code"] >= 1
+    assert "rule" in result["test_code"]
+
+    cbom = export_cbom(str(tmp_path), level="full")
+    contexts = {
+        occurrence["location"]: occurrence["additionalContext"]
+        for component in cbom["components"]
+        for occurrence in (component.get("evidence", {}) or {}).get("occurrences", []) or []
+    }
+    assert any(path.startswith("tests/") for path in contexts), contexts
+    for path, context in contexts.items():
+        if path.startswith("tests/"):
+            assert "[test]" in context, (
+                f"a fixture must say so in the document that leaves the machine: "
+                f"{path} -> {context!r}")
+        else:
+            assert "[test]" not in context, f"{path} is not test code: {context!r}"

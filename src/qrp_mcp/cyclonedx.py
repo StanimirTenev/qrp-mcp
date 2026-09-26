@@ -197,9 +197,19 @@ _NOT_CODE = {"comment"}
 
 
 def _context(item: dict[str, Any]) -> str:
+    """The matched text, prefixed with what kind of place it sits in.
+
+    Composable, because a mention can be both: a comment inside a test fixture gets
+    `[comment][test]`. Anything that is plain code in plain code gets no prefix, so an
+    unprefixed occurrence means exactly what it used to mean.
+    """
     text = item.get("excerpt") or item.get("description", "")
-    kind = item.get("evidence_kind")
-    return f"[{kind}] {text}" if kind in _NOT_CODE else text
+    tags = []
+    if item.get("evidence_kind") in _NOT_CODE:
+        tags.append(f"[{item['evidence_kind']}]")
+    if item.get("in_test_code"):
+        tags.append("[test]")
+    return f"{''.join(tags)} {text}" if tags else text
 
 
 # Findings that are not algorithms. Signing commands are counted in the document

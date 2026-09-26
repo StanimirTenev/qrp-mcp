@@ -1,7 +1,7 @@
 {
   "name": "qrp",
   "description": "A local cryptographic inventory for developers and AI agents that carries verifiable coverage and its own limits inside the CBOM.",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "author": {
     "name": "Stanimir Tenev",
     "url": "https://quantumreadiness.eu"

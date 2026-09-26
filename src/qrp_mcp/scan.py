@@ -114,6 +114,19 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
         # tool spends its time finding in others.
         "files_left_out": scan_result.get("files_left_out", []),
         "files_skipped_by_type": scan_result["files_skipped_by_type"],
+        # Test code is counted apart and never dropped: the rule travels with the
+        # numbers it produced. Three outputs leave this tool and a field added to one
+        # of them reaches nobody -- that cost a whole report on 2026-09-21.
+        #
+        # ⚠️ `counted: false` rather than two zeros when the result did not come from
+        # `scan_repo`. A zero nobody counted is the same defect as a coverage figure
+        # with no denominator: "none here" and "not measured" are different facts and
+        # this tool exists to keep them apart.
+        "test_code": scan_result.get("test_code", {
+            "rule": detectors.TEST_PATH_RULE,
+            "meaning": "whether the finding sits in test code; named, not excluded",
+            "counted": False,
+        }),
         "named_but_not_used": scan_result["named_but_not_used"],
         "unreadable_files": scan_result["unreadable_files"],
         "symlinks_not_followed": scan_result["symlinks_not_followed"],
