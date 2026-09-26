@@ -170,12 +170,36 @@ def _occurrences(located: list[dict[str, Any]], family: str,
             "location": item["path"],
             "line": item["line"],
             # The matched line when the scan kept it (a 'trimmed' scan does not),
-            # otherwise what the rule looks for.
-            "additionalContext": item.get("excerpt") or item.get("description", ""),
+            # otherwise what the rule looks for -- prefixed with the kind of evidence
+            # when it is not code.
+            "additionalContext": _context(item),
         }
         for item in located
         if family_of.get(item.get("algorithm"), item.get("algorithm")) == family
     ]
+
+
+# Evidence kinds that are NOT the code doing the thing. `scan_repo` already grades
+# every match and keeps these out of the inventory; the exported document dropped the
+# grade, so a sentence about certificates arrived at an auditor looking exactly like a
+# signature. Measured on certbot 2026-09-26: 78 of 389 source findings (20%) are
+# comment evidence, and all 78 travelled unmarked.
+#
+# The schema has no field for it, so it is named in `additionalContext` for the same
+# reason classification and the PQC family travel as properties: named, not silently
+# dropped. A reader who filters on `[comment]` gets the inventory the scan itself used.
+#
+# ⚠️ `ban` is deliberately NOT here. A banned algorithm never becomes a component at
+# all -- `!RC4` in a cipher list is excluded upstream, not marked downstream -- so a
+# branch for it would be a line that can never run. Measured, not assumed: a fixture
+# whose only mention of RC4 is `!RC4` produces no RC4 component.
+_NOT_CODE = {"comment"}
+
+
+def _context(item: dict[str, Any]) -> str:
+    text = item.get("excerpt") or item.get("description", "")
+    kind = item.get("evidence_kind")
+    return f"[{kind}] {text}" if kind in _NOT_CODE else text
 
 
 # Findings that are not algorithms. Signing commands are counted in the document

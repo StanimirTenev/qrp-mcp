@@ -354,3 +354,67 @@ def test_an_unpinned_tool_is_unestablished_however_it_was_installed(scan):
     result = coverage.compare(block, json.loads(json.dumps(block)))
     assert result["verdict"] == "unestablished"
     assert any(u["reason"] == "instrument_unpinned" for u in result["unestablished"])
+
+
+def test_an_occurrence_says_whether_its_evidence_is_a_comment(tmp_path):
+    """The CBOM is the document that leaves the machine; it dropped the distinction.
+
+    `scan_repo` grades every match with an `evidence_kind` -- call, declaration,
+    import, reference, ban, comment -- and keeps comment evidence out of the
+    inventory, for a measured reason: the nearest rival strips comments before
+    matching and scored 0.542 precision against this scanner's 0.93.
+
+    Measured on certbot 2026-09-26: **78 of 389 source findings (20%) are comment
+    evidence**, and every one of them reached the exported CBOM as an occurrence
+    indistinguishable from a call. An auditor reading the document could not tell
+    that `ocsp.py:220` is a sentence about certificates rather than a signature.
+
+    The schema has no field for it, so it is named in `additionalContext` -- the
+    same answer this module already gives for classification and the PQC family:
+    named, not silently dropped.
+    """
+    src = tmp_path / "svc.py"
+    src.write_text(
+        "from cryptography.hazmat.primitives.asymmetric import ec\n"
+        "\n"
+        "def sign(key, msg):\n"
+        "    # always present for RSA and ECDSA certificates\n"
+        "    return key.sign(msg, ec.ECDSA(hashes.SHA256()))\n",
+        encoding="utf-8")
+    from qrp_mcp.server import export_cbom
+    cbom = export_cbom(str(tmp_path), level="full")
+    occurrences = [
+        occurrence
+        for component in cbom["components"]
+        for occurrence in (component.get("evidence", {}) or {}).get("occurrences", []) or []
+    ]
+    assert occurrences, "the fixture must produce occurrences at all"
+    comment_lines = [o for o in occurrences if o["line"] == 4]
+    assert comment_lines, "the comment line is an occurrence of ECDSA"
+    for occurrence in comment_lines:
+        assert occurrence["additionalContext"].startswith("[comment]"), (
+            "an occurrence whose only evidence is a comment must say so in the "
+            f"document that leaves the machine, got: {occurrence['additionalContext']!r}")
+    code_lines = [o for o in occurrences if o["line"] == 5]
+    for occurrence in code_lines:
+        assert not occurrence["additionalContext"].startswith("[comment]"), (
+            "a call is not a comment")
+
+
+def test_a_banned_algorithm_never_becomes_a_component_at_all(tmp_path):
+    """Not marked downstream -- excluded upstream. Written after the opposite failed.
+
+    The first version of this test expected `!RC4` to arrive marked `[ban]`, the way a
+    comment arrives marked `[comment]`. It does not: a banned algorithm never becomes a
+    component, which is stronger and is what the document should say. So `ban` is not in
+    `_NOT_CODE`, because a branch for it could never run.
+    """
+    conf = tmp_path / "ssl.conf"
+    conf.write_text('SSLCipherSuite ECDHE-RSA-AES256-GCM-SHA384:!aNULL:!RC4:!3DES\n',
+                    encoding="utf-8")
+    from qrp_mcp.server import export_cbom
+    cbom = export_cbom(str(tmp_path), level="full")
+    names = {component.get("name") for component in cbom["components"]}
+    assert "RC4" not in names and "3DES" not in names, (
+        f"a forbidden algorithm is not an asset, got: {sorted(n for n in names if n)}")
+    assert {"RSA", "ECDH"} <= names, "what the line ENABLES is still inventory"
