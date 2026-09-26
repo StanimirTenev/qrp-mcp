@@ -458,3 +458,66 @@ def test_the_test_code_marker_reaches_every_path_that_leaves_the_tool(tmp_path):
                 f"{path} -> {context!r}")
         else:
             assert "[test]" not in context, f"{path} is not test code: {context!r}"
+
+
+def test_a_component_seen_only_in_test_code_carries_the_standard_scope(tmp_path):
+    """The schema has had the field since 1.6, and we invented our own instead.
+
+    `component.scope` enumerates required / optional / excluded, and 1.6 defines the
+    third verbatim: "Components that are excluded provide the ability to document
+    component usage for test and other non-runtime purposes." It is identical in 1.7
+    and 2.0-dev. v0.18.0 shipped `[test]` in `additionalContext` and set no scope at
+    all — a private spelling of a standard field, which is the thing this project
+    criticises other tools for.
+
+    `scope` is per component and the marker is per occurrence, so they say different
+    things and both stay: a family seen ONLY in fixtures is `excluded`; one seen
+    anywhere in production keeps the schema default, `required`.
+    """
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "app.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+        "key = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n",
+        encoding="utf-8")
+    (tmp_path / "tests" / "test_app.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import ec\n"
+        "FIXTURE = ec.generate_private_key(ec.SECP384R1())\n",
+        encoding="utf-8")
+    from qrp_mcp.server import export_cbom
+    cbom = export_cbom(str(tmp_path), level="full")
+    scopes = {c.get("name"): c.get("scope") for c in cbom["components"]}
+    ec_like = [name for name in scopes if name and name.startswith("EC")]
+    assert ec_like, f"the fixture's EC family must be a component: {sorted(scopes)}"
+    for name in ec_like:
+        assert scopes[name] == "excluded", (
+            f"{name} occurs only under tests/ and must carry the standard scope, "
+            f"got {scopes[name]!r}")
+    assert scopes.get("RSA") in (None, "required"), (
+        f"RSA runs in production and must not be excluded, got {scopes.get('RSA')!r}")
+
+
+def test_a_family_used_in_both_places_is_not_excluded(tmp_path):
+    """Mutation caught this: `all` -> `any` broke nothing, because the first fixture
+    had no family living in both places.
+
+    Measured on certbot the same day: **not one of its 31 components** is confined to
+    test code — every family that appears in a fixture also runs in production. So the
+    mixed case is the normal case on real repositories, and getting it wrong would mark
+    a production algorithm as non-runtime in the document an auditor reads.
+    """
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "app.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+        "key = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n",
+        encoding="utf-8")
+    (tmp_path / "tests" / "test_app.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+        "FIXTURE = rsa.generate_private_key(public_exponent=65537, key_size=1024)\n",
+        encoding="utf-8")
+    from qrp_mcp.server import export_cbom
+    cbom = export_cbom(str(tmp_path), level="full")
+    rsa_scope = {c.get("scope") for c in cbom["components"] if c.get("name") == "RSA"}
+    assert rsa_scope, "RSA must be a component in this fixture"
+    assert rsa_scope <= {None, "required"}, (
+        f"RSA runs in production here and is only ALSO in a fixture; marking it "
+        f"non-runtime would mislead, got {rsa_scope}")

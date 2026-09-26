@@ -179,6 +179,30 @@ def _occurrences(located: list[dict[str, Any]], family: str,
     ]
 
 
+def _scope(located: list[dict[str, Any]], family: str,
+           family_of: dict[str, str]) -> str | None:
+    """`excluded` when every sighting of this family is test code, otherwise nothing.
+
+    The schema has carried this since 1.6 and says it verbatim: "Components that are
+    excluded provide the ability to document component usage for test and other
+    non-runtime purposes." Identical in 1.7 and 2.0-dev.
+
+    ⚠️ v0.18.0 shipped `[test]` in `additionalContext` and set no scope at all -- a
+    private spelling of a standard field, which is the thing this project criticises
+    other tools for. The marker stays, because the two say different things: `scope` is
+    a property of the component, the marker is a property of one sighting, and a family
+    that runs in production and also appears in a fixture needs both facts.
+    
+    Nothing is emitted for the mixed case: the schema's default is already `required`,
+    and writing it out would claim a judgement where the default carries it.
+    """
+    mine = [item for item in located
+            if family_of.get(item.get("algorithm"), item.get("algorithm")) == family]
+    if not mine:
+        return None
+    return "excluded" if all(item.get("in_test_code") for item in mine) else None
+
+
 # Evidence kinds that are NOT the code doing the thing. `scan_repo` already grades
 # every match and keeps these out of the inventory; the exported document dropped the
 # grade, so a sentence about certificates arrived at an auditor looking exactly like a
@@ -293,6 +317,11 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         occurrences = _occurrences(located, family, family_of)
         if occurrences:
             component["evidence"] = {"occurrences": occurrences}
+        # ⚠️ NOT `scope` -- this function already binds that name to the coverage
+        # block, and shadowing it made `scope["files_not_examined"]` read None.
+        component_scope = _scope(located, family, family_of)
+        if component_scope:
+            component["scope"] = component_scope
         components.append(component)
 
     keys = scan_result["evidence"]["embedded_keys"]

@@ -331,6 +331,17 @@ rule it used:
 }
 ```
 
+Components whose every sighting is test code also carry the **standard** field —
+`component.scope: "excluded"`, which the schema has defined since 1.6 as documenting
+"component usage for test and other non-runtime purposes". ⚠️ v0.18.0 shipped the per-occurrence
+marker and no scope at all, which was a private spelling of a field the standard already had.
+
+⚠️ And the honest measurement of that field: on certbot, **not one of the 31 components is
+confined to test code** — every family that appears in a fixture also runs in production. At
+component granularity `excluded` almost never fires on a real repository, which is exactly why
+the per-occurrence marker is not redundant: `scope` is a property of the component, `[test]` is
+a property of one sighting, and 144 of 445 findings need the second.
+
 Those are certbot's real numbers: **almost a third of its findings are in fixtures.**
 Nothing is dropped — a fixture's RSA key is real RSA. Whether it belongs in a particular
 migration plan is the reader's call, and they can only make it if the document says which
