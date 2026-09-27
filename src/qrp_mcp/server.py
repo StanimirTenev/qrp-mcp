@@ -14,7 +14,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import __version__, closure, coverage, cyclonedx
+from . import __version__, closure, coverage, cyclonedx, profiles
 from .classifier import known_algorithms
 from .scan import scan_directory
 
@@ -55,6 +55,20 @@ def scan_repo(
             )
         ),
     ] = "masked",
+    profile: Annotated[
+        Literal["nist", "us-cnsa2", "uk-ncsc", "au-ism", "ca-cccs", "de-bsi", "fr-anssi",
+                "nl-ncsc", "eu-eccg", "bg"],
+        Field(
+            description=(
+                "Whose rules each `replacement` follows. `nist` (the default) is FIPS "
+                "203/204/205. The others read one national document each and say whom it "
+                "addresses: us-cnsa2 (NSA, US National Security Systems), uk-ncsc, au-ism, "
+                "ca-cccs, de-bsi, fr-anssi, nl-ncsc, eu-eccg (EU product certification), bg "
+                "(no Bulgarian guidance found; EU roadmap dates). Detection is identical "
+                "under every profile."
+            )
+        ),
+    ] = "nist",
 ) -> dict[str, Any]:
     """Inventory the cryptography inside one local directory tree, file by file.
 
@@ -87,7 +101,7 @@ def scan_repo(
     call) and removes what nobody asked for. Pass `level="full"` when the line
     itself is the thing being examined.
     """
-    return _at_level(scan_directory(path), level)
+    return _at_level(scan_directory(path, profile=profile), level)
 
 
 @mcp.tool(annotations=_READ_ONLY)
@@ -328,6 +342,10 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
                         "itself, 'masked' its shape with everything but the algorithm "
                         "name starred out, 'trimmed' nothing. Files and line numbers "
                         "stay in all three. Default: " + ("masked" if cbom else "full"))
+    # The CBOM carries no replacement, so a profile would change nothing in it.
+    if not cbom:
+        p.add_argument("--profile", choices=profiles.names(), default="nist",
+                       help="whose rules each replacement follows (default: nist)")
     a = p.parse_args(argv)
     # A path or file name the console cannot encode must not fail the run after the
     # scan has finished.
@@ -345,7 +363,7 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
     # the scanned tree made a second run see one more file, quote the findings out
     # of its own output and produce a different corpus digest for an unchanged
     # tree. Excluding the same path every run keeps two runs comparable.
-    result = scan_directory(a.path, out_path)
+    result = scan_directory(a.path, out_path, getattr(a, "profile", "nist"))
     result = _at_level(result, a.level)
     if cbom:
         result = cyclonedx.build(result)
@@ -402,7 +420,7 @@ def closure_to_file(argv: list[str]) -> int:
 
 
 USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MCP clients run)
-       qrp-mcp scan PATH [--out FILE] [--level full|masked|trimmed]
+       qrp-mcp scan PATH [--out FILE] [--level full|masked|trimmed] [--profile NAME]
                                scan a directory and write the result as JSON
        qrp-mcp cbom PATH [--out FILE] [--level full|masked|trimmed]
                                scan a directory and write a CycloneDX 1.6 CBOM

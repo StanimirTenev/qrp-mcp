@@ -15,6 +15,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from . import profiles
+
 SOURCES = {
     "FIPS 203": ("ML-KEM, final, 13 August 2024", "https://csrc.nist.gov/pubs/fips/203/final"),
     "FIPS 204": ("ML-DSA, final, 13 August 2024", "https://csrc.nist.gov/pubs/fips/204/final"),
@@ -147,8 +149,39 @@ def _role_of_option(option: dict[str, Any]) -> str:
     return "key_establishment" if option["for"].startswith("key establishment") else "signature"
 
 
+def _profile_block(profile: str) -> dict[str, Any]:
+    p = profiles.PROFILES[profile]
+    block = {"name": profile, "authority": p["authority"], "addresses": p["addresses"],
+             "hybrid": p["hybrid"], "source": profiles.source(profile)}
+    for key in ("dates", "symmetric", "absent"):
+        if p.get(key):
+            block[key] = p[key]
+    return block
+
+
+def _profile_options(profile: str, options: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The same roles, in the authority's words. A role the authority does not fill
+    (ASD names no hash-based signature) is left out, not filled with NIST's answer.
+    An authority with no algorithms of its own (Bulgaria) keeps NIST's options."""
+    p = profiles.PROFILES[profile]
+    if p["key_establishment"] is None and p["signatures"] is None:
+        return options
+    out = []
+    for option in options:
+        if option["for"].startswith("key establishment"):
+            use = p["key_establishment"]
+        elif option["for"].startswith("signatures"):
+            use = p["signatures"]
+        else:
+            use = p["firmware"]
+        if use:
+            out.append({"use": use, "for": option["for"], "sources": [profiles.source(profile)]})
+    return out
+
+
 def suggest(finding: dict[str, Any],
-            roles: dict[str, int] | None = None) -> dict[str, Any] | None:
+            roles: dict[str, int] | None = None,
+            profile: str = "nist") -> dict[str, Any] | None:
     """A replacement for one classified finding, or None where none is due.
 
     Post-quantum and quantum-resistant findings get nothing: suggesting a replacement
@@ -157,13 +190,19 @@ def suggest(finding: dict[str, Any],
     `roles` counts the roles read from the lines of an RSA or EC finding (code only,
     not comments). A path is dropped only when no line showed that role and no line
     was undetermined; otherwise it stays, with how many lines it is for.
+
+    `profile` names whose rules to follow (see `profiles`); the default is NIST.
     """
+    if profile != "nist" and profile not in profiles.PROFILES:
+        raise ValueError(f"unknown profile {profile!r}; known: {', '.join(profiles.names())}")
     cls = finding.get("classification")
     fam = finding.get("algorithm_family")
     if cls == "classical_vulnerable" and fam in _BY_FAMILY:
         row = _BY_FAMILY[fam]
         options = [{"use": o["use"], "for": o["for"], "sources": _cite(o["standards"])}
                    for o in row["options"]]
+        if profile != "nist" and options:
+            options = _profile_options(profile, options)
         note = row["note"]
         if fam in ROLE_FAMILIES and roles:
             undetermined = roles.get("undetermined", 0)
@@ -190,6 +229,10 @@ def suggest(finding: dict[str, Any],
         if fam == "RSA" and finding.get("weak_key"):
             out["note"] = _WEAK_RSA + " " + out["note"]
             out["sources_first_step"] = _cite(["SP 800-131A r2"])
+        if profile != "nist":
+            out["profile"] = _profile_block(profile)
+            out["note"] = out["note"].replace(
+                _HYBRID, "Hybrid, under this profile: " + profiles.PROFILES[profile]["hybrid"])
         return out
     if cls == "deprecated_weak":
         if finding.get("pqc_family"):
@@ -198,10 +241,15 @@ def suggest(finding: dict[str, Any],
             row = _WEAK[fam]
         else:
             return None
-        return {"kind": "suggestion, not applied",
-                "options": [{"use": row["use"], "for": "replacement",
-                             "sources": _cite(row["standards"])}],
-                "note": row["note"]}
+        out = {"kind": "suggestion, not applied",
+               "options": [{"use": row["use"], "for": "replacement",
+                            "sources": _cite(row["standards"])}],
+               "note": row["note"]}
+        if profile != "nist":
+            # The weak-algorithm rows are NIST's under every profile; where the
+            # authority sets its own symmetric minimum, it travels beside them.
+            out["profile"] = _profile_block(profile)
+        return out
     return None
 
 

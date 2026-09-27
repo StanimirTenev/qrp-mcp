@@ -8,7 +8,7 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import __version__, certificates, coverage, detectors, remediation
+from . import __version__, certificates, coverage, detectors, profiles, remediation
 from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint
 
 
@@ -33,11 +33,14 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, Any]:
+def scan_directory(path: str | Path, exclude: Path | None = None,
+                   profile: str = "nist") -> dict[str, Any]:
     """Scan a directory for classical crypto usage and classify what was found.
 
     Everything runs locally: no network calls, no data leaves the machine.
     """
+    if profile not in profiles.names():
+        raise ValueError(f"unknown profile {profile!r}; known: {', '.join(profiles.names())}")
     repo_path = Path(path).expanduser().resolve()
     if not repo_path.is_dir():
         raise NotADirectoryError(f"not a directory: {repo_path}")
@@ -143,7 +146,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
         "algorithm_key_sizes_observed": scan_result.get("algorithm_key_sizes_observed", {}),
         # A replacement travels with the finding it is for, and only where one is due;
         # a suggestion, never an action.
-        "findings": [_with_replacement(f.model_dump(), roles) for f in response.findings],
+        "findings": [_with_replacement(f.model_dump(), roles, profile) for f in response.findings],
+        # Whose rules the replacements follow; NIST unless asked.
+        "replacement_profile": profile,
         "summary": response.summary.model_dump(),
         "evidence": {
             "source_code": scan_result["source_code_findings"],
@@ -179,8 +184,10 @@ def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:
 
 
 def _with_replacement(finding: dict[str, Any],
-                      roles: dict[str, dict[str, int]] | None = None) -> dict[str, Any]:
-    suggestion = remediation.suggest(finding, (roles or {}).get(finding.get("algorithm_family")))
+                      roles: dict[str, dict[str, int]] | None = None,
+                      profile: str = "nist") -> dict[str, Any]:
+    suggestion = remediation.suggest(finding, (roles or {}).get(finding.get("algorithm_family")),
+                                     profile)
     if suggestion is not None:
         finding["replacement"] = suggestion
     return finding

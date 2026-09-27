@@ -438,6 +438,37 @@ strength, disallowed after 2035. Hybrids are named as NIST names them — accomm
 temporary. The CBOM is not changed: CycloneDX has no standard field for a recommendation, and
 this project does not add a private one.
 
+### Whose rules: national profiles
+
+The table above is NIST's. Other authorities disagree with it and with each other, so from
+0.22.0 `--profile` (`qrp-mcp scan`) and `profile` (the `scan_repo` tool) choose whose words fill
+the options. The CBOM carries no replacement, so it has no profile. Detection is byte-for-byte the same under every
+profile; only `replacement` changes, and the result names the profile in `replacement_profile`.
+
+| profile | authority · document | key establishment | signatures | hybrid |
+| --- | --- | --- | --- | --- |
+| `nist` (default) | NIST · FIPS 203/204/205 | ML-KEM | ML-DSA, SLH-DSA; LMS/XMSS for firmware | accommodated, temporary |
+| `us-cnsa2` | NSA · CNSA 2.0 FAQ v2.1 (Dec 2024), CNSSP 15 | ML-KEM-1024 only | ML-DSA-87 only; SLH-DSA not approved; LMS/XMSS single-tree | not required |
+| `uk-ncsc` | NCSC · Next steps v2.0 (Aug 2024) | ML-KEM-768 recommended | ML-DSA-65 recommended | allowed, at a cost |
+| `au-ism` | ASD · ISM (Sep 2026) | ML-KEM-1024; 768 not beyond 2030 | ML-DSA-87; 65 not beyond 2030; no hash-based | not recommended, not prohibited |
+| `ca-cccs` | CCCS · ITSP.40.111 v5 (May 2026) | ML-KEM-512/768/1024 | ML-DSA-44/65/87, SLH-DSA; LMS/HSS/XMSS/XMSS^MT | not addressed |
+| `de-bsi` | BSI · TR-02102-1 (2026-01) | ML-KEM-768/1024, **hybrid** | ML-DSA-65/87 hedged, **hybrid**; hash-based alone | lattice schemes recommended only in hybrid form |
+| `fr-anssi` | ANSSI · PG-083 v3.00 (Mar 2026) | ML-KEM-768 (512 conformant), **hybrid** | ML-DSA **hybrid** only; SLH-DSA alone | required for ML-KEM, ML-DSA |
+| `nl-ncsc` | AIVD/CWI/TNO · PQC Migration Handbook, 2nd ed. (Dec 2024) | ML-KEM-1024/768 | ML-DSA-87/65 | recommended |
+| `eu-eccg` | ECCG · Agreed Cryptographic Mechanisms v2.0 (Apr 2025) | ML-KEM-1024/768, combined | ML-DSA-87/65 combined; hash-based alone | lattice not standalone |
+| `bg` | — · no Bulgarian guidance found | NIST's | NIST's | EU roadmap: end-2026 / 2030 / 2035 |
+
+⚠️ **What a profile is not.** Each is one document read on 2026-09-27, and each says whom that
+document addresses — CNSA 2.0 is written for US National Security Systems, the ECCG list for EU
+product certification, the NCSC paper for OFFICIAL-tier and enterprise data. Choosing one does
+not make it law for the reader, and the tool makes no legal finding. The weak-algorithm rows
+(MD5, SHA-1, RC4, DES, 3DES) and the first step for an RSA key under 2048 bits are NIST's under
+every profile; where an authority sets its own symmetric minimum (CNSA 2.0: AES-256, SHA-384/512)
+it travels beside them in `profile.symmetric`. A role an authority does not fill is left out
+rather than filled with NIST's answer: the ISM names no hash-based signature, so `au-ism` offers
+none. Documents change — the ISM quarterly, TR-02102-1 yearly — and each profile carries its
+version and address so a stale one can be recognised.
+
 ### The role of an RSA or EC line
 
 From 0.21.0 every RSA and EC occurrence carries a `role`, read from its own line: `signature`
