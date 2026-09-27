@@ -48,6 +48,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
     scan_result = (detectors.scan_repo(repo_path, exclude) if exclude is not None
                    else detectors.scan_repo(repo_path))
     seconds, finished_at = time.monotonic() - clock, _now()
+    roles = _read_roles(scan_result)
 
     # Detected algorithms are passed as explicit algorithms so each one is classified.
     # (The gateway's ingest contract routes them through package_metadata instead, which
@@ -142,7 +143,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
         "algorithm_key_sizes_observed": scan_result.get("algorithm_key_sizes_observed", {}),
         # A replacement travels with the finding it is for, and only where one is due;
         # a suggestion, never an action.
-        "findings": [_with_replacement(f.model_dump()) for f in response.findings],
+        "findings": [_with_replacement(f.model_dump(), roles) for f in response.findings],
         "summary": response.summary.model_dump(),
         "evidence": {
             "source_code": scan_result["source_code_findings"],
@@ -158,8 +159,28 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
     }
 
 
-def _with_replacement(finding: dict[str, Any]) -> dict[str, Any]:
-    suggestion = remediation.suggest(finding)
+def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:
+    """Mark each RSA and EC occurrence with the role its line shows, and count them per
+    family. Read here, before any level masks the line, so masking never changes a role.
+    Comments carry a role but are not counted: what a comment says is not what the code does."""
+    counts: dict[str, dict[str, int]] = {}
+    for key in ("source_code_findings", "ci_pipeline_findings", "iac_findings",
+                "embedded_key_findings"):
+        for item in scan_result.get(key) or []:
+            role = remediation.role_of(item)
+            if role is None:
+                continue
+            item["role"] = role
+            if item.get("evidence_kind") != "comment":
+                fam = counts.setdefault(item["algorithm"], {
+                    "signature": 0, "key_establishment": 0, "undetermined": 0})
+                fam[role] += 1
+    return counts
+
+
+def _with_replacement(finding: dict[str, Any],
+                      roles: dict[str, dict[str, int]] | None = None) -> dict[str, Any]:
+    suggestion = remediation.suggest(finding, (roles or {}).get(finding.get("algorithm_family")))
     if suggestion is not None:
         finding["replacement"] = suggestion
     return finding

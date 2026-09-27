@@ -32,7 +32,9 @@ from .coverage import _pin_of
 _LOCATION_FIELDS = ("line",)
 # Kept out of identity and reported as its own transition: code moved into a test
 # directory has not been fixed, and it must not look as if it had.
-_CONTEXT_FIELDS = ("in_test_code",)
+# The role is an interpretation of the line, not the line: two readers that read the
+# same line the same way are looking at the same occurrence whatever they call its role.
+_CONTEXT_FIELDS = ("in_test_code", "role")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "
@@ -183,7 +185,7 @@ def _unread_paths(result: dict[str, Any]) -> tuple[set[str], list[str]]:
 
 def _brief(category: str, item: dict[str, Any]) -> dict[str, Any]:
     keep = ("path", "line", "algorithm", "type", "protocol", "version", "package",
-            "evidence_kind", "excerpt", "in_test_code")
+            "evidence_kind", "excerpt", "in_test_code", "role")
     return {"category": category, **{k: item[k] for k in keep if k in item}}
 
 

@@ -12,6 +12,7 @@ given and the reader chooses.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 SOURCES = {
@@ -96,26 +97,94 @@ _WEAK_RSA = ("Two steps. Now: at least 2048 bits (SP 800-131A r2 disallows len(n
              "signature generation). Then: a post-quantum replacement, below.")
 
 
+# The role of one RSA or EC occurrence, read from its own line. Everything else names
+# its role in its family (ECDSA signs, ECDH and X25519 agree keys), so only these two
+# are asked. A key generated or declared on a line is used somewhere else, and this
+# reads one line: such a line stays `undetermined` rather than being guessed from what
+# keys of that kind usually do. A line with signals for both roles is `undetermined` too.
+ROLE_FAMILIES = ("RSA", "EC")
+
+_SIGNATURE = re.compile(
+    r"(?<![a-z])sign(?!al)|(?<![a-z])verif|signature|rsassa|(?<![a-z])pss(?![a-z])"
+    r"|sha\d*with(rsa|ecdsa)|rsa-sha2|ssh-rsa|ecdsa|(?<![a-z0-9])[rpe]s(256|384|512)(?![0-9])"
+    r"|(?<![a-z])(ecdhe|dhe|edh)-rsa-|(?<![a-z])arsa(?![a-z])"
+    r"|1\.2\.840\.113549\.1\.1\.(5|10|11|12|13|14)(?![0-9])")
+_KEY_ESTABLISHMENT = re.compile(
+    r"oaep|rsaes|rsa1_5|(?<![a-z])(en|de)crypt|(?<![a-z])kex|ecdh(?!e-(rsa|ecdsa))"
+    r"|(?<![a-z])derive|key.?(agreement|exchange|transport)|tls_rsa_with|(?<![a-z])krsa(?![a-z])"
+    r"|1\.2\.840\.113549\.1\.1\.7(?![0-9])"
+    # An OpenSSL suite name with no key-exchange prefix (RC4-SHA, AES128-GCM-SHA256)
+    # is RSA key transport. Found in a cipher list the first draft called signature.
+    r"|(?<![a-z0-9_-])(aes\d*|camellia\d*|des-cbc3|rc4|seed|idea)-(gcm-)?(sha|md5)")
+# A cipher list longer than the quoted excerpt: the part that was cut can carry the
+# other role, so what the excerpt shows is not the whole line.
+_EXCERPT_LIMIT = 200
+_CIPHER_LIST = re.compile(r"[a-z0-9]+-[a-z0-9-]+:[a-z0-9]+-")
+
+
+def role_of(item: dict[str, Any]) -> str | None:
+    """`signature`, `key_establishment` or `undetermined` for an RSA or EC occurrence;
+    None for any other family, whose name already says its role."""
+    if item.get("algorithm") not in ROLE_FAMILIES:
+        return None
+    excerpt = str(item.get("excerpt") or "")
+    if len(excerpt) >= _EXCERPT_LIMIT and _CIPHER_LIST.search(excerpt.lower()):
+        return "undetermined"
+    text = f"{excerpt} {item.get('description') or ''}".lower()
+    sig, kex = bool(_SIGNATURE.search(text)), bool(_KEY_ESTABLISHMENT.search(text))
+    if sig and not kex:
+        return "signature"
+    if kex and not sig:
+        return "key_establishment"
+    return "undetermined"
+
+
 def _cite(names: list[str]) -> list[dict[str, str]]:
     return [{"standard": n, "what": SOURCES[n][0], "url": SOURCES[n][1]} for n in names]
 
 
-def suggest(finding: dict[str, Any]) -> dict[str, Any] | None:
+def _role_of_option(option: dict[str, Any]) -> str:
+    return "key_establishment" if option["for"].startswith("key establishment") else "signature"
+
+
+def suggest(finding: dict[str, Any],
+            roles: dict[str, int] | None = None) -> dict[str, Any] | None:
     """A replacement for one classified finding, or None where none is due.
 
     Post-quantum and quantum-resistant findings get nothing: suggesting a replacement
     for ML-KEM would be noise at best.
+
+    `roles` counts the roles read from the lines of an RSA or EC finding (code only,
+    not comments). A path is dropped only when no line showed that role and no line
+    was undetermined; otherwise it stays, with how many lines it is for.
     """
     cls = finding.get("classification")
     fam = finding.get("algorithm_family")
     if cls == "classical_vulnerable" and fam in _BY_FAMILY:
         row = _BY_FAMILY[fam]
+        options = [{"use": o["use"], "for": o["for"], "sources": _cite(o["standards"])}
+                   for o in row["options"]]
+        note = row["note"]
+        if fam in ROLE_FAMILIES and roles:
+            undetermined = roles.get("undetermined", 0)
+            kept = []
+            for option in options:
+                seen = roles.get(_role_of_option(option), 0)
+                if seen or undetermined:
+                    kept.append({**option, "lines_with_this_role": seen,
+                                 "lines_undetermined": undetermined})
+            options = kept
+            note = (f"Role read from each line of code: {roles.get('signature', 0)} signature, "
+                    f"{roles.get('key_establishment', 0)} key establishment, {undetermined} "
+                    f"undetermined -- a key generated or declared on a line is used elsewhere, "
+                    f"and one line cannot say how. " + _HYBRID)
         out = {
             "kind": "suggestion, not applied",
-            "options": [{"use": o["use"], "for": o["for"], "sources": _cite(o["standards"])}
-                        for o in row["options"]],
-            "note": row["note"],
+            "options": options,
+            "note": note,
         }
+        if fam in ROLE_FAMILIES and roles:
+            out["roles_seen"] = dict(roles)
         if not row["options"]:
             out["sources"] = _cite(row["standards"])
         if fam == "RSA" and finding.get("weak_key"):
