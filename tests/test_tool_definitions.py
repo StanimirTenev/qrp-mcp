@@ -72,3 +72,10 @@ def test_no_description_merely_restates_its_name():
         assert description
         assert description != name.replace("_", " ")
         assert description != name
+
+
+def test_prove_closure_is_read_only_and_names_its_boundary():
+    tool = tools()["prove_closure"]
+    a = tool.annotations
+    assert a.read_only_hint is True and a.destructive_hint is False and a.open_world_hint is False
+    assert "compare_coverage" in (tool.description or "")

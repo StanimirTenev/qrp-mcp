@@ -8,7 +8,7 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import __version__, certificates, coverage, detectors
+from . import __version__, certificates, coverage, detectors, remediation
 from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint
 
 
@@ -137,7 +137,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
         # nobody can see is a number nobody can check.
         "algorithm_key_sizes": scan_result.get("algorithm_key_sizes", {}),
         "algorithm_key_sizes_observed": scan_result.get("algorithm_key_sizes_observed", {}),
-        "findings": [f.model_dump() for f in response.findings],
+        # A replacement travels with the finding it is for, and only where one is due;
+        # a suggestion, never an action.
+        "findings": [_with_replacement(f.model_dump()) for f in response.findings],
         "summary": response.summary.model_dump(),
         "evidence": {
             "source_code": scan_result["source_code_findings"],
@@ -151,3 +153,11 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
             "dependencies": scan_result["dependency_findings"],
         },
     }
+
+
+def _with_replacement(finding: dict[str, Any]) -> dict[str, Any]:
+    suggestion = remediation.suggest(finding)
+    if suggestion is not None:
+        finding["replacement"] = suggestion
+    return finding
+

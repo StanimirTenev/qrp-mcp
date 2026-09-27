@@ -14,7 +14,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import __version__, coverage, cyclonedx
+from . import __version__, closure, coverage, cyclonedx
 from .classifier import known_algorithms
 from .scan import scan_directory
 
@@ -184,6 +184,48 @@ def compare_coverage(
     return coverage.compare(first, second)
 
 
+@mcp.tool(annotations=_READ_ONLY)
+def prove_closure(
+    before: Annotated[
+        str,
+        Field(description="Path to the JSON result of the scan made BEFORE the change "
+                          "(`qrp-mcp scan PATH --out FILE`)."),
+    ],
+    after: Annotated[
+        str,
+        Field(description="Path to the JSON result of the scan made AFTER the change, "
+                          "same tree, same instrument, same level."),
+    ],
+) -> dict[str, Any]:
+    """Say which findings a change actually closed, by comparing two saved scans of one tree.
+
+    First it decides whether the two runs can be compared for closure at all: the
+    same instrument commit, version, rules, file types and exclusions, both trees
+    pinned to a commit and clean, both results quoting lines at the same level. The
+    trees themselves may differ -- that difference is what is measured. If the runs
+    cannot be compared, nothing is reported as closed and the repair is named.
+
+    Only then does it match every occurrence without its line number: `closed`
+    (present before, absent from every file the second run read), still open (and
+    how many only moved lines), `relocated` to another path (renamed or moved, not
+    fixed), moved into or out of test code, `new`, and `unverifiable` (in a file the
+    second run did not read). A file the second run could not open is never counted
+    as fixed.
+
+    Use it after a fix, to evidence the fix. Do not use it to compare coverage
+    figures between two estates -- `compare_coverage` answers that. It reads two
+    local files and nothing else.
+    """
+    return closure.prove_closure(_load_result(before), _load_result(after))
+
+
+def _load_result(path: str) -> dict[str, Any]:
+    p = Path(path).expanduser()
+    if not p.is_file():
+        raise FileNotFoundError(f"no scan result at {p}")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
 def _strip_excerpts(result: dict[str, Any]) -> dict[str, Any]:
     """The 'trimmed' level: every occurrence keeps its file and line, but not the
     line of code itself."""
@@ -250,6 +292,9 @@ def _at_level(result: dict[str, Any], level: str) -> dict[str, Any]:
     So the levels live here, and both paths ask this function rather than spelling
     the rule out again. A second spelling is how the two drift apart.
     """
+    # Said in the result, so a later comparison can tell a masked line from a real
+    # one; two results quoting at different levels are not the same text.
+    result["excerpt_level"] = level
     if level == "trimmed":
         return _strip_excerpts(result)
     if level == "masked":

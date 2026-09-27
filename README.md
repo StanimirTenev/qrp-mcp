@@ -83,6 +83,7 @@ so anyone you send the file to can quote back exactly what they received.
 | `scan_repo(path)` | Scans a directory's source, CI/CD configs and infrastructure-as-code; returns findings, a summary, and the coverage block below |
 | `export_cbom(path)` | The same reading as a CycloneDX 1.6 CBOM, with the coverage block inside it |
 | `compare_coverage(a, b)` | Whether two scans produced numbers that can be compared at all |
+| `prove_closure(before, after)` | Which findings a change actually closed, from two saved scans of one tree — only if the two runs can be compared for it |
 | `list_algorithms()` | The algorithm families the server recognises and how each is classified |
 
 ## What it looks at
@@ -354,6 +355,65 @@ cryben corpus of Näther & Hirsch — are 100% synthetic fixtures with no test/p
 distinction. The rule here is a path convention, not a fact, so it is printed with the
 numbers it produced; a reader who disagrees with the rule can see exactly what it caught.
 
+## Whether a fix closed it
+
+A finding missing from the second scan has not necessarily been fixed. It may have moved down
+the file, moved to another file, landed in a directory the second run could not open, or
+stopped matching because the scanner changed. Each of those looks exactly like a fix when the
+only question is "is it still in the list".
+
+`prove_closure(before, after)` takes two saved results (`qrp-mcp scan PATH --out FILE`) and
+answers in two steps:
+
+1. **Can these two runs be compared for closure?** Same instrument commit, version, rules, file
+   types and exclusions; both trees pinned to a commit and clean; both results quoting lines at
+   the same level. Run from an installed release (`uvx qrp-mcp`, `pip install`) there is no
+   commit to name; two runs of the **same installed release** are accepted on its version, and
+   the result says so in `basis` — weaker than a commit, since a locally modified install would
+   carry the same version string. The trees may differ — that is what is measured. If the runs cannot be
+   compared, **nothing is reported as closed**, the reasons are listed, and the repair is named:
+   scan the first commit again with the instrument that did the second.
+2. **Only then, occurrence by occurrence, without line numbers:** `closed`, still open (and how
+   many only moved lines), `relocated` to another path (a rename is not a fix), moved into or
+   out of test code (neither is a fix), `new`, and `unverifiable` — in a file the second run did
+   not read. A file the second run could not open is never counted as fixed.
+
+Checked on a copy of certbot (521 occurrences): removing one RSA call closed exactly that one;
+inserting blank lines closed none and reported two moved; renaming a file closed none and
+reported two relocated; a masked scan against a full one was refused. Two scans of OpenSSH
+with the same instrument: 7,143 still open, 0 closed. A second run with an emitter that had
+uncommitted changes was refused as `instrument_dirty`.
+
+⚠️ What is not claimed: that the fix is correct, only that the occurrence is gone from every
+file the second run read. Other scanners mark a finding fixed when a later scan stops seeing
+it; what was not found in the ones read for this (Semgrep, SonarQube, GitHub code scanning,
+qscan, CBOMkit) is a check, **before** calling anything fixed, that the reader did not change
+between the two scans — SonarQube documents that a file dropped from scope is counted as fixed.
+That is a statement about the sources read on 2026-09-27, not a survey of every tool.
+
+## What to replace it with
+
+Each finding that is quantum-vulnerable or deprecated carries a `replacement`: what to use,
+for which role, and the standard that says so, with its address. It is a suggestion; nothing is
+applied, nothing leaves the machine, no model is asked.
+
+| Found | Suggested | Source |
+| --- | --- | --- |
+| ECDH, X25519, X448, DH | ML-KEM | FIPS 203 (final, 13 Aug 2024) |
+| ECDSA, EdDSA, Ed25519, Ed448, DSA | ML-DSA or SLH-DSA; LMS/XMSS for firmware signing | FIPS 204, FIPS 205, SP 800-208 |
+| RSA, EC (role not visible in the code) | both of the above — the role decides | as above |
+| RSA below 2048 bits | two steps: ≥ 2048 now, post-quantum next | SP 800-131A Rev. 2 |
+| BLS, Schnorr | **no approved drop-in replacement** — the aggregation property has none; a redesign | FIPS 204/205 as the nearest |
+| MD5, SHA-1 | SHA-256 or SHA3-256 | RFC 6151, SP 800-131A Rev. 2 |
+| RC4, DES, 3DES | AES (AES-GCM for RC4's place) | RFC 7465, FIPS 46-3 (withdrawn), SP 800-131A Rev. 2 |
+| a post-quantum scheme that is not a NIST standard | a standardised one | FIPS 203/204/205 |
+
+Transition dates come from NIST IR 8547, which is still an **initial public draft** (12 Nov
+2024): quantum-vulnerable signatures and key establishment deprecated after 2030 at 112-bit
+strength, disallowed after 2035. Hybrids are named as NIST names them — accommodated, and
+temporary. The CBOM is not changed: CycloneDX has no standard field for a recommendation, and
+this project does not add a private one.
+
 ## Measured against the other scanners
 
 In September 2026 three free tools that do the same job — CryptoScan, CBOMkit-hyperion
@@ -588,9 +648,9 @@ from one that read seven out of four hundred, and only one of them is worth trus
 A **free inventory tool**, not a readiness assessment. It deliberately does not do:
 
 - risk scoring or prioritisation,
-- migration planning,
+- migration planning — a `replacement` names what a finding becomes, not when or in what order,
 - network or host scanning, or reading a system certificate store,
-- tracking change over time.
+- tracking change over time — `prove_closure` compares two scans you give it; nothing keeps a history.
 
 Those live in the [Quantum Readiness Platform](https://quantumreadiness.eu), the product this
 tool is extracted from. Nothing here is crippled to push you there — what it does, it does
