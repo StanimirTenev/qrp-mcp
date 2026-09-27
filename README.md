@@ -425,7 +425,7 @@ applied, nothing leaves the machine, no model is asked.
 | --- | --- | --- |
 | ECDH, X25519, X448, DH | ML-KEM | FIPS 203 (final, 13 Aug 2024) |
 | ECDSA, EdDSA, Ed25519, Ed448, DSA | ML-DSA or SLH-DSA; LMS/XMSS for firmware signing | FIPS 204, FIPS 205, SP 800-208 |
-| RSA, EC (role not visible in the code) | both of the above — the role decides | as above |
+| RSA, EC | by the role read from each line (below); both where a line does not show it | as above |
 | RSA below 2048 bits | two steps: ≥ 2048 now, post-quantum next | SP 800-131A Rev. 2 |
 | BLS, Schnorr | **no approved drop-in replacement** — the aggregation property has none; a redesign | FIPS 204/205 as the nearest |
 | MD5, SHA-1 | SHA-256 or SHA3-256 | RFC 6151, SP 800-131A Rev. 2 |
@@ -437,6 +437,36 @@ Transition dates come from NIST IR 8547, which is still an **initial public draf
 strength, disallowed after 2035. Hybrids are named as NIST names them — accommodated, and
 temporary. The CBOM is not changed: CycloneDX has no standard field for a recommendation, and
 this project does not add a private one.
+
+### The role of an RSA or EC line
+
+From 0.21.0 every RSA and EC occurrence carries a `role`, read from its own line: `signature`
+(`RS256`, `rsa-sha2-256`, `SignPSS`, `sha256WithRSAEncryption`, `ECDHE-RSA-…` in a cipher list),
+`key_establishment` (OAEP, `EncryptPKCS1v15`, `TLS_RSA_WITH_…`, a `kex` table) or
+`undetermined`. A key generated or declared on a line is used somewhere else, and this reads one
+line, so such a line stays `undetermined`; so does a line with signals for both, and a cipher list
+longer than the 200-character excerpt. The finding's `replacement` counts the roles of its lines
+of code (comments carry a role but are not counted) in `roles_seen`, and drops a path only when
+no line showed that role **and** no line was undetermined. Every path says how many lines it is for.
+
+⚠️ **Against this:** on every corpus measured, both paths stayed. Undetermined lines of code:
+certbot 208 of 229, OpenSSH 172 of 456, Vault 361 of 656, OpenSSL 3,354 of 3,893. The count is
+the gain, not a shorter list.
+
+**Role-assignment precision on a sample** (not detection; judged from the source ±5 lines, not
+from the excerpt the rule saw; rules frozen at `3287c1c` before these corpora were opened; seed
+20260927):
+
+| corpus | `signature` correct | `key_establishment` correct | `undetermined` with the role visible nearby |
+| --- | --- | --- | --- |
+| Vault `41e571b` | 30 / 30 | 17 / 20 | 5 / 20 |
+| OpenSSL `223e04f` | 25 / 30 (5 should have been undetermined) | 14 / 20 | 4 / 20 |
+| Bitcoin Core `33a363e` | none to sample | none to sample | 0 / 8 |
+
+The nine wrong `key_establishment` lines have two causes, both in TLS names: `TLS_ECDHE_RSA_WITH_…`
+written with underscores is read as ECDH, and in `ECDH_RSA` suites RSA only signs the certificate
+of a fixed ECDH key. Both are known and not fixed in 0.21.0; the fix will be measured on a corpus
+these rules were not written against.
 
 ## Measured against the other scanners
 

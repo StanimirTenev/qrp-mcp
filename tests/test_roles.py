@@ -118,7 +118,20 @@ def test_the_role_stays_out_of_the_cbom(tmp_path):
     (tmp_path / "a.py").write_text("jwt.encode(p, k, algorithm='RS256')\n")
     r = subprocess.run([sys.executable, "-m", "qrp_mcp.server", "cbom", str(tmp_path)],
                        check=True, capture_output=True, text=True)
-    assert '"role"' not in r.stdout
+    keys = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            keys.extend(node)
+            if str(node.get("name", "")).startswith("qrp:"):
+                keys.append(node["name"])
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(json.loads(r.stdout))
+    assert keys and not [k for k in keys if "role" in k.lower()]
 
 
 def test_the_role_is_not_part_of_closure_identity():
@@ -126,3 +139,10 @@ def test_the_role_is_not_part_of_closure_identity():
     a = {"path": "a.py", "line": 1, "algorithm": "RSA", "excerpt": "x", "role": "signature"}
     b = {**a, "role": "undetermined"}
     assert _identity("source_code", a) == _identity("source_code", b)
+
+
+def test_the_mcp_tool_carries_the_role(tmp_path):
+    from qrp_mcp.server import scan_repo
+    (tmp_path / "a.py").write_text("jwt.encode(p, k, algorithm='RS256')\n")
+    d = scan_repo(str(tmp_path))
+    assert [o["role"] for o in d["evidence"]["source_code"] if o["algorithm"] == "RSA"] == ["signature"]
