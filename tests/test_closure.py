@@ -26,6 +26,8 @@ def _result(items, commit="aaa", **over):
         "files_left_out": [],
         "unreadable_directories": [],
         "symlinks_not_followed": [],
+        # a.py is the file every test edits; it is still there unless a test says not.
+        "files_read": sorted({"a.py"} | {i["path"] for i in items}),
     }
     r.update(over)
     return r
@@ -220,3 +222,32 @@ def test_installed_against_checkout_is_unestablished():
     before = _installed(_result([_rsa()]))
     after = _result([], commit="bbb")
     assert closure.prove_closure(before, after)["comparability"]["verdict"] == "unestablished"
+
+
+def test_deleted_file_is_removed_not_closed():
+    before = _result([_rsa(path="a.py"), _rsa(path="old.py", excerpt="z = rsa.y()")])
+    after = _result([_rsa(path="a.py")], commit="bbb")
+    out = closure.prove_closure(before, after)
+    c = out["closure"]
+    assert c["closed"] == []
+    assert [r["path"] for r in c["removed"]] == ["old.py"]
+    assert c["removed"][0]["why"] == "the file is not in the second tree"
+    assert "0 occurrence(s) closed, 1 removed with their file" in out["statement"]
+
+
+def test_fixed_line_in_a_file_that_is_still_there_is_closed_not_removed():
+    before = _result([_rsa(path="a.py"), _rsa(path="b.py", excerpt="z = rsa.y()")])
+    after = _result([_rsa(path="a.py")], commit="bbb", files_read=["a.py", "b.py"])
+    c = closure.prove_closure(before, after)["closure"]
+    assert [r["path"] for r in c["closed"]] == ["b.py"]
+    assert c["removed"] == []
+
+
+def test_result_without_files_read_is_unestablished():
+    before = _result([_rsa(line=10), _rsa(line=20, excerpt="other = rsa.x()")])
+    after = _result([_rsa(line=10)], commit="bbb")
+    del after["files_read"]
+    out = closure.prove_closure(before, after)
+    assert out["comparability"]["verdict"] == "unestablished"
+    assert "files_read_unknown" in [u["reason"] for u in out["comparability"]["unestablished"]]
+    assert out["closure"] is None

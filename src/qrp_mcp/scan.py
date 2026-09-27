@@ -114,6 +114,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None) -> dict[str, A
         # tool spends its time finding in others.
         "files_left_out": scan_result.get("files_left_out", []),
         "files_skipped_by_type": scan_result["files_skipped_by_type"],
+        # By name, beside the counts: what `prove_closure` needs to tell a fix from a
+        # deleted file. Outside `coverage`, so it does not travel into the CBOM.
+        "files_read": scan_result.get("files_read"),
         # Test code is counted apart and never dropped: the rule travels with the
         # numbers it produced. Three outputs leave this tool and a field added to one
         # of them reaches nobody -- that cost a whole report on 2026-09-21.

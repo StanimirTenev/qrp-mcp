@@ -1434,6 +1434,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     walk_problems: list[tuple[str, str]] = []
     unreadable_dirs: list[str] = []
     left_out: list[str] = []
+    # Every file actually read, by path. A count says how much was read; only the
+    # names let a later run tell a file that was fixed from a file that is gone.
+    files_read: list[str] = []
     resolved_exclude = None
     if exclude is not None:
         try:
@@ -1500,6 +1503,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # different findings. No extra I/O; these are the bytes already in hand.
         content_parts.append(
             rel_path + "\0" + hashlib.sha256(raw).hexdigest())
+        files_read.append(rel_path)
 
         for number, text_line in enumerate(lines, 1):
             for asset in scan_protocols(text_line):
@@ -1586,6 +1590,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
 
     return {
         "files_scanned": files_scanned,
+        "files_read": sorted(files_read),
         # Directories that could not be entered or listed; their files are unknown.
         "unreadable_directories": sorted(set(unreadable_dirs)),
         # Seen, not followed. Where the target sits is stated; the target path

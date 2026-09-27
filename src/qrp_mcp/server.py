@@ -208,9 +208,13 @@ def prove_closure(
     Only then does it match every occurrence without its line number: `closed`
     (present before, absent from every file the second run read), still open (and
     how many only moved lines), `relocated` to another path (renamed or moved, not
-    fixed), moved into or out of test code, `new`, and `unverifiable` (in a file the
+    fixed), `removed` (the whole file is gone from the second tree -- not counted as
+    closed), moved into or out of test code, `new`, and `unverifiable` (in a file the
     second run did not read). A file the second run could not open is never counted
     as fixed.
+
+    To keep the verdict as a file that names the two scans it judged, run
+    `qrp-mcp closure BEFORE AFTER --out FILE`.
 
     Use it after a fix, to evidence the fix. Do not use it to compare coverage
     figures between two estates -- `compare_coverage` answers that. It reads two
@@ -302,19 +306,28 @@ def _at_level(result: dict[str, Any], level: str) -> dict[str, Any]:
     return result
 
 
-def scan_to_file(argv: list[str]) -> int:
+def scan_to_file(argv: list[str], cbom: bool = False) -> int:
     """`qrp-mcp scan PATH --out FILE`: the same result as the scan_repo tool,
-    written to a file the owner can inspect and send on. Nothing leaves the machine."""
+    written to a file the owner can inspect and send on. Nothing leaves the machine.
+
+    `qrp-mcp cbom` is the same run written as the export_cbom document. One function
+    for both, so the rules about the output file -- left out of the tree it describes,
+    its digest printed -- cannot be kept on one path and forgotten on the other."""
     p = argparse.ArgumentParser(
-        prog="qrp-mcp scan",
-        description="Scan a directory and write the result as JSON. Nothing is sent anywhere.")
+        prog="qrp-mcp cbom" if cbom else "qrp-mcp scan",
+        description=("Scan a directory and write a CycloneDX 1.6 CBOM that carries its "
+                     "own coverage. Nothing is sent anywhere." if cbom else
+                     "Scan a directory and write the result as JSON. Nothing is sent anywhere."))
     p.add_argument("path", help="directory to scan")
     p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
-    p.add_argument("--level", choices=("full", "masked", "trimmed"), default="full",
+    # The CBOM is the document built to be sent, so it quotes masked by default, as
+    # export_cbom does.
+    p.add_argument("--level", choices=("full", "masked", "trimmed"),
+                   default="masked" if cbom else "full",
                    help="what the quoted line of evidence carries: 'full' the line "
                         "itself, 'masked' its shape with everything but the algorithm "
                         "name starred out, 'trimmed' nothing. Files and line numbers "
-                        "stay in all three")
+                        "stay in all three. Default: " + ("masked" if cbom else "full"))
     a = p.parse_args(argv)
     # A path or file name the console cannot encode must not fail the run after the
     # scan has finished.
@@ -334,6 +347,12 @@ def scan_to_file(argv: list[str]) -> int:
     # tree. Excluding the same path every run keeps two runs comparable.
     result = scan_directory(a.path, out_path)
     result = _at_level(result, a.level)
+    if cbom:
+        result = cyclonedx.build(result)
+    return _write(result, out_path, a.level)
+
+
+def _write(result: dict[str, Any], out_path: Path | None, label: str) -> int:
     data = (json.dumps(result, indent=2, ensure_ascii=False) + "\n").encode()
     if out_path is not None:
         try:
@@ -341,7 +360,7 @@ def scan_to_file(argv: list[str]) -> int:
         except OSError as err:
             print(f"qrp-mcp: could not write {out_path}: {err.strerror}", file=sys.stderr)
             return 1
-        print(f"wrote {out_path} ({a.level})", file=sys.stderr)
+        print(f"wrote {out_path} ({label})", file=sys.stderr)
     else:
         sys.stdout.buffer.write(data)
     # The digest of the exact bytes written: what a recipient will quote back.
@@ -349,9 +368,46 @@ def scan_to_file(argv: list[str]) -> int:
     return 0
 
 
+def closure_to_file(argv: list[str]) -> int:
+    """`qrp-mcp closure BEFORE AFTER --out FILE`: the prove_closure verdict as a file.
+
+    The verdict names the two files it judged by digest. A statement that something
+    was closed, which does not say closed between what and what, is not evidence."""
+    p = argparse.ArgumentParser(
+        prog="qrp-mcp closure",
+        description="Compare two saved scans of one tree (`qrp-mcp scan PATH --out FILE`, "
+                    "before and after a change) and write what the change closed.")
+    p.add_argument("before", help="scan result from before the change")
+    p.add_argument("after", help="scan result from after the change")
+    p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
+    a = p.parse_args(argv)
+    sys.stderr.reconfigure(errors="backslashreplace")
+    inputs, loaded = [], []
+    for name in (a.before, a.after):
+        path = Path(name).expanduser()
+        if not path.is_file():
+            p.error(f"no scan result at {name}")
+        raw = path.read_bytes()
+        try:
+            loaded.append(json.loads(raw))
+        except ValueError:
+            p.error(f"not a JSON scan result: {name}")
+        inputs.append({"path": str(path), "sha256": hashlib.sha256(raw).hexdigest()})
+    out_path = Path(a.out).expanduser() if a.out else None
+    if out_path is not None and not out_path.resolve().parent.is_dir():
+        p.error(f"the folder for --out does not exist: {out_path.parent}")
+    result = {"inputs": {"before": inputs[0], "after": inputs[1]},
+              **closure.prove_closure(*loaded)}
+    return _write(result, out_path, "closure")
+
+
 USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MCP clients run)
        qrp-mcp scan PATH [--out FILE] [--level full|masked|trimmed]
                                scan a directory and write the result as JSON
+       qrp-mcp cbom PATH [--out FILE] [--level full|masked|trimmed]
+                               scan a directory and write a CycloneDX 1.6 CBOM
+       qrp-mcp closure BEFORE AFTER [--out FILE]
+                               compare two saved scans and write what a change closed
        qrp-mcp --version
 """
 
@@ -363,6 +419,10 @@ def main(argv: list[str] | None = None) -> None:
         return
     if argv[0] == "scan":
         raise SystemExit(scan_to_file(argv[1:]))
+    if argv[0] == "cbom":
+        raise SystemExit(scan_to_file(argv[1:], cbom=True))
+    if argv[0] == "closure":
+        raise SystemExit(closure_to_file(argv[1:]))
     if argv[0] in ("-h", "--help", "help"):
         print(USAGE, end="")
         raise SystemExit(0)

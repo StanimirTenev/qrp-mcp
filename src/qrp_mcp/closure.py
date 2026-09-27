@@ -60,6 +60,9 @@ UNESTABLISHED = {
                                   "be checked",
     "excerpt_level_unknown": "at least one result does not say at what level it quotes "
                              "its lines (results from before 0.19.0 do not)",
+    "files_read_unknown": "the second result does not list the files it read (results "
+                          "from before 0.20.0 do not), so a fixed finding cannot be told "
+                          "from a deleted file",
 }
 
 REPAIR = ("Scan the commit the first run read again with the instrument that did the "
@@ -125,6 +128,9 @@ def closure_comparability(before: dict[str, Any], after: dict[str, Any]) -> dict
         unestablished.append("excerpt_level_unknown")
     elif level_a != level_b:
         reasons.append("excerpt_level_differs")
+
+    if not isinstance(after.get("files_read"), list):
+        unestablished.append("files_read_unknown")
 
     verdict = "not_comparable" if reasons else "unestablished" if unestablished else "comparable"
     return {
@@ -239,12 +245,19 @@ def prove_closure(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
     new = [_brief(cat, item) for bucket in pool.values() for cat, item in bucket]
 
     unread_files, unread_dirs = _unread_paths(after)
-    closed, unverifiable = [], []
+    read_after = set(after["files_read"])
+    closed, removed, unverifiable = [], [], []
     for cat, item in gone:
         path = str(item.get("path") or "")
         if path in unread_files or any(path.startswith(d) for d in unread_dirs):
             unverifiable.append({**_brief(cat, item),
                                  "why": "the second run did not read this file"})
+        elif path not in read_after:
+            # The whole file is gone. Deleting code does remove it, but it is also the
+            # cheapest way to make a finding disappear, and a rival tool counts it as
+            # fixed. Named apart, not counted as closed.
+            removed.append({**_brief(cat, item),
+                            "why": "the file is not in the second tree"})
         else:
             closed.append(_brief(cat, item))
 
@@ -258,6 +271,7 @@ def prove_closure(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
         "comparability": comparability,
         "closure": {
             "closed": closed,
+            "removed": removed,
             "still_open_count": len(still_open),
             "still_open_moved_lines": moved_lines,
             "relocated": relocated,
@@ -267,9 +281,12 @@ def prove_closure(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
             "unverifiable": unverifiable,
             "per_family_before_after": per_family,
         },
-        "statement": (f"{len(closed)} occurrence(s) closed, {len(still_open)} still open "
+        "statement": (f"{len(closed)} occurrence(s) closed, {len(removed)} removed with "
+                      f"their file, {len(still_open)} still open "
                       f"({moved_lines} of them only moved lines), {len(relocated)} relocated to "
                       f"another path, {len(new)} new, {len(unverifiable)} unverifiable. "
                       f"Closed means present in the first tree and absent from every file "
-                      f"the second run read, under the same instrument."),
+                      f"the second run read, under the same instrument. Removed means the "
+                      f"whole file is gone; whether its cryptography is still needed "
+                      f"elsewhere is not something this comparison can see."),
     }

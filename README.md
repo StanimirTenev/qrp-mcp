@@ -76,6 +76,16 @@ line but the algorithm name, and `--level trimmed` removes the line altogether; 
 file and line number. The SHA-256 of the written bytes is printed,
 so anyone you send the file to can quote back exactly what they received.
 
+```
+uvx qrp-mcp cbom ~/code/my-protocol --out cbom.json
+uvx qrp-mcp closure before.json after.json --out closure.json
+```
+
+`cbom` writes the same CycloneDX document as the `export_cbom` tool, masked by default because
+it is the document built to be sent. `closure` writes the `prove_closure` verdict for two saved
+scans, and names both inputs by their SHA-256, so the three files can be tied together by
+whoever receives them. Both print the SHA-256 of what they wrote.
+
 ## Tools
 
 | Tool | What it does |
@@ -283,8 +293,9 @@ The published measurement, with the raw artefacts:
 
 ## The CBOM it emits
 
-`export_cbom` produces a CycloneDX 1.6 document, validated against the published schema. Three
-things travel in it that a component list alone cannot say:
+`export_cbom` produces a CycloneDX 1.6 document, validated against the published schema; from
+0.20.0 `qrp-mcp cbom PATH --out FILE` writes the same document to a file. Three things travel in
+it that a component list alone cannot say:
 
 - `compositions.aggregate` — `incomplete` where files were not examined, and `unknown` where
   the tool cannot account for its own reading. Reading every file is *not* enough for
@@ -375,21 +386,34 @@ answers in two steps:
    scan the first commit again with the instrument that did the second.
 2. **Only then, occurrence by occurrence, without line numbers:** `closed`, still open (and how
    many only moved lines), `relocated` to another path (a rename is not a fix), moved into or
-   out of test code (neither is a fix), `new`, and `unverifiable` — in a file the second run did
-   not read. A file the second run could not open is never counted as fixed.
+   out of test code (neither is a fix), `new`, `unverifiable` — in a file the second run did
+   not read — and `removed`: the whole file is gone from the second tree. A deleted file does
+   remove its code, but it is also the cheapest way to make a finding disappear, so it is named
+   apart and **not counted as closed**. A file the second run could not open is never counted
+   as fixed.
+
+From 0.20.0 every scan lists `files_read` by name, beside the counts. That is what tells a fixed
+line from a deleted file; it stays out of the CBOM. Two results without it (0.19.0) are reported
+as `unestablished`, not compared on a weaker rule.
 
 Checked on a copy of certbot (521 occurrences): removing one RSA call closed exactly that one;
 inserting blank lines closed none and reported two moved; renaming a file closed none and
 reported two relocated; a masked scan against a full one was refused. Two scans of OpenSSH
 with the same instrument: 7,143 still open, 0 closed. A second run with an emitter that had
-uncommitted changes was refused as `instrument_dirty`.
+uncommitted changes was refused as `instrument_dirty`. With 0.20.0 installed in a clean
+environment, deleting one RSA line in `client.py` and the whole of `challenges.py` gave
+`1 closed, 1 removed`, each on the right file and line.
 
 ⚠️ What is not claimed: that the fix is correct, only that the occurrence is gone from every
-file the second run read. Other scanners mark a finding fixed when a later scan stops seeing
-it; what was not found in the ones read for this (Semgrep, SonarQube, GitHub code scanning,
-qscan, CBOMkit) is a check, **before** calling anything fixed, that the reader did not change
-between the two scans — SonarQube documents that a file dropped from scope is counted as fixed.
-That is a statement about the sources read on 2026-09-27, not a survey of every tool.
+file the second run read. Other scanners close findings between scans too — Semgrep, SonarQube,
+GitHub code scanning, and Keyfactor AgileSec ("Deleted findings are automatically resolved",
+3.4 release notes). Semgrep marks a finding "Removed" rather than "Fixed" when its rule changed
+or its path went away, and GitHub records the tool version to track changes it caused; both do
+this as a status after the fact. What was not found in the sources read is a **refusal, before**
+calling anything fixed, when the reader changed between the two scans. SonarQube documents that
+a file dropped from scope is counted as fixed. They keep a history across many scans; this
+compares two documents. A statement about the sources read on 2026-09-27, not a survey of
+every tool.
 
 ## What to replace it with
 
