@@ -496,10 +496,22 @@ from the excerpt the rule saw; rules frozen at `3287c1c` before these corpora we
 | OpenSSL `223e04f` | 25 / 30 (5 should have been undetermined) | 14 / 20 | 4 / 20 |
 | Bitcoin Core `33a363e` | none to sample | none to sample | 0 / 8 |
 
-The nine wrong `key_establishment` lines have two causes, both in TLS names: `TLS_ECDHE_RSA_WITH_…`
-written with underscores is read as ECDH, and in `ECDH_RSA` suites RSA only signs the certificate
-of a fixed ECDH key. Both are known and not fixed in 0.21.0; the fix will be measured on a corpus
-these rules were not written against.
+The nine wrong `key_establishment` lines had two causes, both in TLS names: `TLS_ECDHE_RSA_WITH_…`
+written with underscores was read as ECDH, and in `ECDH_RSA` suites RSA only signs the certificate
+of a fixed ECDH key. **Fixed in 0.23.0**, together with lines that name PSS beside the generic RSA
+key type (a table of both uses, now `undetermined`); on Vault and OpenSSL 13 of the 14 are now
+right. Measured again on two corpora these rules had not seen (rules frozen at `8ab8e9c`, seed
+20260928, same method):
+
+| corpus | TLS-name lines | `key_establishment` | `signature` | `undetermined` with the role visible nearby |
+| --- | --- | --- | --- | --- |
+| curl `b3640b0` | 17 / 17 | 20 / 20 | 30 / 30 | 13 / 20 |
+| Mbed TLS `c0748be` | 20 / 20 | 8 / 8 | 30 / 30 | 17 / 20 |
+
+No wrong role in 125 assigned. ⚠️ The samples are concentrated in tables of cipher suites (47 of
+70 curl lines from one test file), which is the easiest case for a rule that reads one line. And the
+misses are systematic: `TLS_RSA_PSK_WITH_…` (RSA transports the key) and TLS groups for EC
+(`groups=secp256r1`) are left `undetermined` although the role is plain.
 
 ## Measured against the other scanners
 
