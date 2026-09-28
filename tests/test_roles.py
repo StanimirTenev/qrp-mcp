@@ -198,6 +198,7 @@ def test_a_tls_group_is_key_establishment(line):
 @pytest.mark.parametrize("line", [
     "group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);",
     "mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1);",
+    "const EC_GROUP *group = EC_KEY_get0_group(ec_key);",
 ])
 def test_the_curves_mathematical_group_says_nothing_about_the_role(line):
     assert _r(line, "EC") == "undetermined"

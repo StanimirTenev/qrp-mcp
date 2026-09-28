@@ -513,6 +513,22 @@ No wrong role in 125 assigned. ⚠️ The samples are concentrated in tables of 
 misses are systematic: `TLS_RSA_PSK_WITH_…` (RSA transports the key) and TLS groups for EC
 (`groups=secp256r1`) are left `undetermined` although the role is plain.
 
+**0.24.0** reads both: RSA-PSK as key establishment, and a TLS group as key establishment in its
+TLS spellings only (`groups=`, `set1_groups_list`, `+GROUP-`, `selected_group`, `IANA_TLS_GROUP_`) —
+`EC_GROUP_new` and `ecp_group` are the curve's mathematical group and say nothing about the role.
+Measured on two more corpora these rules had not seen (frozen at `b2eb73b`, seed 20260929):
+
+| corpus | psk/group lines assigned | `key_establishment` | `signature` | `undetermined` with the role visible |
+| --- | --- | --- | --- | --- |
+| wolfSSL `3c5eead` | 1 / 1 | 15 / 20 (5 should have been undetermined) | 30 / 30 | 4 / 20 |
+| s2n-tls `e691294` | 3 / 3 | 20 / 20 | 30 / 30 | 5 / 20 |
+
+Still no wrong role. ⚠️ **But the group fix reached little:** 4 of 40 psk/group lines. s2n-tls names
+its groups `Group::secp384r1`, `"group.supported.secp256r1"`, `kem_group`; wolfSSL `ctx->group[0]` —
+the rule was written from Mbed TLS's spellings, and 15 of 17 s2n-tls group lines stay undetermined.
+And in C `RSA_public_decrypt` verifies a signature; a switch that handles it together with
+`RSA_PUBLIC_ENCRYPT` was called key establishment (the five above).
+
 ## Measured against the other scanners
 
 In September 2026 three free tools that do the same job — CryptoScan, CBOMkit-hyperion
