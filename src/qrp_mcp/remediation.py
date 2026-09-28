@@ -110,10 +110,16 @@ ROLE_FAMILIES = ("RSA", "EC")
 _SIGNATURE = re.compile(
     r"(?<![a-z])sign(?!al)|(?<![a-z])verif|signature|rsassa|(?<![a-z])pss(?![a-z])"
     r"|sha\d*with(rsa|ecdsa)|rsa-sha2|ssh-rsa|ecdsa|(?<![a-z0-9])[rpe]s(256|384|512)(?![0-9])"
-    r"|(?<![a-z])(ecdhe|dhe|edh)-rsa-|(?<![a-z])arsa(?![a-z])"
+    r"|(?<![a-z])(ecdhe|dhe|edh|ecdh|dh)[-_]rsa(?![a-z])|(?<![a-z])arsa(?![a-z])"
+    # RSA with a fixed (EC)DH key signs the certificate that carries it (0.23: OpenSSL
+    # TLS_CT_RSA_FIXED_ECDH, TLS_ECDH_RSA_WITH_..., both called key transport before).
+    r"|rsa_fixed_e?c?dh|op_type_sig"
     r"|1\.2\.840\.113549\.1\.1\.(5|10|11|12|13|14)(?![0-9])")
 _KEY_ESTABLISHMENT = re.compile(
-    r"oaep|rsaes|rsa1_5|(?<![a-z])(en|de)crypt|(?<![a-z])kex|ecdh(?!e-(rsa|ecdsa))"
+    # `ECDHE_RSA` with an underscore is the IANA spelling of the suite the dash form
+    # names; 0.21 read only the dash and called nine TLS lines key transport.
+    r"oaep|rsaes|rsa1_5|(?<![a-z])(en|de)crypt|(?<![a-z])kex"
+    r"|(?<!fixed_)ecdh(?!e?[-_](rsa|ecdsa))|op_type_crypt"
     r"|(?<![a-z])derive|key.?(agreement|exchange|transport)|tls_rsa_with|(?<![a-z])krsa(?![a-z])"
     r"|1\.2\.840\.113549\.1\.1\.7(?![0-9])"
     # An OpenSSL suite name with no key-exchange prefix (RC4-SHA, AES128-GCM-SHA256)
@@ -122,6 +128,7 @@ _KEY_ESTABLISHMENT = re.compile(
 # A cipher list longer than the quoted excerpt: the part that was cut can carry the
 # other role, so what the excerpt shows is not the whole line.
 _EXCERPT_LIMIT = 200
+_GENERIC_RSA = re.compile(r"evp_pkey_rsa(?![_a-z])")
 _CIPHER_LIST = re.compile(r"[a-z0-9]+-[a-z0-9-]+:[a-z0-9]+-")
 
 
@@ -134,6 +141,9 @@ def role_of(item: dict[str, Any]) -> str | None:
     if len(excerpt) >= _EXCERPT_LIMIT and _CIPHER_LIST.search(excerpt.lower()):
         return "undetermined"
     text = f"{excerpt} {item.get('description') or ''}".lower()
+    # PSS named beside the generic RSA key type is a table of both uses, not a signature.
+    if _GENERIC_RSA.search(text) and "pss" in text:
+        return "undetermined"
     sig, kex = bool(_SIGNATURE.search(text)), bool(_KEY_ESTABLISHMENT.search(text))
     if sig and not kex:
         return "signature"

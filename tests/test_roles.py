@@ -146,3 +146,28 @@ def test_the_mcp_tool_carries_the_role(tmp_path):
     (tmp_path / "a.py").write_text("jwt.encode(p, k, algorithm='RS256')\n")
     d = scan_repo(str(tmp_path))
     assert [o["role"] for o in d["evidence"]["source_code"] if o["algorithm"] == "RSA"] == ["signature"]
+
+
+# 0.23: the TLS-name defects found on Vault and OpenSSL in the 0.21 measurement.
+@pytest.mark.parametrize("line", [
+    "tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,",           # IANA spelling, underscores
+    '{ 0xC011, "TLS_ECDHE_RSA_WITH_RC4_128_SHA" },',
+    "TLS_ECDH_RSA_WITH_CAMELLIA_128_CBC_SHA256   ECDH-RSA-CAMELLIA128-SHA256",  # fixed ECDH
+    "#define TLS_CT_RSA_FIXED_ECDH 65",
+    "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256",
+])
+def test_rsa_that_signs_in_a_tls_name_is_signature(line):
+    assert _r(line) == "signature"
+
+
+def test_rsa_key_transport_suites_stay_key_establishment():
+    assert _r("TLS_RSA_WITH_RC4_128_SHA") == "key_establishment"
+
+
+@pytest.mark.parametrize("line", [
+    "{ OSSL_ACTION_GET, EVP_PKEY_RSA, EVP_PKEY_RSA_PSS,",
+    "if (pkey->type != EVP_PKEY_RSA && pkey->type != EVP_PKEY_RSA_PSS) {",
+    "EVP_PKEY_OP_TYPE_CRYPT | EVP_PKEY_OP_TYPE_SIG,",
+])
+def test_a_table_of_both_uses_is_undetermined(line):
+    assert _r(line) == "undetermined"
