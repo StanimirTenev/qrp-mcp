@@ -120,6 +120,14 @@ _KEY_ESTABLISHMENT = re.compile(
     # names; 0.21 read only the dash and called nine TLS lines key transport.
     r"oaep|rsaes|rsa1_5|(?<![a-z])(en|de)crypt|(?<![a-z])kex"
     r"|(?<!fixed_)ecdh(?!e?[-_](rsa|ecdsa))|op_type_crypt"
+    # 0.24: RSA-PSK suites transport the premaster secret under RSA (curl, 13 of 20 left
+    # undetermined in the 0.23 measurement).
+    r"|(?<![a-z])rsa[-_]psk"
+    # 0.24: a TLS group is what the key exchange runs over (Mbed TLS, 17 of 20). Only the
+    # TLS spellings: `EC_GROUP_new` and `ecp_group` are the curve's mathematical group and
+    # say nothing about the role.
+    r"|(?<![a-z_])groups\s*[=:(]|groups_list|tls_group|[+-]group-|selected_group"
+    r"|have_group_|(?<![a-z_])group\(|(?<![a-z])-groups(?![a-z])"
     r"|(?<![a-z])derive|key.?(agreement|exchange|transport)|tls_rsa_with|(?<![a-z])krsa(?![a-z])"
     r"|1\.2\.840\.113549\.1\.1\.7(?![0-9])"
     # An OpenSSL suite name with no key-exchange prefix (RC4-SHA, AES128-GCM-SHA256)

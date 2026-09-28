@@ -171,3 +171,33 @@ def test_rsa_key_transport_suites_stay_key_establishment():
 ])
 def test_a_table_of_both_uses_is_undetermined(line):
     assert _r(line) == "undetermined"
+
+
+# 0.24: the two systematic misses of the 0.23 measurement (curl, Mbed TLS).
+@pytest.mark.parametrize("line", [
+    '{ 0xC099, "TLS_RSA_PSK_WITH_CAMELLIA_256_CBC_SHA384",', '"RSA-PSK-AES128-CBC-SHA" },',
+])
+def test_rsa_psk_is_key_establishment(line):
+    assert _r(line) == "key_establishment"
+
+
+@pytest.mark.parametrize("line", [
+    '"$P_CLI debug_level=4 groups=secp256r1,secp384r1" \\',
+    "--priority=NORMAL:-GROUP-ALL:+GROUP-SECP256R1:+GROUP-SECP384R1",
+    '-s "selected_group: secp384r1" \\',
+    "#define MBEDTLS_SSL_IANA_TLS_GROUP_SECP256R1     0x0017",
+    'run_test "TLS 1.3: O->m: psk_ephemeral group(secp256r1) check, good"',
+    '"$O_NEXT_CLI -msg -debug -groups P-256:P-384 -no_middlebox"',
+    'SSL_CTX_set1_groups_list(cctx, "secp384r1:secp256r1")',
+    "Groups = ?X448:?secp521r1",
+])
+def test_a_tls_group_is_key_establishment(line):
+    assert _r(line, "EC") == "key_establishment"
+
+
+@pytest.mark.parametrize("line", [
+    "group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);",
+    "mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1);",
+])
+def test_the_curves_mathematical_group_says_nothing_about_the_role(line):
+    assert _r(line, "EC") == "undetermined"
