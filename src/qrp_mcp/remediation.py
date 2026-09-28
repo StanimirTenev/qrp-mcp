@@ -114,11 +114,14 @@ _SIGNATURE = re.compile(
     # RSA with a fixed (EC)DH key signs the certificate that carries it (0.23: OpenSSL
     # TLS_CT_RSA_FIXED_ECDH, TLS_ECDH_RSA_WITH_..., both called key transport before).
     r"|rsa_fixed_e?c?dh|op_type_sig"
+    # 0.25: the raw RSA operations of a signature in C (wolfSSL, OpenSSL): verification is
+    # a public-key "decrypt", signing a private-key "encrypt".
+    r"|public_decrypt|private_encrypt"
     r"|1\.2\.840\.113549\.1\.1\.(5|10|11|12|13|14)(?![0-9])")
 _KEY_ESTABLISHMENT = re.compile(
     # `ECDHE_RSA` with an underscore is the IANA spelling of the suite the dash form
     # names; 0.21 read only the dash and called nine TLS lines key transport.
-    r"oaep|rsaes|rsa1_5|(?<![a-z])(en|de)crypt|(?<![a-z])kex"
+    r"oaep|rsaes|rsa1_5|(?<![a-z])(?:(?<!private_)en|(?<!public_)de)crypt|(?<![a-z])kex"
     r"|(?<!fixed_)ecdh(?!e?[-_](rsa|ecdsa))|op_type_crypt"
     # 0.24: RSA-PSK suites transport the premaster secret under RSA (curl, 13 of 20 left
     # undetermined in the 0.23 measurement).
@@ -128,6 +131,9 @@ _KEY_ESTABLISHMENT = re.compile(
     # say nothing about the role.
     r"|(?<![a-z_])groups\s*[=:(]|groups_list|tls_group|[+-]group-|selected_group"
     r"|have_group_|(?<![a-z_])group\(|(?<![a-z])-groups(?![a-z])"
+    # 0.25: the other spellings met in s2n-tls and wolfSSL (4 of 40 group lines were read).
+    r"|(?<![a-z_])group::|group\.(supported|negotiated)|kem_group|groupinformation|kx_?group"
+    r"|->group\[|(?<![a-z_])groups\[|namedgroup|supported_groups|negotiated_curve|kex_params"
     r"|(?<![a-z])derive|key.?(agreement|exchange|transport)|tls_rsa_with|(?<![a-z])krsa(?![a-z])"
     r"|1\.2\.840\.113549\.1\.1\.7(?![0-9])"
     # An OpenSSL suite name with no key-exchange prefix (RC4-SHA, AES128-GCM-SHA256)
@@ -246,11 +252,18 @@ def suggest(finding: dict[str, Any],
         if not row["options"]:
             out["sources"] = _cite(row["standards"])
         if fam == "RSA" and finding.get("weak_key"):
-            out["note"] = _WEAK_RSA + " " + out["note"]
-            out["sources_first_step"] = _cite(["SP 800-131A r2"])
-            if profile != "nist":
-                out["first_step_follows"] = ("NIST under every profile; a national minimum "
-                                             "for RSA has not been checked")
+            own = profile != "nist" and profiles.PROFILES[profile].get("weak_rsa")
+            if own:
+                # The authority's own minimum, checked against its text, is the first step.
+                out["note"] = (f"Two steps. Now: {own}. Then: a post-quantum replacement, "
+                               f"below. " + out["note"])
+                out["sources_first_step"] = [profiles.source(profile)]
+            else:
+                out["note"] = _WEAK_RSA + " " + out["note"]
+                out["sources_first_step"] = _cite(["SP 800-131A r2"])
+                if profile != "nist":
+                    out["first_step_follows"] = ("NIST: this profile's document sets no RSA "
+                                                 "minimum that has been checked")
         if profile != "nist":
             out["profile"] = _profile_block(profile)
             out["note"] = out["note"].replace(

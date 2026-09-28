@@ -202,3 +202,28 @@ def test_a_tls_group_is_key_establishment(line):
 ])
 def test_the_curves_mathematical_group_says_nothing_about_the_role(line):
     assert _r(line, "EC") == "undetermined"
+
+
+# 0.25: raw RSA signature operations in C, and the group spellings of s2n-tls and wolfSSL.
+@pytest.mark.parametrize("line", [
+    "ret = RSA_public_decrypt(siglen, sig, buf, rsa, pad);", "if (rsa_type == RSA_PRIVATE_ENCRYPT",
+])
+def test_raw_rsa_signature_operations_are_signature(line):
+    assert _r(line) == "signature"
+
+
+def test_raw_rsa_encryption_operations_stay_key_establishment():
+    assert _r("RSA_private_decrypt(len, in, out, rsa, RSA_PKCS1_OAEP_PADDING)") == "key_establishment"
+    assert _r("case RSA_PUBLIC_ENCRYPT:") == "key_establishment"
+    assert _r("if (type == RSA_PUBLIC_ENCRYPT || type == RSA_PUBLIC_DECRYPT)") == "undetermined"
+
+
+@pytest.mark.parametrize("line", [
+    "group: Some(Group::secp384r1),", '"group.supported.secp256r1": 2,',
+    "s2n_kem_group_is_available(&s2n_secp384r1_mlkem_1024)", 'GroupInformation::new("secp256r1", 23),',
+    'KXGroup::Secp256R1 => "P-256",', "ExpectIntEQ(ctx->group[0], WOLFSSL_ECC_SECP384R1);",
+    "groups[count++] = WOLFSSL_ECC_SECP256R1;",
+    "conn->kex_params.server_ecc_evp_params.negotiated_curve = &s2n_ecc_curve_secp256r1;",
+])
+def test_other_tls_group_spellings_are_key_establishment(line):
+    assert _r(line, "EC") == "key_establishment"

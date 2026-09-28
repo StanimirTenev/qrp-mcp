@@ -75,6 +75,10 @@ PROFILES: dict[str, dict[str, Any]] = {
         "dates": "ECDSA 'will not be approved beyond 2030'; new equipment and libraries to "
                  "support ML-DSA-87, ML-KEM-1024, SHA-384, SHA-512 and AES-256 by 2030.",
         "absent": "SLH-DSA, LMS and XMSS do not appear in the ISM.",
+        "weak_hash": "SHA-384 or SHA-512 (SHA-224 and SHA-256 'will not be approved beyond 2030')",
+        "weak_cipher": "AES-128, AES-192 or AES-256, preferably AES-256 (AES-192 or AES-256 for TOP "
+                       "SECRET)",
+        "weak_rsa": "at least 2048 bits, preferably 3072; RSA 'will not be approved beyond 2030'",
     },
     "ca-cccs": {
         "authority": "Canadian Centre for Cyber Security",
@@ -89,6 +93,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "hybrid": "Not addressed: the document does not mention hybrids.",
         "dates": "RSA 'without a post-quantum key establishment scheme should be phased out "
                  "by the end of 2035'.",
+        "weak_rsa": "at least 2048 bits, increased to at least 3072 bits by the end of 2030",
     },
     "de-bsi": {
         "authority": "BSI (Germany)",
@@ -109,6 +114,9 @@ PROFILES: dict[str, dict[str, Any]] = {
                   "may stand alone.",
         "dates": "Classical key agreement alone is recommended only until the end of 2031 "
                  "(the end of 2030 for very high protection requirements).",
+        "weak_hash": "SHA-256, SHA-512/256, SHA-384 or SHA-512; or SHA3-256, SHA3-384 or SHA3-512 "
+                     "(TR-02102-1, Table 4.1)",
+        "weak_rsa": "at least 3000 bits, the guideline's 'recommended minimum bit length'",
     },
     "fr-anssi": {
         "authority": "ANSSI (France)",
@@ -123,6 +131,12 @@ PROFILES: dict[str, dict[str, Any]] = {
                       "conformant, whatever the parameter set); or SLH-DSA alone",
         "firmware": None,
         "hybrid": "Required for ML-KEM and ML-DSA; SLH-DSA 'peut donc être utilisé tel quel'.",
+        "weak_hash": "a hash with at least 256-bit output (SHA2-256, SHA3-256); at least 384 bits "
+                     "where post-quantum security is the goal (RecoPQHachage), e.g. SHA3-384",
+        "weak_cipher": "AES-128 is conformant; AES-192 or AES-256 where post-quantum security is "
+                       "the goal (RecoPQTailleCléSym: keys of at least 192 bits)",
+        "weak_rsa": "at least 2048 bits for use ending by 2030, at least 3072 bits from 2031; 3072 "
+                    "is recommended even before 2031",
     },
     "nl-ncsc": {
         "authority": "AIVD, CWI and TNO (Netherlands)",

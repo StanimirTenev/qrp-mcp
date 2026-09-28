@@ -143,7 +143,7 @@ def test_cnsa2_minimum_replaces_the_nist_row_for_weak_algorithms(fam, expected):
 
 
 def test_a_profile_without_a_checked_minimum_keeps_nist_and_says_so():
-    out = remediation.suggest(MD5, profile="de-bsi")
+    out = remediation.suggest(MD5, profile="uk-ncsc")
     assert out["options"][0]["use"].startswith("SHA-256")
     assert out["follows"].startswith("NIST")
 
@@ -154,7 +154,35 @@ def test_an_unstandardised_pqc_finding_is_not_given_a_hash():
     assert "standardised" in out["options"][0]["use"]
 
 
-def test_the_weak_rsa_first_step_says_it_is_nist_under_a_profile():
-    out = remediation.suggest({**RSA, "weak_key": True}, profile="fr-anssi")
+def test_the_weak_rsa_first_step_says_it_is_nist_where_no_minimum_was_checked():
+    out = remediation.suggest({**RSA, "weak_key": True}, profile="uk-ncsc")
     assert out["first_step_follows"].startswith("NIST")
     assert "first_step_follows" not in remediation.suggest({**RSA, "weak_key": True})
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("de-bsi", "at least 3000 bits"), ("fr-anssi", "at least 3072 bits from 2031"),
+    ("au-ism", "preferably 3072"), ("ca-cccs", "at least 3072 bits by the end of 2030"),
+])
+def test_a_checked_national_rsa_minimum_is_the_first_step(name, expected):
+    out = remediation.suggest({**RSA, "weak_key": True}, profile=name)
+    assert expected in out["note"] and "SP 800-131A" not in out["note"]
+    assert out["sources_first_step"][0]["url"] == profiles.PROFILES[name]["url"]
+    assert "first_step_follows" not in out
+
+
+@pytest.mark.parametrize("name,fam,expected", [
+    ("de-bsi", "MD5", "Table 4.1"), ("fr-anssi", "SHA1", "RecoPQHachage"),
+    ("fr-anssi", "3DES", "RecoPQTailleCléSym"), ("au-ism", "MD5", "SHA-384 or SHA-512"),
+    ("au-ism", "RC4", "preferably AES-256"),
+])
+def test_checked_national_weak_minimums_replace_nist(name, fam, expected):
+    out = remediation.suggest({"classification": "deprecated_weak", "algorithm_family": fam},
+                              profile=name)
+    assert expected in out["options"][0]["use"] and "follows" not in out
+
+
+def test_bsi_has_no_checked_cipher_minimum_so_nist_stays():
+    out = remediation.suggest({"classification": "deprecated_weak", "algorithm_family": "3DES"},
+                              profile="de-bsi")
+    assert out["follows"].startswith("NIST")
