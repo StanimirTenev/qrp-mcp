@@ -88,6 +88,7 @@ _WEAK: dict[str, dict[str, Any]] = {
 
 # The classifier names these by the token it matched.
 _WEAK["TRIPLEDES"] = _WEAK["3DES"]
+_WEAK_HASHES = {"MD5", "SHA1"}
 
 _UNSTANDARDISED_PQC = {
     "use": "a standardised scheme: ML-KEM for key establishment, ML-DSA or SLH-DSA for signatures",
@@ -229,6 +230,9 @@ def suggest(finding: dict[str, Any],
         if fam == "RSA" and finding.get("weak_key"):
             out["note"] = _WEAK_RSA + " " + out["note"]
             out["sources_first_step"] = _cite(["SP 800-131A r2"])
+            if profile != "nist":
+                out["first_step_follows"] = ("NIST under every profile; a national minimum "
+                                             "for RSA has not been checked")
         if profile != "nist":
             out["profile"] = _profile_block(profile)
             out["note"] = out["note"].replace(
@@ -246,9 +250,18 @@ def suggest(finding: dict[str, Any],
                             "sources": _cite(row["standards"])}],
                "note": row["note"]}
         if profile != "nist":
-            # The weak-algorithm rows are NIST's under every profile; where the
-            # authority sets its own symmetric minimum, it travels beside them.
             out["profile"] = _profile_block(profile)
+            own = profiles.PROFILES[profile].get(
+                "weak_hash" if fam in _WEAK_HASHES else "weak_cipher")
+            if own and not finding.get("pqc_family"):
+                # The authority's own minimum, checked against its text, replaces
+                # NIST's row: a first line that contradicts the chosen profile is read
+                # first and believed.
+                out["options"] = [{"use": own, "for": "replacement",
+                                   "sources": [profiles.source(profile)]}]
+            else:
+                out["follows"] = ("NIST: this profile's document sets no minimum for this "
+                                  "algorithm that has been checked, so NIST's row is shown")
         return out
     return None
 

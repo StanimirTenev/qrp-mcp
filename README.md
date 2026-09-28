@@ -461,10 +461,12 @@ profile; only `replacement` changes, and the result names the profile in `replac
 ⚠️ **What a profile is not.** Each is one document read on 2026-09-27, and each says whom that
 document addresses — CNSA 2.0 is written for US National Security Systems, the ECCG list for EU
 product certification, the NCSC paper for OFFICIAL-tier and enterprise data. Choosing one does
-not make it law for the reader, and the tool makes no legal finding. The weak-algorithm rows
-(MD5, SHA-1, RC4, DES, 3DES) and the first step for an RSA key under 2048 bits are NIST's under
-every profile; where an authority sets its own symmetric minimum (CNSA 2.0: AES-256, SHA-384/512)
-it travels beside them in `profile.symmetric`. A role an authority does not fill is left out
+not make it law for the reader, and the tool makes no legal finding. For the weak algorithms
+(MD5, SHA-1, RC4, DES, 3DES) an authority's own minimum replaces NIST's row where it has been
+checked against the text — today CNSA 2.0: SHA-384 or SHA-512, and AES-256, "for all
+classification levels". Under every other profile NIST's row stays and the result says so in
+`follows`; so does the first step for an RSA key under 2048 bits (`first_step_follows`), for which
+no national minimum has been checked. A role an authority does not fill is left out
 rather than filled with NIST's answer: the ISM names no hash-based signature, so `au-ism` offers
 none. Documents change — the ISM quarterly, TR-02102-1 yearly — and each profile carries its
 version and address so a stale one can be recognised.

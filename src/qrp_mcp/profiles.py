@@ -36,6 +36,11 @@ PROFILES: dict[str, dict[str, Any]] = {
                  "in all new products and services that provide cryptographic protection' "
                  "(CNSS Policy 15).",
         "symmetric": "AES-256; SHA-384 or SHA-512.",
+        # Replaces NIST's row for the weak algorithms: the FAQ's table says 'Use SHA-384
+        # or SHA-512 for all classification levels' and AES 'Use 256-bit keys for all
+        # classification levels', so NIST's SHA-256 would not be CNSA 2.0 at all.
+        "weak_hash": "SHA-384 or SHA-512 (CNSA 2.0, all classification levels)",
+        "weak_cipher": "AES-256 (CNSA 2.0, all classification levels)",
     },
     "uk-ncsc": {
         "authority": "NCSC (United Kingdom)",

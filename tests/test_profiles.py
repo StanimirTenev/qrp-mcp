@@ -62,9 +62,8 @@ def test_bulgaria_keeps_nist_options_and_says_why():
     assert "2030" in bg["profile"]["dates"]
 
 
-def test_weak_rows_stay_nist_and_carry_the_profile_minimum():
+def test_the_profile_minimum_also_travels_in_the_profile_block():
     out = remediation.suggest(MD5, profile="us-cnsa2")
-    assert out["options"][0]["use"].startswith("SHA-256")
     assert out["profile"]["symmetric"] == "AES-256; SHA-384 or SHA-512."
 
 
@@ -131,3 +130,31 @@ def test_the_cbom_has_no_profile_because_it_carries_no_replacement(tmp_path):
     from qrp_mcp.server import export_cbom
     fn = getattr(export_cbom, "__wrapped__", export_cbom)
     assert "profile" not in typing.get_type_hints(fn)
+
+
+@pytest.mark.parametrize("fam,expected", [("MD5", "SHA-384 or SHA-512"), ("SHA1", "SHA-384 or SHA-512"),
+                                          ("RC4", "AES-256"), ("3DES", "AES-256"), ("DES", "AES-256")])
+def test_cnsa2_minimum_replaces_the_nist_row_for_weak_algorithms(fam, expected):
+    out = remediation.suggest({"classification": "deprecated_weak", "algorithm_family": fam},
+                              profile="us-cnsa2")
+    assert [o["use"] for o in out["options"]] == [f"{expected} (CNSA 2.0, all classification levels)"]
+    assert out["options"][0]["sources"][0]["url"] == profiles.PROFILES["us-cnsa2"]["url"]
+    assert "follows" not in out
+
+
+def test_a_profile_without_a_checked_minimum_keeps_nist_and_says_so():
+    out = remediation.suggest(MD5, profile="de-bsi")
+    assert out["options"][0]["use"].startswith("SHA-256")
+    assert out["follows"].startswith("NIST")
+
+
+def test_an_unstandardised_pqc_finding_is_not_given_a_hash():
+    out = remediation.suggest({"classification": "deprecated_weak", "algorithm_family": "MD5",
+                               "pqc_family": "X"}, profile="us-cnsa2")
+    assert "standardised" in out["options"][0]["use"]
+
+
+def test_the_weak_rsa_first_step_says_it_is_nist_under_a_profile():
+    out = remediation.suggest({**RSA, "weak_key": True}, profile="fr-anssi")
+    assert out["first_step_follows"].startswith("NIST")
+    assert "first_step_follows" not in remediation.suggest({**RSA, "weak_key": True})
