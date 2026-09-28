@@ -113,6 +113,25 @@ classes a key is loaded through (`jose.JWKRSA.load(...)`, `jose.ComparableRSAKey
 signature OIDs of Python's `cryptography` (`SignatureAlgorithmOID.RSA_WITH_SHA1`): certbot creates
 its ACME account key as `jose.JWKRSA(...)`, and that line, with 28 more like it, was no finding.
 
+Since 0.27.0 also RSA without padding -- `RSA_private_encrypt`, `RSA_public_decrypt`,
+`RSA_padding_add_none`, `RSA_NO_PADDING`, the raw oracle the 2026 forgery of 1024-bit signatures
+needs (ePrint 2026/2131); until then the four were found only when something else on the line
+named RSA. And the type and enum vocabularies of the libraries that carry the algorithm in a name:
+Java's `RSAPublicKeySpec`, `DSAPrivateKey`, `DSAParams`; auth0's `Algorithm.RSA256`; the WebCrypto
+and JOSE names `"RSASSA-PKCS1-v1_5"` and `"RSA-PSS"`; Mbed TLS's `mbedtls_rsa_*` and
+`MBEDTLS_PK_RSA`; `OPENSSL_KEYTYPE_RSA`, `TPM_ALG_RSA*`, `x509.DSAWithSHA256`, `KeyType.RSA`;
+Go's `*rsa.PublicKey`; .NET's `RSASignaturePadding.Pss`; and a JWK's `"kty": "RSA"`. These are
+case-sensitive: `rsaKey` is a variable, `RSAKey` is a type.
+
+Where they came from, and what they did. An independent labeller read 34,967 chunks of
+185 public repositories; 45 of them were set aside before labelling and not read while the rules
+were written. Chunks where the labeller sees an algorithm named in the text and the scanner reports
+nothing of that family: **1,068 → 967 (-9%) on the 140 the rules were written from, 167 → 155 (-7%)
+on the 45 they had never seen.** The two move together, so the rules carry over rather than fit;
+both are modest, because most of what remains is a bare word or a name without an operation, which
+this tool does not count on purpose. The labeller is a model, not ground truth: these are counts of
+disagreement, not recall.
+
 **Cipher suites, decomposed** — `ECDHE-RSA-AES128-GCM-SHA256` is ECDH *and* RSA, and
 `DHE-DSS-…` and `DES-CBC3-SHA` name families that reading the suite as one word never sees.
 IANA `TLS_*` names are read the same way. A banned component is not a use: `!MD5` and `!3DES`
@@ -550,7 +569,8 @@ And in C `RSA_public_decrypt` verifies a signature; a switch that handles it tog
 `RSA_PUBLIC_ENCRYPT` was called key establishment (the five above).
 
 **0.25.0** reads the raw RSA signature operations of C (`RSA_public_decrypt`, `RSA_private_encrypt`)
-as signature, and the other group spellings (`Group::`, `NamedGroup`, `kx_group`, `kem_group`,
+as signature (a role is only put on a finding, and until 0.27.0 those two lines were found only when
+something else on the line named RSA), and the other group spellings (`Group::`, `NamedGroup`, `kx_group`, `kem_group`,
 `group.supported`, `supported_groups`, `negotiated_curve`). Measured on BoringSSL and rustls, which
 these rules had not seen (frozen at `b8bd5ce`, seed 20260930):
 
