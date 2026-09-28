@@ -299,6 +299,34 @@ def test_rs256_reached_through_an_attribute_is_still_rsa(tmp_path):
     assert "RSA" in families, f"jose.RS256 is an RSA signature algorithm, got {families}"
 
 
+def test_an_rsa_key_reached_through_a_library_class_is_rsa(tmp_path):
+    """`jose.JWKRSA.load(...)`, `jose.ComparableRSAKey(...)`, `SignatureAlgorithmOID.RSA_WITH_SHA1`.
+
+    Found by the labeller re-run against 0.25 on certbot: `JWKRSA` is in 19 files and
+    produced 0 occurrences, and it covered 13 of the 23 RSA candidates left. Each of these
+    loads an RSA key or hands an RSA identifier to an API -- qscan's `uncommon` class
+    (`x509.ParsePKCS1PrivateKey`) is the same shape. The key file's name on its own
+    (`'rsa512_key.pem'`) and a symmetric JWK stay what they are.
+    """
+    for name, text in (
+        ("dns_test_common.py", 'KEY = jose.JWKRSA.load(test_util.load_vector("rsa512_key.pem"))\n'),
+        ("test_util.py", "    return jose.ComparableRSAKey(loader(\n"),
+        ("ocsp_test.py", "        signature_algorithm_oid=x509.oid.SignatureAlgorithmOID.RSA_WITH_SHA1,\n"),
+    ):
+        src = tmp_path / name
+        src.write_text(text, encoding="utf-8")
+        families = {f["algorithm"] for f in scan_source_file(src, name)}
+        assert "RSA" in families, f"{name}: {text.strip()!r} gave {families}"
+    for name, text in (
+        ("vectors.py", "KEY_PATH = test_util.vector_path('rsa512_key.pem')\n"),
+        ("hmac.py", "key = jose.JWKOct(key=b'secret')\n"),
+    ):
+        src = tmp_path / name
+        src.write_text(text, encoding="utf-8")
+        families = {f["algorithm"] for f in scan_source_file(src, name)}
+        assert "RSA" not in families, f"{name}: {text.strip()!r} is not RSA, got {families}"
+
+
 def test_an_rsa_key_size_setting_is_an_rsa_declaration(tmp_path):
     """`rsa_key_size=2048` in a defaults module, and `--rsa-key-size` on the CLI.
 

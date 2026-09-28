@@ -129,6 +129,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bcreate(?:Sign|Verify)\(\s*[\"'](?:RSA-)?SHA\d+[\"']|"
         r"\bcreate(?:Sign|Verify)\(\s*[\"']RSA[-\w]*[\"']|"
         r"\bRsaPrivateKey\b|\bRsaPublicKey\b|"
+        # josepy's RSA key classes, and the signature OIDs of Python's `cryptography`.
+        # certbot loads its account keys as `jose.JWKRSA.load(...)` in 19 files and none
+        # was a finding.
+        r"\bJWKRSA\b|\bComparableRSAKey\b|\bRSA_WITH_(?:MD5|SHA)\w*|"
         r"\bCKM_RSA_\w+|"
         # The names protocols and APIs use for the key type itself. OpenSSH's default
         # algorithm list, sshd_config, Vault's key types and AWS key specs name RSA

@@ -108,7 +108,10 @@ SHA-1, RC4 and DES/3DES. Not only through library calls: the names the protocols
 (`ssh-rsa`, `rsa-sha2-512`, `ssh-dss`, key types such as `rsa-2048` and `RSA_4096`), the modern
 OpenSSL 3 form where the algorithm is a string argument (`EVP_PKEY_Q_keygen(libctx, propq,
 "RSA", bits)`, the `EVP_*_fetch` calls), and the hash idioms people actually write
-(`hashes.MD5()`, `hashlib.new('md5')`, `MD5Init`, `<sha1.h>`, Go `sha1.Sum`).
+(`hashes.MD5()`, `hashlib.new('md5')`, `MD5Init`, `<sha1.h>`, Go `sha1.Sum`). Since 0.26.0 also the
+classes a key is loaded through (`jose.JWKRSA.load(...)`, `jose.ComparableRSAKey(...)`) and the
+signature OIDs of Python's `cryptography` (`SignatureAlgorithmOID.RSA_WITH_SHA1`): certbot creates
+its ACME account key as `jose.JWKRSA(...)`, and that line, with 28 more like it, was no finding.
 
 **Cipher suites, decomposed** — `ECDHE-RSA-AES128-GCM-SHA256` is ECDH *and* RSA, and
 `DHE-DSS-…` and `DES-CBC3-SHA` name families that reading the suite as one word never sees.
