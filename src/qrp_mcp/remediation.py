@@ -130,7 +130,11 @@ _KEY_ESTABLISHMENT = re.compile(
     # TLS spellings: `EC_GROUP_new` and `ecp_group` are the curve's mathematical group and
     # say nothing about the role.
     r"|(?<![a-z_])groups\s*[=:(]|groups_list|tls_group|[+-]group-|selected_group"
-    r"|have_group_|(?<![a-z_])group\(|(?<![a-z])-groups(?![a-z])"
+    # `group(` only with a curve or group name inside: BoringSSL's C++ `group()` returns the
+    # curve's mathematical group, and the bare form called seven such lines key
+    # establishment in the 0.25 measurement.
+    r"|have_group_|(?<![a-z_])group\(\s*(secp|x25519|x448|ffdhe|brainpool|p-?\d)"
+    r"|(?<![a-z])-groups(?![a-z])"
     # 0.25: the other spellings met in s2n-tls and wolfSSL (4 of 40 group lines were read).
     r"|(?<![a-z_])group::|group\.(supported|negotiated)|kem_group|groupinformation|kx_?group"
     r"|->group\[|(?<![a-z_])groups\[|namedgroup|supported_groups|negotiated_curve|kex_params"

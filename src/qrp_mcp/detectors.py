@@ -938,6 +938,26 @@ def _in_blob(pos: int, spans: list[tuple[int, int]]) -> bool:
     return any(start <= pos < end for start, end in spans)
 
 
+def _masked(line: str, spans: list[tuple[int, int]]) -> str:
+    """The line with the inside of each blob blanked, for searching only.
+
+    A match that starts inside a blob is thrown away anyway, but searching through the
+    blob first cost time that grows with the square of its length: a pattern that opens
+    with `\\w*` walks to the end of the run from every position in it. One ML-DSA test
+    vector line of 9,272 hex digits took 2.8 s for the 48 patterns, and BoringSSL has
+    12,921 lines over 2,000 characters -- the scan never finished (2026-09-28). The first
+    and last character stay, so a look-behind at the edge of a blob sees what it saw
+    before; positions do not move, so every offset still points into the real line.
+    """
+    if not spans:
+        return line
+    chars = list(line)
+    for start, end in spans:
+        for i in range(start + 1, end - 1):
+            chars[i] = " "
+    return "".join(chars)
+
+
 # What kind of evidence a line is. Asked for by an external audit and by a
 # measured precision gap: a bare word in a comment and a real call site looked
 # alike, and the same algorithm was reported twice -- once where its module is
@@ -1238,6 +1258,7 @@ def scan_source_file(path: Path, rel_path: str,
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
         blobs = _blob_spans(line)
+        searched = _masked(line, blobs)
         for algorithm, description, pattern in ALGORITHM_PATTERNS:
             if algorithm in seen_on_line:
                 continue
@@ -1245,7 +1266,7 @@ def scan_source_file(path: Path, rel_path: str,
             # and allow the same family -- "ALL:!ECDH:ECDHE-RSA-AES256" -- and
             # judging the line by its first match would throw the real use away
             # along with the exclusion.
-            matches = [m for m in pattern.finditer(line) if not _in_blob(m.start(), blobs)]
+            matches = [m for m in pattern.finditer(searched) if not _in_blob(m.start(), blobs)]
             if not matches:
                 continue
             if cipher_exclusions and all(_is_excluded(line, m.start()) for m in matches):

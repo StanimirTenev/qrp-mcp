@@ -227,3 +227,13 @@ def test_raw_rsa_encryption_operations_stay_key_establishment():
 ])
 def test_other_tls_group_spellings_are_key_establishment(line):
     assert _r(line, "EC") == "key_establishment"
+
+
+@pytest.mark.parametrize("line", [
+    "UniquePtr<EC_POINT> p1(EC_POINT_new(group()));",
+    "ASSERT_TRUE(EC_POINT_mul(group(), point2.get(), forty_two.get(), nullptr,",
+    "ASSERT_TRUE(EC_POINT_add(group(), p.get(), p.get(), pub2, nullptr));",
+])
+def test_a_cpp_group_accessor_is_not_a_tls_group(line):
+    # BoringSSL, 0.25 measurement: seven lines like these were called key establishment.
+    assert _r(line, "EC") == "undetermined"

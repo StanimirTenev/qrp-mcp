@@ -219,6 +219,16 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
 }
 ```
 
+### Very long lines
+
+A test-vector line can carry tens of thousands of hex digits. Until 0.25.0 every pattern searched
+through such a run before the match was thrown away as sitting inside a blob, and the cost grew
+with the square of the run's length: one 9,272-digit ML-DSA vector took 2.8 s for the 48 patterns,
+and a scan of BoringSSL (12,921 lines over 2,000 characters) did not finish. Now the inside of a
+blob is blanked before searching — positions and the blob's edge characters stay — and BoringSSL
+takes 18 minutes. On nine corpora (certbot, OpenSSH, Vault, OpenSSL, curl, Mbed TLS, wolfSSL,
+s2n-tls, rustls) every piece of evidence is identical before and after.
+
 ## What the coverage block says
 
 Every scan carries one, because a coverage figure without its conditions is not comparable to
@@ -462,11 +472,18 @@ profile; only `replacement` changes, and the result names the profile in `replac
 document addresses — CNSA 2.0 is written for US National Security Systems, the ECCG list for EU
 product certification, the NCSC paper for OFFICIAL-tier and enterprise data. Choosing one does
 not make it law for the reader, and the tool makes no legal finding. For the weak algorithms
-(MD5, SHA-1, RC4, DES, 3DES) an authority's own minimum replaces NIST's row where it has been
-checked against the text — today CNSA 2.0: SHA-384 or SHA-512, and AES-256, "for all
-classification levels". Under every other profile NIST's row stays and the result says so in
-`follows`; so does the first step for an RSA key under 2048 bits (`first_step_follows`), for which
-no national minimum has been checked. A role an authority does not fill is left out
+(MD5, SHA-1, RC4, DES, 3DES) and for the first step of an RSA key under 2048 bits, an
+authority's own minimum replaces NIST's row where it has been checked against the text:
+
+| profile | weak hash → | weak cipher → | RSA under 2048, now → |
+| --- | --- | --- | --- |
+| `us-cnsa2` | SHA-384 or SHA-512 | AES-256 | (CNSA 2.0 admits no RSA; NIST's step) |
+| `de-bsi` | SHA-256/384/512, SHA-512/256, SHA3 (Table 4.1) | NIST's | at least 3000 bits |
+| `fr-anssi` | ≥ 256-bit output; ≥ 384 for post-quantum security | AES-128; AES-192/256 for post-quantum security | 2048 until 2030, 3072 from 2031 (3072 recommended now) |
+| `au-ism` | SHA-384 or SHA-512 (224/256 not beyond 2030) | AES-128/192/256, preferably 256 | at least 2048, preferably 3072; RSA not beyond 2030 |
+| `ca-cccs` | NIST's | NIST's | at least 2048, at least 3072 by the end of 2030 |
+
+Where a cell says NIST's, the result says so in `follows` or `first_step_follows`. A role an authority does not fill is left out
 rather than filled with NIST's answer: the ISM names no hash-based signature, so `au-ism` offers
 none. Documents change — the ISM quarterly, TR-02102-1 yearly — and each profile carries its
 version and address so a stale one can be recognised.
@@ -528,6 +545,24 @@ its groups `Group::secp384r1`, `"group.supported.secp256r1"`, `kem_group`; wolfS
 the rule was written from Mbed TLS's spellings, and 15 of 17 s2n-tls group lines stay undetermined.
 And in C `RSA_public_decrypt` verifies a signature; a switch that handles it together with
 `RSA_PUBLIC_ENCRYPT` was called key establishment (the five above).
+
+**0.25.0** reads the raw RSA signature operations of C (`RSA_public_decrypt`, `RSA_private_encrypt`)
+as signature, and the other group spellings (`Group::`, `NamedGroup`, `kx_group`, `kem_group`,
+`group.supported`, `supported_groups`, `negotiated_curve`). Measured on BoringSSL and rustls, which
+these rules had not seen (frozen at `b8bd5ce`, seed 20260930):
+
+| corpus | crypt/group lines assigned | `key_establishment` | `signature` | `undetermined` with the role visible |
+| --- | --- | --- | --- | --- |
+| rustls `99f2358` | 18 / 18 | 20 / 20 | 30 / 30 | 2 / 20 |
+| BoringSSL `5112448` | **1 / 3** | **14 / 20** | 30 / 30 | 2 / 20 |
+
+🔴 **Seven wrong roles in BoringSSL, one cause, and it was in 0.24.0 as released:** the rule for
+`group(` — written for Mbed TLS's `psk_ephemeral group(secp256r1)` — also took BoringSSL's C++
+accessor `group()`, which returns the curve's mathematical group, as a TLS group
+(`EC_POINT_mul(group(), …)` → key establishment). 0.25.0 accepts `group(` only with a curve or group
+name inside. That narrows the rule and cannot add a role: on BoringSSL exactly 95 lines change, all
+from key establishment to undetermined, all `group()`. The seven are among them. The fix itself was
+not measured on a corpus it had not seen.
 
 ## Measured against the other scanners
 
