@@ -43,7 +43,10 @@ _KEM = {"use": "ML-KEM (ML-KEM-768 or ML-KEM-1024)", "for": "key establishment",
 _SIG = {"use": "ML-DSA (ML-DSA-65 or ML-DSA-87), or SLH-DSA where a hash-based scheme is wanted",
         "for": "signatures", "standards": ["FIPS 204", "FIPS 205", "NIST IR 8547"]}
 _SIG_FIRMWARE = {"use": "LMS/HSS or XMSS", "for": "firmware and code signing with a bounded "
-                 "number of signatures (stateful: the signer must never reuse a state)",
+                 "number of signatures (stateful: the signer must never reuse a state -- and "
+                 "restoring the key from a backup, or copying it to a second module, reuses one; "
+                 "SP 800-208 prohibits exporting the key and, in Sec. 7, splits it across modules "
+                 "as a two-level HSS or XMSS^MT instead)",
                  "standards": ["SP 800-208"]}
 _HYBRID = ("During the transition a hybrid (classical + post-quantum) is accommodated; NIST "
            "treats it as temporary, leading to post-quantum only (NIST IR 8547 Sec. 3.2).")

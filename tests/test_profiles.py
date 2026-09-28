@@ -186,3 +186,17 @@ def test_bsi_has_no_checked_cipher_minimum_so_nist_stays():
     out = remediation.suggest({"classification": "deprecated_weak", "algorithm_family": "3DES"},
                               profile="de-bsi")
     assert out["follows"].startswith("NIST")
+
+
+def test_the_firmware_suggestion_names_the_backup_that_reuses_a_state():
+    """LMS/XMSS are suggested for firmware signing, and "never reuse a state" was all the
+    warning said. The likeliest way to reuse one is the habit every team has: restoring the
+    key from a backup, or copying it to a second module. SP 800-208 prohibits exporting the
+    private key and in Section 7 splits it across modules instead. Promised publicly on
+    2026-09-28.
+    """
+    ec = {"classification": "classical_vulnerable", "algorithm_family": "ECDSA"}
+    firmware = [o for o in remediation.suggest(ec)["options"] if o["for"].startswith("firmware")]
+    assert firmware, "no firmware option"
+    text = firmware[0]["for"]
+    assert "backup" in text and "Sec. 7" in text, text

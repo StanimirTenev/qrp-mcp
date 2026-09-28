@@ -1,3 +1,4 @@
+import pytest
 from pathlib import Path
 
 from qrp_mcp.detectors import is_ci_config_file, is_iac_file, scan_iac_file, scan_repo, scan_source_file
@@ -325,6 +326,88 @@ def test_an_rsa_key_reached_through_a_library_class_is_rsa(tmp_path):
         src.write_text(text, encoding="utf-8")
         families = {f["algorithm"] for f in scan_source_file(src, name)}
         assert "RSA" not in families, f"{name}: {text.strip()!r} is not RSA, got {families}"
+
+
+def test_raw_rsa_is_found_on_a_line_of_its_own(tmp_path):
+    """The four C spellings of RSA without padding -- the raw oracle that the 2026 forgery
+    (Shea, Haller, Suhl, Heninger, Thome, ePrint 2026/2131) needs.
+
+    0.26 found one of the four, `CKM_RSA_X_509`. 0.25 taught the ROLE of
+    `RSA_private_encrypt` (signature), but a role is only ever put on a finding, and the
+    detector knew the encryption pair (`RSA_public_encrypt`, `RSA_private_decrypt`) and not
+    the signature pair -- so the line alone was invisible, and the README promised more than
+    the code did. Said publicly under a post on 2026-09-28; this pins it.
+    """
+    for i, line in enumerate((
+        "rv = RSA_private_encrypt(len, in, out, rsa, RSA_PKCS1_PADDING);",
+        "n = RSA_public_decrypt(siglen, sig, out, rsa, RSA_PKCS1_PADDING);",
+        "if (!RSA_padding_add_none(to, tlen, from, flen))",
+        "int pad = RSA_NO_PADDING;",
+    )):
+        src = tmp_path / f"raw{i}.c"
+        src.write_text(line + "\n", encoding="utf-8")
+        families = {f["algorithm"] for f in scan_source_file(src, src.name)}
+        assert "RSA" in families, f"{line!r} gave {families}"
+    src = tmp_path / "sym.c"
+    src.write_text("EVP_CIPHER_CTX_set_padding(ctx, 0); /* NO_PADDING for AES-CTR */\n",
+                   encoding="utf-8")
+    assert "RSA" not in {f["algorithm"] for f in scan_source_file(src, src.name)}
+
+
+# Library API vocabularies found by the corpus of 2026-09-28: Jev labels over 140 public
+# repositories (the 45 held out were not read), compared with 0.26. Each group is a whole
+# vocabulary, not the one member the labeller hit. Case-sensitive on purpose: `rsaKey` and
+# `dsaparams` are variable names, `RSAKey` and `DSAParams` are types.
+LIBRARY_API_CASES = [
+    ("RSA", "Java JCA types", "RSAPublicKeySpec spec = new RSAPublicKeySpec(n, e);"),
+    ("RSA", "Java JCA types", "import java.security.interfaces.RSAKey;"),
+    ("DSA", "Java JCA types", "DSAPrivateKey priv = (DSAPrivateKey) kp.getPrivate();"),
+    ("DSA", "Java JCA types", "DSAParams params = key.getParams();"),
+    ("DSA", "Bouncy Castle", "DsaKeyPairGenerator gen = new DsaKeyPairGenerator();"),
+    ("RSA", "auth0 java-jwt", "Algorithm algorithm = Algorithm.RSA256(publicKey, privateKey);"),
+    ("RSA", "auth0 java-jwt", "RSAKeyProvider provider = mock(RSAKeyProvider.class);"),
+    ("ECDSA", "auth0 java-jwt", "Algorithm a = Algorithm.ECDSA384(key);"),
+    ("ECDSA", "auth0 java-jwt", "ECDSAKeyProvider provider = new Provider();"),
+    ("RSA", "WebCrypto names", "{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }"),
+    ("RSA", "WebCrypto names", 'alg = {"name": "RSA-PSS", "saltLength": 32}'),
+    ("RSA", "Mbed TLS", "mbedtls_rsa_context *rsa = mbedtls_pk_rsa(pk);"),
+    ("RSA", "Mbed TLS", "if (mbedtls_pk_get_type(&pk) != MBEDTLS_PK_RSA)"),
+    ("RSA", "enum families", "$cfg = ['private_key_type' => OPENSSL_KEYTYPE_RSA];"),
+    ("DSA", "enum families", "case OPENSSL_KEYTYPE_DSA:"),
+    ("RSA", "enum families", "case TPM_ALG_RSASSA: return COSE_ALG_A;"),
+    ("ECDSA", "enum families", "if (alg == TPM_ALG_ECDSA)"),
+    ("DSA", "enum families", "case x509.DSAWithSHA256:"),
+    ("ECDSA", "enum families", "case x509.ECDSAWithSHA384:"),
+    ("RSA", "enum families", "if key.Type == KeyType.RSA {"),
+    ("RSA", "Go types", "func sign(key *rsa.PrivateKey) {"),
+    ("RSA", "Go types", "k, err := jwt.ParseRSAPrivateKeyFromPEM(pem)"),
+    ("RSA", ".NET", "rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);"),
+    ("RSA", "JWK key type", 'if obj.get("kty") != "RSA":'),
+    ("RSA", "JWK key type", '"kty": "RSA",'),
+]
+
+
+@pytest.mark.parametrize("family,group,line", LIBRARY_API_CASES)
+def test_a_library_api_names_its_algorithm(tmp_path, family, group, line):
+    src = tmp_path / "lib.txt.py"
+    src.write_text(line + "\n", encoding="utf-8")
+    families = {f["algorithm"] for f in scan_source_file(src, src.name)}
+    assert family in families, f"{group}: {line!r} gave {families}"
+
+
+@pytest.mark.parametrize("line", [
+    "rsaKey = load_key(path)",
+    "rsakey = keys_wrapper.get()",
+    "dsaparams = None",
+    'label = "RSA"',
+    "ssh_keys = ['id_rsa', 'id_dsa']",
+    "KEYFILE = 'rsa_privkey.json'",
+])
+def test_a_name_without_an_operation_is_still_not_a_library_api(tmp_path, line):
+    src = tmp_path / "names.py"
+    src.write_text(line + "\n", encoding="utf-8")
+    families = {f["algorithm"] for f in scan_source_file(src, src.name)}
+    assert not families & {"RSA", "DSA", "ECDSA"}, f"{line!r} gave {families}"
 
 
 def test_an_rsa_key_size_setting_is_an_rsa_declaration(tmp_path):

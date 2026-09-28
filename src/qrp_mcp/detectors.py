@@ -149,6 +149,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"KeyPairGenerator\.getInstance\(\s*[\"']RSA[\"']|openssl\s+genrsa|-newkey\s+rsa|"
         # C / OpenSSL: the library's own API, which is what a C tree actually contains.
         r"\bRSA_new\b|\bRSA_generate_key\w*|\bRSA_public_encrypt\b|\bRSA_private_decrypt\b|"
+        # The signature pair and RSA without padding -- the raw oracle the 2026 forgery
+        # needs (ePrint 2026/2131). 0.25 gave these a role, but a role is put only on a
+        # finding, and none of the four was one: a line of its own was invisible.
+        r"\bRSA_private_encrypt\b|\bRSA_public_decrypt\b|\bRSA_padding_add_none\b|\bRSA_NO_PADDING\b|"
         r"\bEVP_PKEY_RSA\b|\bEVP_RSA_gen\b|\bPEM_read_\w*RSA\w*|\bd2i_RSA\w*|"
         # .NET / PowerShell: a Windows estate keeps its certificate handling here.
         r"\bRSACryptoServiceProvider\b|\bRSACng\b|\bRSAOpenSsl\b|\bRSA\.Create\b|"
@@ -266,6 +270,27 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # string in a quoted argument. Measured: 35 such lines in Vault, 1 in certbot,
     # 9 in the qscan corpus. Quoted or as a library constant, so that the word in
     # a sentence stays what it is -- a word in a sentence.
+    # Library API vocabularies, from the corpus of 2026-09-28: Jev labels over 140 public
+    # repositories compared with 0.26 (the 45 held out for measurement were not read). Each
+    # branch is a whole vocabulary, not the one member the labeller happened to hit.
+    # Case-SENSITIVE, unlike "RSA usage": `RSAKey` and `DSAParams` are types, `rsaKey` and
+    # `dsaparams` are variable names -- a name without an operation, like `ssl_dhparams`.
+    ("RSA", "RSA named by a library API", re.compile(
+        r"\bRSA(?:Public|Private|PrivateCrt)?KeySpec\b|\bRSAKey(?:Provider)?\b|"   # JCA, auth0
+        r"\bAlgorithm\.RSA(?:256|384|512)\b|"                                       # auth0 java-jwt
+        r"[\"'](?:RSASSA-PKCS1-v1_5|RSASSA-PSS|RSA-PSS)[\"']|"                      # WebCrypto, JOSE
+        r"\bmbedtls_rsa_\w+|\bMBEDTLS_PK_RSA\w*|\bMBEDTLS_RSA_\w+|"                 # Mbed TLS
+        r"\bOPENSSL_KEYTYPE_RSA\b|\bTPM_ALG_RSA\w*|\bKeyType\.RSA\b|"             # enum families
+        r"\*?\brsa\.(?:PublicKey|PrivateKey)\b|\bParseRSA(?:Private|Public)KeyFromPEM\b|"  # Go
+        r"\bRSA(?:Signature|Encryption)Padding\.\w+|"                               # .NET
+        # A JWK names its key type in `kty`; the value in any other field is a label.
+        r"\bkty[\"']?\s*(?::|==|!=|=)\s*[\"']RSA[\"']|[\"']kty[\"']\)\s*(?:==|!=)\s*[\"']RSA[\"']",
+    )),
+    ("DSA", "DSA named by a library API", re.compile(
+        r"\bDSA(?:Public|Private)Key(?:Spec)?\b|\bDSAParams\b|"                     # JCA
+        r"\bDsa(?:KeyPair|Parameters)Generator\b|"                                  # Bouncy Castle
+        r"\bOPENSSL_KEYTYPE_DSA\b|\bx509\.DSAWithSHA\d+\b|\bKeyType\.DSA\b",
+    )),
     ("RSA", "RSA named as a JOSE/JWT algorithm", re.compile(
         r"[\"'](?:RS|PS)(?:256|384|512)[\"']|"
         r"\bSigningMethod(?:RS|PS)(?:256|384|512)\b|\bAlgorithm::(?:RS|PS)(?:256|384|512)\b|"
