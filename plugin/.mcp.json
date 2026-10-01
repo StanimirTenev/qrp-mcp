@@ -2,7 +2,9 @@
   "mcpServers": {
     "qrp": {
       "command": "uvx",
-      "args": ["qrp-mcp"]
+      "args": [
+        "qrp-mcp==0.27.1"
+      ]
     }
   }
 }
