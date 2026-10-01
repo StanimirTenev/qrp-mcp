@@ -398,6 +398,38 @@ cryben corpus of Näther & Hirsch — are 100% synthetic fixtures with no test/p
 distinction. The rule here is a path convention, not a fact, so it is printed with the
 numbers it produced; a reader who disagrees with the rule can see exactly what it caught.
 
+## What a TLS line does not establish
+
+A line that configures TLS — `ssl_ecdh_curve`, `SSLOpenSSLConfCmd Curves`, `ssl_protocols`,
+`MinVersion` — is what this server **asks for**, not what a connection **got**. The group is
+settled where TLS terminates, together with the client, and that may be a proxy, a load
+balancer or a CDN that is not in the tree. A CDN that upgrades origins on its own makes a
+domain show `X25519MLKEM768` that nobody in the organisation configured; a classical
+terminator in front of a post-quantum origin does the reverse.
+
+This scanner reads files, so on the first case it reports the origin as classical: right
+about the file, silent about the wire. Since 0.27.1 it says so, wherever it read TLS
+configuration and nowhere else:
+
+```json
+"tls_termination": {
+  "statement": "These files configure TLS. This scan reads files, not connections. ...",
+  "configured_in": [
+    {"path": "certbot/src/certbot/_internal/plugins/apache/tls_configs/current-options-ssl-apache.conf", "line": 11, "basis": "configured_group"}
+  ]
+}
+```
+
+`basis` is `configured_group` for a setting that chooses key-exchange groups and
+`configured_protocol` for a pinned version. `null` when the tree configures no TLS; SSH
+configuration is not counted here. On certbot: 23 places (22 protocol pins, 1 group
+setting); on OpenSSH: none. It stays out of the CBOM, like `files_read`.
+
+⚠️ What is not claimed: that the tree's TLS settings are all listed, or which terminator is in
+front. The scanner cannot see a connection; the field says that, not what the connection is.
+Raised in public on 1 October 2026, where a measurement at the front door met the same gap
+from the other side.
+
 ## Whether a fix closed it
 
 A finding missing from the second scan has not necessarily been fixed. It may have moved down

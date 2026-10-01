@@ -495,3 +495,57 @@ def scan_protocols(line: str) -> list[dict[str, Any]]:
                             + "; the algorithms it offers are the lines it names."),
         })
     return out
+
+
+# -- Where TLS terminates is not in the files ------------------------------------------
+#
+# A line that configures TLS is what this server asks for, not what a connection got.
+# The group is settled where TLS terminates -- here, or at a proxy, load balancer or CDN
+# in front -- together with the client. A CDN that upgrades origins on its own makes a
+# domain show X25519MLKEM768 that nobody in the organisation configured; a classical
+# terminator in front of a post-quantum origin does the reverse. This scanner reads
+# files, so on the first case it reports the origin as classical: right about the file,
+# silent about the wire. Raised in public on 2026-10-01 (G. Ivanov) and promised there.
+#
+# Said only where TLS configuration was read. Said everywhere, it is boilerplate.
+
+# A setting that chooses TLS key-exchange groups. Matched only on a line where an
+# algorithm was already found, so `groups = admin` in an .ini configures nothing.
+_TLS_GROUP_SETTING = re.compile(
+    r"ssl_ecdh_curve|set_ecdh_curve|ecdhCurve|ecdh_curves|"
+    r"(?:ssl_conf_command|SSLOpenSSLConfCmd)\s+(?:groups|curves)|"
+    r"^\s*(?:groups|curves)\s*=|CurvePreferences|namedGroups|"
+    r"set1_(?:groups|curves)|supported_groups",
+    re.IGNORECASE)
+
+_COMMENT_START = ("#", ";", "//", "--", "/*", "*")
+
+TLS_TERMINATION = (
+    "These files configure TLS. This scan reads files, not connections. The key "
+    "exchange a connection negotiates is settled where TLS terminates -- this server, "
+    "or a proxy, load balancer or CDN in front of it -- together with the client, and "
+    "a terminator outside the files read can negotiate a different group from the one "
+    "configured here, in either direction. A post-quantum group seen on the wire does "
+    "not show that these files changed; a classical group configured here does not "
+    "show that the wire is classical.")
+
+
+def tls_termination(scan_result: dict[str, Any]) -> dict[str, Any] | None:
+    """Where this tree configures TLS, and what that does not establish. None when it
+    configures none."""
+    places: set[tuple[str, int, str]] = set()
+    for asset in scan_result.get("protocol_findings") or []:
+        if (asset.get("protocol") == "tls"
+                and not asset.get("excerpt", "").lstrip().startswith(_COMMENT_START)):
+            places.add((asset["path"], asset["line"], "configured_protocol"))
+    for key in ("source_code_findings", "ci_pipeline_findings", "iac_findings"):
+        for item in scan_result.get(key) or []:
+            if (item.get("evidence_kind") != "comment"
+                    and _TLS_GROUP_SETTING.search(item.get("excerpt", ""))):
+                places.add((item["path"], item["line"], "configured_group"))
+    if not places:
+        return None
+    return {
+        "statement": TLS_TERMINATION,
+        "configured_in": [{"path": p, "line": n, "basis": b} for p, n, b in sorted(places)],
+    }

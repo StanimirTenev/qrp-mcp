@@ -8,7 +8,7 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import __version__, certificates, coverage, detectors, profiles, remediation
+from . import __version__, assets, certificates, coverage, detectors, profiles, remediation
 from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint
 
 
@@ -134,6 +134,10 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             "meaning": "whether the finding sits in test code; named, not excluded",
             "counted": False,
         }),
+        # Where the tree configures TLS, and that a terminator outside it may negotiate
+        # otherwise. None when nothing here configures TLS. Outside `coverage`, so it
+        # does not travel into the CBOM.
+        "tls_termination": assets.tls_termination(scan_result),
         "named_but_not_used": scan_result["named_but_not_used"],
         "unreadable_files": scan_result["unreadable_files"],
         "symlinks_not_followed": scan_result["symlinks_not_followed"],
