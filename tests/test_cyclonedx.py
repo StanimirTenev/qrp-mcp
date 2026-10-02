@@ -521,3 +521,37 @@ def test_a_family_used_in_both_places_is_not_excluded(tmp_path):
     assert rsa_scope <= {None, "required"}, (
         f"RSA runs in production here and is only ALSO in a fixture; marking it "
         f"non-runtime would mislead, got {rsa_scope}")
+
+
+def test_every_file_not_read_is_named(scan):
+    """Joel Hillier's CAP-1 draft, R1: a count alone is not an accounting. On
+    certbot at 0.27.2, 48 of the 427 files not read were named and 379 were a
+    count by extension -- the remainder that reconciles only by arithmetic, and a
+    CAP-1 verifier refuses it. Promised publicly on 2 Oct 2026 that they would be
+    named. Every reason that carries a count now carries the paths it counts."""
+    for entry in scan["coverage"]["not_examined"]:
+        assert "paths" in entry, f"{entry['reason']} counts files it does not name"
+        assert len(entry["paths"]) == entry["count"], entry["reason"]
+        assert len(set(entry["paths"])) == len(entry["paths"])
+    gap = next(r for r in scan["coverage"]["not_examined"]
+               if r["reason"] == "type_not_claimed")
+    assert gap["count"] > 0, "the fixture must exercise the type gap"
+    by_ext: dict[str, int] = {}
+    for p in gap["paths"]:
+        from pathlib import PurePosixPath
+        ext = PurePosixPath(p).suffix.lower() or "(no extension)"
+        by_ext[ext] = by_ext.get(ext, 0) + 1
+    assert by_ext == gap["by_extension"]
+
+
+def test_the_names_travel_into_the_cbom(scan, document):
+    """The second of the three ways a result leaves: the names must reach the
+    exported document, not stop at the scan result."""
+    props = {p["name"]: p["value"] for p in document["properties"]}
+    gap_index = next(i for i, r in enumerate(scan["coverage"]["not_examined"])
+                     if r["reason"] == "type_not_claimed")
+    key = f"qrp:coverage:not_examined:{gap_index}:paths"
+    gap = scan["coverage"]["not_examined"][gap_index]
+    carried = (props[key].split(",") if key in props else
+               [v for k, v in props.items() if k.startswith(key + ":")])
+    assert sorted(carried) == sorted(gap["paths"])

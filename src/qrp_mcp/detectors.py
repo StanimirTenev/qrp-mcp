@@ -1478,6 +1478,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # with no base -- which is the thing this scanner exists to refuse.
     files_present = 0
     skipped_kinds: dict[str, int] = {}
+    skipped_files: list[str] = []
     present_kinds: dict[str, int] = {}
     excluded_dir_counts: dict[str, int] = {}
 
@@ -1529,6 +1530,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         if not (claimed or peeked_key):
             kind = path.suffix.lower() or "(no extension)"
             skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
+            skipped_files.append(rel_path)
             # Not read, so not hashed: its size is what is known about it without
             # opening a file this tool has declared it does not claim.
             try:
@@ -1661,6 +1663,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # extension. Not a gap in the scan -- a boundary of it, stated rather than
         # left for the reader to assume away.
         "files_left_out": left_out,
+        # The same files by name. A count alone is not an accounting: a reader
+        # given only "379 by extension" cannot ask about any one of them.
+        "files_skipped": sorted(skipped_files),
         "files_skipped_by_type": dict(
             sorted(skipped_kinds.items(), key=lambda kv: kv[1], reverse=True)
         ),

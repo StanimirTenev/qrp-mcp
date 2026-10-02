@@ -313,6 +313,11 @@ def build(
             "paths": unreadable,
         },
     ]
+    # Named as well as counted (Hillier's CAP-1, R1). Only where the scan recorded
+    # the names: a result assembled by hand without them keeps its count and is
+    # not given an empty list that would contradict it.
+    if scan_result.get("files_skipped") is not None:
+        not_examined[0]["paths"] = scan_result["files_skipped"]
     # File links are present, deliberately not read, and were missing from the
     # breakdown: the block knew exactly why the file was skipped and still
     # reported that its own arithmetic did not close. An external retest of

@@ -267,7 +267,10 @@ another coverage figure. Four things, each answering something the percentage ca
 - **scope** — the denominator, the numerator, and *every file that was in the first and not the
   second, with a reason*. The reasons are a closed set: `type_not_claimed` is a boundary this
   tool declares, `unreadable` is a failure it hit, and they are never collapsed. A reason with no
-  instances is reported at zero rather than omitted.
+  instances is reported at zero rather than omitted. From 0.27.3 every reason that carries a
+  count also carries the `paths` it counts, `type_not_claimed` included: a count alone is not an
+  accounting (R1 of the Coverage Attestation Profile, `draft-hillier-coverage-attestation-00`).
+  On certbot that names 379 files that were until then only a number by extension.
 
 Measured across five real repositories (certbot, OpenSSH, Vault, Bitcoin, OpenSSL) at this
 release, the scan reads **67% of the files present** — 74% of OpenSSL, 85% of OpenSSH, 66% of
@@ -844,7 +847,7 @@ images.
 
 Every file under the path is accounted for in one of three ways: **scanned**, **unreadable**,
 or **skipped because the tool does not claim that type** — the last counted by extension, so
-the coverage figure has a base. `files_scanned + unreadable_files + files_skipped_by_type`
+the coverage figure has a base, and from 0.27.3 named one by one in the coverage block (`not_examined` → `paths`). `files_scanned + unreadable_files + files_skipped_by_type`
 always equals `files_present`. A directory the scan cannot enter or list is named in
 `unreadable_directories`; its files cannot be counted, so the scan then says it cannot account
 for every file instead of claiming it read them all. A scan that read seven files out of nine is a different report
