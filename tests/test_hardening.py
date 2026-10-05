@@ -369,9 +369,25 @@ def test_occurrence_carries_the_matched_line(tmp_path):
 
 
 def test_unreadable_path_list_survives_a_comma_in_a_name():
+    """One shape whatever the names hold: a JSON array in one property. Until 0.28.0 a
+    comma in any name switched the list from one joined property to indexed ones, so
+    where the paths were depended on what they were called."""
+    import json
     from qrp_mcp.cyclonedx import _flatten
     flat = dict(_flatten({"paths": ["a,b.c", "c.c"]}))
-    assert flat == {"paths:0": "a,b.c", "paths:1": "c.c"}
+    assert flat == {"paths": '["a,b.c", "c.c"]'}
+    assert json.loads(flat["paths"]) == ["a,b.c", "c.c"]
+    assert dict(_flatten({"paths": ["c.c"]})) == {"paths": '["c.c"]'}
+    assert dict(_flatten({"paths": []})) == {"paths": "[]"}
+
+
+def test_a_list_of_linked_entries_named_paths_keeps_its_fields():
+    """`symlinks_not_followed.paths` holds objects, not names. Found by the positive
+    control on certbot while 0.28.0 was being built: the first version of the JSON
+    shape wrote each object as its Python repr, which reads back as nothing."""
+    from qrp_mcp.cyclonedx import _flatten
+    flat = dict(_flatten({"paths": [{"path": "a,b", "kind": "file"}]}))
+    assert flat == {"paths:0:path": "a,b", "paths:0:kind": "file"}
 
 
 def test_serial_changes_when_the_findings_change(tmp_path):

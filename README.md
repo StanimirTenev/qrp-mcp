@@ -271,6 +271,11 @@ another coverage figure. Four things, each answering something the percentage ca
   count also carries the `paths` it counts, `type_not_claimed` included: a count alone is not an
   accounting (R1 of the Coverage Attestation Profile, `draft-hillier-coverage-attestation-00`).
   On certbot that names 379 files that were until then only a number by extension.
+  In the CBOM each list of names is one property holding a JSON array (`["a,b.c", "d.c"]`,
+  `[]` when empty) from 0.28.0. Until then the names were joined by commas, and switched to one
+  indexed property per name when any name held a comma: nothing was lost, but where the names
+  sat depended on what they were called. Lists of objects (linked entries) stay indexed field
+  by field.
 
 Measured across five real repositories (certbot, OpenSSH, Vault, Bitcoin, OpenSSL) at this
 release, the scan reads **67% of the files present** — 74% of OpenSSL, 85% of OpenSSH, 66% of
@@ -427,6 +432,28 @@ configuration and nowhere else:
 `configured_protocol` for a pinned version. `null` when the tree configures no TLS; SSH
 configuration is not counted here. On certbot: 23 places (22 protocol pins, 1 group
 setting); on OpenSSH: none. It stays out of the CBOM, like `files_read`.
+
+### A classical group offered on its own
+
+From 0.28.0 a classical group named as a group of its own in a group setting — `X25519` in
+`ssl_ecdh_curve X25519MLKEM768:X25519`, `prime256v1` in `SSLOpenSSLConfCmd Curves`, `tls.CurveP256`
+in Go's `CurvePreferences`, `ffdhe2048` in `jdk.tls.namedGroups` — is a finding of its own, under
+`evidence.tls_groups`, with `offered: "alone"` and `basis: "configured_group"`. A hybrid's name
+(`X25519MLKEM768`) is one token and is never counted here; a group removed with OpenSSL's `-`
+prefix is not an offer; a name the table does not hold (`auto`) yields nothing.
+
+Before, removing the classical fallback was invisible: the X25519 inside the hybrid is the same
+family as X25519 alone, so the scan before and after was identical and `closure` called the
+one-line change "3 closed, 3 new". The new finding carries no excerpt — its identity is file,
+setting and group — so removing the fallback shows as **closed**, and editing the line around a
+fallback that stays leaves it **still open**. `per_family_before_after` counts it apart, as
+`X25519 offered alone`. In the CBOM it is a component, `X25519 (TLS group offered alone)`. The
+three source findings on the edited line still close and reopen, because their identity includes
+the line's text; that is how every edited line has always been compared. On certbot: 3 (X25519,
+prime256v1, secp384r1 in the Apache options file); on OpenSSH: none.
+
+⚠️ What is not claimed: that a connection ever uses the fallback. That is settled where TLS
+terminates, as above; the finding is about the file.
 
 ⚠️ What is not claimed: that the tree's TLS settings are all listed, or which terminator is in
 front. The scanner cannot see a connection; the field says that, not what the connection is.

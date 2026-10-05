@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .assets import is_manifest, scan_manifest, scan_protocols
+from .assets import is_manifest, scan_manifest, scan_protocols, scan_tls_groups
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
                            scan_certificate_file)
 
@@ -1472,6 +1472,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # and these deliberately have none.
     protocol_findings: list[dict[str, Any]] = []
     dependency_findings: list[dict[str, Any]] = []
+    # Classical TLS groups offered on their own beside the rest; see assets.scan_tls_groups.
+    tls_group_findings: list[dict[str, Any]] = []
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -1563,6 +1565,11 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 asset["line"] = number
                 asset["excerpt"] = text_line.strip()[:200]
                 protocol_findings.append(asset)
+            for group in scan_tls_groups(text_line):
+                group["path"] = rel_path
+                group["line"] = number
+                group["in_test_code"] = in_test_code(rel_path)
+                tls_group_findings.append(group)
         if is_manifest(path):
             dependency_findings.extend(scan_manifest(path, rel_path, lines))
 
@@ -1675,6 +1682,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         "claimed_but_not_decoded": undecoded,
         "protocol_findings": protocol_findings,
         "dependency_findings": dependency_findings,
+        "tls_group_findings": tls_group_findings,
         # Files removed by EXCLUDED_DIRS before files_present counted anything,
         # by the directory name that removed them. Counted so the denominator
         # can state what it left out instead of leaving it in the source.

@@ -88,6 +88,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             "pem_labels": len(certificates._LABEL_ALGORITHMS),
             "cipher_suite_components": len(detectors._SUITE_COMPONENT),
             "openssl3_fetch_names": len(detectors._FETCH_NAME_FAMILY),
+            "tls_group_names": len(assets.CLASSICAL_GROUPS),
         },
         claimed_types={
             "source": sorted(detectors.SOURCE_EXTENSIONS),
@@ -164,6 +165,10 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # version or an installed library as an observed algorithm.
             "protocols": scan_result["protocol_findings"],
             "dependencies": scan_result["dependency_findings"],
+            # A classical group offered as a group of its own in a TLS group setting.
+            # No excerpt: its identity is file, setting and group, so `closure` can
+            # tell a removed fallback from an edited line.
+            "tls_groups": scan_result.get("tls_group_findings", []),
         },
     }
 

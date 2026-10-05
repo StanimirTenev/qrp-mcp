@@ -185,11 +185,16 @@ def _unread_paths(result: dict[str, Any]) -> tuple[set[str], list[str]]:
 
 def _brief(category: str, item: dict[str, Any]) -> dict[str, Any]:
     keep = ("path", "line", "algorithm", "type", "protocol", "version", "package",
+            "group", "setting", "offered",
             "evidence_kind", "excerpt", "in_test_code", "role")
     return {"category": category, **{k: item[k] for k in keep if k in item}}
 
 
 def _family(item: dict[str, Any]) -> str:
+    # Counted apart from the X25519 family it belongs to: the fallback going away is
+    # the change to see, and inside the family count it is one of several.
+    if item.get("offered") and item.get("group"):
+        return f"{item['group']} offered {item['offered']}"
     for key in ("algorithm", "type", "protocol", "package"):
         if item.get(key):
             return str(item[key])

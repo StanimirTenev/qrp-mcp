@@ -520,6 +520,71 @@ _TLS_GROUP_SETTING = re.compile(
 
 _COMMENT_START = ("#", ";", "//", "--", "/*", "*")
 
+# -- A classical group offered on its own ------------------------------------------------
+#
+# `ssl_ecdh_curve X25519MLKEM768:X25519` and `ssl_ecdh_curve X25519MLKEM768` scanned the
+# same: the X25519 inside the hybrid's name is the same family as X25519 offered alone,
+# so removing the classical fallback -- the step that ends a hybrid migration -- was
+# invisible, and `closure` called it "3 closed, 3 new" on one line. Raised in public on
+# 2026-10-03 (Addie LaMarr). So a classical group named as a group of its own in a group
+# setting is a finding of its own, and it carries no excerpt: its identity is the file,
+# the setting and the group, so editing the line around it neither closes nor reopens it.
+#
+# Said about the file only. Whether a connection ever uses the fallback is settled where
+# TLS terminates; TLS_TERMINATION below still says so.
+
+# Group names as configuration spells them, lower-cased with '-' and '_' removed, to the
+# family the classifier already uses. A hybrid's name (X25519MLKEM768, SecP256r1MLKEM768)
+# is one token and is not in this table, which is the whole point. A name not here
+# (`auto`, `admin`) yields nothing.
+CLASSICAL_GROUPS = {
+    "x25519": "X25519", "x448": "X448",
+    "p256": "ECDH", "p384": "ECDH", "p521": "ECDH",
+    "curvep256": "ECDH", "curvep384": "ECDH", "curvep521": "ECDH",      # Go
+    "secp256r1": "ECDH", "secp384r1": "ECDH", "secp521r1": "ECDH",
+    "prime256v1": "ECDH",
+    "brainpoolp256r1": "ECDH", "brainpoolp384r1": "ECDH", "brainpoolp512r1": "ECDH",
+    "brainpoolp256r1tls13": "ECDH", "brainpoolp384r1tls13": "ECDH",
+    "brainpoolp512r1tls13": "ECDH",
+    "ffdhe2048": "DH", "ffdhe3072": "DH", "ffdhe4096": "DH", "ffdhe6144": "DH",
+    "ffdhe8192": "DH",
+}
+
+_GROUP_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
+
+
+def scan_tls_groups(line: str) -> list[dict[str, Any]]:
+    """Classical groups this line offers as groups of their own in a TLS group setting."""
+    if line.lstrip().startswith(_COMMENT_START):
+        return []
+    setting = _TLS_GROUP_SETTING.search(line)
+    if not setting:
+        return []
+    name = " ".join(setting.group(0).replace("=", " ").split())
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for token in _GROUP_TOKEN.finditer(line, setting.end()):
+        # OpenSSL 3.5 removes a group with a leading '-'; a removal is not an offer.
+        if token.start() > 0 and line[token.start() - 1] in "-!":
+            continue
+        group = token.group(0)
+        key = group.lower().replace("-", "").replace("_", "")
+        family = CLASSICAL_GROUPS.get(key)
+        if family is None or key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "group": group,
+            "family": family,
+            "setting": name,
+            "offered": "alone",
+            "basis": "configured_group",
+            "description": (f"{group} is offered here as a group of its own, without a "
+                            f"post-quantum half. What a connection negotiates is not "
+                            f"stated by this line."),
+        })
+    return out
+
 TLS_TERMINATION = (
     "These files configure TLS. This scan reads files, not connections. The key "
     "exchange a connection negotiates is settled where TLS terminates -- this server, "

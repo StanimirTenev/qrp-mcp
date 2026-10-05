@@ -552,6 +552,30 @@ def test_the_names_travel_into_the_cbom(scan, document):
                      if r["reason"] == "type_not_claimed")
     key = f"qrp:coverage:not_examined:{gap_index}:paths"
     gap = scan["coverage"]["not_examined"][gap_index]
-    carried = (props[key].split(",") if key in props else
-               [v for k, v in props.items() if k.startswith(key + ":")])
-    assert sorted(carried) == sorted(gap["paths"])
+    assert json.loads(props[key]) == gap["paths"]
+
+
+def test_a_comma_in_a_file_name_does_not_change_where_the_names_are(tmp_path, validator):
+    """Joel Hillier (CAP-1), 5 Oct 2026: the paths travelled joined by commas, and a
+    path holding a comma breaks such a list. 0.27.3 did not lose it -- it switched to
+    one indexed property per path -- but then a reader of `...:paths` found nothing
+    there and had to know the rule. One shape now, the same for every name: a JSON
+    array in the one property, through the command people run."""
+    import sys
+    tree = tmp_path / "t"
+    tree.mkdir()
+    (tree / "a,b.xyz").write_text("x\n")
+    (tree / "c.xyz").write_text("y\n")
+    (tree / "m.c").write_text("RSA_generate_key(2048);\n")
+    out = tmp_path / "cbom.json"
+    r = subprocess.run([sys.executable, "-m", "qrp_mcp.server", "cbom", str(tree),
+                        "--out", str(out)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    doc = json.loads(out.read_text())
+    assert not list(validator.iter_errors(doc))
+    props = {p["name"]: p["value"] for p in doc["properties"]}
+    index = next(k.split(":")[3] for k, v in props.items()
+                 if k.endswith(":reason") and v == "type_not_claimed")
+    key = f"qrp:coverage:not_examined:{index}:paths"
+    assert json.loads(props[key]) == ["a,b.xyz", "c.xyz"]
+    assert not [k for k in props if k.startswith(key + ":")]

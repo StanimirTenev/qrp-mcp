@@ -41,6 +41,7 @@ different serial numbers, which is the pin argument stated in one field.
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from typing import Any
@@ -116,6 +117,14 @@ def _flatten(value: Any, path: str = "") -> list[tuple[str, str]]:
             out.extend(_flatten(sub, f"{path}:{key}" if path else key))
         return out
     if isinstance(value, list):
+        # File names are data, and data can hold any separator. Until 0.28.0 they were
+        # joined by commas unless a name held one, and then indexed -- lossless, but
+        # where the names sat depended on what they were called (Joel Hillier, CAP-1,
+        # 5 Oct 2026). Now one shape for every list of names: a JSON array, `[]` empty.
+        # A list of objects (linked entries) stays indexed, field by field, as before.
+        if (path.rsplit(":", 1)[-1] == "paths"
+                and all(not isinstance(item, (dict, list)) for item in value)):
+            return [(path, json.dumps([str(item) for item in value], ensure_ascii=False))]
         if not value:
             return [(path, "")]
         # A set of scalars is joined, unless an item itself contains the separator
@@ -375,6 +384,36 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 for a in group
             ]},
         })
+
+    # A classical TLS group offered as a group of its own, beside or instead of a hybrid.
+    # Its own component, so a document from before the fallback was removed and one from
+    # after differ by a component rather than by nothing. One per group, however it is
+    # spelled: `X25519` and `x25519` would otherwise repeat a bom-ref.
+    by_group: dict[str, list[dict[str, Any]]] = {}
+    for item in scan_result["evidence"].get("tls_groups", []):
+        by_group.setdefault(_ref("tls-group", f"{item['group']}-offered-alone"),
+                            []).append(item)
+    for ref, group in sorted(by_group.items()):
+        component = {
+            "type": "cryptographic-asset",
+            "bom-ref": ref,
+            "name": f"{group[0]['group']} (TLS group offered alone)",
+            "cryptoProperties": {"assetType": "algorithm",
+                                 "algorithmProperties": {"primitive": "key-agree"}},
+            "properties": [
+                {"name": f"{NS}basis", "value": "configured_group"},
+                {"name": f"{NS}offered", "value": "alone"},
+                {"name": f"{NS}family", "value": group[0]["family"]},
+            ],
+            "evidence": {"occurrences": [
+                {"location": g["path"], "line": g["line"],
+                 "additionalContext": _context(g)}
+                for g in group
+            ]},
+        }
+        if all(g.get("in_test_code") for g in group):
+            component["scope"] = "excluded"
+        components.append(component)
 
     # Dependencies are libraries, not cryptographic assets: what is installed is
     # not what is called. They travel as `library` components carrying the
