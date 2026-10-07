@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from . import aws_tls, ike, opcua
+from .classifier import _PQC_SCHEMES
 from .assets import is_manifest, scan_manifest, scan_protocols, scan_tls_groups
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
                            scan_certificate_file)
@@ -501,6 +503,42 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("SIKE", "SIKE usage (broken)", re.compile(r"(?<![A-Za-z])SIKE(?![A-Za-z])")),
     ("HAWK", "HAWK usage (withdrawn)", re.compile(
         r"(?<![A-Za-z])hawk[-_]?(256|512|1024)", re.IGNORECASE,
+    )),
+    # Isogeny key exchange in no standardisation process (research, 7 Oct 2026). The
+    # identifiers are the implementations' own: mike_c's API and CMake options and the
+    # six primes, the Rust crate (not on crates.io), the SageMath module, the GitHub
+    # org. `mike` alone never matches -- a person, the MkDocs versioning tool on PyPI,
+    # MIKEY (RFC 3830) -- and neither does `import mike`, which cannot be told apart
+    # from MkDocs by a regex.
+    ("MIKE", "MIKE usage (isogeny NIKE, research)", re.compile(
+        r"(?<![A-Za-z0-9_])mike_(?:keypair|exchange)\s*\(|"
+        r"(?<![A-Za-z0-9_])MIKE_(?:BUILD_TYPE|PRIME_CHOICE|VARIANT|API|NAMESPACE)\b|"
+        r"(?<![A-Za-z0-9])p(?:308_633|474_593|628_317|374_117|566_77|758_41)(?![0-9])|"
+        r"(?<![A-Za-z0-9_])mike_rs(?![A-Za-z0-9_])|\bMike(?:PublicKey|PrivateKey|Parameters|Constants)\b|"
+        r"from\s+mike\.mike\s+import\b|(?i:tensor-mike/mike_(?:c|rs|py))",
+    )),
+    # CSIDH and its constant-time CTIDH: CIRCL's dh/csidh, the reference code,
+    # highctidh (C, PyPI, Go), secsidh and the csidh crate. The tokens did not occur
+    # outside isogeny code on the research's negative corpus. `sidh` alone stays SIKE's.
+    ("CSIDH/CTIDH", "CSIDH/CTIDH usage (isogeny NIKE, research)", re.compile(
+        r"(?<![A-Za-z])d?csidh|(?<![A-Za-z])(?:d|high)?ctidh|(?<![A-Za-z])secsidh",
+        re.IGNORECASE,
+    )),
+    # Merkle Tree Certificates: the three OIDs IANA assigned on 28 Sep 2026, Cloudflare's
+    # experimental arc used until then, the draft's ASN.1 names, and BoringSSL/Chrome
+    # identifiers. All three generations, because BoringSSL still uses the draft arc.
+    # Trust Anchor IDs (TLSEXT_TYPE_trust_anchors, 0xca34) are a prerequisite, not MTC,
+    # and `merkle` alone is CT, git and every blockchain.
+    ("MTC", "Merkle Tree Certificate identifier (issuer or verifier code)", re.compile(
+        r"(?<![\d.])1\.3\.6\.1\.5\.5\.7\.(?:6\.67|1\.38|25\.3)(?![\d])|"
+        r"(?<![\d.])1\.3\.6\.1\.4\.1\.44363\.47(?:\.[0-5])?(?![\d])|"
+        r"\b1,\s*3,\s*6,\s*1,\s*4,\s*1,\s*44363,\s*47(?:,\s*\d)?\b|"
+        r"\b1L?,\s*3L?,\s*6L?,\s*1L?,\s*5L?,\s*5L?,\s*7L?,\s*(?:6L?,\s*67|1L?,\s*38|25L?,\s*3)L?\b|"
+        r"\b(?:id[-_]alg[-_]mtcProof|id[-_]pe[-_]mtcCertificationAuthority(?:[-_]SHA256)?|"
+        r"alg[-_]mtcProof[-_]draft|pe[-_]mtcCertificationAuthority[-_]draft|MTCProof|MTCLogEntry|"
+        r"TBSCertificateLogEntry|MerkleTreeCertEntry)\b|"
+        r"\b(?:X509_V_FLAG_USE_MTC_DRAFT_PLANTS_\d+|NID_(?:alg_mtcProof|pe_mtcCertificationAuthority)_draft|"
+        r"MTCAnchor|kVerifyMTCs|VerifyMTCs|verify-mtcs)\b",
     )),
 ]
 
@@ -1034,6 +1072,7 @@ _SLASH_COMMENT_EXT = {
     ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".cs", ".java", ".js",
     ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".go", ".rs", ".swift", ".kt",
     ".kts", ".scala", ".sc", ".php", ".m", ".mm", ".groovy", ".dart", ".proto",
+    ".json5",
 }
 _HASH_COMMENT_EXT = {
     ".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".pm", ".ps1", ".psm1",
@@ -1419,6 +1458,32 @@ def scan_source_file(path: Path, rel_path: str,
                 "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
             })
 
+        # Names that stand for a configuration of several algorithms: an OPC UA
+        # SecurityPolicy and an AWS load-balancer TLS policy. Each policy's families come
+        # from its own table, with the policy named in the evidence.
+        named_by_policy = (
+            [(fam, pos, opcua.describe(policy)[2]) for policy, pos in opcua.scan(line)
+             for fam in opcua.describe(policy)[0]]
+            + [(fam, pos, aws_tls.describe(policy)) for policy, pos in aws_tls.scan(line)
+               for fam in aws_tls.families(policy)])
+        # FortiOS names additional key exchanges by number; configuration only.
+        if cipher_exclusions:
+            named_by_policy += [(fam, pos, f"{fam} named by FortiOS additional key exchange id")
+                                for fam, pos in ike.fortios_addke(line)]
+        for family, pos, said in named_by_policy:
+            if family in seen_on_line or _in_blob(pos, blobs):
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": said,
+                "excerpt": line.strip()[:200],
+                "evidence_kind": ("comment" if _in_spans(pos, spans) else kind),
+                "in_test_code": in_test_code(rel_path),
+            })
+
         # Suite names appear in configuration and in code alike: OpenSSL's headers
         # define them as C constants. The `!` exclusion only means anything in a
         # cipher list, and _is_excluded already requires it.
@@ -1444,6 +1509,25 @@ def scan_source_file(path: Path, rel_path: str,
             })
     _attach_providers(findings, lines)
     return _drop_imports_covered_by_a_call(findings)
+
+
+_NOT_A_SETTING = ("#", ";", "//", "--", "/*", "*", "<!--")
+
+
+def _policy_assets(line: str) -> list[dict[str, Any]]:
+    """An OPC UA SecurityPolicy or an AWS TLS policy named on this line, as a configured
+    protocol: what it allows and, for OPC UA, the standing the profile database gives it."""
+    if line.lstrip().startswith(_NOT_A_SETTING):
+        return []
+    out: list[dict[str, Any]] = []
+    for policy, _pos in opcua.scan(line):
+        _families, status, said = opcua.describe(policy)
+        out.append({"protocol": "opcua", "version": None, "security_policy": policy,
+                    "policy_status": status, "deprecated": status == "deprecated",
+                    "basis": "configured_protocol", "description": said})
+    for policy, _pos in aws_tls.scan(line):
+        out.append(aws_tls.asset(policy))
+    return out
 
 
 def scan_embedded_keys(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
@@ -1604,6 +1688,14 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                    or path.suffix.lower() in SOURCE_EXTENSIONS
                    or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
                    or is_certificate_file(path) or is_manifest(path))
+        # `.xml` and `.json5` are read only when they name an OPC UA SecurityPolicy: a
+        # .NET `*.Config.xml` and an open62541 `*.json5` are where those stacks declare
+        # theirs, and every other XML stays the declared boundary it was. Read once,
+        # here, and the same bytes are used below.
+        sniffed = None
+        if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
+            sniffed = _read_file(path, repo_path)
+            claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
         # Only a file no declared type claims is peeked at for key material; a .py or
         # a .tf that happens to contain a PEM block stays source and infrastructure.
         peeked_key = False if claimed else looks_like_key_file(path)
@@ -1622,7 +1714,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
 
         # Read once, here: classification and scanning must see the same content, and a
         # file that cannot be read has to leave a mark rather than pass as scanned-clean.
-        read = _read_file(path, repo_path)
+        read = sniffed if sniffed is not None else _read_file(path, repo_path)
         if read is None:
             unreadable.append(rel_path)
             content_parts.append(f"{rel_path}\0unread")
@@ -1648,6 +1740,23 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 group["line"] = number
                 group["in_test_code"] = in_test_code(rel_path)
                 tls_group_findings.append(group)
+            for asset in _policy_assets(text_line):
+                asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
+                protocol_findings.append(asset)
+        # A load-balancer listener that serves HTTPS or TLS and names no policy gets
+        # the provider's: said as a default, with the reason, on the resource.
+        for number in aws_tls.listeners_without_policy(path.suffix.lower(), lines):
+            excerpt = lines[number - 1].strip()[:200]
+            for family in aws_tls.families(aws_tls.DEFAULT_POLICY):
+                iac_findings.append({
+                    "path": rel_path, "line": number, "algorithm": family,
+                    "description": aws_tls.describe(aws_tls.DEFAULT_POLICY, default=True),
+                    "excerpt": excerpt, "evidence_kind": "default",
+                    "basis": "provider_default",
+                    "in_test_code": in_test_code(rel_path),
+                })
+            protocol_findings.append({**aws_tls.asset(aws_tls.DEFAULT_POLICY, default=True),
+                                      "path": rel_path, "line": number, "excerpt": excerpt})
         if is_manifest(path):
             dependency_findings.extend(scan_manifest(path, rel_path, lines))
 
@@ -1692,6 +1801,16 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             files_scanned["config"] += 1
             src = scan_source_file(path, rel_path, lines, cipher_exclusions=True)
             source_findings.extend(src)
+            # An IKE configuration carrying a post-quantum algorithm: name its
+            # fragmentation setting (see ike.py).
+            post_quantum: dict[str, int] = {}
+            for item in src:
+                if (item["algorithm"] in _PQC_SCHEMES
+                        and item.get("evidence_kind") not in {"comment", "ban"}):
+                    post_quantum.setdefault(item["algorithm"], item["line"])
+            for asset in ike.scan(path.name, lines, post_quantum):
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
             algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
             _merge(iac_findings, algo_findings, already=src)
             embedded_key_findings.extend(key_findings)

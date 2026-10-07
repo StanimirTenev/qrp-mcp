@@ -177,7 +177,7 @@ SQIsign, UOV — are recognised as candidates, and CROSS as dropped from that pr
 
 Each carries the mathematical family it rests on (structured or unstructured lattice,
 code-based, hash-based, isogeny-based, multivariate, symmetric-based) and where it stands:
-standardised, selected, candidate, superseded, withdrawn, eliminated or broken. SIKE is reported
+standardised, selected, candidate, superseded, research, withdrawn, eliminated or broken. SIKE is reported
 as broken and HAWK as withdrawn rather than counted as quantum-resistant — "post-quantum" is a
 category, not an assessment.
 
@@ -224,6 +224,32 @@ An unknown provider is **absent, never guessed**: a header such as `<openssl/evp
 OpenSSL, BoringSSL and LibreSSL and names no one. What is named is the API, not the build — a fork
 that keeps the API reads the same — and **nothing here claims CMVP or FIPS 140-3 validation**.
 
+**Isogeny key exchange in no standardisation process: MIKE, CSIDH, CTIDH.** Until this release
+code doing either read as having no post-quantum cryptography at all (raised by John Preuß
+Mattsson). Matched by the implementations' own identifiers — MIKE's `mike_keypair(` /
+`mike_exchange(`, `MIKE_BUILD_TYPE` and the other CMake options, its six primes (`p308_633` …),
+the `mike_rs` crate, `from mike.mike import`, `tensor-MIKE/mike_*`; CSIDH/CTIDH as `csidh`,
+`ctidh`, `highctidh`, `secsidh`, CIRCL's `dh/csidh` — and reported with status **`research`**,
+`pqc_pre_standard`: not ready, and not broken. The SIKE attack does not carry over (it needs the
+torsion-point images MIKE and CSIDH do not publish). CSIDH-512 is below its claimed level against
+quantum attack (Peikert; Bonnetain–Schrottenloher), which the finding says — a cost estimate, not
+a classical break. **The word `mike` alone never matches**: it is a person, the MkDocs versioning
+tool on PyPI, and MIKEY (RFC 3830); `import mike` cannot be told apart from MkDocs and is not read
+as MIKE either. Through the classifier API `MIKE` matches only as the whole value.
+
+**Merkle Tree Certificates are named, never counted as post-quantum.** The three OIDs IANA
+assigned on 28 Sep 2026 (`1.3.6.1.5.5.7.6.67`, `.1.38`, `.25.3`), Cloudflare's experimental arc
+`1.3.6.1.4.1.44363.47` (in dotted and Go integer-list form), the draft's ASN.1 names
+(`id-alg-mtcProof`, `MTCProof`, `MTCLogEntry`, `MerkleTreeCertEntry` …) and the BoringSSL and
+Chrome identifiers (`X509_V_FLAG_USE_MTC_DRAFT_PLANTS_05`, `NID_alg_mtcProof_draft`,
+`MTCAnchor`, `kVerifyMTCs`, `verify-mtcs`) give family `MTC`, classification `unknown`. They live
+in CA, TLS-library and browser code, not in an origin's configuration, and a hit means "this
+code issues or verifies MTCs" — the authentication rests on the CA's and the cosigners' signature
+algorithms, and the leaf keeps an ordinary key (ECDSA-P256 in Cloudflare's experiment). So it
+is neither `pqc_ready` nor a mechanism, and stays out of `pqc_readiness`. Trust Anchor IDs
+(`TLSEXT_TYPE_trust_anchors`, `0xca34`) are a prerequisite, not MTC, and are not matched; nor is
+`merkle` alone. Raised by Delta Li.
+
 **Certificates and keys** — `.pem`, `.der`, `.crt`, `.cer`, `.cert`, `.csr`, `.key`, `.pub`,
 `.p12`, `.pfx`. Algorithms are resolved from the object identifiers inside the DER and from
 PEM labels and OpenSSH key types, and private key material is reported separately. This does
@@ -239,6 +265,52 @@ instrument and says so: that data comes from a structural parser or an external 
 `.toml`, `.properties`, `.hcl`, `.json`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid
 group is chosen: `X25519MLKEM768` and `mlkem768x25519-sha256` are almost never strings in code.
 IKE proposal syntax is read here too — `ecp384` is NIST P-384, `modp2048` is group 14.
+
+**OPC UA SecurityPolicies.** Each of the 30 SecurityPolicy URIs in the OPC Foundation profile
+database (UACore 1.05, read 7 Oct 2026) names the algorithms it rests on — RSA, ECDSA+ECDH,
+Ed25519/X25519, Ed448/X448 or RSA with finite-field DH; SHA-1 for Basic128Rsa15 and Basic256 —
+and no post-quantum one exists. A URI (`http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256`)
+or a stack's own identifier — .NET `SecurityPolicies.X`, open62541 `UA_SecurityPolicy_X(` /
+`UA_ServerConfig_addSecurityPolicyX(`, asyncua `SecurityPolicyType.X_Sign…` and
+`set_security_string("X,…`, Milo/node-opcua `SecurityPolicy.X`, gopcua `SecurityPolicyURIX`,
+Node-RED `"secpol"` — gives those families, and the policy itself as a protocol asset
+(`protocol: "opcua"`) with `policy_status` and `deprecated`: ten are `Deprecated` in the database
+(Basic128Rsa15, Basic256, the six un-suffixed ECC policies and two interim names). For the six ECC
+ones the .NET stack disagrees (`IsDeprecated = false`) and the asset says so; a policy without the
+attribute is "not marked deprecated", not "released". Stack-only names (`Https`, `Basic192` …) are
+named with no algorithm claimed. A bare `Basic256Sha256` or `None` never matches. **`.xml` and
+`.json5` are read only when the file contains a SecurityPolicy URI** — a .NET `*.Config.xml`, an
+open62541 `*.json5` — and declared as `claimed_types.config_when_naming_opcua_security_policy`;
+every other XML stays `type_not_claimed`, so coverage on trees without OPC UA does not move.
+Raised by Ogochukwu Friday Ikwuogu.
+
+**AWS load-balancer TLS policies, and the one you get by writing none.** An `ELBSecurityPolicy-…`
+name — Terraform `ssl_policy`, CloudFormation `SslPolicy`, CDK `elbv2.SslPolicy.X` — is read
+against the 45 policies on AWS's ALB and NLB pages: every one offers classical (EC)DHE (`ECDH`),
+the 13 `…PQ-2025-09` ones add hybrid ML-KEM, and those with RSA key-transport suites name `RSA`;
+the policy is a protocol asset with `allows_versions`, `post_quantum` and `deprecated` (TLS 1.0 or
+1.1 allowed). **A Terraform `aws_lb_listener`/`aws_alb_listener` or a CloudFormation
+`AWS::ElasticLoadBalancingV2::Listener` that serves HTTPS or TLS and names no policy gets
+`ELBSecurityPolicy-2016-08`**, AWS's documented default for the CLI, CloudFormation, the CDK and
+the API (Terraform sends none) — TLS 1.0–1.2, RSA key transport, no post-quantum group — with
+`default_applied: "default applied because ssl_policy is absent"`, `basis: provider_default` and
+evidence kind `default`. The console default is a PQ policy; that difference is the point (raised
+by Vladimir Mikhalev, whose probe — explicit `2016-08`, and no `ssl_policy` — gave 0 findings
+both ways until this release). Only a top-level `protocol` counts: the `redirect { protocol =
+"HTTPS" }` inside an HTTP listener does not make it an HTTPS listener, and `ssl_policy = var.x` is
+not absent. An unknown name, and CDK `LEGACY` (on neither AWS page), claim nothing.
+
+**IKEv2 fragmentation, where the configuration carries post-quantum.** An ML-DSA signature lands
+in IKE_AUTH, and draft-ietf-ipsecme-ikev2-pqc-auth makes RFC 7383 fragmentation a MUST for it;
+RFC 9370 puts additional key exchanges in IKE_INTERMEDIATE so they can be fragmented. So where a
+strongSwan, Libreswan, Cisco, FortiOS, Junos or OpenBSD iked configuration carries a post-quantum
+family, a protocol asset (`protocol: "ike"`) names `fragmentation` — `enabled`, `disabled`, the
+value as written, or `not_found` in the files read — and `fragmentation_default` as each product
+documents it: strongSwan yes since 5.5.1, Libreswan yes (5.4), FortiOS enable (7.6.6), Junos
+enabled, iked `nofragmentation`. A file rarely carries the version, so a default is said as
+documented, never as what the box does. **Cisco's is "default not confirmed"**: IOS XE and ASA
+document opposite defaults and the platform is not in the file. FortiOS's numeric `set addkeN 36`
+is read as ML-KEM (35–37), and 1080–1094 as Kyber, FrodoKEM, BIKE and HQC. Raised by Saqib Ahmad.
 
 **Quantum-resistant mechanisms, not only algorithms** — RFC 8784 mixes a postquantum preshared
 key into IKEv2 key derivation, so a tunnel resists a quantum adversary with no post-quantum
@@ -391,6 +463,13 @@ it that a component list alone cannot say:
   rather than something to hide.
 - `evidence.occurrences` — file, line and matched text for every asset.
 
+A policy or an IKE configuration is a `protocol` component whose `qrp:` properties carry what it
+says — `qrp:security_policy` and `qrp:policy_status` (OPC UA, protocol type `other`, which is
+CycloneDX's word for a protocol it has no name for), `qrp:policy`, `qrp:allows_versions`,
+`qrp:post_quantum` and `qrp:default_applied` (AWS), `qrp:product`, `qrp:fragmentation` and
+`qrp:fragmentation_default` (IKE) — because the matched text is masked by default and cannot carry
+them.
+
 Where the scan named the module, an algorithm component carries `qrp:providers` (a JSON array)
 and `qrp:provider_validation`, which says that validation is not claimed and has to be checked
 against the CMVP list for the deployed version. `certificationLevel` is never written: it states
@@ -407,7 +486,9 @@ Two things about a match are not the match itself, and both now travel with it �
 scan result and in the exported CBOM.
 
 **Evidence kind.** `scan_repo` grades every match: `call`, `declaration`, `import`,
-`reference`, `ban`, `comment`. Comment evidence is kept out of the inventory, and the
+`reference`, `ban`, `comment`, and `default` -- a value the provider applies because the file
+wrote none (an AWS listener with no `ssl_policy`), counted as in use, never as a comment or a
+ban. Comment evidence is kept out of the inventory, and the
 reason is measured — the nearest rival strips comments before matching and scored 0.542
 precision on an independent corpus against this scanner's 0.93. The exported document
 used to drop that grade, so a sentence about certificates reached an auditor looking
@@ -480,6 +561,11 @@ configuration and nowhere else:
 `configured_protocol` for a pinned version. `null` when the tree configures no TLS; SSH
 configuration is not counted here. On certbot: 23 places (22 protocol pins, 1 group
 setting); on OpenSSH: none. It stays out of the CBOM, like `files_read`.
+
+The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
+verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
+can be served with one — and its own key is still ECDSA, and reported as such. An AWS listener
+policy is a TLS terminator in the tree, and counts as a place here.
 
 ### A classical group offered on its own
 
@@ -870,6 +956,15 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
 - **A symlink is never read.** Where a tree reaches content only through a link whose target
   sits in a directory this tool excludes, that content is not scanned. It is named as a link
   rather than silently skipped, but it is not read.
+- **Not built from the 7 Oct 2026 research, and why.** A CDK listener with no `sslPolicy`
+  (the result depends on a `cdk.json` feature flag and on CDK inferring the protocol); CloudFront,
+  API Gateway, Transfer Family and OpenSearch policies; open62541's
+  `UA_ServerConfig_setDefaultWithSecurityPolicies(` (whether the SHA-1 pair is in depends on a build
+  flag); Cisco's `authentication … mldsa-sig` (seen only in a vendor blog); PAN-OS and Windows IKE
+  fragmentation (no element or key found in a primary source); Junos curly-brace `fragmentation {
+  disable; }` (only the `set` form is read); Bouncy Castle's `cert.plants` classes (known from
+  search snippets only); `.sage` files, where much CSIDH and SQIsign prototyping lives. Cisco
+  running-configs saved as `.txt` or without an extension are not read.
 - **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
   scope by design.** This tool reports what a cryptographically relevant quantum computer would
   break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,

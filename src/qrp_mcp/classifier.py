@@ -109,6 +109,19 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     # reads as "nothing found" rather than "found and broken".
     ("SIKE", "SIKE", "pqc_ready", "key_exchange"),
     ("HAWK", "HAWK", "pqc_ready", "signature"),
+    # Isogeny key exchange outside any standardisation process. MIKE and CSIDH are
+    # non-interactive (NIKE), so key agreement rather than a KEM. "MIKE" is matched
+    # only as the whole value -- see _WORDLIKE_SUFFIX -- because inside a phrase it is
+    # a person, the MkDocs versioning tool, or MIKEY.
+    ("MIKE", "MIKE", "pqc_ready", "key_exchange"),
+    ("CSIDH", "CSIDH/CTIDH", "pqc_ready", "key_exchange"),
+    ("CTIDH", "CSIDH/CTIDH", "pqc_ready", "key_exchange"),
+    # Merkle Tree Certificates. Not an algorithm, and not a mechanism that protects
+    # anything by being present: code naming MTC issues or verifies them, and whether
+    # that authentication resists a quantum computer is the CA's and the cosigners'
+    # signature algorithm, which the identifier does not carry. "unknown" in this column
+    # sends it to its own branch in classify_algorithm.
+    ("MTC", "MTC", "unknown", "signature"),
     # LMS is deliberately absent: the squashed token "LMS" also matches ordinary
     # words such as "films", and a false positive here is worse than a miss.
     # Classical elliptic-curve
@@ -153,6 +166,7 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
 #   selected     -> chosen for standardisation, standard not yet published
 #   superseded   -> a submission replaced by a standard it does not interoperate with
 #   candidate    -> under evaluation or recommended by a national body
+#   research     -> published research in no standardisation process
 #   withdrawn    -> pulled from standardisation by its own authors
 #   eliminated   -> dropped by NIST at the end of an evaluation round
 #   broken       -> a practical attack is public
@@ -180,6 +194,8 @@ _PQC_SCHEMES: dict[str, tuple[str, str]] = {
     "QR-UOV": ("multivariate", "candidate"),
     "SNOVA": ("multivariate", "candidate"),
     "CROSS": ("code-based", "eliminated"),
+    "MIKE": ("isogeny-based", "research"),
+    "CSIDH/CTIDH": ("isogeny-based", "research"),
 }
 
 _PQC_UNSAFE = ("withdrawn", "broken", "eliminated")
@@ -238,6 +254,20 @@ _PRE_STANDARD_NOTE = {
         "two do not interoperate. Whether this code was updated to FIPS 203 under the "
         "old name is not visible from the name; the standard is ML-KEM."
     ),
+    "MIKE": (
+        " MIKE (Module Isogeny Key Exchange) is a non-interactive key exchange published "
+        "in October 2026 and in no standardisation process: NIST's covered KEMs only and "
+        "there is no IETF draft. Its authors ask for cryptanalysis and expect parameters "
+        "may change. The SIKE break does not carry over: MIKE publishes no torsion-point "
+        "images."
+    ),
+    "CSIDH/CTIDH": (
+        " CSIDH-512 (and CTIDH-511/512) is below its claimed NIST level 1 against quantum "
+        "attack (Peikert, EUROCRYPT 2020; Bonnetain-Schrottenloher, EUROCRYPT 2020); later "
+        "work takes 2048-4096-bit primes for level 1. That is a quantum cost estimate, not "
+        "a classical break, and the SIKE attack does not apply to CSIDH (Maino et al., "
+        "EUROCRYPT 2023)."
+    ),
 }
 
 
@@ -259,6 +289,10 @@ _WORDLIKE_SUFFIX: dict[str, str] = {
     # schemes -- Mayo Clinic, crossroads, cross-site.
     "MAYO": r"[-_]?[1235]",
     "CROSS": r"[-_]?R[-_]?SDP",
+    # Only the whole value: no suffix makes either of these a scheme inside a phrase.
+    # "MIKEY" is RFC 3830, and "mtctr" is a PowerPC instruction in OpenSSL.
+    "MIKE": r"(?!)",
+    "MTC": r"(?!)",
 }
 
 
@@ -508,6 +542,30 @@ def classify_algorithm(
                     "entropy of the preshared key and on it being distributed out of "
                     "band -- neither of which is visible from a file."
                     f"{alongside}"
+                ),
+            )
+
+        if classification == "unknown":
+            # Merkle Tree Certificates, the one row with this column. Kept out of the
+            # readiness count by being unknown: neither ready nor a mechanism.
+            return Finding(
+                source=source,
+                location=location,
+                raw_value=raw_value,
+                algorithm_family=family,
+                also_present=also_present,
+                classification="unknown",
+                quantum_vulnerable=False,
+                weak_key=False,
+                severity="info",
+                reason=(
+                    "Code that issues or verifies Merkle Tree Certificates "
+                    "(draft-ietf-plants-merkle-tree-certs). Not counted as post-quantum: an "
+                    "MTC's authentication rests on the signature algorithms of the CA and "
+                    "the cosigners, which this identifier does not name, and the leaf keeps "
+                    "an ordinary subject key (ECDSA-P256 in Cloudflare's experiment). It "
+                    "says this code handles MTCs, not that a service's authentication "
+                    f"resists a quantum computer.{alongside}"
                 ),
             )
 

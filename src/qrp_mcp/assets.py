@@ -592,7 +592,10 @@ TLS_TERMINATION = (
     "a terminator outside the files read can negotiate a different group from the one "
     "configured here, in either direction. A post-quantum group seen on the wire does "
     "not show that these files changed; a classical group configured here does not "
-    "show that the wire is classical.")
+    "show that the wire is classical. The same holds for authentication: a Merkle Tree "
+    "Certificate is issued by the CA and verified by the browser, often served from an "
+    "edge, and an origin whose files name an ECDSA key can be served with one -- its own "
+    "key is still ECDSA, and reported as such.")
 
 
 def tls_termination(scan_result: dict[str, Any]) -> dict[str, Any] | None:

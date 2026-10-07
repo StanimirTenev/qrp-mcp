@@ -8,7 +8,8 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import __version__, assets, certificates, coverage, detectors, profiles, remediation
+from . import (__version__, assets, aws_tls, certificates, coverage, detectors, ike, opcua,
+               profiles, remediation)
 from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint
 
 
@@ -96,6 +97,10 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             "cipher_suite_components": len(detectors._SUITE_COMPONENT),
             "openssl3_fetch_names": len(detectors._FETCH_NAME_FAMILY),
             "tls_group_names": len(assets.CLASSICAL_GROUPS),
+            # Names that stand for several algorithms at once, each from its own table.
+            "opcua_security_policies": len(opcua.POLICIES),
+            "aws_tls_policies": len(aws_tls.POLICIES),
+            "ike_fragmentation_products": len(ike.PRODUCTS),
         },
         claimed_types={
             "source": sorted(detectors.SOURCE_EXTENSIONS),
@@ -106,6 +111,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # Read as bytes rather than lines, and missing from this list while the
             # scan was reporting findings from them.
             "certificate": sorted(certificates.CERTIFICATE_EXTENSIONS),
+            # Read only when the file names an OPC UA SecurityPolicy URI; otherwise
+            # counted under type_not_claimed like any other unclaimed file.
+            "config_when_naming_opcua_security_policy": sorted(opcua.SNIFF_EXTENSIONS),
         },
         excluded_dirs=list(detectors.EXCLUDED_DIRS),
     )

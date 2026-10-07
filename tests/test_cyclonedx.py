@@ -579,3 +579,27 @@ def test_a_comma_in_a_file_name_does_not_change_where_the_names_are(tmp_path, va
     key = f"qrp:coverage:not_examined:{index}:paths"
     assert json.loads(props[key]) == ["a,b.xyz", "c.xyz"]
     assert not [k for k in props if k.startswith(key + ":")]
+
+
+def test_policy_and_ike_components_validate(validator, tmp_path):
+    """OPC UA policies, AWS TLS policies (configured and defaulted) and an IKE
+    fragmentation state are protocol components; OPC UA has no CycloneDX protocol type
+    of its own and must land on `other`, not on an invalid value."""
+    (tmp_path / "Server.Config.xml").write_text(
+        "<SecurityPolicyUri>http://opcfoundation.org/UA/SecurityPolicy#Basic256"
+        "</SecurityPolicyUri>\n")
+    (tmp_path / "main.tf").write_text(
+        'resource "aws_lb_listener" "a" {\n  protocol = "HTTPS"\n}\n'
+        'resource "aws_lb_listener" "b" {\n  protocol = "TLS"\n'
+        '  ssl_policy = "ELBSecurityPolicy-TLS13-1-2-PQ-2025-09"\n}\n')
+    (tmp_path / "swanctl.conf").write_text(
+        "connections {\n  c {\n    proposals = aes256-sha384-x25519-ke1_mlkem768\n  }\n}\n")
+    document = cyclonedx.build(scan_directory(str(tmp_path)))
+    errors = sorted(validator.iter_errors(document), key=lambda e: list(e.path))
+    assert not errors, [f"{list(e.path)}: {e.message}" for e in errors[:5]]
+    types = {c["cryptoProperties"]["protocolProperties"]["type"]
+             for c in document["components"]
+             if c.get("cryptoProperties", {}).get("assetType") == "protocol"}
+    assert {"other", "tls", "ike"} <= types
+    refs = [c["bom-ref"] for c in document["components"]]
+    assert len(refs) == len(set(refs))

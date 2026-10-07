@@ -41,6 +41,7 @@ different serial numbers, which is the pin argument stated in one field.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import uuid
@@ -75,7 +76,30 @@ _PRIMITIVE_BY_FAMILY = {
     "3DES": "block-cipher",
     "RC4": "stream-cipher",
     "PPK (RFC 8784)": "other",
+    # Not an algorithm: a certificate format whose strength is the CA's and cosigners'.
+    "MTC": "other",
 }
+
+
+# What a protocol asset says beyond its version, carried as properties. The default a
+# listener got because nothing was written, the standing of an OPC UA policy, and the
+# fragmentation of an IKE configuration all have to reach the document that is sent,
+# and an excerpt -- masked by default -- cannot carry them.
+_PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versions",
+                    "post_quantum", "default_applied", "product", "fragmentation",
+                    "fragmentation_default")
+_CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
+
+
+def _protocol_label(asset: dict[str, Any]) -> str:
+    if asset.get("security_policy"):
+        return f"OPC UA SecurityPolicy {asset['security_policy']}"
+    if asset.get("policy"):
+        return asset["policy"] + (" (default: ssl_policy absent)"
+                                  if asset.get("default_applied") else "")
+    if asset.get("product"):
+        return f"{asset.get('version') or 'IKE'} ({asset['product']})"
+    return asset.get("version") or asset["protocol"].upper()
 
 
 # Said beside every provider, so the name is not read as more than it is.
@@ -369,28 +393,41 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     protocols = scan_result["evidence"].get("protocols", [])
     # Banned and configured are kept apart: `-SSLv3` and `ssl_protocols SSLv3`
     # are opposite facts, and merging them would report a ban as a use.
-    by_protocol: dict[tuple[str, str | None, bool], list[dict[str, Any]]] = {}
+    # A named policy (OPC UA, AWS) or an IKE configuration is one component per policy
+    # and per state: what it says is in the fields below, and two files that say
+    # different things about the same policy are two facts.
+    by_protocol: dict[tuple[str, str | None, bool, str], list[dict[str, Any]]] = {}
     for asset in protocols:
+        said = json.dumps({k: asset[k] for k in _PROTOCOL_FIELDS if k in asset},
+                          sort_keys=True)
         by_protocol.setdefault(
-            (asset["protocol"], asset.get("version"), bool(asset.get("banned"))),
+            (asset["protocol"], asset.get("version"), bool(asset.get("banned")), said),
             []).append(asset)
-    for (name, version, banned), group in sorted(by_protocol.items(),
-                                                 key=lambda kv: str(kv[0])):
-        label = (version or name.upper()) + (" (forbidden)" if banned else "")
+    for (name, version, banned, said), group in sorted(by_protocol.items(),
+                                                       key=lambda kv: str(kv[0])):
+        label = _protocol_label(group[0]) + (" (forbidden)" if banned else "")
         properties = [
-            {"name": f"{NS}basis", "value": "configured_protocol"},
+            {"name": f"{NS}basis", "value": group[0].get("basis", "configured_protocol")},
             {"name": f"{NS}deprecated",
              "value": "true" if any(a.get("deprecated") for a in group) else "false"},
             # A version listed to forbid it is evidence of hardening, not of use.
             {"name": f"{NS}forbidden", "value": "true" if banned else "false"},
         ]
+        for key, value in json.loads(said).items():
+            properties.append({"name": f"{NS}{key}", "value": (
+                json.dumps(value) if isinstance(value, (list, dict))
+                else ("true" if value is True else "false" if value is False else str(value)))})
         components.append({
             "type": "cryptographic-asset",
-            "bom-ref": _ref("protocol", label),
+            # Stable across runs: the same policy in the same state gets the same ref.
+            "bom-ref": _ref("protocol", label + (
+                "-" + hashlib.sha256(said.encode()).hexdigest()[:8] if said != "{}" else "")),
             "name": label,
             "cryptoProperties": {
                 "assetType": "protocol",
-                "protocolProperties": {"type": name,
+                # CycloneDX's protocol types are a closed list: OPC UA is `other`, and
+                # the property above names it.
+                "protocolProperties": {"type": name if name in _CDX_PROTOCOLS else "other",
                                        **({"version": version} if version else {})},
             },
             "properties": properties,
