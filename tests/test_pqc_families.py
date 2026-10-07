@@ -36,7 +36,10 @@ def test_every_pqc_token_has_a_family():
 def test_standing_schemes_carry_their_family(value, family, pqc_family, pqc_status):
     f = classify(value)
     assert f.algorithm_family == family
-    assert f.classification == "pqc_ready"
+    # Only a published standard is pqc_ready; selected and candidate schemes are
+    # pqc_pre_standard since the change for Bill Buchanan's HQC finding (5 Oct 2026).
+    assert f.classification == ("pqc_ready" if pqc_status == "standardised"
+                                else "pqc_pre_standard")
     assert (f.pqc_family, f.pqc_status) == (pqc_family, pqc_status)
 
 
@@ -132,7 +135,8 @@ def test_leading_boundary_still_separates_distinct_schemes(tmp_path):
         ('groups = "X25519MLKEM768"', {"ML-KEM", "X25519"}),
         ('groups = "SecP256r1MLKEM768"', {"ML-KEM"}),
         ('groups = "SecP384r1MLKEM1024"', {"ML-KEM"}),
-        ('groups = "X25519Kyber768Draft00"', {"ML-KEM", "X25519"}),
+        # The draft hybrid carries round-3 Kyber, not ML-KEM (FIPS 203, Appendix C).
+        ('groups = "X25519Kyber768Draft00"', {"Kyber", "X25519"}),
         ("kex = sntrup761x25519-sha512@openssh.com", {"NTRU", "X25519"}),
     ],
 )

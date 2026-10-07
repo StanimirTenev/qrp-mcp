@@ -18,7 +18,9 @@ CONTRACT_VERSION = "cfp-v1"
 # Classification values:
 #   classical_vulnerable  -> public-key algorithm broken by a large quantum
 #                            computer (Shor).
-#   pqc_ready             -> post-quantum algorithm (NIST PQC / draft names).
+#   pqc_ready             -> post-quantum algorithm with a published standard.
+#   pqc_pre_standard      -> post-quantum algorithm without one: selected,
+#                            candidate, or a pre-standard version (round-3 Kyber).
 #   symmetric_reduced     -> symmetric cipher; only weakened by Grover, not
 #                            broken. Not a migration blocker on its own.
 #   hash                  -> hash primitive of acceptable strength.
@@ -32,6 +34,10 @@ Classification = Literal[
     "quantum_resistant_mechanism",
     "classical_vulnerable",
     "pqc_ready",
+    # Post-quantum by design, no published standard behind it. Kept apart from
+    # pqc_ready because an implementation of today's specification need not match
+    # the standard when it comes: FIPS 203's own 2023 draft differs from the final.
+    "pqc_pre_standard",
     "symmetric_reduced",
     "hash",
     "deprecated_weak",
@@ -53,7 +59,12 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("PPK", "PPK (RFC 8784)", "quantum_resistant_mechanism", "key_exchange"),
     # Post-quantum
     ("MLKEM", "ML-KEM", "pqc_ready", "key_exchange"),
-    ("KYBER", "ML-KEM", "pqc_ready", "key_exchange"),
+    # Round-3 Kyber is not ML-KEM. FIPS 203 Appendix C: ML-KEM uses a different
+    # Fujisaki-Okamoto variant, so the two do not interoperate. Until 0.28.0 this
+    # token mapped to ML-KEM and a pre-standard KEM read as the standard. The third
+    # column is "pqc_ready" for every post-quantum row; what a finding is called is
+    # decided by its status below (see _pqc_classification).
+    ("KYBER", "Kyber", "pqc_ready", "key_exchange"),
     ("MLDSA", "ML-DSA", "pqc_ready", "signature"),
     ("DILITHIUM", "ML-DSA", "pqc_ready", "signature"),
     ("SLHDSA", "SLH-DSA", "pqc_ready", "signature"),
@@ -140,12 +151,14 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
 # as simply "PQC" is reporting a category, not an assessment.
 #   standardised -> published standard
 #   selected     -> chosen for standardisation, standard not yet published
+#   superseded   -> a submission replaced by a standard it does not interoperate with
 #   candidate    -> under evaluation or recommended by a national body
 #   withdrawn    -> pulled from standardisation by its own authors
 #   eliminated   -> dropped by NIST at the end of an evaluation round
 #   broken       -> a practical attack is public
 _PQC_SCHEMES: dict[str, tuple[str, str]] = {
     "ML-KEM": ("structured lattice", "standardised"),
+    "Kyber": ("structured lattice", "superseded"),
     "ML-DSA": ("structured lattice", "standardised"),
     "SLH-DSA": ("hash-based", "standardised"),
     "XMSS": ("hash-based", "standardised"),
@@ -170,6 +183,19 @@ _PQC_SCHEMES: dict[str, tuple[str, str]] = {
 }
 
 _PQC_UNSAFE = ("withdrawn", "broken", "eliminated")
+
+
+def _pqc_classification(status: str) -> str:
+    """What a post-quantum finding is called, from where its scheme stands.
+
+    Only a published standard is pqc_ready. Until 0.28.0 everything not unsafe was:
+    HQC, selected and unpublished, counted the same as ML-KEM (Bill Buchanan, 5 Oct
+    2026). One rule for every status rather than one family, so a candidate cannot
+    read as more ready than a selected scheme.
+    """
+    if status in _PQC_UNSAFE:
+        return "deprecated_weak"
+    return "pqc_ready" if status == "standardised" else "pqc_pre_standard"
 
 # Weak / deprecated tokens that can co-occur (e.g. a weak signature hash).
 _WEAK_TOKENS: list[tuple[str, str]] = [
@@ -203,6 +229,16 @@ _SEVERITY_RANK: dict[str, int] = {
 }
 
 WEAK_RSA_MIN_BITS = 2048
+
+# Said in the reason where the family has something specific to say.
+_PRE_STANDARD_NOTE = {
+    "Kyber": (
+        " Named as Kyber, not as ML-KEM: round-3 Kyber uses a different "
+        "Fujisaki-Okamoto variant from FIPS 203 ML-KEM (FIPS 203, Appendix C) and the "
+        "two do not interoperate. Whether this code was updated to FIPS 203 under the "
+        "old name is not visible from the name; the standard is ML-KEM."
+    ),
+}
 
 
 def _squash(value: str) -> str:
@@ -396,6 +432,10 @@ class FingerprintSummary(BaseModel):
     total_findings: int
     quantum_vulnerable_count: int
     pqc_ready_count: int
+    # Post-quantum without a published standard, and post-quantum and broken,
+    # withdrawn or eliminated. Counted apart so neither hides inside another count.
+    pqc_pre_standard_count: int = 0
+    broken_pqc_count: int = 0
     weak_count: int
     highest_severity: str
     pqc_readiness: str
@@ -490,6 +530,28 @@ def classify_algorithm(
                     reason=(
                         f"{family} is a post-quantum ({pqc_family}) scheme that is "
                         f"{pqc_status}; it must not be counted as quantum-resistant."
+                    ),
+                )
+
+            if _pqc_classification(pqc_status) == "pqc_pre_standard":
+                return Finding(
+                    source=source,
+                    location=location,
+                    raw_value=raw_value,
+                    algorithm_family=family,
+                    also_present=also_present,
+                    pqc_family=pqc_family,
+                    pqc_status=pqc_status,
+                    classification="pqc_pre_standard",
+                    quantum_vulnerable=False,
+                    weak_key=False,
+                    severity="info",
+                    reason=(
+                        f"{family} is a post-quantum {pqc_family} scheme ({pqc_status}) "
+                        f"with no published standard behind it. Not counted as "
+                        f"pqc_ready: an implementation of a pre-standard specification "
+                        f"need not match, or interoperate with, the standard."
+                        f"{_PRE_STANDARD_NOTE.get(family, '')}{alongside}"
                     ),
                 )
 
@@ -747,6 +809,11 @@ def extract_findings(request: FingerprintRequest) -> list[Finding]:
 def summarize(findings: list[Finding]) -> FingerprintSummary:
     vulnerable = sum(1 for f in findings if f.quantum_vulnerable)
     pqc = sum(1 for f in findings if f.classification == "pqc_ready")
+    pre_standard = sum(1 for f in findings if f.classification == "pqc_pre_standard")
+    # deprecated_weak alone also holds MD5; the post-quantum status is what tells a
+    # broken post-quantum scheme from a broken hash.
+    broken_pqc = sum(1 for f in findings if f.classification == "deprecated_weak"
+                     and f.pqc_status in _PQC_UNSAFE)
     weak = sum(1 for f in findings if f.classification == "deprecated_weak" or f.weak_key)
 
     highest = "info"
@@ -762,12 +829,24 @@ def summarize(findings: list[Finding]) -> FingerprintSummary:
     # way of saying "you have not started" about someone who had finished.
     mechanisms = sum(1 for f in findings
                      if f.classification == "quantum_resistant_mechanism")
-    if vulnerable and pqc:
+    # A broken post-quantum scheme comes first, whatever sits beside it. Until 0.28.0
+    # a file holding only SIKE read "no_quantum_vulnerable_detected" -- the most
+    # reassuring thing this summary can say, about the one scheme in the table with
+    # a public break (Larisa Ghazaryan, 5 Oct 2026). The other counts still say what
+    # else is there.
+    if broken_pqc:
+        readiness = "broken_pqc_present"
+    elif vulnerable and pqc:
         readiness = "hybrid_partial"
+    elif vulnerable and pre_standard:
+        readiness = "hybrid_pre_standard"
     elif mechanisms:
         readiness = "mechanism_protected"
     elif vulnerable:
         readiness = "classical_only"
+    elif pre_standard:
+        # pqc_ready only when every post-quantum scheme found has a standard.
+        readiness = "pqc_pre_standard"
     elif pqc:
         readiness = "pqc_ready"
     elif crypto_findings:
@@ -779,6 +858,8 @@ def summarize(findings: list[Finding]) -> FingerprintSummary:
         total_findings=len(findings),
         quantum_vulnerable_count=vulnerable,
         pqc_ready_count=pqc,
+        pqc_pre_standard_count=pre_standard,
+        broken_pqc_count=broken_pqc,
         weak_count=weak,
         highest_severity=highest,
         pqc_readiness=readiness,
@@ -802,5 +883,9 @@ def known_algorithms() -> list[dict[str, Any]]:
     for _token, family, classification, kind in _PUBLIC_KEY_FAMILIES:
         if family not in seen:
             seen.add(family)
+            if classification == "pqc_ready":
+                # The table's column marks a post-quantum row; what a scan calls it
+                # depends on its status. Answering from the column said SIKE was ready.
+                classification = _pqc_classification(_PQC_SCHEMES[family][1])
             unique.append({"family": family, "classification": classification, "kind": kind})
     return unique

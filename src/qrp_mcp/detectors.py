@@ -104,6 +104,9 @@ def in_test_code(rel_path: str) -> bool:
     return bool(_TEST_FILE.search(stem))
 
 
+# Description of the rule for "kyber" with no identifier around it.
+KYBER_BY_NAME_ONLY = "Kyber named without an identifier (round-3 Kyber, or an old name for ML-KEM)"
+
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
         r"Crypto\.PublicKey\.RSA|Crypto\.PublicKey\s+import\s+RSA|"
@@ -419,9 +422,25 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # names the TLS hybrids by concatenation: X25519MLKEM768 puts a digit in front
     # of the scheme. A word boundary refuses both. What does the protective work is
     # the lookbehind for a LETTER -- it is why "FXMSS" still does not match XMSS.
-    ("ML-KEM", "ML-KEM (Kyber) usage", re.compile(
-        r"(?<![A-Za-z])ml[-_]?kem|(?<![A-Za-z])kyber(?![A-Za-z])|pqcrystals[-_]?kyber|crypto_kem_kyber", re.IGNORECASE,
+    ("ML-KEM", "ML-KEM usage", re.compile(r"(?<![A-Za-z])ml[-_]?kem", re.IGNORECASE)),
+    # Round-3 Kyber is not ML-KEM: FIPS 203 Appendix C, a different Fujisaki-Okamoto
+    # variant, and the two do not interoperate. Until 0.28.0 every spelling below was
+    # reported as standardised ML-KEM (Mehrdad Daei, 5 Oct 2026). These are the names
+    # the round-3 code carries: the reference and SUPERCOP/PQClean APIs, the Python
+    # and Rust pqcrypto packages, liboqs's algorithm ids, CIRCL's package, and the
+    # draft TLS hybrids (X25519Kyber768Draft00 and the oqs-provider group names).
+    ("Kyber", "Kyber usage (a Kyber identifier, not FIPS 203 ML-KEM)", re.compile(
+        r"pqcrystals[-_]?kyber|crypto_kem_(?:keypair_|enc_|dec_)?kyber|PQCLEAN_KYBER|"
+        r"pqcrypto[-_.](?:kem\.)?kyber|pqcrypto\.kem\s+import\s+kyber|"
+        r"(?<![A-Za-z])(?:x25519|x448|p256|p384|p521|secp\d+r1)[-_]?kyber|"
+        r"kyber\d*[-_]?draft|OQS_KEM_(?:alg_)?kyber|circl/kem/kyber|(?<![A-Za-z])pqc_kyber",
+        re.IGNORECASE,
     )),
+    # The word alone. It names the round-3 scheme and is also an old name people
+    # still use for ML-KEM, and the line does not say which; so it is not counted as
+    # the standard. A line that names ML-KEM as well resolves it (see
+    # KYBER_BY_NAME_ONLY in scan_source_file).
+    ("Kyber", KYBER_BY_NAME_ONLY, re.compile(r"(?<![A-Za-z])kyber(?![A-Za-z])", re.IGNORECASE)),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
         r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])dilithium|pqcrystals[-_]?dilithium", re.IGNORECASE,
     )),
@@ -1257,6 +1276,61 @@ def _drop_imports_covered_by_a_call(findings: list[dict[str, Any]]) -> list[dict
             if not (f.get("evidence_kind") == "import" and f["algorithm"] in called)]
 
 
+# Which module implements the algorithm, where a line names it unambiguously. For a
+# FIPS reader the module is the question -- validation belongs to a module, not to an
+# algorithm -- and until 0.28.0 `@noble/post-quantum` and Go's `crypto/mlkem` gave
+# identical findings (Jesone Sam, 6 Oct 2026). What is named is the API: a fork that
+# keeps it reads the same. Nothing here says anything about CMVP validation. A header
+# such as <openssl/evp.h> is shared by OpenSSL, BoringSSL and LibreSSL, so it names no
+# one; only identifiers one of them alone carries are listed.
+PROVIDER_PATTERNS: list[tuple[str, re.Pattern]] = [
+    ("@noble/post-quantum", re.compile(r"@noble/post-quantum")),
+    ("Go standard library", re.compile(r"[\"'`]crypto/(?:mlkem|internal/fips140/mlkem)[\"'`]")),
+    ("Cloudflare CIRCL", re.compile(r"github\.com/cloudflare/circl/(?:kem|sign|dh|pke)/")),
+    ("liboqs", re.compile(
+        r"\bOQS_(?:KEM|SIG)_|\boqs\s*(?:\.|::)\s*(?:KeyEncapsulation|Signature|kem|sig)\b")),
+    ("pqcrypto", re.compile(
+        r"\bpqcrypto(?:\.(?:kem|sign)\b|[-_](?:kyber|mlkem|dilithium|mldsa|falcon|"
+        r"sphincsplus|hqc|classicmceliece|frodo))", re.IGNORECASE)),
+    ("PQClean", re.compile(r"\bPQCLEAN_[A-Z0-9]+_")),
+    ("pq-crystals reference", re.compile(r"\bpqcrystals_(?:kyber|dilithium)")),
+    ("Bouncy Castle", re.compile(
+        r"\b[Oo]rg\.[Bb]ouncy[Cc]astle\.|getInstance\([^)\n]*,\s*\"BC(?:PQC)?\"\s*\)")),
+    ("BoringSSL", re.compile(
+        r"\b(?:MLKEM(?:768|1024)|MLDSA(?:44|65|87)|KYBER)_(?:generate_key|encap|decap|"
+        r"public_from_private|parse_public_key|marshal_public_key|private_key_from_seed|"
+        r"sign|verify)\b")),
+    ("OpenSSL 3", re.compile(
+        r"\bEVP_PKEY_Q_keygen\b|\bEVP_PKEY_CTX_new_from_name\b|"
+        r"\bEVP_(?:KEM|SIGNATURE|KEYMGMT)_fetch\b")),
+]
+
+
+def _attach_providers(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    """Name the provider on each finding of a family whose module this file names.
+
+    Collected before imports covered by a call are dropped: the import is usually the
+    only line that names the module (`import "crypto/mlkem"`, then `mlkem.Generate...`),
+    and dropping it first left the call with nothing to say. A line that names a
+    provider itself gets that one; otherwise the file's, if it names exactly one for
+    the family. Two in one file and none on the line: absent, not guessed. Comments
+    and bans neither give nor get a provider.
+    """
+    def on(line_no: int) -> list[str]:
+        text = lines[line_no - 1] if 0 < line_no <= len(lines) else ""
+        return [name for name, pattern in PROVIDER_PATTERNS if pattern.search(text)]
+
+    used = [f for f in findings if f.get("evidence_kind") not in {"comment", "ban"}]
+    in_file: dict[str, set[str]] = {}
+    for f in used:
+        in_file.setdefault(f["algorithm"], set()).update(on(f["line"]))
+    for f in used:
+        own = on(f["line"])
+        names = own if own else sorted(in_file.get(f["algorithm"], ()))
+        if len(names) == 1:
+            f["provider"] = names[0]
+
+
 def scan_source_file(path: Path, rel_path: str,
                      lines: list[str] | None = None,
                      cipher_exclusions: bool = False) -> list[dict[str, Any]]:
@@ -1290,6 +1364,9 @@ def scan_source_file(path: Path, rel_path: str,
         searched = _masked(line, blobs)
         for algorithm, description, pattern in ALGORITHM_PATTERNS:
             if algorithm in seen_on_line:
+                continue
+            # "ML-KEM (Kyber)": the line names the standard and gives its old name.
+            if description == KYBER_BY_NAME_ONLY and "ML-KEM" in seen_on_line:
                 continue
             # Every match on the line, not the first: a cipher string can both ban
             # and allow the same family -- "ALL:!ECDH:ECDHE-RSA-AES256" -- and
@@ -1365,6 +1442,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": "RFC 8784 postquantum preshared key",
                 "excerpt": line.strip()[:200],
             })
+    _attach_providers(findings, lines)
     return _drop_imports_covered_by_a_call(findings)
 
 

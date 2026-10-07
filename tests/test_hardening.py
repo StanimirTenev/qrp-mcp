@@ -254,8 +254,12 @@ def test_kyberswap_is_not_ml_kem(tmp_path):
     assert "ML-KEM" not in fam
 
 
-def test_kyber_with_a_parameter_set_is_still_ml_kem(tmp_path):
-    assert "ML-KEM" in _families(tmp_path, "k.c", "crypto_kem_keypair_kyber768(pk, sk);\n")
+def test_kyber_with_a_parameter_set_is_kyber_not_ml_kem(tmp_path):
+    # Until 0.28.0 this asserted ML-KEM. crypto_kem_keypair_kyber768 is the round-3
+    # API, and round-3 Kyber does not interoperate with FIPS 203 (Appendix C); it is
+    # still found, as the pre-standard scheme it is.
+    fam = _families(tmp_path, "k.c", "crypto_kem_keypair_kyber768(pk, sk);\n")
+    assert "Kyber" in fam and "ML-KEM" not in fam
 
 
 def test_release_candidate_suffix_is_not_rc4(tmp_path):

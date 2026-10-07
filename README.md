@@ -177,9 +177,52 @@ SQIsign, UOV — are recognised as candidates, and CROSS as dropped from that pr
 
 Each carries the mathematical family it rests on (structured or unstructured lattice,
 code-based, hash-based, isogeny-based, multivariate, symmetric-based) and where it stands:
-standardised, selected, candidate, withdrawn, eliminated or broken. SIKE is reported as broken
-and HAWK as withdrawn rather than counted as quantum-resistant — "post-quantum" is a category,
-not an assessment.
+standardised, selected, candidate, superseded, withdrawn, eliminated or broken. SIKE is reported
+as broken and HAWK as withdrawn rather than counted as quantum-resistant — "post-quantum" is a
+category, not an assessment.
+
+**Only a published standard is `pqc_ready`.** A selected or candidate scheme — HQC, Falcon
+(FIPS 206 not yet listed as published here), Classic McEliece, BIKE, FrodoKEM, NTRU including
+OpenSSH's `sntrup761`, and the additional-signature candidates — is `pqc_pre_standard`: found,
+post-quantum, and not counted as ready, because an implementation of today's specification need
+not match the standard when it comes (FIPS 203's own 2023 draft differs from the final text).
+Until 0.28.0 these counted as `pqc_ready`; raised in public by Bill Buchanan about HQC.
+
+**Round-3 Kyber is not ML-KEM.** FIPS 203, Appendix C: ML-KEM uses a different Fujisaki-Okamoto
+variant from the round-3 submission, and the two do not interoperate. Until 0.28.0 every Kyber
+spelling was reported as standardised ML-KEM (raised by Mehrdad Daei). Now the identifiers round-3
+code carries — `pqcrystals_kyber…`, `crypto_kem_…kyber…`, `PQCLEAN_KYBER…`, `pqcrypto.kem.kyber…`
+and the `pqcrypto-kyber` crate, `OQS_KEM_alg_kyber_…`, CIRCL's `kem/kyber`, `pqc_kyber`, and the
+draft hybrids such as `X25519Kyber768Draft00` — are family `Kyber`, status `superseded`,
+`pqc_pre_standard`. **The word `kyber` alone** is reported the same way: it is the round-3 name
+and also an old name people still use for ML-KEM, the line does not say which, and claiming a
+standard for code that may not interoperate with it is the worse error. A line that names ML-KEM
+as well (`ML-KEM (Kyber)`) resolves the old name and is ML-KEM only. Whether code that says
+`pqcrystals_kyber` was updated to FIPS 203 under the old name is not visible from the name, and the
+finding says so.
+
+**The summary does not reassure past a broken scheme.** `summary.pqc_readiness` is one of
+`broken_pqc_present` (a broken, withdrawn or eliminated post-quantum scheme is present — first,
+whatever sits beside it), `hybrid_partial`, `hybrid_pre_standard` (classical beside post-quantum
+schemes none of which is standardised), `mechanism_protected`, `classical_only`,
+`pqc_pre_standard`, `pqc_ready` (every post-quantum scheme found is standardised and nothing
+classical is), `no_quantum_vulnerable_detected` or `unknown`. Until 0.28.0 a file holding only
+SIKE read `no_quantum_vulnerable_detected` (raised by Larisa Ghazaryan). `pqc_pre_standard_count`
+and `broken_pqc_count` sit beside `pqc_ready_count`, and `list_algorithms` answers with the same
+classification a scan gives.
+
+**Which module implements it, where the file says.** Validation belongs to a module, not to an
+algorithm, and `@noble/post-quantum` and Go's `crypto/mlkem` used to give identical findings
+(raised by Jesone Sam). Now a line that uses a family carries `provider` when the file names the
+module unambiguously — `@noble/post-quantum`, the Go standard library (`"crypto/mlkem"`),
+Cloudflare CIRCL, liboqs, pqcrypto, PQClean, the pq-crystals reference code, Bouncy Castle,
+BoringSSL (`MLKEM768_…`, `MLDSA65_…`, `KYBER_…`) and OpenSSL 3 (`EVP_PKEY_Q_keygen`,
+`EVP_PKEY_CTX_new_from_name`, `EVP_KEM_fetch`…) — and each finding lists its `providers`. The
+module is usually named on the import line and used on another, so a call line takes the module
+its file imports for that family; two modules in one file and none on the line leave it absent.
+An unknown provider is **absent, never guessed**: a header such as `<openssl/evp.h>` is shared by
+OpenSSL, BoringSSL and LibreSSL and names no one. What is named is the API, not the build — a fork
+that keeps the API reads the same — and **nothing here claims CMVP or FIPS 140-3 validation**.
 
 **Certificates and keys** — `.pem`, `.der`, `.crt`, `.cer`, `.cert`, `.csr`, `.key`, `.pub`,
 `.p12`, `.pfx`. Algorithms are resolved from the object identifiers inside the DER and from
@@ -348,6 +391,11 @@ it that a component list alone cannot say:
   rather than something to hide.
 - `evidence.occurrences` — file, line and matched text for every asset.
 
+Where the scan named the module, an algorithm component carries `qrp:providers` (a JSON array)
+and `qrp:provider_validation`, which says that validation is not claimed and has to be checked
+against the CMVP list for the deployed version. `certificationLevel` is never written: it states
+a validation, and nothing in a file establishes one.
+
 Output is deterministic where it matters. The serial number is derived from the target, the two
 pins and a digest of what was found, so the same code over the same corpus that finds the same
 things gets the same serial, and a different result gets a different one. The timestamp and the
@@ -484,7 +532,8 @@ answers in two steps:
    not read — and `removed`: the whole file is gone from the second tree. A deleted file does
    remove its code, but it is also the cheapest way to make a finding disappear, so it is named
    apart and **not counted as closed**. A file the second run could not open is never counted
-   as fixed.
+   as fixed. An occurrence's `provider` is shown but is not part of its identity: it can come
+   from the file's import line, and editing that line does not close the calls below it.
 
 From 0.20.0 every scan lists `files_read` by name, beside the counts. That is what tells a fixed
 line from a deleted file; it stays out of the CBOM. Two results without it (0.19.0) are reported

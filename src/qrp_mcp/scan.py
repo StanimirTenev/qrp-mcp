@@ -69,6 +69,13 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         crypto_evidence={"repo_scan": scan_result},
     )
     response = fingerprint(request)
+    # The modules named for each family, from the lines that use it. Absent where
+    # none was named: an empty list would read as "checked, none", which it is not.
+    providers: dict[str, set[str]] = {}
+    for item in scan_result["source_code_findings"] + scan_result["iac_findings"]:
+        if item.get("provider"):
+            providers.setdefault(item["algorithm"], set()).add(item["provider"])
+    detected_by_name = dict(zip(named, scan_result["detected_algorithms"]))
 
     coverage_block = coverage.build(
         repo_path=repo_path,
@@ -151,7 +158,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         "algorithm_key_sizes_observed": scan_result.get("algorithm_key_sizes_observed", {}),
         # A replacement travels with the finding it is for, and only where one is due;
         # a suggestion, never an action.
-        "findings": [_with_replacement(f.model_dump(), roles, profile) for f in response.findings],
+        "findings": [_with_providers(_with_replacement(f.model_dump(), roles, profile),
+                                     providers, detected_by_name)
+                     for f in response.findings],
         # Whose rules the replacements follow; NIST unless asked.
         "replacement_profile": profile,
         "summary": response.summary.model_dump(),
@@ -190,6 +199,14 @@ def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:
                     "signature": 0, "key_establishment": 0, "undetermined": 0})
                 fam[role] += 1
     return counts
+
+
+def _with_providers(finding: dict[str, Any], providers: dict[str, set[str]],
+                    detected_by_name: dict[str, str]) -> dict[str, Any]:
+    family = detected_by_name.get(finding.get("raw_value"))
+    if family in providers:
+        finding["providers"] = sorted(providers[family])
+    return finding
 
 
 def _with_replacement(finding: dict[str, Any],

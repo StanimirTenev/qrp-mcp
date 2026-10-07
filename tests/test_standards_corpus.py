@@ -78,7 +78,9 @@ def test_stateful_hash_based_signatures_are_recognised(value):
 def test_fips_206_name_is_not_read_as_classical_dsa():
     finding = classify("FN-DSA-512")
     assert finding.algorithm_family == "Falcon"
-    assert finding.classification == "pqc_ready"
+    # Post-quantum, not classical DSA -- and, while FIPS 206 is listed as selected
+    # rather than published, not counted as pqc_ready either.
+    assert finding.classification == "pqc_pre_standard"
 
 
 # RFC 10024 (TLS 1.3), OpenSSH 10, and draft-ietf-lamps-pq-composite-sigs. A

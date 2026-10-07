@@ -34,7 +34,9 @@ _LOCATION_FIELDS = ("line",)
 # directory has not been fixed, and it must not look as if it had.
 # The role is an interpretation of the line, not the line: two readers that read the
 # same line the same way are looking at the same occurrence whatever they call its role.
-_CONTEXT_FIELDS = ("in_test_code", "role")
+# The provider can come from another line of the file (its import), so editing that
+# line must not turn every call below it into closed + new.
+_CONTEXT_FIELDS = ("in_test_code", "role", "provider")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "
@@ -186,7 +188,7 @@ def _unread_paths(result: dict[str, Any]) -> tuple[set[str], list[str]]:
 def _brief(category: str, item: dict[str, Any]) -> dict[str, Any]:
     keep = ("path", "line", "algorithm", "type", "protocol", "version", "package",
             "group", "setting", "offered",
-            "evidence_kind", "excerpt", "in_test_code", "role")
+            "evidence_kind", "excerpt", "in_test_code", "role", "provider")
     return {"category": category, **{k: item[k] for k in keep if k in item}}
 
 

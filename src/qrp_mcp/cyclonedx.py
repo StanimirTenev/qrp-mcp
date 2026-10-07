@@ -66,7 +66,7 @@ _PRIMITIVE_BY_KIND = {
     "public_key": "pke",
 }
 _KEM_FAMILIES = {
-    "ML-KEM", "FrodoKEM", "Classic McEliece", "NTRU", "BIKE", "HQC", "SIKE",
+    "ML-KEM", "Kyber", "FrodoKEM", "Classic McEliece", "NTRU", "BIKE", "HQC", "SIKE",
 }
 _PRIMITIVE_BY_FAMILY = {
     "MD5": "hash",
@@ -76,6 +76,13 @@ _PRIMITIVE_BY_FAMILY = {
     "RC4": "stream-cipher",
     "PPK (RFC 8784)": "other",
 }
+
+
+# Said beside every provider, so the name is not read as more than it is.
+PROVIDER_VALIDATION = (
+    "not claimed: the provider is named from the API in the file, not from the build, "
+    "and whether that module is CMVP-validated (FIPS 140-3) has to be checked against "
+    "the CMVP list for the version actually deployed")
 
 
 def _primitive(family: str) -> str:
@@ -323,6 +330,15 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         for key in ("pqc_family", "pqc_status"):
             if finding.get(key):
                 component["properties"].append({"name": f"{NS}{key}", "value": finding[key]})
+        # The modules the evidence names, one JSON array like every other list here.
+        # Not `certificationLevel`: that field states a validation, and nothing in a
+        # file establishes one. Not `implementationPlatform`: that is a CPU.
+        if finding.get("providers"):
+            component["properties"].append({
+                "name": f"{NS}providers",
+                "value": json.dumps(finding["providers"], ensure_ascii=False)})
+            component["properties"].append({
+                "name": f"{NS}provider_validation", "value": PROVIDER_VALIDATION})
         occurrences = _occurrences(located, family, family_of)
         if occurrences:
             component["evidence"] = {"occurrences": occurrences}
