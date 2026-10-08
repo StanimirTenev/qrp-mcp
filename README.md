@@ -488,9 +488,10 @@ scan result and in the exported CBOM.
 **Evidence kind.** `scan_repo` grades every match: `call`, `declaration`, `import`,
 `reference`, `ban`, `comment`, and `default` -- a value the provider applies because the file
 wrote none (an AWS listener with no `ssl_policy`), counted as in use, never as a comment or a
-ban. Comment evidence is kept out of the inventory, and the
-reason is measured — the nearest rival strips comments before matching and scored 0.542
-precision on an independent corpus against this scanner's 0.93. The exported document
+ban. Comment evidence is kept out of the inventory: a sentence that names an algorithm is
+not a use of it. (An earlier version of this paragraph gave precision figures here with the
+two tools swapped; the measured figures are under "Measured on a corpus this project did not
+write" below.) The exported document
 used to drop that grade, so a sentence about certificates reached an auditor looking
 exactly like a signature: **78 of 465 occurrences on certbot (17%) and 1174 of 7142 on
 OpenSSH (16%)**, including 493 ML-DSA and 429 ML-KEM mentions in OpenSSH, which is a lot
