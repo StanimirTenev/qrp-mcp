@@ -391,6 +391,11 @@ another coverage figure. Four things, each answering something the percentage ca
   indexed property per name when any name held a comma: nothing was lost, but where the names
   sat depended on what they were called. Lists of objects (linked entries) stay indexed field
   by field.
+  The declared boundary (`instrument.claimed_types`) names every way a file is read. Until
+  0.29.1 it left out `.yaml`/`.yml`, the dependency manifests (`requirements.txt`, `pom.xml`,
+  `packages.config`, `*.csproj`…) and a file of any type that begins with key material: a CAP-1
+  examiner run by Joel Hillier over the certbot CBOM counted 44 such files examined outside the
+  declared types. They were read all along; only the declaration was narrower than the scan.
 
 Measured across five real repositories (certbot, OpenSSH, Vault, Bitcoin, OpenSSL) at this
 release, the scan reads **67% of the files present** — 74% of OpenSSL, 85% of OpenSSH, 66% of

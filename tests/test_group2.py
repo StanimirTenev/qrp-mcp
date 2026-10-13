@@ -6,6 +6,8 @@ the strength of having read every file.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from qrp_mcp import cyclonedx
 from qrp_mcp.scan import scan_directory
 
@@ -93,3 +95,30 @@ def test_ruleset_counts_the_rules_that_are_not_line_patterns(tmp_path):
     (tmp_path / "a.py").write_text("x = 1\n")
     ruleset = scan_directory(str(tmp_path))["coverage"]["instrument"]["ruleset"]
     assert ruleset.get("certificate_oid_names") and ruleset.get("pem_labels")
+
+
+def test_every_file_read_is_inside_the_declared_types(tmp_path):
+    """Joel Hillier's CAP-1 examiner, over the certbot CBOM of 0.27.3 (13.10.2026): 44
+    files -- .yaml, .yml, a requirements .txt -- were counted examined while the types the
+    tool declares it claims omitted them. The boundary in the report was narrower than the
+    one the scan applied. Every way a file gets read must be named in claimed_types."""
+    files = {"a.yaml": "x: 1\n", "b.yml": "x: 1\n", "requirements.txt": "cryptography\n",
+             "pom.xml": "<project/>\n", "packages.config": "<packages/>\n",
+             "a.csproj": "<Project/>\n", "README.md": "not claimed\n",
+             "id_key": "-----BEGIN PRIVATE KEY-----\n" + ("A" * 64 + "\n") * 4
+                       + "-----END PRIVATE KEY-----\n"}
+    for name, text in files.items():
+        (tmp_path / name).write_text(text)
+    cov = scan_directory(str(tmp_path))["coverage"]
+    claimed = cov["instrument"]["claimed_types"]
+    unread = {p for g in cov["not_examined"] for p in g.get("paths", [])}
+    assert unread == {"README.md"}, unread
+
+    def declared(name):
+        suffix = Path(name).suffix.lower()
+        return any(name in v if k.endswith("_filenames") else suffix in v
+                   for k, v in claimed.items())
+    assert [n for n in files if n not in unread | {"id_key"} and not declared(n)] == []
+    # Read for what its first bytes are, whatever its type: declared as such.
+    assert claimed.get("any_type_beginning_with_key_material")
+    assert not declared("README.md")

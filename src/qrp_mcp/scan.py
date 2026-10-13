@@ -114,6 +114,13 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # Read only when the file names an OPC UA SecurityPolicy URI; otherwise
             # counted under type_not_claimed like any other unclaimed file.
             "config_when_naming_opcua_security_policy": sorted(opcua.SNIFF_EXTENSIONS),
+            # Read by the scan and missing here until a CAP-1 examiner counted 44 such
+            # files in certbot as examined outside the declared types (13.10.2026).
+            "yaml": [".yaml", ".yml"],
+            "manifest": sorted(assets._NUGET_SUFFIXES),
+            "manifest_filenames": sorted(set(assets.MANIFEST_FILENAMES) | assets._NUGET_FILENAMES),
+            # A file no type claims is still read when its first bytes are a key.
+            "any_type_beginning_with_key_material": ["*"],
         },
         excluded_dirs=list(detectors.EXCLUDED_DIRS),
     )
