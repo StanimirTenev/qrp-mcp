@@ -107,6 +107,8 @@ def in_test_code(rel_path: str) -> bool:
 
 
 # Description of the rule for "kyber" with no identifier around it.
+EXPERIMENTAL_SSH_MLDSA = ("OpenSSH 10.4 experimental ML-DSA-44-Ed25519 key type "
+                          "(@openssh.com), not the one 10.6 enabled")
 KYBER_BY_NAME_ONLY = "Kyber named without an identifier (round-3 Kyber, or an old name for ML-KEM)"
 
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
@@ -443,6 +445,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # the standard. A line that names ML-KEM as well resolves it (see
     # KYBER_BY_NAME_ONLY in scan_source_file).
     ("Kyber", KYBER_BY_NAME_ONLY, re.compile(r"(?<![A-Za-z])kyber(?![A-Za-z])", re.IGNORECASE)),
+    # OpenSSH 10.4's experimental composite, which 10.6 replaced without the suffix:
+    # keys made with it "must be regenerated and/or removed" (10.6 release notes). Before
+    # ML-DSA, which then skips the matches inside it (scan_source_file).
+    ("ML-DSA-44-Ed25519 experimental", EXPERIMENTAL_SSH_MLDSA, re.compile(
+        r"(?<![A-Za-z])ssh-mldsa44-ed25519@openssh\.com", re.IGNORECASE)),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
         r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])dilithium|pqcrystals[-_]?dilithium", re.IGNORECASE,
     )),
@@ -1399,6 +1406,7 @@ def scan_source_file(path: Path, rel_path: str,
         # inflates the headline number by however many ways the line could be
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
+        experimental: list[tuple[int, int]] = []
         blobs = _blob_spans(line)
         searched = _masked(line, blobs)
         for algorithm, description, pattern in ALGORITHM_PATTERNS:
@@ -1412,6 +1420,12 @@ def scan_source_file(path: Path, rel_path: str,
             # judging the line by its first match would throw the real use away
             # along with the exclusion.
             matches = [m for m in pattern.finditer(searched) if not _in_blob(m.start(), blobs)]
+            if description == EXPERIMENTAL_SSH_MLDSA:
+                experimental = [(m.start(), m.end()) for m in matches]
+            elif algorithm == "ML-DSA":
+                # The experimental key type's own "mldsa" is not a second, standard key.
+                matches = [m for m in matches
+                           if not any(s <= m.start() < e for s, e in experimental)]
             if not matches:
                 continue
             if cipher_exclusions and all(_is_excluded(line, m.start()) for m in matches):

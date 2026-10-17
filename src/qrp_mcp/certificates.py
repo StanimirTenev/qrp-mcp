@@ -63,10 +63,15 @@ _SSH_KEY_TYPES = {
     "sk-ecdsa-sha2-nistp256@openssh.com": "ECDSA",
     "ssh-mldsa44": "ML-DSA",
     "ssh-mldsa65": "ML-DSA",
-    "ssh-mldsa44-ed25519": "ML-DSA",
+    # A composite names both halves, so the classifier can carry Ed25519 beside ML-DSA
+    # rather than drop it (ZA-OPRAVYANE row 18, 08.10.2026: also_present was empty).
+    "ssh-mldsa44-ed25519": "ML-DSA-44-Ed25519",
     "ssh-mldsa44@openssh.com": "ML-DSA",
     "ssh-mldsa65@openssh.com": "ML-DSA",
-    "ssh-mldsa44-ed25519@openssh.com": "ML-DSA",
+    # Not the same key: OpenSSH 10.4 shipped this composite as an experiment under the
+    # vendor suffix; 10.6 enabled it without the suffix and says keys made with the
+    # experimental support "must be regenerated and/or removed" (release notes, 10.6).
+    "ssh-mldsa44-ed25519@openssh.com": "ML-DSA-44-Ed25519 experimental",
     "sntrup761x25519-sha512": "NTRU",
     "sntrup761x25519-sha512@openssh.com": "NTRU",
     "mlkem768x25519-sha256": "ML-KEM",

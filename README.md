@@ -201,6 +201,17 @@ as well (`ML-KEM (Kyber)`) resolves the old name and is ML-KEM only. Whether cod
 `pqcrystals_kyber` was updated to FIPS 203 under the old name is not visible from the name, and the
 finding says so.
 
+**OpenSSH's experimental ML-DSA key is not the one that replaced it.** OpenSSH 10.4 shipped a
+composite of ML-DSA-44 and Ed25519 as an experiment, as `ssh-mldsa44-ed25519@openssh.com`; 10.6
+enabled the scheme without the suffix, and its release notes say keys generated with the
+experimental support must be regenerated and/or removed. Until 0.30.0 both read as ML-DSA,
+`pqc_ready`. Now the suffixed type — in a key or certificate file, or named in configuration such as
+`HostKeyAlgorithms` — is family `ML-DSA-44-Ed25519 experimental`, status `superseded`,
+`pqc_pre_standard`, and the ML-DSA rule does not count it a second time. The unsuffixed composite
+stays ML-DSA and now names its classical half: `also_present: ["Ed25519"]`. Whether a given server
+still accepts an experimental key is not visible from the file. On OpenSSH's own tree, four test
+keys under `regress/` still carry the experimental type while the source uses the new name.
+
 **The summary does not reassure past a broken scheme.** `summary.pqc_readiness` is one of
 `broken_pqc_present` (a broken, withdrawn or eliminated post-quantum scheme is present — first,
 whatever sits beside it), `hybrid_partial`, `hybrid_pre_standard` (classical beside post-quantum

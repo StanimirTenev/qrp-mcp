@@ -73,7 +73,30 @@ def test_openssh_hybrid_key_type_with_the_domain_suffix(tmp_path):
     (tmp_path / "hybrid.pub").write_text(
         "ssh-mldsa44-ed25519@openssh.com AAAAH3NzaC1tbGRzYTQ0LWVkMjU1MTlAb3Blbn\n")
     families = scan_directory(tmp_path)["detected_algorithms"]
-    assert "ML-DSA" in families
+    assert "ML-DSA-44-Ed25519 experimental" in families
+
+
+def _finding(tmp_path, line, family):
+    (tmp_path / "k.pub").write_text(line)
+    found = [f for f in scan_directory(tmp_path)["findings"] if f["algorithm_family"] == family]
+    assert len(found) == 1, scan_directory(tmp_path)["findings"]
+    return found[0]
+
+
+def test_the_experimental_openssh_key_is_not_the_standard_one(tmp_path):
+    """Row 18 (08.10.2026): the suffixed type is OpenSSH 10.4's experiment, and 10.6 says
+    keys made with it "must be regenerated and/or removed". Reported as ML-DSA, pqc_ready,
+    it read exactly like the key that replaced it."""
+    f = _finding(tmp_path, "ssh-mldsa44-ed25519@openssh.com AAAAH3NzaC1tbGRzYTQ0\n",
+                 "ML-DSA-44-Ed25519 experimental")
+    assert (f["classification"], f["pqc_status"]) == ("pqc_pre_standard", "superseded")
+    assert "regenerated" in f["reason"] and "Ed25519" in f["reason"]
+
+
+def test_the_hybrid_key_names_its_classical_half(tmp_path):
+    """Row 18, second half: also_present was empty, so the Ed25519 half went unsaid."""
+    f = _finding(tmp_path, "ssh-mldsa44-ed25519 AAAAE3NzaC1tbGRzYTQ0\n", "ML-DSA")
+    assert (f["classification"], f["also_present"]) == ("pqc_ready", ["Ed25519"])
 
 
 def test_ssh_protocol_1_public_key(tmp_path):
@@ -103,3 +126,16 @@ def test_diffie_hellman_key_by_object_identifier(tmp_path):
     # a hand-built DER would test the pattern rather than the file.
     shutil.copy(Path(__file__).parent / "fixtures" / "dh-key.der", tmp_path / "DH.priv.der")
     assert "DH" in scan_directory(tmp_path)["detected_algorithms"]
+
+
+def test_the_experimental_type_in_sshd_config_is_not_also_counted_as_ml_dsa(tmp_path):
+    """The source rule for ML-DSA matches the "mldsa" inside the suffixed name; a line
+    naming only the experimental type must not also report the standard key."""
+    (tmp_path / "sshd_config").write_text(
+        "HostKeyAlgorithms ssh-mldsa44-ed25519@openssh.com\n")
+    families = {f["algorithm_family"] for f in scan_directory(tmp_path)["findings"]}
+    assert "ML-DSA-44-Ed25519 experimental" in families and "ML-DSA" not in families
+    (tmp_path / "sshd_config").write_text(
+        "HostKeyAlgorithms ssh-mldsa44-ed25519,ssh-mldsa44-ed25519@openssh.com\n")
+    families = {f["algorithm_family"] for f in scan_directory(tmp_path)["findings"]}
+    assert {"ML-DSA-44-Ed25519 experimental", "ML-DSA"} <= families

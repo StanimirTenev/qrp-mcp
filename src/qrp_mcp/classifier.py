@@ -66,6 +66,11 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     # decided by its status below (see _pqc_classification).
     ("KYBER", "Kyber", "pqc_ready", "key_exchange"),
     ("MLDSA", "ML-DSA", "pqc_ready", "signature"),
+    # The OpenSSH 10.4 experimental key type (ssh-mldsa44-ed25519@openssh.com). The
+    # token is longer than MLDSA, so it wins; it also contains ED25519, so the hybrid's
+    # classical half is said in the note rather than in also_present.
+    ("MLDSA44ED25519EXPERIMENTAL", "ML-DSA-44-Ed25519 experimental",
+     "pqc_ready", "signature"),
     ("DILITHIUM", "ML-DSA", "pqc_ready", "signature"),
     ("SLHDSA", "SLH-DSA", "pqc_ready", "signature"),
     ("SPHINCS", "SLH-DSA", "pqc_ready", "signature"),
@@ -173,6 +178,7 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
 _PQC_SCHEMES: dict[str, tuple[str, str]] = {
     "ML-KEM": ("structured lattice", "standardised"),
     "Kyber": ("structured lattice", "superseded"),
+    "ML-DSA-44-Ed25519 experimental": ("structured lattice", "superseded"),
     "ML-DSA": ("structured lattice", "standardised"),
     "SLH-DSA": ("hash-based", "standardised"),
     "XMSS": ("hash-based", "standardised"),
@@ -253,6 +259,13 @@ _PRE_STANDARD_NOTE = {
         "Fujisaki-Okamoto variant from FIPS 203 ML-KEM (FIPS 203, Appendix C) and the "
         "two do not interoperate. Whether this code was updated to FIPS 203 under the "
         "old name is not visible from the name; the standard is ML-KEM."
+    ),
+    "ML-DSA-44-Ed25519 experimental": (
+        " A composite of ML-DSA-44 and Ed25519 in the encoding OpenSSH 10.4 shipped as an "
+        "experiment, with the @openssh.com suffix. OpenSSH 10.6 enabled the scheme without "
+        "the suffix, and its release notes say keys generated with the experimental support "
+        "must be regenerated and/or removed. Whether a given server still accepts this key "
+        "is not visible from the file."
     ),
     "MIKE": (
         " MIKE (Module Isogeny Key Exchange) is a non-interactive key exchange published "
