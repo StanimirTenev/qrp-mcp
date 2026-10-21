@@ -606,6 +606,33 @@ prime256v1, secp384r1 in the Apache options file); on OpenSSH: none.
 ⚠️ What is not claimed: that a connection ever uses the fallback. That is settled where TLS
 terminates, as above; the finding is about the file.
 
+### A classical SSH key exchange offered on its own
+
+The same defect existed in OpenSSH until the release after 0.30.0 (on this branch, not yet
+released): `KexAlgorithms mlkem768x25519-sha256,curve25519-sha256` and `KexAlgorithms
+mlkem768x25519-sha256` scanned the same, because the X25519 inside the hybrid's name is the family
+of `curve25519-sha256` too, and removing the classical fallback from `sshd_config` closed nothing.
+Now a classical algorithm in a `KexAlgorithms` list (`sshd_config`, `ssh_config`, `ssh -o
+KexAlgorithms=…`) is a finding of its own, under `evidence.ssh_kex`, with `offered: "alone"`,
+`setting: "KexAlgorithms"` and `basis: "configured_kex"`. The names are OpenSSH's own — every
+algorithm `sshd_config(5)` lists that `kex-names.c` marks as not post-quantum (OpenSSH at
+`7fe3b24`): `curve25519-sha256` (and `@libssh.org`), `ecdh-sha2-nistp256/384/521` and the
+`diffie-hellman-group*` names. The hybrids (`mlkem768x25519-sha256`, `mlkem768nistp256-sha256`,
+`sntrup761x25519-sha512`) are never counted. OpenSSH's prefix applies to the whole list: a list
+beginning with `-` removes what it names, so nothing in it is an offer; `+` (appended to the
+default) and `^` (placed at its head) still offer it, and the finding says the default set is
+not named on that line.
+
+It is kept apart from `tls_groups` because an `sshd_config` is not a TLS configuration: it adds no
+place to `tls_termination`. In `closure` removing the fallback is **closed**
+(`curve25519-sha256 offered alone`), and in the CBOM it is a component,
+`curve25519-sha256 (SSH key exchange offered alone)`. On OpenSSH: 3, all in `regress/` test
+scripts; on certbot: none. Nothing else in either scan changes: the same files read (740 of 873,
+823 of 1,250) and the same evidence and findings as 0.30.0.
+
+⚠️ What is not claimed: which algorithm a connection uses. The client chooses from what the
+server offers, and an sshd built without a hybrid, or a jump host in front, is not in the files.
+
 ⚠️ What is not claimed: that the tree's TLS settings are all listed, or which terminator is in
 front. The scanner cannot see a connection; the field says that, not what the connection is.
 Raised in public on 1 October 2026, where a measurement at the front door met the same gap

@@ -193,6 +193,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # No excerpt: its identity is file, setting and group, so `closure` can
             # tell a removed fallback from an edited line.
             "tls_groups": scan_result.get("tls_group_findings", []),
+            # The same for SSH, in a KexAlgorithms list. Apart from tls_groups: an
+            # sshd_config is not a TLS configuration.
+            "ssh_kex": scan_result.get("ssh_kex_findings", []),
         },
     }
 

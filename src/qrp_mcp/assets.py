@@ -585,6 +585,70 @@ def scan_tls_groups(line: str) -> list[dict[str, Any]]:
         })
     return out
 
+
+# -- A classical SSH key exchange offered on its own -------------------------------------
+#
+# The same defect as above, in OpenSSH (ZA-OPRAVYANE row 22, 2026-10-21): `KexAlgorithms
+# mlkem768x25519-sha256,curve25519-sha256` and `KexAlgorithms mlkem768x25519-sha256`
+# scanned the same, so removing the classical fallback from sshd closed nothing. Kept
+# apart from the TLS groups: an sshd_config is not a TLS configuration, and the TLS
+# statement below must not be said about it.
+#
+# The names and their families are OpenSSH's own: every algorithm sshd_config(5) lists
+# under KexAlgorithms that kex-names.c marks KEX_NOT_PQ (OpenSSH at 7fe3b24, 2026-09-04).
+# The hybrids (mlkem768x25519-sha256, mlkem768nistp256-sha256, sntrup761x25519-sha512)
+# are not in this table, which is the whole point.
+CLASSICAL_SSH_KEX = {
+    "curve25519-sha256": "X25519", "curve25519-sha256@libssh.org": "X25519",
+    "ecdh-sha2-nistp256": "ECDH", "ecdh-sha2-nistp384": "ECDH", "ecdh-sha2-nistp521": "ECDH",
+    "diffie-hellman-group1-sha1": "DH", "diffie-hellman-group14-sha1": "DH",
+    "diffie-hellman-group14-sha256": "DH", "diffie-hellman-group16-sha512": "DH",
+    "diffie-hellman-group18-sha512": "DH", "diffie-hellman-group-exchange-sha1": "DH",
+    "diffie-hellman-group-exchange-sha256": "DH",
+}
+
+# The keyword, then the value: `KexAlgorithms list`, `KexAlgorithms=list` (ssh_config and
+# `ssh -o`). The keyword is case-insensitive in both config files.
+_SSH_KEX_SETTING = re.compile(r"\bKexAlgorithms\b\s*(?:=\s*|\s+)([^\s\"']+)", re.IGNORECASE)
+
+
+def scan_ssh_kex(line: str) -> list[dict[str, Any]]:
+    """Classical key exchange algorithms this line offers in an SSH KexAlgorithms list."""
+    if line.lstrip().startswith(_COMMENT_START):
+        return []
+    setting = _SSH_KEX_SETTING.search(line)
+    if not setting:
+        return []
+    value = setting.group(1)
+    # sshd_config(5): a list beginning with '-' removes what it names from the default;
+    # '+' appends to the default and '^' places it at the head -- both still offer it.
+    # The prefix applies to the whole list, not to one name.
+    if value.startswith("-"):
+        return []
+    relative = value[:1] in "+^"
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for name in value.lstrip("+^").split(","):
+        key = name.strip().lower()
+        family = CLASSICAL_SSH_KEX.get(key)
+        if family is None or key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "group": name.strip(),
+            "family": family,
+            "setting": "KexAlgorithms",
+            "offered": "alone",
+            "basis": "configured_kex",
+            "description": (f"{name.strip()} is offered here as a key exchange of its own, "
+                            f"without a post-quantum half"
+                            + (", added to the default set this line does not name"
+                               if relative else "")
+                            + ". Which one a connection uses is chosen with the client "
+                              "and is not stated by this line."),
+        })
+    return out
+
 TLS_TERMINATION = (
     "These files configure TLS. This scan reads files, not connections. The key "
     "exchange a connection negotiates is settled where TLS terminates -- this server, "

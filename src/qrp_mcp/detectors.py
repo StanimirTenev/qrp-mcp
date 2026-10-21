@@ -10,7 +10,8 @@ from typing import Any
 
 from . import aws_tls, ike, opcua
 from .classifier import _PQC_SCHEMES
-from .assets import is_manifest, scan_manifest, scan_protocols, scan_tls_groups
+from .assets import (is_manifest, scan_manifest, scan_protocols, scan_ssh_kex,
+                     scan_tls_groups)
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
                            scan_certificate_file)
 
@@ -1650,6 +1651,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     dependency_findings: list[dict[str, Any]] = []
     # Classical TLS groups offered on their own beside the rest; see assets.scan_tls_groups.
     tls_group_findings: list[dict[str, Any]] = []
+    # The same for SSH: classical KexAlgorithms offered beside a hybrid; see assets.scan_ssh_kex.
+    ssh_kex_findings: list[dict[str, Any]] = []
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -1754,6 +1757,11 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 group["line"] = number
                 group["in_test_code"] = in_test_code(rel_path)
                 tls_group_findings.append(group)
+            for kex in scan_ssh_kex(text_line):
+                kex["path"] = rel_path
+                kex["line"] = number
+                kex["in_test_code"] = in_test_code(rel_path)
+                ssh_kex_findings.append(kex)
             for asset in _policy_assets(text_line):
                 asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
                 protocol_findings.append(asset)
@@ -1894,6 +1902,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         "protocol_findings": protocol_findings,
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,
+        "ssh_kex_findings": ssh_kex_findings,
         # Files removed by EXCLUDED_DIRS before files_present counted anything,
         # by the directory name that removed them. Counted so the denominator
         # can state what it left out instead of leaving it in the source.

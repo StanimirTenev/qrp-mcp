@@ -468,6 +468,34 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["scope"] = "excluded"
         components.append(component)
 
+    # The same for SSH: a classical algorithm in a KexAlgorithms list, beside or instead
+    # of a hybrid (ZA-OPRAVYANE row 22). OpenSSH's names are case-sensitive on the wire
+    # but not in this table, so one component per name however it is spelled.
+    by_kex: dict[str, list[dict[str, Any]]] = {}
+    for item in scan_result["evidence"].get("ssh_kex", []):
+        by_kex.setdefault(_ref("ssh-kex", f"{item['group']}-offered-alone"), []).append(item)
+    for ref, group in sorted(by_kex.items()):
+        component = {
+            "type": "cryptographic-asset",
+            "bom-ref": ref,
+            "name": f"{group[0]['group']} (SSH key exchange offered alone)",
+            "cryptoProperties": {"assetType": "algorithm",
+                                 "algorithmProperties": {"primitive": "key-agree"}},
+            "properties": [
+                {"name": f"{NS}basis", "value": "configured_kex"},
+                {"name": f"{NS}offered", "value": "alone"},
+                {"name": f"{NS}family", "value": group[0]["family"]},
+            ],
+            "evidence": {"occurrences": [
+                {"location": g["path"], "line": g["line"],
+                 "additionalContext": _context(g)}
+                for g in group
+            ]},
+        }
+        if all(g.get("in_test_code") for g in group):
+            component["scope"] = "excluded"
+        components.append(component)
+
     # Dependencies are libraries, not cryptographic assets: what is installed is
     # not what is called. They travel as `library` components carrying the
     # families they implement, and the basis says the difference out loud.
