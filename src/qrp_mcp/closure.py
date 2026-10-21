@@ -36,7 +36,9 @@ _LOCATION_FIELDS = ("line",)
 # same line the same way are looking at the same occurrence whatever they call its role.
 # The provider can come from another line of the file (its import), so editing that
 # line must not turn every call below it into closed + new.
-_CONTEXT_FIELDS = ("in_test_code", "role", "provider")
+# The TLS-termination pointer is a note about the line, the same on every TLS line, and
+# absent from results written before 0.31.0.
+_CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

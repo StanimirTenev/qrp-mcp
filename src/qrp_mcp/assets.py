@@ -662,21 +662,40 @@ TLS_TERMINATION = (
     "key is still ECDSA, and reported as such.")
 
 
+# Beside every evidence item at a TLS place, so the caveat is next to each setting and
+# not only once per scan (ZA-OPRAVYANE row 25, 21.10.2026). Short, and pointing at the
+# statement, which is still printed once.
+TLS_SETTING_NOTE = (
+    "Configured, not negotiated: a terminator outside the files can negotiate otherwise. "
+    "See tls_termination.statement.")
+
+
 def tls_termination(scan_result: dict[str, Any]) -> dict[str, Any] | None:
     """Where this tree configures TLS, and what that does not establish. None when it
-    configures none."""
+    configures none.
+
+    Every evidence item at one of those places -- and every classical group offered
+    alone, which sits on such a line -- gets `tls_termination: TLS_SETTING_NOTE`."""
     places: set[tuple[str, int, str]] = set()
+    marked: list[dict[str, Any]] = []
     for asset in scan_result.get("protocol_findings") or []:
         if (asset.get("protocol") == "tls"
                 and not asset.get("excerpt", "").lstrip().startswith(_COMMENT_START)):
             places.add((asset["path"], asset["line"], "configured_protocol"))
+            marked.append(asset)
     for key in ("source_code_findings", "ci_pipeline_findings", "iac_findings"):
         for item in scan_result.get(key) or []:
             if (item.get("evidence_kind") != "comment"
                     and _TLS_GROUP_SETTING.search(item.get("excerpt", ""))):
                 places.add((item["path"], item["line"], "configured_group"))
+                marked.append(item)
+    for group in scan_result.get("tls_group_findings") or []:
+        places.add((group["path"], group["line"], "configured_group"))
+        marked.append(group)
     if not places:
         return None
+    for item in marked:
+        item["tls_termination"] = TLS_SETTING_NOTE
     return {
         "statement": TLS_TERMINATION,
         "configured_in": [{"path": p, "line": n, "basis": b} for p, n, b in sorted(places)],

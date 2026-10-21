@@ -578,7 +578,25 @@ configuration and nowhere else:
 `basis` is `configured_group` for a setting that chooses key-exchange groups and
 `configured_protocol` for a pinned version. `null` when the tree configures no TLS; SSH
 configuration is not counted here. On certbot: 23 places (22 protocol pins, 1 group
-setting); on OpenSSH: none. It stays out of the CBOM, like `files_read`.
+setting); on OpenSSH: none. The statement stays out of the CBOM, like `files_read`.
+
+From 0.31.0 the caveat is also beside every TLS setting, not only once per scan. Every evidence
+item at one of those places — a pinned version under `evidence.protocols`, the source, CI or IaC
+item on a group-setting line, and each classical group offered alone under `evidence.tls_groups`
+— carries one short field that points at the statement:
+
+```json
+"tls_termination": "Configured, not negotiated: a terminator outside the files can negotiate otherwise. See tls_termination.statement."
+```
+
+It is the same in `scan --out`, in `scan_repo` at every level, and in `prove_closure`'s inputs,
+where it is not part of an occurrence's identity, so a result written before 0.31.0 compares
+with one written after. In the CBOM every TLS protocol component and every `(TLS group offered
+alone)` component carries it as `qrp:tls_termination`; the long statement stays out. An algorithm
+component (`X25519`, `ML-KEM`) is not marked: it gathers occurrences from TLS and non-TLS lines
+alike, so a line setting only hybrid groups is marked in the scan result and not in the CBOM. On certbot:
+54 evidence items at the 23 places; on OpenSSH: none. Nothing else changes: the same files read,
+the same evidence and findings as 0.30.0. SSH settings and commented-out lines carry nothing.
 
 The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
 verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
@@ -609,8 +627,7 @@ terminates, as above; the finding is about the file.
 
 ### A classical SSH key exchange offered on its own
 
-The same defect existed in OpenSSH until the release after 0.30.0 (on this branch, not yet
-released): `KexAlgorithms mlkem768x25519-sha256,curve25519-sha256` and `KexAlgorithms
+The same defect existed in OpenSSH until 0.31.0: `KexAlgorithms mlkem768x25519-sha256,curve25519-sha256` and `KexAlgorithms
 mlkem768x25519-sha256` scanned the same, because the X25519 inside the hybrid's name is the family
 of `curve25519-sha256` too, and removing the classical fallback from `sshd_config` closed nothing.
 Now a classical algorithm in a `KexAlgorithms` list (`sshd_config`, `ssh_config`, `ssh -o
@@ -1010,6 +1027,12 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
   disable; }` (only the `set` form is read); Bouncy Castle's `cert.plants` classes (known from
   search snippets only); `.sage` files, where much CSIDH and SQIsign prototyping lives. Cisco
   running-configs saved as `.txt` or without an extension are not read.
+- **A size is not checked against the interface it has to fit.** A finding names the algorithm
+  — ML-KEM-768, whose ciphertext is 1,088 bytes (FIPS 203), or an ML-DSA signature (FIPS 204) —
+  not whether that fits the link it is configured for: an EAP identity, a single IKE message, a
+  DNSSEC answer over UDP. The ceiling of the interface is not in the file, and no ceiling is
+  claimed here. IKE fragmentation (above) is the one case read, because there the configuration
+  says whether a large message is split.
 - **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
   scope by design.** This tool reports what a cryptographically relevant quantum computer would
   break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,

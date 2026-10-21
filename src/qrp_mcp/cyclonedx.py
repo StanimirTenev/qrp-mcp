@@ -47,6 +47,7 @@ import re
 import uuid
 from typing import Any
 
+from .assets import TLS_SETTING_NOTE
 from .classifier import known_algorithms
 
 SPEC_VERSION = "1.6"
@@ -413,6 +414,11 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             # A version listed to forbid it is evidence of hardening, not of use.
             {"name": f"{NS}forbidden", "value": "true" if banned else "false"},
         ]
+        # The pointer beside every TLS setting (row 25), on the components the scan marked
+        # as a TLS place (a commented-out pin is not one); the statement stays out.
+        if any(a.get("tls_termination") for a in group):
+            properties.append({"name": f"{NS}tls_termination",
+                               "value": TLS_SETTING_NOTE})
         for key, value in json.loads(said).items():
             properties.append({"name": f"{NS}{key}", "value": (
                 json.dumps(value) if isinstance(value, (list, dict))
@@ -457,6 +463,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 {"name": f"{NS}basis", "value": "configured_group"},
                 {"name": f"{NS}offered", "value": "alone"},
                 {"name": f"{NS}family", "value": group[0]["family"]},
+                {"name": f"{NS}tls_termination", "value": TLS_SETTING_NOTE},
             ],
             "evidence": {"occurrences": [
                 {"location": g["path"], "line": g["line"],
