@@ -452,11 +452,12 @@ Three values travel with every share, and the third is the one most tools omit:
   partitions by file extension and says so beside every figure.
 
 The signer's sentence carries the same three inside the bracket holding the count, because a
-figure lifted out of a document without them is the failure the block exists to prevent:
+figure lifted out of a document without them is the failure the block exists to prevent
+(certbot at `56ee049`, 0.30.0):
 
 ```
-This scan read 822 of 1250 files (65.76%); the remaining 428 (3 of 24, by extension —
-files with no extension, .rst and .txt — being 68.93% of them) are listed with a reason each.
+This scan read 823 of 1250 files (65.84%); the remaining 427 (3 of 22, by extension —
+files with no extension, .rst and .txt — being 73.09% of them) are listed with a reason each.
 ```
 
 The published measurement, with the raw artefacts:
