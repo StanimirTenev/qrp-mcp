@@ -540,6 +540,28 @@ def _group_setting(line: str) -> re.Match | None:
 
 _COMMENT_START = ("#", ";", "//", "--", "/*", "*")
 
+# A setting that chooses TLS cipher suites. A suite is negotiated where TLS terminates,
+# like a group, so the line is a TLS place (ZA-OPRAVYANE row 31, 22.10.2026: 0.31.0
+# said "beside every TLS setting" and left these out). The setting, not the suite: an
+# OpenSSL header defines every suite as a C constant, and those configure nothing.
+# nginx (`*ssl_ciphers`), Apache (`SSL[Proxy]CipherSuite`), HAProxy (global defaults,
+# and `ciphers`/`ciphersuites` on a bind or server line, below), OpenSSL's SSL_CONF
+# (`CipherString`, `Ciphersuites`), the OpenSSL and Python calls, Envoy, Go and Java.
+_TLS_CIPHER_SETTING = re.compile(
+    r"ssl_ciphers\b|SSL(?:Proxy)?CipherSuite\b|ssl-default-(?:bind|server)-ciphers(?:uites)?\b|"
+    r"(?:ssl_conf_command|SSLOpenSSLConfCmd)\s+(?:CipherString|Ciphersuites)\b|"
+    r"^\s*(?:CipherString|Ciphersuites)\s*=|"
+    r"\bset_cipher_list\b|\bset_ciphersuites\b|\bset_ciphers\b|"
+    r"\bcipher_suites\s*[:=]|\bCipherSuites\s*[:=]|\bsetEnabledCipherSuites\b",
+    re.IGNORECASE)
+_HAPROXY_CIPHERS = re.compile(r"(?<=\s)ciphers(?:uites)?(?=\s)")
+
+
+def _cipher_setting(line: str) -> bool:
+    """Whether this line sets TLS cipher suites."""
+    return bool(_TLS_CIPHER_SETTING.search(line)
+                or (_HAPROXY_LINE.match(line) and _HAPROXY_CIPHERS.search(line)))
+
 # -- A classical group offered on its own ------------------------------------------------
 #
 # `ssl_ecdh_curve X25519MLKEM768:X25519` and `ssl_ecdh_curve X25519MLKEM768` scanned the
@@ -705,9 +727,14 @@ def tls_termination(scan_result: dict[str, Any]) -> dict[str, Any] | None:
             marked.append(asset)
     for key in ("source_code_findings", "ci_pipeline_findings", "iac_findings"):
         for item in scan_result.get(key) or []:
-            if (item.get("evidence_kind") != "comment"
-                    and _group_setting(item.get("excerpt", ""))):
+            if item.get("evidence_kind") == "comment":
+                continue
+            excerpt = item.get("excerpt", "")
+            if _group_setting(excerpt):
                 places.add((item["path"], item["line"], "configured_group"))
+                marked.append(item)
+            elif _cipher_setting(excerpt):
+                places.add((item["path"], item["line"], "configured_cipher_suite"))
                 marked.append(item)
     for group in scan_result.get("tls_group_findings") or []:
         places.add((group["path"], group["line"], "configured_group"))
