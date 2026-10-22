@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import aws_tls, ike, opcua
+from . import aws_tls, dnssec, ike, opcua
 from .classifier import _PQC_SCHEMES
 from .assets import (is_manifest, scan_manifest, scan_protocols, scan_ssh_kex,
                      scan_tls_groups)
@@ -61,7 +61,10 @@ IAC_EXTENSIONS = {".tf", ".tfvars"}
 CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
                      # HCL configures Vault and Terraform; JSON carries cipher-suite
                      # lists and algorithm names in service configuration.
-                     ".hcl", ".json"}
+                     ".hcl", ".json",
+                     # A DNS zone file: its DNSKEY, DS and RRSIG records name the
+                     # algorithm the zone is signed with by number (see dnssec.py).
+                     ".zone"}
 
 # The same files that carry no extension at all.
 CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
@@ -185,6 +188,19 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z])ssh-dss(?![A-Za-z])",
         re.IGNORECASE,
     )),
+    # DNSSEC algorithm mnemonics (IANA DNSSEC Algorithm Numbers), as BIND's
+    # dnssec-policy and dnssec-keygen -a, Knot's `algorithm:` and PowerDNS write them.
+    # Before "ECDSA usage", so the curve the mnemonic names is kept (DNSSEC_CURVES).
+    # ED25519, ED448 and MLDSA44 are already reached by their own rules below.
+    ("ECDSA", "ECDSA P-256 named by a DNSSEC algorithm (13, ECDSAP256SHA256)", re.compile(
+        r"(?<![A-Za-z0-9])(?:ECDSAP256SHA256|ecdsa256)(?![A-Za-z0-9])", re.IGNORECASE)),
+    ("ECDSA", "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)", re.compile(
+        r"(?<![A-Za-z0-9])(?:ECDSAP384SHA384|ecdsa384)(?![A-Za-z0-9])", re.IGNORECASE)),
+    ("RSA", "RSA named by a DNSSEC algorithm (1, 5, 7, 8 or 10)", re.compile(
+        r"(?<![A-Za-z0-9])(?:RSAMD5|RSASHA1(?:-NSEC3-SHA1)?|RSASHA256|RSASHA512)(?![A-Za-z0-9])",
+        re.IGNORECASE)),
+    ("DSA", "DSA named by a DNSSEC algorithm (6, DSA-NSEC3-SHA1)", re.compile(
+        r"(?<![A-Za-z0-9])DSA-NSEC3-SHA1(?![A-Za-z0-9])", re.IGNORECASE)),
     ("ECDSA", "ECDSA usage", re.compile(
         r"crypto/ecdsa|(?<![A-Za-z])ECDSA|"
         # C / OpenSSL.
@@ -550,6 +566,12 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
 ]
 
+# The curve a DNSSEC mnemonic names, by the rule that matched it.
+DNSSEC_CURVES = {
+    "ECDSA P-256 named by a DNSSEC algorithm (13, ECDSAP256SHA256)": ("P-256", 256),
+    "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)": ("P-384", 384),
+}
+
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(r"\bgpg\s+(--detach-sign|--sign|-s)\b")),
@@ -669,7 +691,9 @@ _KEY_SIZE = re.compile(
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
     r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
-    r"EVP_PKEY_Q_keygen\([^)]*?(\d{3,5})\s*\)",
+    r"EVP_PKEY_Q_keygen\([^)]*?(\d{3,5})\s*\)|"
+    # DNSSEC: BIND's `algorithm rsasha256 2048` and `dnssec-keygen -a RSASHA256 -b 2048`.
+    r"\balgorithm\s+rsa\w*\s+(\d{3,5})\b|\bdnssec-keygen\b[^\n]*?\s-b\s+(\d{3,5})\b",
     re.IGNORECASE)
 
 
@@ -1459,6 +1483,8 @@ def scan_source_file(path: Path, rel_path: str,
             size = key_size_on_line(line) if algorithm == "RSA" else None
             if size:
                 item["key_size"] = size
+            if description in DNSSEC_CURVES:
+                item["curve"], item["key_size"] = DNSSEC_CURVES[description]
             findings.append(item)
         for family, pos in scan_openssl3_names(line):
             if family in seen_on_line or _in_blob(pos, blobs):
@@ -1498,6 +1524,23 @@ def scan_source_file(path: Path, rel_path: str,
                 "evidence_kind": ("comment" if _in_spans(pos, spans) else kind),
                 "in_test_code": in_test_code(rel_path),
             })
+        # DNSSEC algorithm numbers, in the shape of a DNSKEY, DS or RRSIG record.
+        for family, pos, said, curve in dnssec.scan_records(line):
+            if family in seen_on_line or _in_blob(pos, blobs):
+                continue
+            seen_on_line.add(family)
+            item = {
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": said,
+                "excerpt": line.strip()[:200],
+                "evidence_kind": ("comment" if _in_spans(pos, spans) else kind),
+                "in_test_code": in_test_code(rel_path),
+            }
+            if curve in ("P-256", "P-384"):
+                item["curve"], item["key_size"] = curve, int(curve[2:])
+            findings.append(item)
 
         # Suite names appear in configuration and in code alike: OpenSSL's headers
         # define them as C constants. The `!` exclusion only means anything in a
@@ -1837,6 +1880,10 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                         and item.get("evidence_kind") not in {"comment", "ban"}):
                     post_quantum.setdefault(item["algorithm"], item["line"])
             for asset in ike.scan(path.name, lines, post_quantum):
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
+            # The DNS UDP size budget a BIND configuration sets (see dnssec.py).
+            for asset in dnssec.udp_sizes(lines):
                 asset["path"] = rel_path
                 protocol_findings.append(asset)
             algo_findings, key_findings = scan_iac_file(path, rel_path, lines)

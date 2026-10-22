@@ -88,7 +88,7 @@ _PRIMITIVE_BY_FAMILY = {
 # and an excerpt -- masked by default -- cannot carry them.
 _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versions",
                     "post_quantum", "default_applied", "product", "fragmentation",
-                    "fragmentation_default")
+                    "fragmentation_default", "udp_setting", "udp_size")
 _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 
 

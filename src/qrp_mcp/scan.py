@@ -8,8 +8,8 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import (__version__, assets, aws_tls, certificates, coverage, detectors, ike, opcua,
-               profiles, remediation)
+from . import (__version__, assets, aws_tls, certificates, coverage, detectors, dnssec, ike,
+               opcua, profiles, remediation)
 from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint
 
 
@@ -101,6 +101,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             "opcua_security_policies": len(opcua.POLICIES),
             "aws_tls_policies": len(aws_tls.POLICIES),
             "ike_fragmentation_products": len(ike.PRODUCTS),
+            "dnssec_algorithm_numbers": len(dnssec.ALGORITHMS),
         },
         claimed_types={
             "source": sorted(detectors.SOURCE_EXTENSIONS),
