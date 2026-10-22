@@ -180,7 +180,13 @@ def _unread_paths(result: dict[str, Any]) -> tuple[set[str], list[str]]:
             path = entry.get("path") if isinstance(entry, dict) else entry
             if isinstance(path, str):
                 files.add(path)
-    dirs = [d.rstrip("/") + "/" for d in result.get("unreadable_directories") or []
+    # Every file the coverage block names as not examined, whatever the reason. A key
+    # file skipped by type was called "removed -- not in the second tree" while it was
+    # there, holding the same key (ZA-OPRAVYANE row 59).
+    for entry in ((result.get("coverage") or {}).get("not_examined") or []):
+        if isinstance(entry, dict):
+            files.update(p for p in entry.get("paths") or [] if isinstance(p, str))
+    dirs =[d.rstrip("/") + "/" for d in result.get("unreadable_directories") or []
             if isinstance(d, str)]
     # A linked file is a file not read; a linked directory hides everything under it.
     for entry in result.get("symlinks_not_followed") or []:
