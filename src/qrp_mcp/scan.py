@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
@@ -90,9 +91,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
     # What the evidence says about a finding that the finding alone does not: a TLS
     # place the pinned image cannot negotiate. Joined here, where the evidence is, and
     # the summary counted again with it.
-    notes, set_aside = _what_the_evidence_adds(scan_result, response.findings,
-                                               detected_by_name)
-    summary = summarize(response.findings, set_aside)
+    notes, set_aside, protected = _what_the_evidence_adds(scan_result, response.findings,
+                                                          detected_by_name)
+    summary = summarize(response.findings, set_aside, protected)
 
     coverage_block = coverage.build(
         repo_path=repo_path,
@@ -230,6 +231,12 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
     }
 
 
+# strongSwan's `ppk_required = no` (its default) and a PPK switched off outright: the value,
+# not the key, says whether the preshared key is required.
+_PPK_NOT_REQUIRED = re.compile(r"(?<![A-Za-z])ppk(?:_required)?\s*=\s*(?:no|false|never)\b",
+                               re.IGNORECASE)
+
+
 def _in_use(scan_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     """Occurrences that are neither a comment nor a ban, by the detector's family name."""
     out: dict[str, list[dict[str, Any]]] = {}
@@ -241,13 +248,17 @@ def _in_use(scan_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 
 def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
                             detected_by_name: dict[str, str]
-                            ) -> tuple[dict[str, dict[str, Any]], set[str]]:
+                            ) -> tuple[dict[str, dict[str, Any]], set[str], set[str]]:
     """Fields to add to findings, by family, and the families the summary sets aside.
 
     A post-quantum family whose every use is a TLS place that a pinned image cannot
     negotiate (`evidence.library_support`, not_negotiable) is named with the image and
     not counted as ready (ZA-OPRAVYANE row 55). Only where every use is such a place:
-    the image limits the place, not ML-KEM used by the code beside it."""
+    the image limits the place, not ML-KEM used by the code beside it.
+
+    An RFC 8784 preshared key `protects` the families used in the files that configure
+    it, and nothing in a file where it is optional or off (`ppk_required = no`):
+    ZA-OPRAVYANE rows 57 and 58. Per family, not per occurrence."""
     family_of = {detected_by_name[f.raw_value]: f.algorithm_family for f in findings
                  if f.raw_value in detected_by_name}
     pqc = {f.algorithm_family for f in findings
@@ -271,7 +282,27 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
             notes.setdefault(family, {})["not_negotiable_by"] = sorted(
                 {image for place in places for image in unable[place]})
             set_aside.add(family)
-    return notes, set_aside
+
+    protected: set[str] = set()
+    ppk_files: dict[str, bool] = {}
+    for item in uses.get("PPK", []):
+        optional = bool(_PPK_NOT_REQUIRED.search(item.get("excerpt") or ""))
+        ppk_files[item["path"]] = ppk_files.get(item["path"], False) or optional
+    if ppk_files:
+        for name, items in uses.items():
+            if name != "PPK" and name in family_of and any(
+                    ppk_files.get(i["path"]) is False for i in items):
+                protected.add(family_of[name])
+        mechanism = family_of.get("PPK")
+        if mechanism:
+            notes.setdefault(mechanism, {})["protects"] = sorted(protected)
+            if not protected and all(ppk_files.values()):
+                set_aside.add(mechanism)
+                notes[mechanism]["reason"] = (
+                    "RFC 8784 postquantum preshared key, configured as optional or switched "
+                    "off (ppk_required = no): the exchange falls back to classical key "
+                    "derivation when the peer has no PPK, so it protects nothing here.")
+    return notes, set_aside, protected
 
 
 def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:

@@ -878,10 +878,14 @@ def extract_findings(request: FingerprintRequest) -> list[Finding]:
 
 
 def summarize(findings: list[Finding],
-              set_aside: frozenset[str] | set[str] = frozenset()) -> FingerprintSummary:
+              set_aside: frozenset[str] | set[str] = frozenset(),
+              protected: set[str] | None = None) -> FingerprintSummary:
     """`set_aside` names families whose findings stay in the list but are not counted
     towards what reassures: post-quantum or a mechanism the scan has shown does not hold
-    where it was found. Never towards what warns -- a vulnerable count is not lowered."""
+    where it was found. Never towards what warns -- a vulnerable count is not lowered.
+
+    `protected` names the families a mechanism covers, where that is known. Then
+    `mechanism_protected` needs every quantum-vulnerable family among them."""
     vulnerable = sum(1 for f in findings if f.quantum_vulnerable)
     pqc = sum(1 for f in findings if f.classification == "pqc_ready"
               and f.algorithm_family not in set_aside)
@@ -918,7 +922,10 @@ def summarize(findings: list[Finding],
         readiness = "hybrid_partial"
     elif vulnerable and pre_standard:
         readiness = "hybrid_pre_standard"
-    elif mechanisms:
+    elif mechanisms and (protected is None or {
+            f.algorithm_family for f in findings if f.quantum_vulnerable} <= protected):
+        # One PPK line made the whole tree protected, with RSA signing in another file
+        # (ZA-OPRAVYANE row 57). A preshared key mixed into IKEv2 protects that exchange.
         readiness = "mechanism_protected"
     elif vulnerable:
         readiness = "classical_only"
