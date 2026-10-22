@@ -239,7 +239,8 @@ keys under `regress/` still carry the experimental type while the source uses th
 whatever sits beside it), `hybrid_partial`, `hybrid_pre_standard` (classical beside post-quantum
 schemes none of which is standardised), `mechanism_protected`, `classical_only`,
 `pqc_pre_standard`, `pqc_ready` (every post-quantum scheme found is standardised and nothing
-classical is), `no_quantum_vulnerable_detected` or `unknown`. Until 0.28.0 a file holding only
+classical is), `no_quantum_vulnerable_detected`, `not_established` (one of the reassuring values,
+withheld because the scan did not read or determine everything — from 0.34.0) or `unknown`. Until 0.28.0 a file holding only
 SIKE read `no_quantum_vulnerable_detected` (raised by Larisa Ghazaryan). `pqc_pre_standard_count`
 and `broken_pqc_count` sit beside `pqc_ready_count`, and `list_algorithms` answers with the same
 classification a scan gives.
@@ -780,6 +781,77 @@ server did not offer ML-KEM on the wire. Reproduced against 0.32.0, that is not 
 `evidence_kind: comment`, outside `detected_algorithms` and the TLS places, and `[comment]` in the
 CBOM (a test now pins it).
 
+**From 0.34.0**, after a systematic probe of 22 Oct 2026 that set the summary beside what the scan
+had actually read, and four points raised in public the same day, the output stops being confident
+where the evidence beside it was not:
+
+- **`pqc_ready` is withheld past what was not read.** A value that says nothing classical is
+  present — `pqc_ready`, `pqc_pre_standard`, `mechanism_protected`,
+  `no_quantum_vulnerable_detected` — becomes `not_established` when files in the tree were not
+  read (or a directory not entered, a linked directory not followed), or when a private key's
+  algorithm was not determined (PKCS#8 embedded in source, an encrypted key file).
+  `summary.readiness_not_established` says what it would have read and why not, e.g.
+  `"1 of 2 files were not read (50.0% read); see coverage.not_examined"`. A value that warns is
+  never withheld. The case: ML-KEM in a module and a `Caddyfile` with `curves x25519`, which is not
+  read; the summary said `pqc_ready` about the one file it had not opened (raised by Chandra
+  Devadass). Files removed by the directory exclusions do not withhold it; they are named in the
+  verdict instead (below).
+- **The verdict names what the directory exclusions removed.** The directories left out before
+  anything is counted are `.git`, `node_modules`, `venv`, `.venv`, `__pycache__`, `vendor`, `dist`,
+  `build`, `.tox`, `target`, `.pytest_cache`, `.mypy_cache` and `.ruff_cache`
+  (`coverage.instrument.excluded_dirs`). A file under `vendor/` said "read every one of the 3
+  files" of a 4-file tree; now the sentence ends "Left out before counting, by directory name: 1
+  file in vendor/." `.git` is not named there (raised by Muhammad Atif).
+- **A post-quantum family is not counted as ready where the evidence says it does not hold.**
+  Where every use is a TLS place that a pinned image cannot negotiate (`evidence.library_support`,
+  `not_negotiable`), the finding names the image in `not_negotiable_by` (also
+  `qrp:not_negotiable_by` on the CBOM component) and the summary leaves it out of
+  `pqc_ready_count` and the readiness. Where every use is test code, the finding carries
+  `in_test_code: true` and the same applies; the CBOM already marked it `scope: excluded`. The
+  classification is unchanged — ML-KEM is standardised — and test-only classical code still counts
+  as vulnerable: the summary does not reassure from what it set aside, and never warns less.
+- **What an RFC 8784 PPK protects.** One PPK line made a whole tree `mechanism_protected` with RSA
+  signing in another file. The PPK finding now lists `protects`: the families used in the files
+  that configure it. `mechanism_protected` needs every quantum-vulnerable family among them;
+  otherwise the readiness is what it would be without the mechanism. Per family, not per
+  occurrence: EC in the IKE file and EC elsewhere are one family. A PPK whose file says
+  `ppk_required = no` (or switches it off) protects nothing and its reason says it is optional.
+  ⚠️ strongSwan's default for `ppk_required` is also `no`; a `ppk_id` with no `ppk_required`
+  line is not yet read as optional.
+- **A recoverable private key raises its finding.** Where `evidence.weak_keys` finds k·G, the
+  finding of that family is `weak_key: true`, severity `critical`, with the place in its reason,
+  so `weak_count` and `highest_severity` say it too (raised by Sagar A.).
+- **A denial block governs names, not calls.** `if (err.code === 'ERR_UNSUPPORTED') {` or
+  `except UnsupportedAlgorithm:` opened a "denial block", and the classical fallback generated
+  inside it read as a ban. A call is now a use wherever it sits; names listed under
+  `forbiddenAlgorithms:` stay bans. A *declaration* in such a block (`curve = 'P-256'`) is still
+  read as a ban.
+- **A group removed with OpenSSL's `-` is a ban on the algorithm path too.** `Groups =
+  DEFAULT:-X25519MLKEM768` switches the hybrid off; ML-KEM was detected from it. The algorithm
+  rule now asks the same group-setting test as the TLS group rule.
+- **LMS through its API.** wolfSSL `wc_LmsKey_*`, hash-sigs `hss_validate_signature`,
+  `hss_generate_private_key`, `hss_generate_signature`, `hss_load_private_key`, and Bouncy
+  Castle's `LMSSigner`/`HSSSigner` are HSS/LMS (raised by Dhiraj S.). XMSS through
+  `wc_XmssKey_*`, `xmss_sign_open` and `XMSSSigner` was already matched and is now pinned.
+- **`prove_closure` does not call a skipped file removed.** A key file the second run skipped by
+  type was "removed — the file is not in the second tree" while it was there; every path in
+  `coverage.not_examined` is now unread, so such an occurrence is `unverifiable`.
+
+- **UTF-16 without a byte-order mark is read as UTF-16.** A `.ps1` saved by a Windows tool as
+  UTF-16-LE with no BOM was decoded as UTF-8, gave nothing, and counted as read. One NUL in every
+  byte pair, on the same side, over the first 4 KiB now selects UTF-16; text with more than about
+  a tenth non-ASCII characters is not recognised this way.
+- **Deprecated TLS versions reach the summary.** `summary.deprecated_protocols` lists the
+  deprecated versions enabled in the tree (`TLSv1.0`, `TLSv1.1`, `SSLv3` …); a version struck out
+  is not listed. `weak_count` still counts keys and algorithms only.
+- **The coverage identity has four terms.** A linked file is in `files_present` and in
+  `symlinks_not_followed`, not in the other three (below).
+
+Not changed by any of this: what is detected, apart from the LMS names, the two ban rules and
+UTF-16 above, and the coverage figures — on OpenSSH and certbot the files read, the evidence, the
+findings and the verdict are the same as in 0.33.0, and no file in OpenSSH, certbot or wolfSSL is
+UTF-16 without a BOM.
+
 The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
 verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
 can be served with one — and its own key is still ECDSA, and reported as such. An AWS listener
@@ -1274,10 +1346,12 @@ It reads source, configuration, CI pipelines, infrastructure-as-code, Kubernetes
 build files, certificates and key inventories. It does not read documentation, binaries or
 images.
 
-Every file under the path is accounted for in one of three ways: **scanned**, **unreadable**,
-or **skipped because the tool does not claim that type** — the last counted by extension, so
-the coverage figure has a base, and from 0.27.3 named one by one in the coverage block (`not_examined` → `paths`). `files_scanned + unreadable_files + files_skipped_by_type`
-always equals `files_present`. A directory the scan cannot enter or list is named in
+Every file under the path is accounted for in one of four ways: **scanned**, **unreadable**,
+**skipped because the tool does not claim that type** — counted by extension, so
+the coverage figure has a base, and from 0.27.3 named one by one in the coverage block (`not_examined` → `paths`) —
+or **a link not followed**, named in `symlinks_not_followed`. `files_scanned + unreadable_files +
+files_skipped_by_type` plus the linked files always equals `files_present`; until 0.34.0 this
+sentence said three ways and left the links out. A directory the scan cannot enter or list is named in
 `unreadable_directories`; its files cannot be counted, so the scan then says it cannot account
 for every file instead of claiming it read them all. A scan that read seven files out of nine is a different report
 from one that read seven out of four hundred, and only one of them is worth trusting.
