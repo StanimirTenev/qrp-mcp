@@ -143,6 +143,8 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         excluded_dirs=list(detectors.EXCLUDED_DIRS),
     )
 
+    _withhold_reassurance(summary, coverage_block, scan_result, response.findings)
+
     return {
         "target": detectors.display_path(str(repo_path)),
         # One sentence for whoever signs the report rather than runs the tool.
@@ -235,6 +237,47 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
 # not the key, says whether the preshared key is required.
 _PPK_NOT_REQUIRED = re.compile(r"(?<![A-Za-z])ppk(?:_required)?\s*=\s*(?:no|false|never)\b",
                                re.IGNORECASE)
+
+
+# Values that say nothing classical is present. Each is withheld while the scan did not
+# read every file or did not determine a private key's algorithm (ZA-OPRAVYANE rows 52,
+# 62): `pqc_ready` beside an unread Caddyfile was about the one file not opened.
+_REASSURING = ("pqc_ready", "pqc_pre_standard", "mechanism_protected",
+               "no_quantum_vulnerable_detected")
+
+
+def _withhold_reassurance(summary: Any, block: dict[str, Any], scan_result: dict[str, Any],
+                          findings: list[Any]) -> None:
+    if summary.pqc_readiness not in _REASSURING:
+        return
+    because: list[str] = []
+    scope = block["scope"]
+    hidden = (block.get("directories_not_entered") or {}).get("count", 0)
+    if hidden:
+        because.append(f"{hidden} director{'y' if hidden == 1 else 'ies'} could not be entered")
+    linked = (block.get("symlinks_not_followed") or {}).get("directories", 0)
+    if linked:
+        because.append(f"{linked} linked director{'y was' if linked == 1 else 'ies were'} "
+                       f"not followed")
+    if not block["accounts_for_every_file"]:
+        because.append("the reasons given for files not read do not add up to the files "
+                       "present")
+    if scope["files_not_examined"]:
+        because.append(f"{scope['files_not_examined']} of {scope['files_present']} files were "
+                       f"not read ({scope['coverage_pct']}% read); see coverage.not_examined")
+    # A key whose algorithm no line of the same place names: what it is was not determined.
+    named_at = {(i["path"], i["line"]) for items in _in_use(scan_result).values()
+                for i in items}
+    for f in findings:
+        if f.algorithm_family == "private_key" and f.classification == "unknown":
+            path, _, line = f.location.rpartition(":")
+            if (path, int(line) if line.isdigit() else line) not in named_at:
+                because.append(f"a private key at {f.location} whose algorithm was not "
+                               f"determined")
+    if because:
+        summary.readiness_not_established = {"would_read": summary.pqc_readiness,
+                                             "because": because}
+        summary.pqc_readiness = "not_established"
 
 
 def _in_use(scan_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:

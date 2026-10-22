@@ -486,6 +486,9 @@ class FingerprintSummary(BaseModel):
     weak_count: int
     highest_severity: str
     pqc_readiness: str
+    # Set when a value that says nothing classical is present was withheld: what it would
+    # have read, and what the scan did not read or determine. None otherwise.
+    readiness_not_established: dict[str, Any] | None = None
 
 
 class FingerprintResponse(BaseModel):
