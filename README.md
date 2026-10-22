@@ -778,7 +778,7 @@ The same probe said that two comments were counted as uses — `# … classical 
 above HAProxy's curves line, and `# … hybrid ML-KEM group preferred.` in an nginx file whose
 server did not offer ML-KEM on the wire. Reproduced against 0.32.0, that is not so here: both are
 `evidence_kind: comment`, outside `detected_algorithms` and the TLS places, and `[comment]` in the
-CBOM (a test now pins it). The document that carried them unmarked was qrp-dora's.
+CBOM (a test now pins it).
 
 The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
 verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
