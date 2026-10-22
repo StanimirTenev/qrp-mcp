@@ -59,7 +59,13 @@ def test_bind_and_server_line_keywords(tmp_path):
     result = scan_directory(_tree(tmp_path, {"haproxy.cfg": cfg}))
     assert [(g["group"], g["setting"], g["line"]) for g in result["evidence"]["tls_groups"]] == [
         ("X25519", "curves", 2), ("secp384r1", "curves", 4)]
-    assert [a["version"] for a in result["evidence"]["protocols"]] == ["TLSv1.2"]
+    assert [a["version"] for a in result["evidence"]["protocols"]
+            if a["basis"] == "configured_protocol"] == ["TLSv1.2"]
+    # 0.33.0: the bind line is also the listener; it sets curves and ssl-min-ver itself.
+    [listener] = [a for a in result["evidence"]["protocols"]
+                  if a["basis"] == "configured_listener"]
+    assert listener["line"] == 2
+    assert listener["library_defaults"] == ["TLS 1.2 cipher list", "TLS 1.3 cipher suites"]
 
 
 def test_the_word_curves_in_prose_is_not_a_setting(tmp_path):

@@ -88,11 +88,17 @@ _PRIMITIVE_BY_FAMILY = {
 # and an excerpt -- masked by default -- cannot carry them.
 _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versions",
                     "post_quantum", "default_applied", "product", "fragmentation",
-                    "fragmentation_default", "udp_setting", "udp_size", "included_by")
+                    "fragmentation_default", "udp_setting", "udp_size", "included_by",
+                    "listener", "library_defaults", "peer_verification",
+                    "verification_setting")
 _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 
 
 def _protocol_label(asset: dict[str, Any]) -> str:
+    if asset.get("listener"):
+        return f"TLS listener ({asset['listener']})"
+    if asset.get("peer_verification"):
+        return f"TLS peer verification off ({asset['verification_setting']})"
     if asset.get("security_policy"):
         return f"OPC UA SecurityPolicy {asset['security_policy']}"
     if asset.get("policy"):

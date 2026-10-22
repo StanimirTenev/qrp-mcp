@@ -522,6 +522,100 @@ def scan_openssl_fips(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     return sorted(out, key=lambda item: item["line"])
 
 
+# -- An HAProxy listener that terminates TLS, and peer verification switched off ----------
+#
+# `bind :8443 ssl crt edge.pem` terminates TLS and was not a TLS place: with no
+# ssl-min-ver and no cipher list in the file, the scan said nothing, while on the wire
+# that listener took TLS 1.2 with 13 suites, 6 of them static RSA (ZA-OPRAVYANE row 42,
+# the network-vs-code probe of 22.10.2026). A setting that is absent is still a fact
+# about the file: the defaults apply. What they are depends on the HAProxy and the TLS
+# library that run, which the file does not say, so it is not said here either -- except
+# what HAProxy's own manual documents (3.2: "ssl-min-ver ... The default value is
+# TLSv1.2"), named as that.
+#
+# And `server app1 app:443 ssl verify none` turns off the check of the backend's
+# certificate (HAProxy 3.2 manual, `verify`: "If set to 'none', server certificate is not
+# verified"; `ssl-server-verify none` does it for every server). nginx's
+# `proxy_ssl_verify off` does the same, and is also nginx's default (ngx_http_proxy_module:
+# "Default: proxy_ssl_verify off"), which a file without the line does not show and this
+# scan does not infer. The hop behind a proxy is the one thing the wire outside cannot
+# see (ZA-OPRAVYANE row 44). `verify` on a `bind` line is the client-certificate check,
+# not this, and is left alone.
+_HAPROXY_BIND = re.compile(r"^\s*bind\s")
+_HAPROXY_SERVER = re.compile(r"^\s*(?:server|default-server)\s")
+_HAPROXY_VERSION_OPTION = re.compile(
+    r"(?<!\S)(?:ssl-min-ver|ssl-max-ver|force-(?:sslv3|tlsv1\d?)|no-(?:sslv3|tlsv1\d?))(?!\S)",
+    re.IGNORECASE)
+_NGINX_VERIFY_OFF = re.compile(r"^\s*proxy_ssl_verify\s+off\s*;")
+_HAPROXY_GLOBAL_VERIFY_NONE = re.compile(r"^\s*ssl-server-verify\s+none(?:\s|$)")
+
+
+def _tokens(line: str) -> list[str]:
+    return line.split("#", 1)[0].split()
+
+
+def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """HAProxy listeners that terminate TLS, with the settings left to the defaults, and
+    backend connections whose certificate is not verified (HAProxy, nginx)."""
+    defaults = {"versions": False, "ciphers": False, "ciphersuites": False, "curves": False}
+    for text in lines:
+        words = _tokens(text)
+        if not words:
+            continue
+        if words[0] == "ssl-default-bind-options" and _HAPROXY_VERSION_OPTION.search(text):
+            defaults["versions"] = True
+        for key in ("ciphers", "ciphersuites", "curves"):
+            if words[0] == f"ssl-default-bind-{key}":
+                defaults[key] = True
+    out: list[dict[str, Any]] = []
+    said = {"versions": "protocol versions", "ciphers": "TLS 1.2 cipher list",
+            "ciphersuites": "TLS 1.3 cipher suites", "curves": "groups"}
+    for number, text in enumerate(lines, 1):
+        words = _tokens(text)
+        if _HAPROXY_BIND.match(text) and "ssl" in words:
+            here = {"versions": bool(_HAPROXY_VERSION_OPTION.search(" ".join(words))),
+                    "ciphers": "ciphers" in words, "ciphersuites": "ciphersuites" in words,
+                    "curves": "curves" in words}
+            absent = [said[k] for k in said if not (here[k] or defaults[k])]
+            description = "TLS is terminated here (HAProxy `bind ... ssl`)."
+            if absent:
+                description += (
+                    f" Not set for this listener, on its line or in this file's "
+                    f"ssl-default-bind-*: {', '.join(absent)}. There HAProxy's and the TLS "
+                    f"library's defaults apply, and which they are depends on the versions "
+                    f"that run, which the file does not say.")
+                if "protocol versions" in absent:
+                    description += (" HAProxy 3.2's manual gives TLSv1.2 as the "
+                                    "ssl-min-ver default.")
+            out.append({"path": rel_path, "line": number, "protocol": "tls", "version": None,
+                        "basis": "configured_listener", "listener": "HAProxy bind",
+                        "library_defaults": absent, "deprecated": False,
+                        "excerpt": text.strip()[:200], "description": description})
+        verify_off = None
+        if _HAPROXY_SERVER.match(text) and "ssl" in words:
+            at = [i for i, w in enumerate(words) if w == "verify"]
+            if at and at[-1] + 1 < len(words) and words[at[-1] + 1] == "none":
+                verify_off = ("verify none", f"HAProxy, on a {words[0]} line")
+        elif _HAPROXY_GLOBAL_VERIFY_NONE.match(text):
+            verify_off = ("ssl-server-verify none",
+                          "HAProxy, for every server line that does not say verify required")
+        elif _NGINX_VERIFY_OFF.match(text):
+            verify_off = ("proxy_ssl_verify off", "nginx; off is also nginx's default")
+        if verify_off:
+            setting, where = verify_off
+            out.append({
+                "path": rel_path, "line": number, "protocol": "tls", "version": None,
+                "basis": "configured_verification", "peer_verification": "off",
+                "verification_setting": setting, "deprecated": False,
+                "excerpt": text.strip()[:200],
+                "description": (f"The backend's certificate is not verified ({setting}; "
+                                f"{where}): this TLS hop is encrypted but not "
+                                f"authenticated, so whoever sits on the path can stand in "
+                                f"for the server. It is not visible from outside."),
+            })
+    return out
+
+
 def _tls_version_name(match: re.Match) -> str:
     minor = next((g for g in match.groups() if g), None)
     text = match.group(0)
@@ -917,9 +1011,15 @@ def tls_termination(scan_result: dict[str, Any]) -> dict[str, Any] | None:
     places: set[tuple[str, int, str]] = set()
     marked: list[dict[str, Any]] = []
     for asset in scan_result.get("protocol_findings") or []:
+        # A backend whose certificate is not checked is TLS configuration, but of the
+        # client side of a hop: not where a connection from outside terminates.
+        if asset.get("basis") == "configured_verification":
+            continue
         if (asset.get("protocol") == "tls"
                 and not asset.get("excerpt", "").lstrip().startswith(_COMMENT_START)):
-            places.add((asset["path"], asset["line"], "configured_protocol"))
+            places.add((asset["path"], asset["line"],
+                        "configured_listener" if asset.get("basis") == "configured_listener"
+                        else "configured_protocol"))
             marked.append(asset)
     for key in ("source_code_findings", "ci_pipeline_findings", "iac_findings"):
         for item in scan_result.get(key) or []:

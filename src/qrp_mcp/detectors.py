@@ -13,7 +13,7 @@ from . import aws_tls, dnssec, ike, opcua
 from .classifier import _PQC_SCHEMES
 from .assets import (is_manifest, pinned_versions, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
-                     static_rsa_positions)
+                     scan_tls_listeners, static_rsa_positions)
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
                            scan_certificate_file, small_scalar_keys)
 
@@ -2021,6 +2021,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 protocol_findings.append(asset)
             if path.suffix.lower() == ".cnf":
                 fips_findings.extend(scan_openssl_fips(rel_path, lines))
+            # HAProxy listeners and unverified backends (HAProxy, nginx): see
+            # assets.scan_tls_listeners.
+            protocol_findings.extend(scan_tls_listeners(rel_path, lines))
             # The DNS UDP size budget a BIND configuration sets (see dnssec.py).
             for asset in dnssec.udp_sizes(lines):
                 asset["path"] = rel_path
