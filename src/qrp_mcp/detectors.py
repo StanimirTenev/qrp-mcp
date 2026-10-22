@@ -11,7 +11,7 @@ from typing import Any
 
 from . import aws_tls, dnssec, ike, opcua
 from .classifier import _PQC_SCHEMES
-from .assets import (image_pins, is_manifest, library_support, pinned_versions,
+from .assets import (_group_setting, image_pins, is_manifest, library_support, pinned_versions,
                      scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
@@ -1342,7 +1342,10 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
     # out only when it opens one. So find the entry containing this position and
     # ask whether that entry begins with - or !.
-    if not _ALGORITHM_LIST_LINE.search(line):
+    # A TLS group setting is a list too: `Groups = DEFAULT:-X25519MLKEM768` removes the
+    # hybrid. The same test the TLS group rule asks, so the two cannot disagree
+    # (ZA-OPRAVYANE row 56).
+    if not (_ALGORITHM_LIST_LINE.search(line) or _group_setting(line)):
         return False
     start = position
     while start > 0 and line[start - 1] not in ",;:=([{ \t\"'":
