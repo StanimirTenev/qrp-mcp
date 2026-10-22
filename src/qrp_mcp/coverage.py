@@ -623,6 +623,22 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
 
 
 def verdict_line(block: dict[str, Any]) -> str:
+    """The verdict, and what the directory exclusions removed before counting.
+
+    A file in vendor/ left the denominator with nothing said in the sentence: "read every
+    one of the 3 files" of a 4-file tree (ZA-OPRAVYANE row 49). `.git` is not named; git
+    metadata is not part of the estate and is in every checkout."""
+    excluded = ((block["scope"].get("files_excluded_before_counting") or {})
+                .get("by_directory") or {})
+    named = sorted(((n, d) for d, n in excluded.items() if d != ".git" and n),
+                   key=lambda nd: (-nd[0], nd[1]))
+    if not named:
+        return _verdict(block)
+    return (_verdict(block) + " Left out before counting, by directory name: "
+            + ", ".join(f"{n} file{'' if n == 1 else 's'} in {d}/" for n, d in named) + ".")
+
+
+def _verdict(block: dict[str, Any]) -> str:
     """One sentence for the person who signs the report rather than runs the tool.
 
     Derived from the block's own identity flag rather than recomputed from the
