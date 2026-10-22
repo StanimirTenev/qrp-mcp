@@ -1694,10 +1694,11 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
     script's own directory. A path the step names that is not in the tree is said to be
     absent; a path written with a variable is left alone."""
     for step in ci_findings:
-        match = _SIGNING_KEY_ARG.search(step.get("excerpt", ""))
-        if not match:
-            continue
-        written = (match.group(1) or match.group(2)).strip("\"'")
+        # The first value that is not a flag: in `openssl cms -sign -in m -signer c
+        # -inkey k` the bare -sign takes no argument, and the word after it is `-in`.
+        values = [m.group(1) or m.group(2)
+                  for m in _SIGNING_KEY_ARG.finditer(step.get("excerpt", ""))]
+        written = next((v.strip("\"'") for v in values if not v.startswith("-")), "")
         if not written or "$" in written or "{" in written or "%" in written:
             continue
         here = posixpath.dirname(step["path"])

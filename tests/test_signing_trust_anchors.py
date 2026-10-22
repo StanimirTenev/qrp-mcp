@@ -91,3 +91,14 @@ def test_the_step_is_linked_to_the_key_in_the_tree(result):
     step = by[("ci/release.sh", "openssl_sign")]
     assert _identity("ci_pipeline", step) == _identity(
         "ci_pipeline", {k: v for k, v in step.items() if k != "signing_key"})
+
+
+@pytest.mark.parametrize("line,key", [
+    ("openssl cms -sign -in msg.txt -signer cert.pem -inkey key.pem -out m.p7s", "key.pem"),
+    ("openssl smime -sign -in m -signer c.pem -inkey keys/k.pem", "keys/k.pem"),
+    ("openssl dgst -sha256 -sign k.pem -out s.sig f.bin", "k.pem"),
+])
+def test_the_key_argument_not_the_next_flag(tmp_path, line, key):
+    (tmp_path / "s.sh").write_text(line + "\n", encoding="utf-8")
+    steps = scan_directory(tmp_path)["evidence"]["ci_pipeline"]
+    assert [s["signing_key"]["path"] for s in steps] == [key]
