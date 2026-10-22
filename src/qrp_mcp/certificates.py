@@ -78,6 +78,142 @@ _SSH_KEY_TYPES = {
 }
 
 
+# Named curves by object identifier: RFC 5480 section 2.1.1.1 for the NIST three, SEC 2
+# v2.0 appendix A.2.1 for secp256k1 (ellipticCurve 10). Without these the curve was never
+# named: id-ecPublicKey records "EC" first and the curve identifier repeats the family
+# (ZA-OPRAVYANE row 32, 22.10.2026).
+CURVE_OIDS: dict[str, tuple[str, int]] = {
+    "1.2.840.10045.3.1.7": ("P-256", 256),
+    "1.3.132.0.34": ("P-384", 384),
+    "1.3.132.0.35": ("P-521", 521),
+    "1.3.132.0.10": ("secp256k1", 256),
+}
+
+# -- A private key recoverable from the public key ---------------------------------------
+#
+# A public point equal to k*G for a small k gives the private key away: the eight keys in
+# Bill Buchanan's post of 22.10.2026 all had k < 256, and one was 4*G on P-384. Checking
+# it needs only the public key, so it runs on every uncompressed point this file can
+# locate, not on a decoded certificate (this module does not parse X.509; see above).
+# The bound is stated, not implied: a scalar of 257 is not found.
+SMALL_SCALAR_BOUND = 256
+
+# (p, a, Gx, Gy) from SEC 2 v2.0 section 2.4.1, 2.4.2, 2.5.1, 2.6.1. The NIST three agree
+# with RFC 5903 section 3, checked 22.10.2026. b is not needed: a point is compared with
+# the table below, not tested for membership.
+_CURVES: dict[str, tuple[int, int, int, int]] = {
+    "P-256": (
+        0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff,
+        0xffffffff00000001000000000000000000000000fffffffffffffffffffffffc,
+        0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296,
+        0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5),
+    "P-384": (
+        0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff,
+        0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000fffffffc,
+        0xaa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab7,
+        0x3617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f),
+    "P-521": (
+        (1 << 521) - 1,
+        (1 << 521) - 4,
+        0xc6858e06b70404e9cd9e3ecb662395b4429c648139053fb521f828af606b4d3dbaa14b5e77efe75928fe1dc127a2ffa8de3348b3c1856a429bf97e7e31c2e5bd66,
+        0x11839296a789a3bc0045c8a5fb42c7d1bd998f54449579b446817afbd17273e662c97ee72995ef42640c550b9013fad0761353c7086a272c24088be94769fd16650),
+    "secp256k1": (
+        0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f,
+        0,
+        0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
+        0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8),
+}
+_SMALL_MULTIPLES: dict[str, dict[tuple[int, int], int]] = {}
+
+
+def _small_multiples(curve: str) -> dict[tuple[int, int], int]:
+    """{k*G: k} for k = 1..SMALL_SCALAR_BOUND, built once per curve: 256 affine
+    additions, so a key costs a dictionary lookup."""
+    if curve not in _SMALL_MULTIPLES:
+        p, a, gx, gy = _CURVES[curve]
+        table = {(gx, gy): 1}
+        x, y = gx, gy
+        for k in range(2, SMALL_SCALAR_BOUND + 1):
+            if (x, y) == (gx, gy):
+                slope = (3 * x * x + a) * pow(2 * y, -1, p) % p
+            else:
+                slope = (gy - y) * pow(gx - x, -1, p) % p
+            nx = (slope * slope - x - gx) % p
+            x, y = nx, (slope * (x - nx) - y) % p
+            table[(x, y)] = k
+        _SMALL_MULTIPLES[curve] = table
+    return _SMALL_MULTIPLES[curve]
+
+
+def _der_length(n: int) -> bytes:
+    return bytes([n]) if n < 0x80 else bytes([0x81, n])
+
+
+# Where an uncompressed point sits, by curve: a DER BIT STRING `03 len 00 04 X Y`
+# (SubjectPublicKeyInfo, SEC 1 ECPrivateKey, PKCS#8), and OpenSSH's wire string
+# `nistpNNN` followed by `04 X Y` (a .pub line and an openssh-key-v1 file both carry it).
+def _point_markers(curve: str) -> list[bytes]:
+    size = (_CURVES[curve][0].bit_length() + 7) // 8
+    markers = [b"\x03" + _der_length(2 + 2 * size) + b"\x00\x04"]
+    ssh = {"P-256": b"nistp256", "P-384": b"nistp384", "P-521": b"nistp521"}.get(curve)
+    if ssh:
+        markers.append(len(ssh).to_bytes(4, "big") + ssh
+                       + (1 + 2 * size).to_bytes(4, "big") + b"\x04")
+    return markers
+
+
+def small_scalar_keys(rel_path: str, raw: bytes) -> list[dict[str, Any]]:
+    """EC public points in this file that equal k*G for k <= SMALL_SCALAR_BOUND.
+
+    Only uncompressed points, in DER or in OpenSSH's encoding; a compressed point, a
+    key inside an encrypted container and a raw point with no marker are not checked."""
+    text = raw.decode("utf-8", errors="replace")
+    blobs: list[tuple[bytes, int]] = []
+    for match in _PEM_BLOCK.finditer(text):
+        try:
+            blobs.append((base64.b64decode(match.group(2), validate=False),
+                          text.count("\n", 0, match.start()) + 1))
+        except (ValueError, TypeError):
+            continue
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        fields = line.split()
+        if len(fields) >= 2 and "ecdsa-sha2-nistp" in fields[0]:
+            try:
+                blobs.append((base64.b64decode(fields[1], validate=False), line_no))
+            except (ValueError, TypeError):
+                continue
+    if not blobs and not text.lstrip().startswith("-----BEGIN"):
+        blobs.append((raw, 1))
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, int]] = set()
+    for blob, line_no in blobs:
+        for curve in _CURVES:
+            size = (_CURVES[curve][0].bit_length() + 7) // 8
+            for marker in _point_markers(curve):
+                start = blob.find(marker)
+                while start != -1:
+                    body = blob[start + len(marker):start + len(marker) + 2 * size]
+                    if len(body) == 2 * size:
+                        point = (int.from_bytes(body[:size], "big"),
+                                 int.from_bytes(body[size:], "big"))
+                        k = _small_multiples(curve).get(point)
+                        if k is not None and (curve, k) not in seen:
+                            seen.add((curve, k))
+                            out.append({
+                                "path": rel_path, "line": line_no, "algorithm": "EC",
+                                "curve": curve, "scalar": k,
+                                "bound": SMALL_SCALAR_BOUND,
+                                "basis": "public_point_is_small_multiple",
+                                "description": (
+                                    f"private key recoverable: the public point is "
+                                    f"{k}*G on {curve}, so the private scalar is {k}. "
+                                    f"Found from the public key alone, by comparing it "
+                                    f"with k*G for every k <= {SMALL_SCALAR_BOUND}."),
+                            })
+                    start = blob.find(marker, start + 1)
+    return out
+
+
 def _decode_oid(body: bytes) -> str:
     """DER contents octets of an OBJECT IDENTIFIER -> dotted decimal."""
     if not body:
@@ -287,6 +423,16 @@ def scan_certificate_file(path: Path, rel_path: str,
                        f"{entry[1]} object identifier {oid} observed in the file; "
                        f"the file was not decoded as a certificate",
                        1, oid, kind="reference")
+
+    # The curve of an EC key, from its named-curve identifier. Attached to the EC
+    # finding however it was recorded (a PEM label, id-ecPublicKey, the curve OID).
+    curves = sorted({CURVE_OIDS[oid] for blob in blobs for oid in _iter_oids(blob)
+                     if oid in CURVE_OIDS}, key=lambda c: c[1])
+    for item in algorithms:
+        if item["algorithm"] == "EC" and curves:
+            item["curve"] = ", ".join(name for name, _ in curves)
+            item["key_size"] = curves[0][1]
+            item["description"] += f"; curve {item['curve']} from its object identifier"
 
     # PKCS#12. The wrapper is not encrypted even when everything inside it is, so
     # it still names its bags: a shrouded key bag means a private key is in the

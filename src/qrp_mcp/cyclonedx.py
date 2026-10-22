@@ -503,6 +503,36 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["scope"] = "excluded"
         components.append(component)
 
+    # An EC key whose private scalar is small enough to read off the public key
+    # (ZA-OPRAVYANE row 32). Related key material, one component per curve and scalar:
+    # the same weak key in two files is one key.
+    by_weak: dict[str, list[dict[str, Any]]] = {}
+    for item in scan_result["evidence"].get("weak_keys", []):
+        by_weak.setdefault(_ref("weak-key", f"{item['curve']}-k{item['scalar']}"),
+                           []).append(item)
+    for ref, group in sorted(by_weak.items()):
+        component = {
+            "type": "cryptographic-asset",
+            "bom-ref": ref,
+            "name": f"EC key on {group[0]['curve']} with private scalar {group[0]['scalar']}",
+            "cryptoProperties": {"assetType": "related-crypto-material",
+                                 "relatedCryptoMaterialProperties": {"type": "public-key"}},
+            "properties": [
+                {"name": f"{NS}basis", "value": group[0]["basis"]},
+                {"name": f"{NS}curve", "value": group[0]["curve"]},
+                {"name": f"{NS}scalar", "value": str(group[0]["scalar"])},
+                {"name": f"{NS}bound", "value": str(group[0]["bound"])},
+            ],
+            "evidence": {"occurrences": [
+                {"location": g["path"], "line": g["line"],
+                 "additionalContext": g["description"]}
+                for g in group
+            ]},
+        }
+        if all(g.get("in_test_code") for g in group):
+            component["scope"] = "excluded"
+        components.append(component)
+
     # Dependencies are libraries, not cryptographic assets: what is installed is
     # not what is called. They travel as `library` components carrying the
     # families they implement, and the basis says the difference out loud.

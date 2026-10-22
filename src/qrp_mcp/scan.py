@@ -196,6 +196,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # The same for SSH, in a KexAlgorithms list. Apart from tls_groups: an
             # sshd_config is not a TLS configuration.
             "ssh_kex": scan_result.get("ssh_kex_findings", []),
+            # An EC public key equal to k*G for a small k: the private key is recoverable
+            # from it. Checked on the keys and certificates the scan opens as bytes.
+            "weak_keys": scan_result.get("weak_key_findings", []),
         },
     }
 

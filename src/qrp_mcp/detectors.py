@@ -13,7 +13,7 @@ from .classifier import _PQC_SCHEMES
 from .assets import (is_manifest, scan_manifest, scan_protocols, scan_ssh_kex,
                      scan_tls_groups)
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
-                           scan_certificate_file)
+                           scan_certificate_file, small_scalar_keys)
 
 SOURCE_EXTENSIONS = {
     ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
@@ -1653,6 +1653,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     tls_group_findings: list[dict[str, Any]] = []
     # The same for SSH: classical KexAlgorithms offered beside a hybrid; see assets.scan_ssh_kex.
     ssh_kex_findings: list[dict[str, Any]] = []
+    # EC public keys whose private scalar is small enough to read off; see
+    # certificates.small_scalar_keys.
+    weak_key_findings: list[dict[str, Any]] = []
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -1789,6 +1792,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             algo_findings, key_findings = scan_certificate_file(path, rel_path, raw)
             source_findings.extend(algo_findings)
             embedded_key_findings.extend(key_findings)
+            for weak in small_scalar_keys(rel_path, raw):
+                weak["in_test_code"] = in_test_code(rel_path)
+                weak_key_findings.append(weak)
             if is_undecoded(algo_findings, key_findings):
                 undecoded.append(rel_path)
         elif is_ci:
@@ -1903,6 +1909,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,
         "ssh_kex_findings": ssh_kex_findings,
+        "weak_key_findings": weak_key_findings,
         # Files removed by EXCLUDED_DIRS before files_present counted anything,
         # by the directory name that removed them. Counted so the denominator
         # can state what it left out instead of leaving it in the source.
