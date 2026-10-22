@@ -40,8 +40,10 @@ _LOCATION_FIELDS = ("line",)
 # absent from results written before 0.31.0.
 # The signing key joined to a signing step is read from another file, like the provider.
 # So are the version pinned for the provider and the FIPS activation beside it.
+# A pinned image's group places and the files it serves are read from other files too.
 _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signing_key",
-                   "provider_pin", "fips_provider_configured_in")
+                   "provider_pin", "fips_provider_configured_in", "group_places", "serves",
+                   "serves_group_places")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

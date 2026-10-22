@@ -11,7 +11,8 @@ from typing import Any
 
 from . import aws_tls, dnssec, ike, opcua
 from .classifier import _PQC_SCHEMES
-from .assets import (is_manifest, pinned_versions, scan_manifest, scan_openssl_fips,
+from .assets import (image_pins, is_manifest, library_support, pinned_versions,
+                     scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
@@ -1812,6 +1813,10 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     tls_group_findings: list[dict[str, Any]] = []
     # RSA key exchange enabled in a cipher-suite setting; see assets.scan_static_rsa_kex.
     static_rsa_findings: list[dict[str, Any]] = []
+    # Hybrid groups in a TLS group setting, and the TLS server images the tree pins, so
+    # the two can be put side by side; see assets.library_support.
+    hybrid_places: list[tuple[str, int, str]] = []
+    pinned_images: list[dict[str, Any]] = []
     # The same for SSH: classical KexAlgorithms offered beside a hybrid; see assets.scan_ssh_kex.
     ssh_kex_findings: list[dict[str, Any]] = []
     # EC public keys whose private scalar is small enough to read off; see
@@ -1928,6 +1933,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 group["line"] = number
                 group["in_test_code"] = in_test_code(rel_path)
                 tls_group_findings.append(group)
+            hybrid_places.extend((rel_path, number, g) for g in scan_hybrid_groups(text_line))
             for item in scan_static_rsa_kex(text_line):
                 item["path"] = rel_path
                 item["line"] = number
@@ -1955,6 +1961,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 })
             protocol_findings.append({**aws_tls.asset(aws_tls.DEFAULT_POLICY, default=True),
                                       "path": rel_path, "line": number, "excerpt": excerpt})
+        if path.suffix.lower() in {".yaml", ".yml"}:
+            pinned_images.extend(image_pins(rel_path, lines))
         if is_manifest(path):
             dependency_findings.extend(scan_manifest(path, rel_path, lines))
             pins.extend((eco, pkg, ver, rel_path, n)
@@ -2101,6 +2109,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,
         "static_rsa_kex_findings": static_rsa_findings,
+        "library_support_findings": library_support(pinned_images, hybrid_places, files_read),
         "ssh_kex_findings": ssh_kex_findings,
         "weak_key_findings": weak_key_findings,
         "fips_provider_findings": fips_findings,

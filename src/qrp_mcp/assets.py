@@ -26,6 +26,7 @@ wording here is ours, and the credit is theirs.
 from __future__ import annotations
 
 import json
+import posixpath
 import re
 from pathlib import Path
 from typing import Any
@@ -1000,6 +1001,158 @@ TLS_TERMINATION = (
 TLS_SETTING_NOTE = (
     "Configured, not negotiated: a terminator outside the files can negotiate otherwise. "
     "See tls_termination.statement.")
+
+
+# -- A hybrid group and the library version that has to negotiate it ---------------------
+#
+# The probe of 22.10.2026 (ZA-OPRAVYANE row 41): the repository configures
+# X25519MLKEM768, and ops keeps the service on nginx:1.24.0, whose OpenSSL is 1.1.1. That
+# OpenSSL does not know the group, nginx refused the repository's configuration, and the
+# host runs a classical hotfix. The pin was in a compose file the scanner reads; nothing
+# joined it to the group.
+#
+# Said only from facts read at the source, and otherwise "not established":
+# * the group names are the IANA TLS Supported Groups registry's (read 22.10.2026);
+# * OpenSSL added X25519MLKEM768, SecP256r1MLKEM768 and SecP384r1MLKEM1024 in 3.5.0
+#   (CHANGES.md, "Changes between 3.4 and 3.5.0"), so an OpenSSL older than 3.5 cannot
+#   negotiate them;
+# * which OpenSSL an image carries: only nginx:1.24.0, the Debian image of docker-nginx
+#   1.24.0 (stable/debian/Dockerfile: FROM debian:bullseye-slim), whose OpenSSL is 1.1.1
+#   (packages.debian.org, bullseye: openssl 1.1.1w). Every other tag, an -alpine one
+#   included, is "not established".
+# Pins are read from `image:` lines (compose, Kubernetes); a Dockerfile is not a file
+# type this scanner reads, and a package pin is not read for this. A compose service is
+# joined to the configuration file it mounts (short volume syntax, inside the tree);
+# without such a mount the pin and the group are named side by side, not joined.
+HYBRID_TLS_GROUPS = {
+    name.lower(): name for name in (
+        "X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024",
+        "SecP256r1MLKEM512", "MLKEM512X25519", "curveSM2MLKEM768",
+        "X25519Kyber768Draft00", "SecP256r1Kyber768Draft00")}
+_OPENSSL_35_HYBRIDS = ("X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024")
+# image name, tag -> (TLS library, whether it is older than OpenSSL 3.5, the source)
+_IMAGE_TLS_LIBRARY = {
+    ("nginx", "1.24.0"): ("OpenSSL 1.1.1 (Debian bullseye)", True,
+                          "docker-nginx 1.24.0 stable/debian/Dockerfile is FROM "
+                          "debian:bullseye-slim; bullseye's openssl is 1.1.1w"),
+}
+# Images whose job is to terminate TLS with the configuration they are given.
+_TLS_SERVER_IMAGES = {"nginx", "haproxy", "httpd", "traefik", "caddy", "envoy", "openresty"}
+_IMAGE_LINE = re.compile(
+    r"^(\s*)(?:-\s+)?image:\s*[\"']?([A-Za-z0-9][\w./-]*?):([A-Za-z0-9_][\w.-]*)[\"']?\s*(?:#.*)?$")
+_VOLUME_ITEM = re.compile(r"^\s*-\s+[\"']?([^\s\"':]+):(/[^\s\"':]*)(?::\w+)?[\"']?\s*$")
+
+
+def scan_hybrid_groups(line: str) -> list[str]:
+    """Hybrid groups named in this line's TLS group setting."""
+    if line.lstrip().startswith(_COMMENT_START):
+        return []
+    setting = _group_setting(line)
+    if not setting:
+        return []
+    out: list[str] = []
+    for token in _GROUP_TOKEN.finditer(line, setting.end()):
+        if token.start() > 0 and line[token.start() - 1] in "-!":
+            continue
+        name = HYBRID_TLS_GROUPS.get(token.group(0).lower())
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def image_pins(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """`image: name:tag` lines naming a TLS-terminating server, with the configuration
+    files the same compose service mounts from inside the tree (short volume syntax)."""
+    def indent(text: str) -> int:
+        return len(text) - len(text.lstrip())
+
+    def meaningful(text: str) -> bool:
+        return bool(text.strip()) and not text.lstrip().startswith("#")
+
+    pins: list[dict[str, Any]] = []
+    base = posixpath.dirname(rel_path)
+    for number, text in enumerate(lines, 1):
+        image = _IMAGE_LINE.match(text)
+        if not image or image.group(2).rsplit("/", 1)[-1] not in _TLS_SERVER_IMAGES:
+            continue
+        name, tag = image.group(2), image.group(3)
+        level = len(image.group(1))
+        # The service block: back to the line that opens it, forward to the next line
+        # at a lower indent. `image:` and `volumes:` are its keys, in either order.
+        first = number - 1
+        while first > 0 and not (meaningful(lines[first - 1]) and indent(lines[first - 1]) < level):
+            first -= 1
+        last = number
+        while last < len(lines) and not (meaningful(lines[last]) and indent(lines[last]) < level):
+            last += 1
+        mounts: list[str] = []
+        in_volumes = False
+        for inner in lines[first:last]:
+            if not meaningful(inner):
+                continue
+            if indent(inner) == level:
+                in_volumes = inner.strip().startswith("volumes:")
+                continue
+            volume = _VOLUME_ITEM.match(inner) if in_volumes else None
+            # A path inside the tree; a named volume and an absolute host path are not.
+            if volume and not volume.group(1).startswith("/") and (
+                    volume.group(1).startswith(".") or "/" in volume.group(1)):
+                mounts.append(posixpath.normpath(posixpath.join(base, volume.group(1))))
+        pins.append({"path": rel_path, "line": number, "image": f"{name}:{tag}",
+                     "name": name.rsplit("/", 1)[-1], "tag": tag, "mounts": mounts})
+    return pins
+
+
+def library_support(pins: list[dict[str, Any]], hybrids: list[tuple[str, int, str]],
+                    files_read: list[str]) -> list[dict[str, Any]]:
+    """For each pinned TLS server image, whether it can negotiate the hybrid groups this
+    tree configures: not, where that is established at the source, else not established.
+    Nothing when the tree configures no hybrid group."""
+    if not hybrids:
+        return []
+    groups = sorted({g for _, _, g in hybrids})
+    read = set(files_read)
+    out: list[dict[str, Any]] = []
+    for pin in pins:
+        library = _IMAGE_TLS_LIBRARY.get((pin["name"], pin["tag"]))
+        served = sorted({m for m in pin["mounts"] if m in read}
+                        | {f for f in read for m in pin["mounts"] if f.startswith(m + "/")})
+        serving = [f"{p}:{n}" for p, n, _ in sorted(set(hybrids)) if p in served]
+        item = {"path": pin["path"], "line": pin["line"], "image": pin["image"],
+                "basis": "pinned_image", "groups": groups,
+                "group_places": [f"{p}:{n}" for p, n, _ in sorted(set(hybrids))],
+                "serves": served, "serves_group_places": serving}
+        if library and library[1]:
+            unknown = [g for g in groups if g in _OPENSSL_35_HYBRIDS]
+            item.update(tls_library=library[0], support="not_supported",
+                        not_negotiable=unknown, source=library[2])
+            said = (f"{pin['image']} is pinned here, and its TLS library is {library[0]} "
+                    f"({library[2]}). OpenSSL added {', '.join(_OPENSSL_35_HYBRIDS)} in "
+                    f"3.5.0, so a server on this image cannot negotiate "
+                    f"{', '.join(unknown) or 'them'}, which this tree configures; it may "
+                    f"refuse the setting or run with a classical group instead.")
+            rest = [g for g in groups if g not in _OPENSSL_35_HYBRIDS]
+            if rest:
+                said += (f" For {', '.join(rest)} support in that library is not "
+                         f"established here.")
+        else:
+            item.update(tls_library=None, support="not_established")
+            said = (f"{pin['image']} is pinned here. Which TLS library and version that "
+                    f"image carries is not established by this scan, so whether it can "
+                    f"negotiate {', '.join(groups)}, which this tree configures, is not "
+                    f"established either.")
+        if not pin["mounts"]:
+            said += " Which configuration this image serves is not joined here."
+        elif serving:
+            said += " Its compose service mounts a configuration that names the group."
+        elif served:
+            said += (" Its compose service mounts configuration from this tree that names "
+                     "no hybrid group.")
+        else:
+            said += " What its compose service mounts was not read in this scan."
+        item["description"] = said
+        out.append(item)
+    return out
 
 
 def tls_termination(scan_result: dict[str, Any]) -> dict[str, Any] | None:

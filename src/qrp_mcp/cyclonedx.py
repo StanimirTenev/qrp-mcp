@@ -524,6 +524,33 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["scope"] = "excluded"
         components.append(component)
 
+    # A TLS server image pinned beside the hybrid groups the tree configures
+    # (ZA-OPRAVYANE row 41): whether its library can negotiate them, where established.
+    by_image: dict[str, list[dict[str, Any]]] = {}
+    for item in scan_result["evidence"].get("library_support", []):
+        by_image.setdefault(item["image"], []).append(item)
+    for image, group in sorted(by_image.items()):
+        first = group[0]
+        properties = [
+            {"name": f"{NS}basis", "value": "pinned_image"},
+            {"name": f"{NS}support", "value": first["support"]},
+            {"name": f"{NS}groups", "value": ", ".join(first["groups"])},
+        ]
+        if first.get("tls_library"):
+            properties.append({"name": f"{NS}tls_library", "value": first["tls_library"]})
+            properties.append({"name": f"{NS}not_negotiable",
+                               "value": ", ".join(first.get("not_negotiable") or [])})
+        components.append({
+            "type": "container",
+            "bom-ref": _ref("image", image),
+            "name": image,
+            "properties": properties,
+            "evidence": {"occurrences": [
+                {"location": g["path"], "line": g["line"], "additionalContext": g["description"]}
+                for g in group
+            ]},
+        })
+
     # The same for SSH: a classical algorithm in a KexAlgorithms list, beside or instead
     # of a hybrid (ZA-OPRAVYANE row 22). OpenSSH's names are case-sensitive on the wire
     # but not in this table, so one component per name however it is spelled.

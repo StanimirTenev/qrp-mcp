@@ -210,6 +210,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # RSA key exchange (static RSA) enabled by a cipher-suite setting: AES256-SHA
             # names no key exchange and is TLS_RSA_WITH_AES_256_CBC_SHA.
             "static_rsa_kex": scan_result.get("static_rsa_kex_findings", []),
+            # A TLS server image pinned in the tree beside the hybrid groups the tree
+            # configures: whether that image's library can negotiate them, where known.
+            "library_support": scan_result.get("library_support_findings", []),
             # An EC public key equal to k*G for a small k: the private key is recoverable
             # from it. Checked on the keys and certificates the scan opens as bytes.
             "weak_keys": scan_result.get("weak_key_findings", []),
