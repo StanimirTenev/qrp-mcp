@@ -84,7 +84,8 @@ def scan_repo(
     running host or a certificate store: it opens files on disk and nothing else.
 
     Coverage is reported as a fraction with a base. `files_scanned + unreadable_files +
-    files_skipped_by_type == files_present`. A file that could not be opened is listed,
+    files_skipped_by_type + the linked files in symlinks_not_followed == files_present`;
+    a link is not followed and is named, not read. A file that could not be opened is listed,
     never counted as scanned, because no findings in a file nobody read is not the same
     as a file that is clean. Files skipped because this tool does not claim their type
     are counted by extension, so the reader can judge the boundary rather than assume
