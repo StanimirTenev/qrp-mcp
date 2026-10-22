@@ -1498,7 +1498,10 @@ def scan_source_file(path: Path, rel_path: str,
         indent = len(line) - len(line.lstrip())
         if denial_block_indent is not None and line.strip() and indent <= denial_block_indent:
             denial_block_indent = None
-        in_denial = denial_block_indent is not None
+        # The block governs list entries and declarations, never a call. `if (err.code
+        # === 'ERR_UNSUPPORTED') {` opened one, and the classical fallback generated
+        # inside it read as a ban (ZA-OPRAVYANE row 54).
+        in_denial = denial_block_indent is not None and kind != "call"
         if _opens_a_denial_block(code):
             denial_block_indent = indent
         # One line, one finding per algorithm. Several patterns can carry the same
