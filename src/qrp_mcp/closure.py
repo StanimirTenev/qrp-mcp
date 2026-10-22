@@ -39,7 +39,9 @@ _LOCATION_FIELDS = ("line",)
 # The TLS-termination pointer is a note about the line, the same on every TLS line, and
 # absent from results written before 0.31.0.
 # The signing key joined to a signing step is read from another file, like the provider.
-_CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signing_key")
+# So are the version pinned for the provider and the FIPS activation beside it.
+_CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signing_key",
+                   "provider_pin", "fips_provider_configured_in")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

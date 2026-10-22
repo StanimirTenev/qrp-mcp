@@ -11,8 +11,8 @@ from typing import Any
 
 from . import aws_tls, dnssec, ike, opcua
 from .classifier import _PQC_SCHEMES
-from .assets import (is_manifest, scan_manifest, scan_protocols, scan_ssh_kex,
-                     scan_tls_groups)
+from .assets import (is_manifest, pinned_versions, scan_manifest, scan_openssl_fips,
+                     scan_protocols, scan_ssh_kex, scan_tls_groups)
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
                            scan_certificate_file, small_scalar_keys)
 
@@ -1395,7 +1395,58 @@ PROVIDER_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("OpenSSL 3", re.compile(
         r"\bEVP_PKEY_Q_keygen\b|\bEVP_PKEY_CTX_new_from_name\b|"
         r"\bEVP_(?:KEM|SIGNATURE|KEYMGMT)_fetch\b")),
+    # Python's cryptography, by its own module path (ZA-OPRAVYANE row 35).
+    ("pyca/cryptography", re.compile(r"\b(?:from|import)\s+cryptography\.hazmat\b")),
 ]
+
+# The manifest package a provider is installed as, so a version pinned for it can be
+# named beside it (row 24a/35). The Go standard library and OpenSSL are not packages
+# in a manifest, and are not here.
+PROVIDER_PACKAGES = {
+    "pyca/cryptography": ("pypi", "cryptography"),
+    "Cloudflare CIRCL": ("go", "github.com/cloudflare/circl"),
+    "pqcrypto": ("pypi", "pqcrypto"),
+}
+
+
+def _package_key(ecosystem: str, name: str) -> tuple[str, str]:
+    return (ecosystem, re.sub(r"[-_.]+", "-", name).lower() if ecosystem == "pypi" else name)
+
+
+def _join_pins(items: list[dict[str, Any]],
+               pins: list[tuple[str, str, str, str, int]]) -> None:
+    """The version pinned for a provider's package, from the nearest manifest above the
+    file that uses it. Two pins that disagree there, or none, give nothing."""
+    by_package: dict[tuple[str, str], list[tuple[str, str, str, str]]] = {}
+    for ecosystem, package, version, path, line in pins:
+        by_package.setdefault(_package_key(ecosystem, package), []).append(
+            (posixpath.dirname(path), package, version, f"{path}:{line}"))
+    for item in items:
+        package = PROVIDER_PACKAGES.get(item.get("provider", ""))
+        if not package:
+            continue
+        here = posixpath.dirname(item["path"])
+        above = [p for p in by_package.get(_package_key(*package), [])
+                 if p[0] == "" or here == p[0] or here.startswith(p[0] + "/")]
+        if not above:
+            continue
+        deepest = max(len(p[0]) for p in above)
+        nearest = [p for p in above if len(p[0]) == deepest]
+        if len({p[2] for p in nearest}) != 1:
+            continue
+        _, name, version, pinned_in = nearest[0]
+        item["provider_pin"] = {"package": name, "version": version, "pinned_in": pinned_in}
+
+
+def _join_fips(items: list[dict[str, Any]], fips: list[dict[str, Any]]) -> None:
+    """Name the FIPS activation beside every finding whose provider is OpenSSL 3."""
+    where = [f"{f['path']}:{f['line']}" for f in fips
+             if f["activation"] in {"loads_fips_provider", "fips_default_property"}]
+    if not where:
+        return
+    for item in items:
+        if item.get("provider") == "OpenSSL 3":
+            item["fips_provider_configured_in"] = where
 
 
 def _attach_providers(findings: list[dict[str, Any]], lines: list[str]) -> None:
@@ -1748,6 +1799,10 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # Key and certificate files read, by path, with the families found in each, so a
     # signing step can be joined to the key it names (_link_signing_keys).
     key_files: dict[str, list[str]] = {}
+    # OpenSSL's FIPS provider brought in by an openssl.cnf; see assets.scan_openssl_fips.
+    fips_findings: list[dict[str, Any]] = []
+    # Packages pinned to one version: (ecosystem, package, version, manifest, line).
+    pins: list[tuple[str, str, str, str, int]] = []
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -1876,6 +1931,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                                       "path": rel_path, "line": number, "excerpt": excerpt})
         if is_manifest(path):
             dependency_findings.extend(scan_manifest(path, rel_path, lines))
+            pins.extend((eco, pkg, ver, rel_path, n)
+                        for eco, pkg, ver, n in pinned_versions(path, lines))
 
         if is_certificate_file(path) or peeked_key:
             # Certificates and keys are read as bytes, not lines: a .der carries no
@@ -1936,6 +1993,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             for asset in ike.scan(path.name, lines, post_quantum):
                 asset["path"] = rel_path
                 protocol_findings.append(asset)
+            if path.suffix.lower() == ".cnf":
+                fips_findings.extend(scan_openssl_fips(rel_path, lines))
             # The DNS UDP size budget a BIND configuration sets (see dnssec.py).
             for asset in dnssec.udp_sizes(lines):
                 asset["path"] = rel_path
@@ -1974,6 +2033,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         content_parts.append(f"{rel}\0{kind}")
 
     _link_signing_keys(ci_findings, key_files)
+    _join_pins(source_findings + iac_findings, pins)
+    _join_fips(source_findings + iac_findings, fips_findings)
     return {
         "files_scanned": files_scanned,
         "files_read": sorted(files_read),
@@ -2012,6 +2073,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         "tls_group_findings": tls_group_findings,
         "ssh_kex_findings": ssh_kex_findings,
         "weak_key_findings": weak_key_findings,
+        "fips_provider_findings": fips_findings,
         # Files removed by EXCLUDED_DIRS before files_present counted anything,
         # by the directory name that removed them. Counted so the denominator
         # can state what it left out instead of leaving it in the source.

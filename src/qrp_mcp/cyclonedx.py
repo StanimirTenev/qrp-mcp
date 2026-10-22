@@ -364,6 +364,19 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 "value": json.dumps(finding["providers"], ensure_ascii=False)})
             component["properties"].append({
                 "name": f"{NS}provider_validation", "value": PROVIDER_VALIDATION})
+        # The version a manifest pins for the provider, and where an openssl.cnf
+        # activates the FIPS provider -- both read from files, neither a validation.
+        if finding.get("provider_pins"):
+            component["properties"].append({
+                "name": f"{NS}provider_pins",
+                "value": json.dumps(finding["provider_pins"], ensure_ascii=False)})
+        if finding.get("fips_provider_configured_in"):
+            component["properties"].append({
+                "name": f"{NS}provider_configuration",
+                "value": ("FIPS provider activated in "
+                          + ", ".join(finding["fips_provider_configured_in"])
+                          + "; whether the process running this code loads that "
+                            "configuration is not in the files")})
         occurrences = _occurrences(located, family, family_of)
         if occurrences:
             component["evidence"] = {"occurrences": occurrences}

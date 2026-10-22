@@ -73,9 +73,19 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
     # The modules named for each family, from the lines that use it. Absent where
     # none was named: an empty list would read as "checked, none", which it is not.
     providers: dict[str, set[str]] = {}
+    # The version pinned for a provider, and where OpenSSL's FIPS provider is activated,
+    # by family: what the evidence items carry, said once on the finding.
+    pins: dict[str, dict[str, set[str]]] = {}
+    fips: dict[str, set[str]] = {}
     for item in scan_result["source_code_findings"] + scan_result["iac_findings"]:
         if item.get("provider"):
             providers.setdefault(item["algorithm"], set()).add(item["provider"])
+        if item.get("provider_pin"):
+            pin = item["provider_pin"]
+            pins.setdefault(item["algorithm"], {}).setdefault(item["provider"], set()).add(
+                f"{pin['version']} ({pin['pinned_in']})")
+        if item.get("fips_provider_configured_in"):
+            fips.setdefault(item["algorithm"], set()).update(item["fips_provider_configured_in"])
     detected_by_name = dict(zip(named, scan_result["detected_algorithms"]))
 
     coverage_block = coverage.build(
@@ -175,7 +185,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         # A replacement travels with the finding it is for, and only where one is due;
         # a suggestion, never an action.
         "findings": [_with_providers(_with_replacement(f.model_dump(), roles, profile),
-                                     providers, detected_by_name)
+                                     providers, detected_by_name, pins, fips)
                      for f in response.findings],
         # Whose rules the replacements follow; NIST unless asked.
         "replacement_profile": profile,
@@ -200,6 +210,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # An EC public key equal to k*G for a small k: the private key is recoverable
             # from it. Checked on the keys and certificates the scan opens as bytes.
             "weak_keys": scan_result.get("weak_key_findings", []),
+            # OpenSSL's FIPS provider brought in by an openssl.cnf: activated in
+            # configuration, never "validated".
+            "fips_provider": scan_result.get("fips_provider_findings", []),
         },
     }
 
@@ -224,11 +237,25 @@ def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:
 
 
 def _with_providers(finding: dict[str, Any], providers: dict[str, set[str]],
-                    detected_by_name: dict[str, str]) -> dict[str, Any]:
+                    detected_by_name: dict[str, str],
+                    pins: dict[str, dict[str, set[str]]] | None = None,
+                    fips: dict[str, set[str]] | None = None) -> dict[str, Any]:
     family = detected_by_name.get(finding.get("raw_value"))
     if family in providers:
         finding["providers"] = sorted(providers[family])
+    # One version per provider, or none: two pins for the same provider are not chosen.
+    pinned = {name: next(iter(said)) for name, said in ((pins or {}).get(family) or {}).items()
+              if len(said) == 1}
+    if pinned:
+        finding["provider_pins"] = pinned
+    if (fips or {}).get(family):
+        finding["fips_provider_configured_in"] = sorted(fips[family], key=_by_place)
     return finding
+
+
+def _by_place(where: str) -> tuple[str, int]:
+    path, _, line = where.rpartition(":")
+    return path, int(line) if line.isdigit() else 0
 
 
 def _with_replacement(finding: dict[str, Any],

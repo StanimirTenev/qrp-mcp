@@ -324,6 +324,34 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
     return out
 
 
+# A version pinned to one release, which is the only version a manifest states as a
+# fact: `cryptography==44.0.0` in requirements.txt, `github.com/x/y v1.2.3` in go.mod.
+# A range (`>=42`) is a request, not a version, and yields nothing. pyproject.toml,
+# Pipfile and the lockfiles are not read for this.
+_PY_PIN = re.compile(
+    r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*===?\s*"
+    r"([A-Za-z0-9][A-Za-z0-9.+!_-]*)\s*(?:[;#]|$)")
+_GO_PIN = re.compile(r"^\s*(?:require\s+)?([a-z0-9][\w./-]*\.[a-z]{2,}/[\w./-]+)\s+(v[\w.+-]+)")
+
+
+def pinned_versions(path: Path, lines: list[str]) -> list[tuple[str, str, str, int]]:
+    """(ecosystem, package, version, line) for each package pinned to one version."""
+    if path.name == "requirements.txt":
+        ecosystem, pattern = "pypi", _PY_PIN
+    elif path.name == "go.mod":
+        ecosystem, pattern = "go", _GO_PIN
+    else:
+        return []
+    out = []
+    for number, text in enumerate(lines, 1):
+        if text.strip().startswith(("#", "//", "-")):
+            continue
+        match = pattern.match(text)
+        if match:
+            out.append((ecosystem, match.group(1), match.group(2), number))
+    return out
+
+
 def is_manifest(path: Path) -> bool:
     return (path.name in MANIFEST_FILENAMES
             or path.name in _NUGET_FILENAMES
@@ -419,6 +447,74 @@ _SSH_KEY_LINE = re.compile(
 _VERSION_MACRO = re.compile(r"(?<![A-Za-z0-9_])(SSL[23]|TLS1(?:_[0-3])?)_VERSION(?![A-Za-z0-9_])")
 
 _DEPRECATED_TLS = {"SSLv2", "SSLv3", "TLSv1.0", "TLSv1.1"}
+
+
+# -- OpenSSL's FIPS provider, activated in openssl.cnf -----------------------------------
+#
+# ZA-OPRAVYANE row 35 (Paul J. Lilly, 22.10.2026): an openssl.cnf that activates the FIPS
+# provider was read and said nothing, and the ML-KEM line read "OpenSSL 3" either way --
+# the difference a certificate-number check turns on. The settings are OpenSSL's own
+# (config(5), fips_module(7)): `.include .../fipsmodule.cnf`, `fips = <section>` in the
+# section `providers =` names, with `activate` there yes/on/true/1 or the section in the
+# included file, and `default_properties = fips=yes` (or the deprecated `fips_mode = yes`).
+# Activated in configuration is all a file can say. Whether the process that runs the
+# code loads this file, and whether that module is CMVP-validated, it cannot.
+_CNF_SECTION = re.compile(r"^\s*\[\s*([^\]\s]+)\s*\]")
+_CNF_SETTING = re.compile(r"^\s*([A-Za-z0-9_.]+)\s*=\s*\"?([^\"#]*?)\"?\s*(?:#.*)?$")
+_CNF_INCLUDE_FIPS = re.compile(r"^\s*\.include\s*=?\s*\S*fipsmodule\.cnf\b")
+_FIPS_YES = re.compile(r"(?:^|,)\s*fips\s*=\s*yes\b", re.IGNORECASE)
+_ON = {"yes", "on", "true", "1"}
+
+
+def scan_openssl_fips(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """Lines of an OpenSSL configuration that bring the FIPS provider in."""
+    sections: dict[str, list[tuple[int, str, str]]] = {}
+    current = ""
+    for number, text in enumerate(lines, 1):
+        head = _CNF_SECTION.match(text)
+        if head:
+            current = head.group(1)
+            continue
+        setting = _CNF_SETTING.match(text)
+        if setting:
+            sections.setdefault(current, []).append(
+                (number, setting.group(1), setting.group(2).strip()))
+    includes = [n for n, text in enumerate(lines, 1) if _CNF_INCLUDE_FIPS.match(text)]
+    provider_sections = {value for entries in sections.values()
+                         for _, name, value in entries if name == "providers"}
+    out: list[dict[str, Any]] = []
+
+    def add(number: int, activation: str, said: str) -> None:
+        out.append({"path": rel_path, "line": number, "activation": activation,
+                    "excerpt": lines[number - 1].strip()[:200],
+                    "basis": "configured_provider",
+                    "description": said + " Activated in configuration, not validated: "
+                                          "whether the process that runs the code loads "
+                                          "this file is not in the files, and CMVP status "
+                                          "is checked against the CMVP list."})
+
+    for number in includes:
+        add(number, "includes_fips_module_config",
+            f"FIPS module configuration included in {rel_path}:{number}.")
+    for section in sorted(provider_sections):
+        for number, name, value in sections.get(section, []):
+            if name != "fips":
+                continue
+            activate = [v.lower() for _, n, v in sections.get(value, []) if n == "activate"]
+            if activate and activate[-1] not in _ON:
+                continue
+            if not activate and not includes:
+                continue
+            add(number, "loads_fips_provider",
+                f"FIPS provider activated in {rel_path}:{number} ({name} = {value}).")
+    for entries in sections.values():
+        for number, name, value in entries:
+            if ((name == "default_properties" and _FIPS_YES.search(value))
+                    or (name == "fips_mode" and value.lower() == "yes")):
+                add(number, "fips_default_property",
+                    f"FIPS provider activated in {rel_path}:{number} ({name} = {value}): "
+                    f"algorithm fetches default to the FIPS provider.")
+    return sorted(out, key=lambda item: item["line"])
 
 
 def _tls_version_name(match: re.Match) -> str:
