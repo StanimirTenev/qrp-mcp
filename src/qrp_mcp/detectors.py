@@ -505,7 +505,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # and code signing, so a firmware pipeline that had complied scanned as empty.
     ("HSS/LMS", "LMS/HSS stateful signature usage", re.compile(
         r"(?<![A-Za-z])lms[-_]?sha|(?<![A-Za-z])hss[-_/]?lms|(?<![A-Za-z])lms[-_]?(sha256|shake)|"
-        r"(?<![A-Za-z])hsslms|lms_sha256_m\d+_h\d+",
+        r"(?<![A-Za-z])hsslms|lms_sha256_m\d+_h\d+|"
+        # Through the library API (ZA-OPRAVYANE row 50): wolfSSL's wc_LmsKey_* (lms.h),
+        # hash-sigs' hss_* entry points, Bouncy Castle's LMS/HSS signers. Whole names only:
+        # bare `hss` is a home subscriber server and bare `lms` a learning system.
+        r"\bwc_LmsKey_\w+|"
+        r"\bhss_(?:validate_signature\w*|generate_private_key|generate_signature|"
+        r"load_private_key)\b|\b(?:LMS|HSS)Signer\b",
         re.IGNORECASE,
     )),
     # The nine schemes NIST advanced to the third additional-signatures round on
