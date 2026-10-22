@@ -101,3 +101,10 @@ def test_bind_default_when_the_size_is_not_set(tmp_path):
 def test_no_budget_without_dns(tmp_path):
     result = scan_directory(_tree(tmp_path, {"nginx.conf": "server { listen 443; }\n"}))
     assert not [a for a in result["evidence"]["protocols"] if a["protocol"] == "dns"]
+
+
+def test_a_variable_named_ecdsa256_is_not_a_dnssec_algorithm(tmp_path):
+    # OpenSSH's regress/misc/fuzz-harness/sig_fuzz.cc, found in the positive control.
+    src = "static struct sshkey *ecdsa256 = generate_or_die(KEY_ECDSA, 256);\n"
+    found = scan_directory(_tree(tmp_path, {"sig_fuzz.cc": src}))["evidence"]["source_code"]
+    assert [(f["algorithm"], "DNSSEC" in f["description"]) for f in found] == [("ECDSA", False)]

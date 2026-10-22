@@ -197,11 +197,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # DNSSEC algorithm mnemonics (IANA DNSSEC Algorithm Numbers), as BIND's
     # dnssec-policy and dnssec-keygen -a, Knot's `algorithm:` and PowerDNS write them.
     # Before "ECDSA usage", so the curve the mnemonic names is kept (DNSSEC_CURVES).
-    # ED25519, ED448 and MLDSA44 are already reached by their own rules below.
+    # ED25519, ED448 and MLDSA44 are already reached by their own rules below, and so is
+    # PowerDNS's `ecdsa256`/`ecdsa384` -- by "ECDSA usage", without a curve: the same
+    # word is an ordinary variable name in OpenSSH, where it means no DNSSEC algorithm.
     ("ECDSA", "ECDSA P-256 named by a DNSSEC algorithm (13, ECDSAP256SHA256)", re.compile(
-        r"(?<![A-Za-z0-9])(?:ECDSAP256SHA256|ecdsa256)(?![A-Za-z0-9])", re.IGNORECASE)),
+        r"(?<![A-Za-z0-9])ECDSAP256SHA256(?![A-Za-z0-9])", re.IGNORECASE)),
     ("ECDSA", "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)", re.compile(
-        r"(?<![A-Za-z0-9])(?:ECDSAP384SHA384|ecdsa384)(?![A-Za-z0-9])", re.IGNORECASE)),
+        r"(?<![A-Za-z0-9])ECDSAP384SHA384(?![A-Za-z0-9])", re.IGNORECASE)),
     ("RSA", "RSA named by a DNSSEC algorithm (1, 5, 7, 8 or 10)", re.compile(
         r"(?<![A-Za-z0-9])(?:RSAMD5|RSASHA1(?:-NSEC3-SHA1)?|RSASHA256|RSASHA512)(?![A-Za-z0-9])",
         re.IGNORECASE)),
