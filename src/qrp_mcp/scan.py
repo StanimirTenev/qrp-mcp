@@ -326,6 +326,21 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
                 {image for place in places for image in unable[place]})
             set_aside.add(family)
 
+    # A private key recoverable from its public key raises the finding of its family,
+    # so the finding, weak_count and the severity say what evidence.weak_keys says
+    # (ZA-OPRAVYANE row 51: 4*G on P-384 beside an EC finding with weak_key false).
+    recoverable: dict[str, list[str]] = {}
+    for weak in scan_result.get("weak_key_findings") or []:
+        recoverable.setdefault(weak["algorithm"], []).append(
+            f"{weak['path']}:{weak['line']} ({weak['scalar']}*G on {weak['curve']})")
+    for f in findings:
+        if f.raw_value in detected_by_name and detected_by_name[f.raw_value] in recoverable:
+            f.weak_key = True
+            f.severity = "critical"
+            f.reason += (" Private key recoverable from the public key at "
+                         + ", ".join(recoverable[detected_by_name[f.raw_value]])
+                         + "; see evidence.weak_keys.")
+
     protected: set[str] = set()
     ppk_files: dict[str, bool] = {}
     for item in uses.get("PPK", []):
