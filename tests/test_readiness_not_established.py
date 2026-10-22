@@ -78,3 +78,25 @@ def test_encrypted_key_beside_mlkem(tmp_path):
     assert summary["pqc_readiness"] == "not_established"
     assert summary["readiness_not_established"]["because"] == [
         "a private key at server.key:1 whose algorithm was not determined"]
+
+
+def test_the_runs_own_output_file_does_not_withhold_it(tmp_path):
+    """`qrp-mcp scan . --out scan.json`: the output is left out by name, not unread."""
+    import json
+
+    from qrp_mcp.server import scan_to_file
+    (tmp_path / "kem.py").write_text(KEM)
+    out = tmp_path / "scan.json"
+    for _ in range(2):  # the second run finds the first one's file in the tree
+        assert scan_to_file([str(tmp_path), "--out", str(out)]) == 0
+    assert json.loads(out.read_text())["summary"]["pqc_readiness"] == "pqc_ready"
+
+
+def test_the_tool_carries_it_at_every_level(tmp_path):
+    from qrp_mcp import server
+    (tmp_path / "kem.py").write_text(KEM)
+    (tmp_path / "Caddyfile").write_text(CADDY)
+    for level in ("full", "masked", "trimmed"):
+        summary = server.scan_repo(str(tmp_path), level=level)["summary"]
+        assert summary["pqc_readiness"] == "not_established"
+        assert summary["readiness_not_established"]["would_read"] == "pqc_ready"

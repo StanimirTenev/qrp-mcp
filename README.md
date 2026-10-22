@@ -781,6 +781,11 @@ server did not offer ML-KEM on the wire. Reproduced against 0.32.0, that is not 
 `evidence_kind: comment`, outside `detected_algorithms` and the TLS places, and `[comment]` in the
 CBOM (a test now pins it).
 
+The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
+verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
+can be served with one — and its own key is still ECDSA, and reported as such. An AWS listener
+policy is a TLS terminator in the tree, and counts as a place here.
+
 **From 0.34.0**, after a systematic probe of 22 Oct 2026 that set the summary beside what the scan
 had actually read, and four points raised in public the same day, the output stops being confident
 where the evidence beside it was not:
@@ -792,7 +797,9 @@ where the evidence beside it was not:
   algorithm was not determined (PKCS#8 embedded in source, an encrypted key file).
   `summary.readiness_not_established` says what it would have read and why not, e.g.
   `"1 of 2 files were not read (50.0% read); see coverage.not_examined"`. A value that warns is
-  never withheld. The case: ML-KEM in a module and a `Caddyfile` with `curves x25519`, which is not
+  never withheld. In practice nearly every real repository has a file the scanner does not
+  read (a `README.md`, a `LICENSE`), so on a real tree these four values give way to
+  `not_established`, with the would-be value beside it. The case: ML-KEM in a module and a `Caddyfile` with `curves x25519`, which is not
   read; the summary said `pqc_ready` about the one file it had not opened (raised by Chandra
   Devadass). Files removed by the directory exclusions do not withhold it; they are named in the
   verdict instead (below).
@@ -829,9 +836,9 @@ where the evidence beside it was not:
 - **A group removed with OpenSSL's `-` is a ban on the algorithm path too.** `Groups =
   DEFAULT:-X25519MLKEM768` switches the hybrid off; ML-KEM was detected from it. The algorithm
   rule now asks the same group-setting test as the TLS group rule.
-- **LMS through its API.** wolfSSL `wc_LmsKey_*`, hash-sigs `hss_validate_signature`,
-  `hss_generate_private_key`, `hss_generate_signature`, `hss_load_private_key`, and Bouncy
-  Castle's `LMSSigner`/`HSSSigner` are HSS/LMS (raised by Dhiraj S.). XMSS through
+- **LMS through its API.** wolfSSL `wc_LmsKey_*` (its `lms.h`), hash-sigs'
+  `hss_validate_signature` and the other `hss_*` entry points for generating, loading and
+  signing, and Bouncy Castle's `LMSSigner`/`HSSSigner` are HSS/LMS (raised by Dhiraj S.). XMSS through
   `wc_XmssKey_*`, `xmss_sign_open` and `XMSSSigner` was already matched and is now pinned.
 - **`prove_closure` does not call a skipped file removed.** A key file the second run skipped by
   type was "removed — the file is not in the second tree" while it was there; every path in
@@ -854,11 +861,6 @@ evidence line: `make_key(elliptic_curve="nothere", key_type='ecdsa')` under `wit
 pytest.raises(…, match='Unsupported elliptic curve…'):` in a test is now a call, not a ban (ECDSA
 was found elsewhere anyway); its summary gains `deprecated_protocols`. No file in OpenSSH,
 certbot or wolfSSL is UTF-16 without a BOM.
-
-The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
-verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
-can be served with one — and its own key is still ECDSA, and reported as such. An AWS listener
-policy is a TLS terminator in the tree, and counts as a place here.
 
 ### A classical group offered on its own
 
