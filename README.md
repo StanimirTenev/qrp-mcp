@@ -848,9 +848,12 @@ where the evidence beside it was not:
   `symlinks_not_followed`, not in the other three (below).
 
 Not changed by any of this: what is detected, apart from the LMS names, the two ban rules and
-UTF-16 above, and the coverage figures — on OpenSSH and certbot the files read, the evidence, the
-findings and the verdict are the same as in 0.33.0, and no file in OpenSSH, certbot or wolfSSL is
-UTF-16 without a BOM.
+UTF-16 above, and the coverage figures. On OpenSSH the files read, the evidence, the findings, the
+summary's readiness and the verdict are the same as in 0.33.0. On certbot the same, but for one
+evidence line: `make_key(elliptic_curve="nothere", key_type='ecdsa')` under `with
+pytest.raises(…, match='Unsupported elliptic curve…'):` in a test is now a call, not a ban (ECDSA
+was found elsewhere anyway); its summary gains `deprecated_protocols`. No file in OpenSSH,
+certbot or wolfSSL is UTF-16 without a BOM.
 
 The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
 verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
