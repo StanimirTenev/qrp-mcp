@@ -145,6 +145,63 @@ def _small_multiples(curve: str) -> dict[tuple[int, int], int]:
     return _SMALL_MULTIPLES[curve]
 
 
+# -- The size of an RSA public key --------------------------------------------------------
+#
+# A certificate's RSA key was named and never sized: `key_size: None` for four RSA files
+# in the probe of 22.10.2026, two of them 2048 bits (ZA-OPRAVYANE row 46). The size is in
+# the public key, so it is read from there and nowhere else: a SubjectPublicKeyInfo whose
+# AlgorithmIdentifier is rsaEncryption with NULL parameters (RFC 3279 section 2.3.1), then
+# BIT STRING, SEQUENCE, and the modulus INTEGER (RFC 8017 A.1.1); or an `RSA PUBLIC KEY`
+# block, which is that SEQUENCE alone. Still not an X.509 parser: the walk is anchored on
+# those bytes and anything else yields nothing. A private key (PKCS#1 or PKCS#8) is not
+# read for its size.
+_RSA_SPKI_ALGORITHM = bytes.fromhex("300d06092a864886f70d0101010500")
+
+
+def _der_header(blob: bytes, i: int, tag: int) -> tuple[int, int] | None:
+    """(length, start of contents) of the element at i if its tag is `tag`."""
+    if i + 1 >= len(blob) or blob[i] != tag:
+        return None
+    first = blob[i + 1]
+    if first < 0x80:
+        return first, i + 2
+    count = first & 0x7F
+    if not 1 <= count <= 3 or i + 2 + count > len(blob):
+        return None
+    return int.from_bytes(blob[i + 2:i + 2 + count], "big"), i + 2 + count
+
+
+def _modulus_bits(blob: bytes, i: int) -> int | None:
+    """Bits of the modulus of the RSAPublicKey SEQUENCE at i."""
+    seq = _der_header(blob, i, 0x30)
+    if seq is None:
+        return None
+    integer = _der_header(blob, seq[1], 0x02)
+    if integer is None or integer[1] + integer[0] > len(blob):
+        return None
+    bits = int.from_bytes(blob[integer[1]:integer[1] + integer[0]], "big").bit_length()
+    # Outside this range the bytes were not a modulus; say nothing rather than a number.
+    return bits if 512 <= bits <= 16384 else None
+
+
+def rsa_key_sizes(blob: bytes, pkcs1_public: bool = False) -> set[int]:
+    """Sizes of the RSA public keys in a DER blob."""
+    sizes: set[int] = set()
+    if pkcs1_public:
+        bits = _modulus_bits(blob, 0)
+        if bits:
+            sizes.add(bits)
+    at = blob.find(_RSA_SPKI_ALGORITHM)
+    while at != -1:
+        bit_string = _der_header(blob, at + len(_RSA_SPKI_ALGORITHM), 0x03)
+        if bit_string is not None and blob[bit_string[1]:bit_string[1] + 1] == b"\x00":
+            bits = _modulus_bits(blob, bit_string[1] + 1)
+            if bits:
+                sizes.add(bits)
+        at = blob.find(_RSA_SPKI_ALGORITHM, at + 1)
+    return sizes
+
+
 def _der_length(n: int) -> bytes:
     return bytes([n]) if n < 0x80 else bytes([0x81, n])
 
@@ -356,6 +413,8 @@ def scan_certificate_file(path: Path, rel_path: str,
             return [], []
 
     blobs: list[bytes] = []
+    # The blobs that are an `RSA PUBLIC KEY` block, read as a bare RSAPublicKey.
+    pkcs1_public: set[int] = set()
     text = raw.decode("utf-8", errors="replace")
 
     for match in _PEM_BLOCK.finditer(text):
@@ -377,6 +436,8 @@ def scan_certificate_file(path: Path, rel_path: str,
             blobs.append(base64.b64decode(match.group(2), validate=False))
         except (ValueError, TypeError):
             continue
+        if label == "RSA PUBLIC KEY":
+            pkcs1_public.add(len(blobs) - 1)
 
     # A .der or .p12 is the same content without the armour.
     if not blobs and not text.lstrip().startswith("-----BEGIN"):
@@ -433,6 +494,16 @@ def scan_certificate_file(path: Path, rel_path: str,
             item["curve"] = ", ".join(name for name, _ in curves)
             item["key_size"] = curves[0][1]
             item["description"] += f"; curve {item['curve']} from its object identifier"
+
+    # The size of an RSA key, from its public key (ZA-OPRAVYANE row 46). The smallest when
+    # a file holds several, as for the curve above; all of them in the description.
+    sizes = sorted(set().union(*(rsa_key_sizes(blob, n in pkcs1_public)
+                                 for n, blob in enumerate(blobs))) if blobs else set())
+    for item in algorithms:
+        if item["algorithm"] == "RSA" and sizes and "key_size" not in item:
+            item["key_size"] = sizes[0]
+            item["description"] += (f"; modulus of {', '.join(map(str, sizes))} bits "
+                                    f"from its public key")
 
     # PKCS#12. The wrapper is not encrypted even when everything inside it is, so
     # it still names its bags: a shrouded key bag means a private key is in the
