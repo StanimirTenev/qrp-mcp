@@ -326,6 +326,17 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
                 {image for place in places for image in unable[place]})
             set_aside.add(family)
 
+    # A family found only in test code says so on its finding, and a post-quantum one is
+    # not counted as deployed: the CBOM already marked it `scope: excluded` while the
+    # summary said hybrid_partial (ZA-OPRAVYANE row 62). Never the other way round: test-only
+    # classical still counts as vulnerable.
+    for name, items in uses.items():
+        family = family_of.get(name)
+        if family and all(i.get("in_test_code") for i in items):
+            notes.setdefault(family, {})["in_test_code"] = True
+            if family in pqc:
+                set_aside.add(family)
+
     # A private key recoverable from its public key raises the finding of its family,
     # so the finding, weak_count and the severity say what evidence.weak_keys says
     # (ZA-OPRAVYANE row 51: 4*G on P-384 beside an EC finding with weak_key false).
