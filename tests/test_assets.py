@@ -198,8 +198,11 @@ def test_one_component_per_library_however_many_manifests(tmp_path):
 
 
 @pytest.mark.parametrize("line,used,banned", [
-    ("SSLProtocol all -SSLv2 -SSLv3", [], ["SSLv2", "SSLv3"]),
-    ("SSLProtocol             all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1", [], ["SSLv2", "SSLv3", "TLSv1.0", "TLSv1.1"]),
+    # `all` enables what it does not strike out (mod_ssl; ZA-OPRAVYANE row 43, 0.33.0).
+    ("SSLProtocol all -SSLv2 -SSLv3", ["TLSv1.0", "TLSv1.1", "TLSv1.2", "TLSv1.3"],
+     ["SSLv2", "SSLv3"]),
+    ("SSLProtocol             all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1", ["TLSv1.2", "TLSv1.3"],
+     ["SSLv2", "SSLv3", "TLSv1.0", "TLSv1.1"]),
     ("ssl_protocols TLSv1.2 TLSv1.3;", ["TLSv1.2", "TLSv1.3"], []),
     ("ssl_protocols SSLv2 SSLv3 TLSv1;", ["SSLv2", "SSLv3", "TLSv1.0"], []),
 ])

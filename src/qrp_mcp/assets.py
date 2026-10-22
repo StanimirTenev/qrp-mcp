@@ -448,6 +448,11 @@ _VERSION_MACRO = re.compile(r"(?<![A-Za-z0-9_])(SSL[23]|TLS1(?:_[0-3])?)_VERSION
 
 _DEPRECATED_TLS = {"SSLv2", "SSLv3", "TLSv1.0", "TLSv1.1"}
 
+# `SSLProtocol all` or `+all`, but not `-all`, as Apache writes the directive.
+_SSL_PROTOCOL_ALL = re.compile(r"^\s*SSLProtocol\s+(?:.*\s)?\+?all(?:\s|$)",
+                               re.IGNORECASE)
+_ALL_VERSIONS = ("SSLv3", "TLSv1.0", "TLSv1.1", "TLSv1.2", "TLSv1.3")
+
 
 # -- OpenSSL's FIPS provider, activated in openssl.cnf -----------------------------------
 #
@@ -571,6 +576,32 @@ def scan_protocols(line: str) -> list[dict[str, Any]]:
                                 f"{name} is configured here. Which algorithms it "
                                 f"negotiates is not stated by the version."),
             })
+        # Apache's `SSLProtocol all` names no version and enables them all: mod_ssl's
+        # manual (2.4, read 22.10.2026) says `all` is "+SSLv3 +TLSv1 +TLSv1.1 +TLSv1.2
+        # +TLSv1.3" with OpenSSL 1.0.1 and later, without SSLv3 where OpenSSL was built
+        # with no-ssl3. So `SSLProtocol all -SSLv3` enables TLS 1.0 and 1.1, and was
+        # reported only as "SSLv3 is forbidden here" (ZA-OPRAVYANE row 43).
+        enabled = _SSL_PROTOCOL_ALL.match(line)
+        if enabled:
+            removed = {name for name, banned in seen if banned}
+            for name in _ALL_VERSIONS:
+                if name in removed or (name, False) in seen:
+                    continue
+                seen.add((name, False))
+                out.append({
+                    "protocol": "tls",
+                    "version": name,
+                    "banned": False,
+                    "basis": "configured_protocol",
+                    "included_by": "all",
+                    "deprecated": name in _DEPRECATED_TLS,
+                    "description": (
+                        f"{name} is enabled by `all` on this line (mod_ssl: all is +SSLv3 "
+                        f"+TLSv1 +TLSv1.1 +TLSv1.2 +TLSv1.3 with OpenSSL 1.0.1 and later; "
+                        f"TLSv1.3 needs OpenSSL 1.1.1, and SSLv3 is absent from an OpenSSL "
+                        f"built with no-ssl3). Whether the TLS library still allows it at "
+                        f"run time is not stated by this line."),
+                })
     if _SSH_KEY_LINE.search(line):
         out.append({
             "protocol": "ssh",
@@ -657,6 +688,75 @@ def _cipher_setting(line: str) -> bool:
     """Whether this line sets TLS cipher suites."""
     return bool(_TLS_CIPHER_SETTING.search(line)
                 or (_HAPROXY_LINE.match(line) and _HAPROXY_CIPHERS.search(line)))
+
+
+# -- RSA key exchange in a cipher-suite setting ------------------------------------------
+#
+# OpenSSL names a suite with RSA key exchange by its cipher alone: AES256-SHA is
+# TLS_RSA_WITH_AES_256_CBC_SHA, and no word in the name says RSA. So `SSLCipherSuite
+# HIGH:!aNULL:AES256-SHA:DES-CBC3-SHA` gave 3DES and nothing else, and an nginx line with
+# ECDHE-RSA-... gave RSA from the authentication half only (ZA-OPRAVYANE row 43, the
+# network-vs-code probe of 22.10.2026). The session key of such a suite travels encrypted
+# to the server's RSA key: no forward secrecy, and a recorded session opens to whoever
+# later has that key -- a quantum computer that can factor it included.
+#
+# The names are every TLS_RSA_WITH_* suite in openssl-ciphers(1) (OpenSSL 3.5, section
+# "CIPHER SUITE NAMES", read 22.10.2026), with OpenSSL's `kRSA` keyword ("cipher suites
+# using RSA key exchange") and the IANA spelling. Case matters: OpenSSL writes them in
+# capitals, and `aes128-sha256-modp2048` is a strongSwan proposal, not a TLS suite.
+# Matched only on a cipher-suite setting: OpenSSL's headers define every name as a
+# C constant, and those configure nothing. `RSA` and `aRSA` are left alone: they select
+# by authentication too.
+STATIC_RSA_SUITES = (
+    "AES128-CCM", "AES128-CCM8", "AES128-GCM-SHA256", "AES128-SHA", "AES128-SHA256",
+    "AES256-CCM", "AES256-CCM8", "AES256-GCM-SHA384", "AES256-SHA", "AES256-SHA256",
+    "ARIA128-CBC-SHA256", "ARIA128-GCM-SHA256", "ARIA256-CBC-SHA384", "ARIA256-GCM-SHA384",
+    "CAMELLIA128-GCM-SHA256", "CAMELLIA128-SHA", "CAMELLIA128-SHA256",
+    "CAMELLIA256-GCM-SHA384", "CAMELLIA256-SHA", "CAMELLIA256-SHA256",
+    "DES-CBC3-SHA", "IDEA-CBC-SHA", "NULL-MD5", "NULL-SHA", "NULL-SHA256",
+    "RC4-MD5", "RC4-SHA", "SEED-SHA", "SM4-CCM-SM3", "SM4-GCM-SM3",
+)
+_STATIC_RSA = re.compile(
+    r"(?<![A-Za-z0-9_-])("
+    + "|".join(re.escape(s) for s in sorted(STATIC_RSA_SUITES, key=len, reverse=True))
+    + r"|kRSA|TLS_RSA_WITH_[A-Z0-9_]+)(?![A-Za-z0-9_-])")
+
+
+def _cipher_setting_name(line: str) -> str:
+    setting = _TLS_CIPHER_SETTING.search(line) or _HAPROXY_CIPHERS.search(line)
+    return " ".join(setting.group(0).replace("=", " ").split()) if setting else ""
+
+
+def static_rsa_positions(line: str) -> list[tuple[str, int]]:
+    """(suite, position) for each RSA-key-exchange suite this cipher-suite setting
+    enables. A suite struck out with `!` or `-` is not enabled."""
+    if line.lstrip().startswith(_COMMENT_START) or not _cipher_setting(line):
+        return []
+    return [(m.group(1), m.start()) for m in _STATIC_RSA.finditer(line)
+            if not (m.start() > 0 and line[m.start() - 1] in "!-")]
+
+
+def scan_static_rsa_kex(line: str) -> list[dict[str, Any]]:
+    """RSA key exchange enabled by this cipher-suite setting, as one finding per line."""
+    suites: list[str] = []
+    for suite, _ in static_rsa_positions(line):
+        if suite not in suites:
+            suites.append(suite)
+    if not suites:
+        return []
+    return [{
+        "family": "RSA",
+        "key_exchange": "RSA",
+        "suites": suites,
+        "setting": _cipher_setting_name(line),
+        "basis": "configured_cipher_suite",
+        "description": (f"{', '.join(suites)}: RSA key exchange (static RSA). The session "
+                        f"key is sent encrypted to the server's RSA key, so there is no "
+                        f"forward secrecy and a recorded session opens to whoever later "
+                        f"recovers that key, by a quantum computer included. Which suite "
+                        f"a connection uses is chosen with the client and is not stated "
+                        f"by this line."),
+    }]
 
 # -- A classical group offered on its own ------------------------------------------------
 #
@@ -835,6 +935,9 @@ def tls_termination(scan_result: dict[str, Any]) -> dict[str, Any] | None:
     for group in scan_result.get("tls_group_findings") or []:
         places.add((group["path"], group["line"], "configured_group"))
         marked.append(group)
+    for item in scan_result.get("static_rsa_kex_findings") or []:
+        places.add((item["path"], item["line"], "configured_cipher_suite"))
+        marked.append(item)
     if not places:
         return None
     for item in marked:

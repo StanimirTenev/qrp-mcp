@@ -88,7 +88,7 @@ _PRIMITIVE_BY_FAMILY = {
 # and an excerpt -- masked by default -- cannot carry them.
 _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versions",
                     "post_quantum", "default_applied", "product", "fragmentation",
-                    "fragmentation_default", "udp_setting", "udp_size")
+                    "fragmentation_default", "udp_setting", "udp_size", "included_by")
 _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 
 
@@ -485,6 +485,36 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             ]},
         }
         if all(g.get("in_test_code") for g in group):
+            component["scope"] = "excluded"
+        components.append(component)
+
+    # RSA key exchange enabled by a cipher-suite setting (ZA-OPRAVYANE row 43): one
+    # component, whichever suites name it; the suites travel as a property.
+    static_rsa = scan_result["evidence"].get("static_rsa_kex", [])
+    if static_rsa:
+        suites: list[str] = []
+        for item in static_rsa:
+            suites.extend(s for s in item["suites"] if s not in suites)
+        component = {
+            "type": "cryptographic-asset",
+            "bom-ref": _ref("tls-kex", "RSA-static"),
+            "name": "RSA key exchange (static RSA cipher suites)",
+            "cryptoProperties": {"assetType": "algorithm",
+                                 "algorithmProperties": {"primitive": "pke"}},
+            "properties": [
+                {"name": f"{NS}basis", "value": "configured_cipher_suite"},
+                {"name": f"{NS}family", "value": "RSA"},
+                {"name": f"{NS}key_exchange", "value": "RSA"},
+                {"name": f"{NS}suites", "value": ", ".join(suites)},
+                {"name": f"{NS}tls_termination", "value": TLS_SETTING_NOTE},
+            ],
+            "evidence": {"occurrences": [
+                {"location": g["path"], "line": g["line"],
+                 "additionalContext": _context(g)}
+                for g in static_rsa
+            ]},
+        }
+        if all(g.get("in_test_code") for g in static_rsa):
             component["scope"] = "excluded"
         components.append(component)
 

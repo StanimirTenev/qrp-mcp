@@ -12,7 +12,8 @@ from typing import Any
 from . import aws_tls, dnssec, ike, opcua
 from .classifier import _PQC_SCHEMES
 from .assets import (is_manifest, pinned_versions, scan_manifest, scan_openssl_fips,
-                     scan_protocols, scan_ssh_kex, scan_tls_groups)
+                     scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
+                     static_rsa_positions)
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
                            scan_certificate_file, small_scalar_keys)
 
@@ -1631,6 +1632,21 @@ def scan_source_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
                 "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
             })
+        # A suite whose OpenSSL name carries no key-exchange word is RSA key exchange
+        # (AES256-SHA is TLS_RSA_WITH_AES_256_CBC_SHA); see assets.STATIC_RSA_SUITES.
+        for suite, pos in static_rsa_positions(line):
+            if "RSA" in seen_on_line or _in_blob(pos, blobs) or _in_spans(pos, spans):
+                continue
+            seen_on_line.add("RSA")
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": "RSA",
+                "description": f"RSA key exchange named by the cipher suite {suite}",
+                "excerpt": line.strip()[:200],
+                "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
+                "in_test_code": in_test_code(rel_path),
+            })
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
             findings.append({
                 "path": rel_path,
@@ -1794,6 +1810,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     dependency_findings: list[dict[str, Any]] = []
     # Classical TLS groups offered on their own beside the rest; see assets.scan_tls_groups.
     tls_group_findings: list[dict[str, Any]] = []
+    # RSA key exchange enabled in a cipher-suite setting; see assets.scan_static_rsa_kex.
+    static_rsa_findings: list[dict[str, Any]] = []
     # The same for SSH: classical KexAlgorithms offered beside a hybrid; see assets.scan_ssh_kex.
     ssh_kex_findings: list[dict[str, Any]] = []
     # EC public keys whose private scalar is small enough to read off; see
@@ -1910,6 +1928,11 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 group["line"] = number
                 group["in_test_code"] = in_test_code(rel_path)
                 tls_group_findings.append(group)
+            for item in scan_static_rsa_kex(text_line):
+                item["path"] = rel_path
+                item["line"] = number
+                item["in_test_code"] = in_test_code(rel_path)
+                static_rsa_findings.append(item)
             for kex in scan_ssh_kex(text_line):
                 kex["path"] = rel_path
                 kex["line"] = number
@@ -2074,6 +2097,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         "protocol_findings": protocol_findings,
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,
+        "static_rsa_kex_findings": static_rsa_findings,
         "ssh_kex_findings": ssh_kex_findings,
         "weak_key_findings": weak_key_findings,
         "fips_provider_findings": fips_findings,
