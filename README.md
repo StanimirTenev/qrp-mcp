@@ -320,6 +320,14 @@ From 0.32.0 an EC key's **curve is named** from its named-curve identifier — P
 secp256k1 (`1.3.132.0.10`) from SEC 2 v2.0 — as `curve` and `key_size` on the EC finding. Before,
 the curve identifier was swallowed by `id-ecPublicKey`, and a P-384 key read as "EC".
 
+From 0.33.0 an RSA key's **size** is read the same way, from its public key: the modulus in a
+SubjectPublicKeyInfo whose algorithm is `rsaEncryption` (RFC 3279 §2.3.1, RFC 8017 A.1.1) and in
+an `RSA PUBLIC KEY` block, as `key_size` on the RSA finding, so it reaches `algorithm_key_sizes`
+and the CBOM. Before, a certificate's RSA key was named and never sized. An issuer's RSA
+signature on a certificate whose own key is EC gets no size — the issuer's key is not in it — and
+a private key is not read for its size. On certbot the smallest RSA size becomes 512 bits (test
+certificates in `acme/…/testdata`, checked with `openssl x509 -text`); on OpenSSH nothing moves.
+
 And **a private key recoverable from its public key is a finding of its own**, under
 `evidence.weak_keys` ("private key recoverable"), with the curve and the scalar: every
 uncompressed EC public point the scan can locate is compared with k·G for every k ≤ 256. The
@@ -663,7 +671,7 @@ configuration and nowhere else:
 
 `basis` is `configured_group` for a setting that chooses key-exchange groups,
 `configured_protocol` for a pinned version and, from 0.32.0, `configured_cipher_suite` for a
-setting that chooses cipher suites. `null` when the tree configures no TLS; SSH configuration is
+setting that chooses cipher suites; from 0.33.0 `configured_listener` for an HAProxy `bind … ssl`. `null` when the tree configures no TLS; SSH configuration is
 not counted here. On certbot: 39 places (22 protocol pins, 16 cipher-suite settings, 1 group
 setting; 23 before 0.32.0); on OpenSSH: none. The statement stays out of the CBOM, like
 `files_read`.
@@ -714,6 +722,63 @@ cipher suite. Of the other terminators, Envoy (`tls_minimum_protocol_version: TL
 `curvePreferences` list over several lines) and **Caddy** (a `Caddyfile` has no extension and is
 not read; `protocols tls1.2`, `curves x25519` in it are not recognised) are not, tested on
 22 Oct 2026.
+
+**From 0.33.0**, after a local probe of 22 Oct 2026 that put a network scan of three TLS
+endpoints beside a scan of the repository that configures them, five things that probe showed
+the code scan missing:
+
+- **An HAProxy listener that terminates TLS is a place.** `bind :8443 ssl crt edge.pem` is a
+  protocol asset with `basis: configured_listener` and is in `configured_in`, and it names what
+  neither its line nor the file's `ssl-default-bind-*` sets — `library_defaults: ["protocol
+  versions", "TLS 1.2 cipher list", "TLS 1.3 cipher suites", "groups"]`, as many of them as are
+  absent. There HAProxy's and the TLS library's defaults apply, and which they are depends on the
+  versions that run, which the file does not say; the one default stated is HAProxy 3.2's own
+  manual's (`ssl-min-ver`: "The default value is TLSv1.2"), named as that. The probe's edge
+  listener said nothing in 0.32.0 and took TLS 1.2 with 13 suites on the wire.
+- **RSA key exchange is named.** OpenSSL calls TLS_RSA_WITH_AES_256_CBC_SHA `AES256-SHA`: no
+  word in the name says RSA, so `SSLCipherSuite HIGH:!aNULL:AES256-SHA:DES-CBC3-SHA` gave 3DES and
+  nothing else. On a cipher-suite setting the 30 `TLS_RSA_WITH_*` names of `openssl-ciphers(1)`
+  (OpenSSL 3.5), the `kRSA` keyword and the IANA spelling are now `evidence.static_rsa_kex` —
+  RSA key exchange: no forward secrecy, and a recorded session opens to whoever later recovers
+  the server's RSA key — with RSA on the line and a CBOM component `RSA key exchange (static RSA
+  cipher suites)`. `ECDHE-RSA-…` stays RSA by authentication only; a suite struck out with `!` or
+  `-`, a comment, a C constant and a lower-case strongSwan proposal are not counted. On certbot: 2
+  lines (an Apache options file in the integration-test assets and a test vhost).
+- **`SSLProtocol all` enables what it does not strike out.** mod_ssl's manual (2.4): `all` is
+  `+SSLv3 +TLSv1 +TLSv1.1 +TLSv1.2 +TLSv1.3` with OpenSSL 1.0.1 and later (TLSv1.3 with 1.1.1,
+  SSLv3 not where OpenSSL was built with `no-ssl3`). So `SSLProtocol all -SSLv3`, which 0.32.0
+  reported only as "SSLv3 is forbidden here", now also gives TLSv1.0 to TLSv1.3, each with
+  `included_by: "all"`, the two old ones `deprecated`. Whether the TLS library still allows them
+  at run time is not in the line. On certbot: 60 protocol assets more (TLS places 39 → 42).
+- **A backend whose certificate is not verified.** HAProxy `verify none` on a `server` or
+  `default-server` line, its global `ssl-server-verify none`, and nginx `proxy_ssl_verify off`
+  are protocol assets with `peer_verification: "off"` (`basis: configured_verification`): the hop
+  is encrypted and not authenticated, and it is the one thing a scan from outside cannot see.
+  They are not termination places. `verify` on a `bind` line is the client-certificate check and
+  is left alone. ⚠️ nginx's default is also off (ngx_http_proxy_module: "Default:
+  proxy_ssl_verify off"); a file without the line is not reported, and that is a boundary.
+- **A hybrid group beside the image that has to negotiate it.** `evidence.library_support`: for
+  each `image:` line (compose, Kubernetes) naming a TLS server image — nginx, haproxy, httpd,
+  traefik, caddy, envoy, openresty — in a tree that configures a hybrid group (the IANA TLS
+  Supported Groups names: X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024, the ML-KEM-512
+  drafts, X25519Kyber768Draft00 …), whether that image can negotiate it. `support:
+  "not_supported"` only where every step was read at a source: OpenSSL added the three RFC 10024
+  hybrids in 3.5.0 (`CHANGES.md`), and `nginx:1.24.0` is docker-nginx's Debian image, `FROM
+  debian:bullseye-slim`, whose openssl is 1.1.1w. That is the one image in the table; every other
+  one, an `-alpine` tag included, is `"not_established"`, and says so. A compose service is joined
+  to the configuration it mounts from the tree (`serves`, `serves_group_places`); without a mount
+  the pin and the groups are named side by side, not joined. In the probe the repository set
+  X25519MLKEM768 for a service that ops ran on nginx:1.24.0 with a classical hotfix mounted
+  instead; nginx refused the repository's configuration. A `Dockerfile` is not a file type this
+  scanner reads, so `FROM nginx:1.24.0` is not seen, and a package pin is not read for this. The
+  places and the mounts are not part of the finding's identity in `closure`; in the CBOM it is a
+  `container` component. On OpenSSH and certbot: none.
+
+The same probe said that two comments were counted as uses — `# … classical X25519 as fallback.`
+above HAProxy's curves line, and `# … hybrid ML-KEM group preferred.` in an nginx file whose
+server did not offer ML-KEM on the wire. Reproduced against 0.32.0, that is not so here: both are
+`evidence_kind: comment`, outside `detected_algorithms` and the TLS places, and `[comment]` in the
+CBOM (a test now pins it). The document that carried them unmarked was qrp-dora's.
 
 The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
 verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
@@ -1153,6 +1218,11 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
   `edns-udp-size`, 1232 bytes when absent (BIND 9 ARM). Even there the size is reported beside the
   algorithm, not compared with the signed answer: how large an answer gets depends on the zone,
   and the effective size on the path can be lower than the configured one.
+- **What a TLS library defaults to is not stated** (from 0.33.0 the absence is): an HAProxy
+  listener without `ssl-min-ver` or a cipher list says the defaults apply, not which. nginx's
+  `proxy_ssl_verify` is off by default and only an explicit `off` is reported. Which TLS library
+  an image carries is known for one image (`nginx:1.24.0`); a `Dockerfile` is not read, so a
+  `FROM` pin is not joined to anything.
 - **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
   scope by design.** This tool reports what a cryptographically relevant quantum computer would
   break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,
