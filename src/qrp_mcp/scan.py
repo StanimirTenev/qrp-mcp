@@ -10,7 +10,7 @@ from typing import Any
 
 from . import (__version__, assets, aws_tls, certificates, coverage, detectors, dnssec, ike,
                opcua, profiles, remediation)
-from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint
+from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint, summarize
 
 
 def _version() -> str:
@@ -87,6 +87,12 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         if item.get("fips_provider_configured_in"):
             fips.setdefault(item["algorithm"], set()).update(item["fips_provider_configured_in"])
     detected_by_name = dict(zip(named, scan_result["detected_algorithms"]))
+    # What the evidence says about a finding that the finding alone does not: a TLS
+    # place the pinned image cannot negotiate. Joined here, where the evidence is, and
+    # the summary counted again with it.
+    notes, set_aside = _what_the_evidence_adds(scan_result, response.findings,
+                                               detected_by_name)
+    summary = summarize(response.findings, set_aside)
 
     coverage_block = coverage.build(
         repo_path=repo_path,
@@ -184,12 +190,13 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         "algorithm_key_sizes_observed": scan_result.get("algorithm_key_sizes_observed", {}),
         # A replacement travels with the finding it is for, and only where one is due;
         # a suggestion, never an action.
-        "findings": [_with_providers(_with_replacement(f.model_dump(), roles, profile),
-                                     providers, detected_by_name, pins, fips)
+        "findings": [{**_with_providers(_with_replacement(f.model_dump(), roles, profile),
+                                        providers, detected_by_name, pins, fips),
+                      **notes.get(f.algorithm_family, {})}
                      for f in response.findings],
         # Whose rules the replacements follow; NIST unless asked.
         "replacement_profile": profile,
-        "summary": response.summary.model_dump(),
+        "summary": summary.model_dump(),
         "evidence": {
             "source_code": scan_result["source_code_findings"],
             "ci_pipeline": scan_result["ci_pipeline_findings"],
@@ -221,6 +228,50 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             "fips_provider": scan_result.get("fips_provider_findings", []),
         },
     }
+
+
+def _in_use(scan_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Occurrences that are neither a comment nor a ban, by the detector's family name."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    for item in scan_result["source_code_findings"] + scan_result["iac_findings"]:
+        if item.get("evidence_kind") not in {"comment", "ban"} and item.get("algorithm"):
+            out.setdefault(item["algorithm"], []).append(item)
+    return out
+
+
+def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
+                            detected_by_name: dict[str, str]
+                            ) -> tuple[dict[str, dict[str, Any]], set[str]]:
+    """Fields to add to findings, by family, and the families the summary sets aside.
+
+    A post-quantum family whose every use is a TLS place that a pinned image cannot
+    negotiate (`evidence.library_support`, not_negotiable) is named with the image and
+    not counted as ready (ZA-OPRAVYANE row 55). Only where every use is such a place:
+    the image limits the place, not ML-KEM used by the code beside it."""
+    family_of = {detected_by_name[f.raw_value]: f.algorithm_family for f in findings
+                 if f.raw_value in detected_by_name}
+    pqc = {f.algorithm_family for f in findings
+           if f.classification in ("pqc_ready", "pqc_pre_standard")}
+    uses = _in_use(scan_result)
+    notes: dict[str, dict[str, Any]] = {}
+    set_aside: set[str] = set()
+
+    unable: dict[str, list[str]] = {}
+    for item in scan_result.get("library_support_findings") or []:
+        if item.get("not_negotiable"):
+            for place in item.get("group_places") or []:
+                unable.setdefault(place, []).append(
+                    f"{item['image']} ({item['path']}:{item['line']})")
+    for name, items in uses.items():
+        family = family_of.get(name)
+        if family not in pqc or not unable:
+            continue
+        places = {f"{i['path']}:{i['line']}" for i in items}
+        if places <= set(unable):
+            notes.setdefault(family, {})["not_negotiable_by"] = sorted(
+                {image for place in places for image in unable[place]})
+            set_aside.add(family)
+    return notes, set_aside
 
 
 def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:

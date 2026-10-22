@@ -877,10 +877,16 @@ def extract_findings(request: FingerprintRequest) -> list[Finding]:
     return findings
 
 
-def summarize(findings: list[Finding]) -> FingerprintSummary:
+def summarize(findings: list[Finding],
+              set_aside: frozenset[str] | set[str] = frozenset()) -> FingerprintSummary:
+    """`set_aside` names families whose findings stay in the list but are not counted
+    towards what reassures: post-quantum or a mechanism the scan has shown does not hold
+    where it was found. Never towards what warns -- a vulnerable count is not lowered."""
     vulnerable = sum(1 for f in findings if f.quantum_vulnerable)
-    pqc = sum(1 for f in findings if f.classification == "pqc_ready")
-    pre_standard = sum(1 for f in findings if f.classification == "pqc_pre_standard")
+    pqc = sum(1 for f in findings if f.classification == "pqc_ready"
+              and f.algorithm_family not in set_aside)
+    pre_standard = sum(1 for f in findings if f.classification == "pqc_pre_standard"
+                       and f.algorithm_family not in set_aside)
     # deprecated_weak alone also holds MD5; the post-quantum status is what tells a
     # broken post-quantum scheme from a broken hash.
     broken_pqc = sum(1 for f in findings if f.classification == "deprecated_weak"
@@ -899,7 +905,8 @@ def summarize(findings: list[Finding]) -> FingerprintSummary:
     # and would otherwise read here as "classical_only" -- the strongest possible
     # way of saying "you have not started" about someone who had finished.
     mechanisms = sum(1 for f in findings
-                     if f.classification == "quantum_resistant_mechanism")
+                     if f.classification == "quantum_resistant_mechanism"
+                     and f.algorithm_family not in set_aside)
     # A broken post-quantum scheme comes first, whatever sits beside it. Until 0.28.0
     # a file holding only SIKE read "no_quantum_vulnerable_detected" -- the most
     # reassuring thing this summary can say, about the one scheme in the table with

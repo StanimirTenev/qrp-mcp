@@ -383,6 +383,12 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                           + ", ".join(finding["fips_provider_configured_in"])
                           + "; whether the process running this code loads that "
                             "configuration is not in the files")})
+        # A pinned image that cannot negotiate the group at every place it is used: the
+        # scan's summary does not count it as ready, and the component says why.
+        if finding.get("not_negotiable_by"):
+            component["properties"].append({
+                "name": f"{NS}not_negotiable_by",
+                "value": json.dumps(finding["not_negotiable_by"], ensure_ascii=False)})
         occurrences = _occurrences(located, family, family_of)
         if occurrences:
             component["evidence"] = {"occurrences": occurrences}
