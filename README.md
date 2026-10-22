@@ -123,6 +123,28 @@ and JOSE names `"RSASSA-PKCS1-v1_5"` and `"RSA-PSS"`; Mbed TLS's `mbedtls_rsa_*`
 Go's `*rsa.PublicKey`; .NET's `RSASignaturePadding.Pss`; and a JWK's `"kty": "RSA"`. These are
 case-sensitive: `rsaKey` is a variable, `RSAKey` is a type.
 
+From 0.32.0 also OpenSSL's RSA signing calls — `RSA_sign`, `RSA_verify`, their
+`_ASN1_OCTET_STRING` forms, `RSA_verify_PKCS1_PSS(_mgf1)`, `RSA_padding_add/check_PKCS1_PSS`,
+`_PKCS1_type_1`, `_X931` and `RSA_PKCS1_PSS_PADDING` (names from `include/openssl/rsa.h`), with
+role `signature`. A secure-boot verifier is often one `RSA_verify` against a key fused at
+manufacture, and that line scanned as nothing (raised by Ken Camp).
+
+**DNSSEC** (from 0.32.0, raised by Georgi Ivanov). The algorithm a zone is signed with, by its
+IANA mnemonic as BIND (`dnssec-policy … algorithm rsasha256 2048`, `dnssec-keygen -a RSASHA256 -b
+2048`), Knot (`algorithm: rsasha512`) and PowerDNS (`default-ksk-algorithm=rsasha1-nsec3-sha1`)
+write it: `RSAMD5`, `RSASHA1`, `RSASHA1-NSEC3-SHA1`, `RSASHA256`, `RSASHA512` → RSA, with the size
+where the line gives one; `DSA-NSEC3-SHA1` → DSA; `ECDSAP256SHA256`, `ECDSAP384SHA384` → ECDSA with
+`curve` P-256 / P-384; `ED25519`, `ED448`, `MLDSA44` by their own rules. And by number (IANA
+DNSSEC Algorithm Numbers, read 22 Oct 2026), only in the shape of a record — `DNSKEY`/`CDNSKEY`
+`flags 3 alg`, `DS`/`CDS` `tag alg digest-type digest`, `RRSIG type alg`, and BIND's
+`static-key`/`initial-key`/`static-ds`/`initial-ds` trust anchors: 1, 5, 7, 8, 10 RSA; 2 DH;
+3, 6 DSA; 13, 14 ECDSA with the curve; 15 Ed25519; 16 Ed448; 17 SM2; 18 ML-DSA. A bare `8`
+is a number, not RSA. ECC-GOST (12, 23) has no family here and is left unnamed. `.zone` files are
+read. Not read: PowerDNS's `ecdsa256`/`ecdsa384` as DNSSEC names — they are found as ECDSA by the
+ordinary rule, without a curve, because the same word is a variable name in OpenSSH; a bare `DSA`
+(algorithm 3) as a mnemonic; the `.private` files `dnssec-keygen` writes; zone files saved under
+other names (`db.example`).
+
 Where they came from, and what they did. An independent labeller read 34,967 chunks of
 185 public repositories; 45 of them were set aside before labelling and not read while the rules
 were written. Chunks where the labeller sees an algorithm named in the text and the scanner reports
@@ -235,6 +257,27 @@ An unknown provider is **absent, never guessed**: a header such as `<openssl/evp
 OpenSSL, BoringSSL and LibreSSL and names no one. What is named is the API, not the build — a fork
 that keeps the API reads the same — and **nothing here claims CMVP or FIPS 140-3 validation**.
 
+From 0.32.0 (raised by Paul J. Lilly, extending a point Solahuddin Shamsuddin made): Python's
+`cryptography` is a provider too (`pyca/cryptography`, by `from cryptography.hazmat…`), and **a
+version pinned in a manifest is joined to the provider whose package it is**: `cryptography==44.0.0`
+in requirements.txt gives every line that imports it `provider_pin: {"package": "cryptography",
+"version": "44.0.0", "pinned_in": "requirements.txt:1"}`, and the finding `provider_pins`. Read
+from `requirements.txt` (`==` only) and `go.mod`, from the nearest manifest above the file, for
+pyca/cryptography, Cloudflare CIRCL and pqcrypto. A range (`>=42`) is a request, not a version, and
+gives nothing; two pins that disagree at the same level give nothing. `pyproject.toml`, `Pipfile`
+and the lockfiles are not read for this. "Pinned" is what the manifest asks for, not what is
+installed.
+
+And **OpenSSL's FIPS provider, activated in `openssl.cnf`**, is `evidence.fips_provider`, one item
+per line that brings it in, from OpenSSL's `config(5)` and `fips_module(7)`: `.include
+…/fipsmodule.cnf`, `fips = <section>` in the section `providers =` names (when that section's
+`activate` is yes/on/true/1, or the section is in the included file), and `default_properties =
+fips=yes` or the deprecated `fips_mode = yes`. Each says "FIPS provider activated in
+openssl.cnf:8 … Activated in configuration, not validated". Every finding whose provider is
+OpenSSL 3 then carries `fips_provider_configured_in` — the same ML-KEM line read "OpenSSL 3"
+whether it ran through the FIPS provider or the default one. Which process loads which
+configuration file is not in the files, and is not claimed; neither is validation.
+
 **Isogeny key exchange in no standardisation process: MIKE, CSIDH, CTIDH.** Until this release
 code doing either read as having no post-quantum cryptography at all (raised by John Preuß
 Mattsson). Matched by the implementations' own identifiers — MIKE's `mike_keypair(` /
@@ -272,10 +315,39 @@ analysis put a valid RSA identifier into arbitrary bytes and got a finding, whic
 code measures. For a certificate register — issuer, validity, the device — this tool is the wrong
 instrument and says so: that data comes from a structural parser or an external inventory.
 
+From 0.32.0 an EC key's **curve is named** from its named-curve identifier — P-256
+(`1.2.840.10045.3.1.7`), P-384 (`1.3.132.0.34`), P-521 (`1.3.132.0.35`) from RFC 5480 §2.1.1.1,
+secp256k1 (`1.3.132.0.10`) from SEC 2 v2.0 — as `curve` and `key_size` on the EC finding. Before,
+the curve identifier was swallowed by `id-ecPublicKey`, and a P-384 key read as "EC".
+
+And **a private key recoverable from its public key is a finding of its own**, under
+`evidence.weak_keys` ("private key recoverable"), with the curve and the scalar: every
+uncompressed EC public point the scan can locate is compared with k·G for every k ≤ 256. The
+eight keys in a post of 22 Oct 2026 all had k < 256, one of them 4·G on P-384, and before this
+release that certificate scanned exactly like one with a random key (raised by Bill Buchanan;
+the check is Israr Ahmed's). Where the point is located, without parsing X.509: a DER BIT STRING
+`00 04 X Y` of the key's curve size (SubjectPublicKeyInfo in a certificate, a public key, SEC 1
+`EC PRIVATE KEY`, PKCS#8) and OpenSSH's `nistp256/384/521` encoding (a `.pub` line, an
+`openssh-key-v1` private key file). P-256, P-384, P-521 and secp256k1; curve parameters from SEC 2
+v2.0, agreeing with RFC 5903 §3. **Not checked**: compressed points, keys inside encrypted
+containers (PKCS#12, encrypted PEM), other curves (brainpool, Ed25519 and X25519 keys), points
+quoted in source code or in a `known_hosts`/`authorized_keys` line read as configuration, and any
+scalar above 256 — the bound is the finding's, and a key with scalar 257 is not reported.
+Debian's weak OpenSSL keys and ROCA are a different family of weak key and are not checked. The
+table is built once per curve (four curves: 39 ms) and a key costs a lookup: on OpenSSH's 130 key
+and certificate files the check took 3 ms. In the CBOM each weak key is a
+`related-crypto-material` component, `EC key on P-384 with private scalar 4`.
+
 **Configuration** — `nginx.conf`, `sshd_config`, `openssl.cnf`, `swanctl.conf`, `.ini`,
 `.toml`, `.properties`, `.hcl`, `.json`, and any YAML that is not a manifest. This is where a TLS or SSH hybrid
 group is chosen: `X25519MLKEM768` and `mlkem768x25519-sha256` are almost never strings in code.
 IKE proposal syntax is read here too — `ecp384` is NIST P-384, `modp2048` is group 14.
+From 0.32.0 also `.zone` files, and the DNS size budget of a BIND configuration: `max-udp-size`
+(the largest UDP response BIND sends) and `edns-udp-size` (the buffer it advertises for responses
+it receives) are protocol assets with `protocol: "dns"`, `udp_setting` and `udp_size`. Both
+default to 1232 bytes (BIND 9 ARM); a file with a `dnssec-policy` that does not set
+`max-udp-size` gets that default as an asset with `default_applied: true`, at the
+`dnssec-policy` line.
 
 **OPC UA SecurityPolicies.** Each of the 30 SecurityPolicy URIs in the OPC Foundation profile
 database (UACore 1.05, read 7 Oct 2026) names the algorithms it rests on — RSA, ECDSA+ECDH,
@@ -332,7 +404,16 @@ because a preshared key is not ML-KEM. Whether it holds depends on the entropy o
 on out-of-band distribution, neither of which is visible in a file, and the finding says so.
 
 **CI/CD pipelines** — signing commands such as `gpg --sign`, `cosign sign`, `signtool`,
-`jarsigner`, `codesign`.
+`jarsigner`, `codesign`. From 0.32.0 also Secure Boot, kernel-module and IMA/EVM signing, each
+from its own manual: `sbsign`, `pesign -s`/`--sign`, `kmodsign`, `evmctl sign`/`ima_sign`/
+`sign_hash` and the kernel's `scripts/sign-file`; and signing commands in any `.sh` file, not
+only in the pipeline files — a pipeline often only calls the release script. A step that names
+its key (`openssl dgst -sign KEY`, `-inkey KEY`, `--key KEY`, signtool's `/f FILE`, the key
+argument of `kmodsign` and `sign-file`) carries `signing_key`: the path, `in_tree` — whether the
+scan read a key or certificate file there, from the tree's root or the script's directory — and
+the families it found in it. A path written with a variable is left alone. In the CBOM the steps
+are still only counted. Raised by Ken Camp. Whether a trust anchor can be rotated in the field is
+not in any file and is not inferred: that is the platform owner's statement.
 
 **Infrastructure as code** — Terraform and Kubernetes key algorithms, and private key material
 committed by mistake.
@@ -490,7 +571,12 @@ them.
 Where the scan named the module, an algorithm component carries `qrp:providers` (a JSON array)
 and `qrp:provider_validation`, which says that validation is not claimed and has to be checked
 against the CMVP list for the deployed version. `certificationLevel` is never written: it states
-a validation, and nothing in a file establishes one.
+a validation, and nothing in a file establishes one. From 0.32.0 the same component carries
+`qrp:provider_pins` (a JSON object, provider → "version (manifest:line)") where a manifest pins
+the provider's package, and `qrp:provider_configuration` where an `openssl.cnf` in the tree
+activates the FIPS provider for a component whose provider is OpenSSL 3. A DNS size-budget asset
+carries `qrp:udp_setting`, `qrp:udp_size` and, for BIND's default, `qrp:default_applied`; a weak
+EC key is a `related-crypto-material` component with `qrp:curve`, `qrp:scalar` and `qrp:bound`.
 
 Output is deterministic where it matters. The serial number is derived from the target, the two
 pins and a digest of what was found, so the same code over the same corpus that finds the same
@@ -575,10 +661,12 @@ configuration and nowhere else:
 }
 ```
 
-`basis` is `configured_group` for a setting that chooses key-exchange groups and
-`configured_protocol` for a pinned version. `null` when the tree configures no TLS; SSH
-configuration is not counted here. On certbot: 23 places (22 protocol pins, 1 group
-setting); on OpenSSH: none. The statement stays out of the CBOM, like `files_read`.
+`basis` is `configured_group` for a setting that chooses key-exchange groups,
+`configured_protocol` for a pinned version and, from 0.32.0, `configured_cipher_suite` for a
+setting that chooses cipher suites. `null` when the tree configures no TLS; SSH configuration is
+not counted here. On certbot: 39 places (22 protocol pins, 16 cipher-suite settings, 1 group
+setting; 23 before 0.32.0); on OpenSSH: none. The statement stays out of the CBOM, like
+`files_read`.
 
 From 0.31.0 the caveat is also beside every TLS setting, not only once per scan. Every evidence
 item at one of those places — a pinned version under `evidence.protocols`, the source, CI or IaC
@@ -597,6 +685,35 @@ component (`X25519`, `ML-KEM`) is not marked: it gathers occurrences from TLS an
 alike, so a line setting only hybrid groups is marked in the scan result and not in the CBOM. On certbot:
 54 evidence items at the 23 places; on OpenSSH: none. Nothing else changes: the same files read,
 the same evidence and findings as 0.30.0. SSH settings and commented-out lines carry nothing.
+
+From 0.32.0 that sentence is true of cipher suites as well. In 0.31.0 "every TLS setting" meant
+protocol pins and group settings; a cipher-suite line — nginx `ssl_ciphers
+ECDHE-RSA-AES128-GCM-SHA256:AES256-SHA`, HAProxy `ssl-default-bind-ciphers` — gave its ECDH and
+RSA without the pointer and was not in `configured_in` (we said so in public on 22 Oct 2026). A
+suite is negotiated where TLS terminates, like a group, so a line that **sets** cipher suites is
+now a place: nginx `*ssl_ciphers`, Apache `SSLCipherSuite`/`SSLProxyCipherSuite`, HAProxy's
+`ssl-default-bind/server-ciphers(uites)` and `ciphers`/`ciphersuites` on a `bind` or `server`
+line, OpenSSL's `CipherString`/`Ciphersuites` (and through `ssl_conf_command` /
+`SSLOpenSSLConfCmd`), `SSL_CTX_set_cipher_list`, `set_ciphersuites`, Python's `set_ciphers`,
+Envoy's `cipher_suites`, Go's `CipherSuites`, Java's `setEnabledCipherSuites`. A suite name on its
+own is not: OpenSSL's headers define every suite as a C constant, and those configure nothing.
+On certbot this adds 16 places and 50 evidence items with the pointer (104 in all); OpenSSH is
+unchanged at none. In the CBOM nothing new is marked, for the reason above: the algorithm
+components gather TLS and non-TLS lines alike.
+
+**HAProxy** (from 0.32.0, raised by Kiran Murthy: "validate runtime negotiation points such as
+load balancers"). Until then an `haproxy.cfg` with `ssl-default-bind-curves
+X25519MLKEM768:X25519` and `ssl-default-bind-options ssl-min-ver TLSv1.2` gave its algorithms and
+nothing else — no TLS place, no pin, no classical group offered alone, all three of which the same
+settings in nginx got. Now `ssl-min-ver`/`ssl-max-ver` and `ssl-default-bind/server-options` are
+read as protocol pins, and `ssl-default-bind/server-curves` and `curves` on a `bind` or `server`
+line as group settings; the names are HAProxy's own (Configuration Manual 3.5,
+`doc/configuration.txt`, read 22 Oct 2026). `ecdhe <curve>` is not read: ECDHE is in nearly every
+cipher suite. Of the other terminators, Envoy (`tls_minimum_protocol_version: TLSv1_2`,
+`ecdh_curves`, `cipher_suites`) was already read; **Traefik** (`minVersion: VersionTLS12`, a
+`curvePreferences` list over several lines) and **Caddy** (a `Caddyfile` has no extension and is
+not read; `protocols tls1.2`, `curves x25519` in it are not recognised) are not, tested on
+22 Oct 2026.
 
 The statement says the same of authentication: a Merkle Tree Certificate is issued by the CA,
 verified by the browser and often served from an edge, so an origin whose files name an ECDSA key
@@ -1030,9 +1147,12 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
 - **A size is not checked against the interface it has to fit.** A finding names the algorithm
   — ML-KEM-768, whose ciphertext is 1,088 bytes (FIPS 203), or an ML-DSA signature (FIPS 204) —
   not whether that fits the link it is configured for: an EAP identity, a single IKE message, a
-  DNSSEC answer over UDP. The ceiling of the interface is not in the file, and no ceiling is
-  claimed here. IKE fragmentation (above) is the one case read, because there the configuration
-  says whether a large message is split.
+  DNSSEC answer over UDP. For most interfaces the ceiling is not in the file, and none is claimed.
+  Two cases are read: IKE fragmentation (above), where the configuration says whether a large
+  message is split, and, from 0.32.0, DNS, where it is in the file — BIND's `max-udp-size` and
+  `edns-udp-size`, 1232 bytes when absent (BIND 9 ARM). Even there the size is reported beside the
+  algorithm, not compared with the signed answer: how large an answer gets depends on the zone,
+  and the effective size on the path can be lower than the configured one.
 - **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
   scope by design.** This tool reports what a cryptographically relevant quantum computer would
   break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,
