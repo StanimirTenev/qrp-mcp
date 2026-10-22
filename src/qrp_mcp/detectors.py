@@ -1025,6 +1025,16 @@ def _decode(raw: bytes) -> list[str]:
         return raw.decode("utf-16", errors="ignore").splitlines()
     if raw.startswith(b"\xef\xbb\xbf"):
         raw = raw[3:]
+    # UTF-16 without a byte-order mark: ASCII text puts a NUL in every pair, on the same
+    # side. Decoded as UTF-8 it read as clean and was counted as read (ZA-OPRAVYANE row 61).
+    head = raw[:4096]
+    pairs = len(head) // 2
+    if pairs >= 4:
+        odd, even = head[1::2].count(0), head[0::2].count(0)
+        if odd >= 0.9 * pairs and even == 0:
+            return raw.decode("utf-16-le", errors="ignore").splitlines()
+        if even >= 0.9 * pairs and odd == 0:
+            return raw.decode("utf-16-be", errors="ignore").splitlines()
     return raw.decode("utf-8", errors="ignore").splitlines()
 
 
