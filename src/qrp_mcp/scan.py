@@ -144,6 +144,10 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
     )
 
     _withhold_reassurance(summary, coverage_block, scan_result, response.findings)
+    # ZA-OPRAVYANE row 63: evidence.protocols said TLSv1.0 was enabled; the summary did not.
+    summary.deprecated_protocols = sorted({
+        p["version"] for p in scan_result["protocol_findings"]
+        if p.get("deprecated") and not p.get("banned") and p.get("version")})
 
     return {
         "target": detectors.display_path(str(repo_path)),

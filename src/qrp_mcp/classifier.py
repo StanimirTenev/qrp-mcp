@@ -489,6 +489,9 @@ class FingerprintSummary(BaseModel):
     # Set when a value that says nothing classical is present was withheld: what it would
     # have read, and what the scan did not read or determine. None otherwise.
     readiness_not_established: dict[str, Any] | None = None
+    # Deprecated protocol versions enabled somewhere in the tree. Not in weak_count, which
+    # counts keys and algorithms; until 0.34.0 nothing in the summary carried them.
+    deprecated_protocols: list[str] = Field(default_factory=list)
 
 
 class FingerprintResponse(BaseModel):
