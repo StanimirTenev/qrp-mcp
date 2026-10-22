@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import posixpath
 import re
 from pathlib import Path
 from typing import Any
@@ -164,6 +165,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # needs (ePrint 2026/2131). 0.25 gave these a role, but a role is put only on a
         # finding, and none of the four was one: a line of its own was invisible.
         r"\bRSA_private_encrypt\b|\bRSA_public_decrypt\b|\bRSA_padding_add_none\b|\bRSA_NO_PADDING\b|"
+        # The signing calls themselves, which a secure-boot verifier is made of: one
+        # RSA_verify against a key fused at manufacture scanned as nothing (ZA-OPRAVYANE
+        # row 34, 22.10.2026). Names from OpenSSL's include/openssl/rsa.h.
+        r"\bRSA_(?:sign|verify)(?:_ASN1_OCTET_STRING)?\b|\bRSA_verify_PKCS1_PSS(?:_mgf1)?\b|"
+        r"\bRSA_padding_(?:add|check)_(?:PKCS1_PSS(?:_mgf1)?|PKCS1_type_1|X931)\b|\bRSA_PKCS1_PSS_PADDING\b|"
         r"\bEVP_PKEY_RSA\b|\bEVP_RSA_gen\b|\bPEM_read_\w*RSA\w*|\bd2i_RSA\w*|"
         # .NET / PowerShell: a Windows estate keeps its certificate handling here.
         r"\bRSACryptoServiceProvider\b|\bRSACng\b|\bRSAOpenSsl\b|\bRSA\.Create\b|"
@@ -580,7 +586,22 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("signtool_sign", re.compile(r"\bsigntool\s+sign\b", re.IGNORECASE)),
     ("jarsigner", re.compile(r"\bjarsigner\b")),
     ("codesign", re.compile(r"\bcodesign\b")),
+    # Secure Boot, kernel modules and IMA/EVM (ZA-OPRAVYANE row 34), from each tool's
+    # manual: sbsign(1), pesign(1) `-s`/`--sign`, kmodsign(1), evmctl(1) `sign`,
+    # `ima_sign`, `sign_hash`, and the kernel's scripts/sign-file (module-signing.rst).
+    ("sbsign", re.compile(r"\bsbsign\b")),
+    ("pesign", re.compile(r"\bpesign\b.*\s(?:-s|--sign)(?=\s|$)")),
+    ("kmodsign", re.compile(r"\bkmodsign\b")),
+    ("evmctl_sign", re.compile(r"\bevmctl\b.*\s(?:ima_sign|sign_hash|sign)(?=\s|$)")),
+    ("kernel_sign_file", re.compile(r"(?:^|[\s/])sign-file\s+(?:-\w+\s+)*\w+\s+\S+\s+\S+")),
 ]
+
+# The key a signing step names, so it can be joined to a key the scan found at that path.
+# `openssl dgst -sign KEY` and `-inkey KEY`, `--key KEY` (sbsign, cosign, evmctl),
+# signtool's `/f FILE`, and the second positional argument of kmodsign and sign-file.
+_SIGNING_KEY_ARG = re.compile(
+    r"(?:\s-sign|\s-inkey|\s--key|\s/f)(?:\s+|=)([^\s;|&)]+)|"
+    r"(?:\bkmodsign|(?:^|[\s/])sign-file)\s+(?:-\w+\s+)*\w+\s+([^\s;|&)]+)")
 
 # (algorithm, description, compiled regex) for key algorithms declared in IaC syntax
 # (Terraform tls_private_key/aws_kms_key resources, cert-manager Certificate manifests) --
@@ -1612,6 +1633,31 @@ def _merge(into: list[dict[str, Any]], extra: list[dict[str, Any]],
             into.append(f)
 
 
+def _link_signing_keys(ci_findings: list[dict[str, Any]],
+                       key_files: dict[str, list[str]]) -> None:
+    """Join each signing step to the key it names, where the scan read that file.
+
+    The path is read as the step writes it, from the root of the tree and from the
+    script's own directory. A path the step names that is not in the tree is said to be
+    absent; a path written with a variable is left alone."""
+    for step in ci_findings:
+        match = _SIGNING_KEY_ARG.search(step.get("excerpt", ""))
+        if not match:
+            continue
+        written = (match.group(1) or match.group(2)).strip("\"'")
+        if not written or "$" in written or "{" in written or "%" in written:
+            continue
+        here = posixpath.dirname(step["path"])
+        candidates = [posixpath.normpath(written),
+                      posixpath.normpath(posixpath.join(here, written))]
+        found = next((c for c in candidates if c in key_files), None)
+        if found:
+            step["signing_key"] = {"path": found, "in_tree": True,
+                                   "algorithms": key_files[found]}
+        else:
+            step["signing_key"] = {"path": posixpath.normpath(written), "in_tree": False}
+
+
 def scan_ci_file(path: Path, rel_path: str,
                  lines: list[str] | None = None) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
@@ -1699,6 +1745,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # EC public keys whose private scalar is small enough to read off; see
     # certificates.small_scalar_keys.
     weak_key_findings: list[dict[str, Any]] = []
+    # Key and certificate files read, by path, with the families found in each, so a
+    # signing step can be joined to the key it names (_link_signing_keys).
+    key_files: dict[str, list[str]] = {}
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -1834,6 +1883,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             files_scanned["certificate"] += 1
             algo_findings, key_findings = scan_certificate_file(path, rel_path, raw)
             source_findings.extend(algo_findings)
+            key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
             embedded_key_findings.extend(key_findings)
             for weak in small_scalar_keys(rel_path, raw):
                 weak["in_test_code"] = in_test_code(rel_path)
@@ -1859,6 +1909,10 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             files_scanned["source"] += 1
             source_findings.extend(scan_source_file(path, rel_path, lines))
             embedded_key_findings.extend(scan_embedded_keys(rel_path, lines))
+            # A release script signs the same way a pipeline does, and the pipeline
+            # often only calls it (ZA-OPRAVYANE row 34).
+            if path.suffix.lower() == ".sh":
+                ci_findings.extend(scan_ci_file(path, rel_path, lines))
         else:
             # Configuration: the extensions above, and any YAML that is not a
             # manifest. This branch exists so that nothing can be opened and then
@@ -1919,6 +1973,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             unreadable_dirs.append(rel + "/")
         content_parts.append(f"{rel}\0{kind}")
 
+    _link_signing_keys(ci_findings, key_files)
     return {
         "files_scanned": files_scanned,
         "files_read": sorted(files_read),

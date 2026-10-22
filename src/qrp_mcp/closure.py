@@ -38,7 +38,8 @@ _LOCATION_FIELDS = ("line",)
 # line must not turn every call below it into closed + new.
 # The TLS-termination pointer is a note about the line, the same on every TLS line, and
 # absent from results written before 0.31.0.
-_CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination")
+# The signing key joined to a signing step is read from another file, like the provider.
+_CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signing_key")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

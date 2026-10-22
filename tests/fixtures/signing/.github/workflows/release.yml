@@ -1,0 +1,9 @@
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: openssl dgst -sha256 -sign keys/fw_signing.pem -out fw.sig build/fw.bin
+      - run: cosign sign --key cosign.key ghcr.io/example/agent:1.4
+      - run: sbsign --key keys/db.key --cert keys/db.crt --output grubx64.efi.signed grubx64.efi
