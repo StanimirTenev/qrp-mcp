@@ -384,7 +384,10 @@ _TLS_CONTEXT = re.compile(
     r"min_?version|max_?version|MinVersion|MaxVersion|ssl_protocols|"
     r"enabled-protocols|SSLProtocol|set_ciphers|SslProtocols|protocol_version|"
     r"PROTOCOL_TLS|SSL_CTX_set_|supported_protocols|versions\s*[:=]|"
-    r"ServerOptions|SSLContext|tls\.Config|rustls|sslVersion",
+    r"ServerOptions|SSLContext|tls\.Config|rustls|sslVersion|"
+    # HAProxy: `ssl-min-ver`/`ssl-max-ver` on a bind or server line, and the global
+    # defaults that carry them (Configuration Manual 3.5; ZA-OPRAVYANE row 30).
+    r"ssl-(?:min|max)-ver|ssl-default-(?:bind|server)-options",
     re.IGNORECASE)
 
 # SSH transport, configured the same way.
@@ -515,8 +518,25 @@ _TLS_GROUP_SETTING = re.compile(
     r"ssl_ecdh_curve|set_ecdh_curve|ecdhCurve|ecdh_curves|"
     r"(?:ssl_conf_command|SSLOpenSSLConfCmd)\s+(?:groups|curves)|"
     r"^\s*(?:groups|curves)\s*=|CurvePreferences|namedGroups|"
-    r"set1_(?:groups|curves)|supported_groups",
+    r"set1_(?:groups|curves)|supported_groups|"
+    # HAProxy's global defaults (Configuration Manual 3.5; ZA-OPRAVYANE row 30). Its
+    # `curves` keyword on a bind or server line is matched below, by the line's shape.
+    r"ssl-default-(?:bind|server)-curves",
     re.IGNORECASE)
+
+# `curves X25519:P-256` as a keyword of an HAProxy `bind` or `server` line. The word on
+# its own is prose; only on such a line is it a setting. Not `ecdhe <curve>`: ECDHE is
+# in nearly every cipher suite, and every cipher line would become a group setting.
+_HAPROXY_LINE = re.compile(r"^\s*(?:bind|server|default-server)\s")
+_HAPROXY_CURVES = re.compile(r"(?<=\s)curves(?=\s)")
+
+
+def _group_setting(line: str) -> re.Match | None:
+    """The group setting on this line, if it has one."""
+    setting = _TLS_GROUP_SETTING.search(line)
+    if setting is None and _HAPROXY_LINE.match(line):
+        setting = _HAPROXY_CURVES.search(line)
+    return setting
 
 _COMMENT_START = ("#", ";", "//", "--", "/*", "*")
 
@@ -557,7 +577,7 @@ def scan_tls_groups(line: str) -> list[dict[str, Any]]:
     """Classical groups this line offers as groups of their own in a TLS group setting."""
     if line.lstrip().startswith(_COMMENT_START):
         return []
-    setting = _TLS_GROUP_SETTING.search(line)
+    setting = _group_setting(line)
     if not setting:
         return []
     name = " ".join(setting.group(0).replace("=", " ").split())
@@ -686,7 +706,7 @@ def tls_termination(scan_result: dict[str, Any]) -> dict[str, Any] | None:
     for key in ("source_code_findings", "ci_pipeline_findings", "iac_findings"):
         for item in scan_result.get(key) or []:
             if (item.get("evidence_kind") != "comment"
-                    and _TLS_GROUP_SETTING.search(item.get("excerpt", ""))):
+                    and _group_setting(item.get("excerpt", ""))):
                 places.add((item["path"], item["line"], "configured_group"))
                 marked.append(item)
     for group in scan_result.get("tls_group_findings") or []:
