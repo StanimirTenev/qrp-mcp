@@ -183,6 +183,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # .NET / PowerShell: a Windows estate keeps its certificate handling here.
         r"\bRSACryptoServiceProvider\b|\bRSACng\b|\bRSAOpenSsl\b|\bRSA\.Create\b|"
         r"\bRSACertificateExtensions\b|\bGetRSAPublicKey\b|\bGetRSAPrivateKey\b|"
+        r"\bCngAlgorithm\.Rsa\b|"                       # CngAlgorithm.cs, row 70
         r"-KeyAlgorithm\s+[\"']?RSA",
         re.IGNORECASE,
     )),
@@ -202,7 +203,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']dsa[\"']|"     # Node, row 69
         # include/openssl/dsa.h: the signing calls and the header (row 65).
         r"\bDSA_(?:do_)?(?:sign|verify)\b|[<\"]openssl/dsa\.h[>\"]|"
-        r"\bDSACryptoServiceProvider\b|\bDSACng\b|"
+        r"\bDSACryptoServiceProvider\b|\bDSACng\b|\bDSA\.Create\b|"     # DSA.cs, row 70
         r"(?<![A-Za-z])ssh-dss(?![A-Za-z])",
         re.IGNORECASE,
     )),
@@ -290,7 +291,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"hashes\.MD5\s*\(|hashlib\.new\(\s*[\"']md5[\"']|"
         r"\bMD5(?:Init|Update|Final|Transform)\b|<md5\.h>|\bmd5\.(?:New|Sum)\b|"
         # OpenSSL's one-shot MD5() (include/openssl/md5.h) and its header (row 65).
-        r"\bMD5\(|[<\"]openssl/md5\.h[>\"]",
+        r"\bMD5\(|[<\"]openssl/md5\.h[>\"]|"
+        # .NET 5+ one-shots and the hash name a signature call takes (MD5.cs,
+        # HashAlgorithmName.cs; row 70).
+        r"\bMD5\.HashData(?:Async)?\b|\bHashAlgorithmName\.MD5\b",
         re.IGNORECASE,
     )),
     ("SHA1", "SHA-1 usage", re.compile(
@@ -302,7 +306,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bSHA1(?:Init|Update|Final|Transform)\b|<sha1\.h>|\bsha1\.(?:New|Sum)\b|"
         # OpenSSL's one-shot SHA1() (include/openssl/sha.h), row 65. Not the header:
         # sha.h declares SHA-256 and SHA-512 as well.
-        r"\bSHA1\(",
+        r"\bSHA1\(|"
+        r"\bSHA1\.HashData(?:Async)?\b|\bHashAlgorithmName\.SHA1\b",     # .NET, row 70
         re.IGNORECASE,
     )),
     ("RC4", "RC4 usage", re.compile(
@@ -391,6 +396,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # the EVP_des_ede* family (two- and three-key) must not fall in here.
         r"crypto/des\b|\bDES_set_key\w*|\bDES_ecb_encrypt\b|"
         r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b|\bdes\.NewCipher\b|"
+        r"\bDES\.Create\b|"                             # .NET DES.cs, row 70
         # Node passes the cipher name to OpenSSL: single DES in one of its modes, not
         # des-ede3-* (row 69).
         r"\bcreate(?:Cipheriv|Decipheriv|Cipher|Decipher)\(\s*[\"']des(?:-(?:cbc|ecb|cfb|cfb1|cfb8|ofb))?[\"']",
