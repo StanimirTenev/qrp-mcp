@@ -414,6 +414,15 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("3DES", "3DES named by the wolfCrypt API", re.compile(
         r"\bwc_Des3_\w+|[<\"]wolfssl/wolfcrypt/des3\.h[>\"]")),
     ("DES", "DES named by the wolfCrypt API", re.compile(r"\bwc_Des_\w+")),
+    # strongSwan's credential API names RSA and the IKE DH groups by constant: 87 of 109
+    # C files using them had no RSA finding, while KEY_ECDSA was seen in all 68 (ZA-OPRAVYANE
+    # row 80, swarm C). From credentials/keys/{public_key,private_key}.h and
+    # crypto/key_exchange.h in strongSwan; the plugins' own prefixes (gmp_rsa_*,
+    # openssl_rsa_*, botan_rsa_*, wolfssl_rsa_*) from src/libstrongswan/plugins.
+    ("RSA", "RSA named by the strongSwan API", re.compile(
+        r"\bKEY_RSA\b|\bSIGN_RSA_\w+|\bENCRYPT_RSA_\w+|\b(?:gmp|openssl|botan|wolfssl)_rsa_\w+")),
+    ("DH", "DH named by the strongSwan API", re.compile(
+        r"\bMODP_(?:\d+_(?:BIT|\d+)|CUSTOM)\b")),
     # Mbed TLS beyond mbedtls_rsa_/ecdsa/ecdh, and its PSA key types and algorithms
     # (ZA-OPRAVYANE row 73). Checked against mbedtls-3.6 include/mbedtls/{dhm,ecp,md5,sha1,
     # des,md}.h and include/psa/crypto_values.h (read 23.10.2026).
