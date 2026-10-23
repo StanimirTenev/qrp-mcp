@@ -349,6 +349,23 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"Crypto(?:dome)?\.Hash\s+import\s+[^\n#]*\bSHA1?\b|Crypto(?:dome)?\.Hash\.SHA1?\b|\bSHA1\.new\b",
         re.IGNORECASE,
     )),
+    # SHA-224, SHA3-224 and AES in ECB mode, which NIST SP 800-131A Rev. 3's initial public
+    # draft proposes to retire (ZA-OPRAVYANE row 104): none was seen at all. The calls are
+    # the libraries' own (pyca hashes.SHA224/SHA3_224 and modes.ECB, hashlib, JCA names,
+    # Node createHash, OpenSSL EVP_sha224/EVP_sha3_224/EVP_aes_*_ecb, Go sha256.Sum224,
+    # PyCryptodome AES.MODE_ECB). ECB only next to AES: `modes.ECB()` under TripleDES is 3DES.
+    ("SHA224", "SHA-224 usage", re.compile(
+        r"hashes\.SHA224\s*\(|hashlib\.sha224\b|hashlib\.new\(\s*[\"']sha224[\"']|"
+        r"MessageDigest\.getInstance\(\s*[\"']SHA-?224[\"']|createHash\(\s*[\"']sha224[\"']|"
+        r"\bEVP_sha224\b|\bsha256\.(?:New224|Sum224)\b", re.IGNORECASE)),
+    ("SHA3-224", "SHA3-224 usage", re.compile(
+        r"hashes\.SHA3_224\s*\(|hashlib\.sha3_224\b|hashlib\.new\(\s*[\"']sha3[-_]224[\"']|"
+        r"MessageDigest\.getInstance\(\s*[\"']SHA3-224[\"']|createHash\(\s*[\"']sha3-224[\"']|"
+        r"\bEVP_sha3_224\b|\bsha3\.(?:New224|Sum224)\b", re.IGNORECASE)),
+    ("AES-ECB", "AES in ECB mode", re.compile(
+        r"algorithms\.AES\w*\([^\n]*modes\.ECB\s*\(|getInstance\(\s*[\"']AES(?:_\d+)?/ECB|"
+        r"\bAES\.MODE_ECB\b|[\"']aes-?(?:128|192|256)-ecb[\"']|\bEVP_aes_(?:128|192|256)_ecb\b",
+        re.IGNORECASE)),
     ("RC4", "RC4 usage", re.compile(
         # Not a release suffix: "1.0.0-rc4" is a version. A cipher suite such as
         # "EXP-RC4-MD5" also has a dash before it, so only a digit then a dash or dot

@@ -234,6 +234,7 @@ _WEAK_TOKENS: list[tuple[str, str]] = [
 
 _SYMMETRIC_TOKENS: list[tuple[str, str]] = [
     ("CHACHA", "ChaCha20"),
+    ("AESECB", "AES-ECB"),
     ("AES", "AES"),
 ]
 
@@ -242,8 +243,22 @@ _HASH_TOKENS: list[tuple[str, str]] = [
     ("SHA384", "SHA-384"),
     ("SHA256", "SHA-256"),
     ("SHA224", "SHA-224"),
+    ("SHA3224", "SHA3-224"),
     ("SHA3", "SHA-3"),
 ]
+
+# What NIST SP 800-131A Rev. 3 proposes for these, said as a draft: the initial public draft
+# of October 2024 (nvlpubs NIST.SP.800-131Ar3.ipd, read 23.10.2026; CSRC had no final
+# revision that day). ZA-OPRAVYANE row 104.
+_R3_IPD = "NIST SP 800-131A Rev. 3, initial public draft (October 2024; not final)"
+_DRAFT_NOTES: dict[str, str] = {
+    "SHA-224": f" {_R3_IPD} proposes 224-bit hashes as deprecated through 2030 and "
+               f"disallowed thereafter.",
+    "SHA3-224": f" {_R3_IPD} proposes 224-bit hashes as deprecated through 2030 and "
+                f"disallowed thereafter.",
+    "AES-ECB": f" ECB encrypts equal blocks to equal ciphertext; {_R3_IPD} proposes "
+               f"disallowing ECB for encrypting secret data (legacy decryption allowed).",
+}
 
 _SEVERITY_RANK: dict[str, int] = {
     "info": 0,
@@ -309,6 +324,8 @@ _WORDLIKE_SUFFIX: dict[str, str] = {
     # "MIKEY" is RFC 3830, and "mtctr" is a PowerPC instruction in OpenSSL.
     "MIKE": r"(?!)",
     "MTC": r"(?!)",
+    # ECB is a block-cipher mode, not elliptic curves: "AES-ECB" read as EC (row 104).
+    "EC": r"(?![Bb])",
 }
 
 
@@ -705,7 +722,8 @@ def classify_algorithm(
                 quantum_vulnerable=False,
                 weak_key=False,
                 severity="low",
-                reason=f"{label} is symmetric; Grover halves effective strength but does not break it.",
+                reason=(f"{label} is symmetric; Grover halves effective strength but does not "
+                        f"break it.{_DRAFT_NOTES.get(label, '')}"),
             )
 
     for token, label in _HASH_TOKENS:
@@ -719,7 +737,7 @@ def classify_algorithm(
                 quantum_vulnerable=False,
                 weak_key=False,
                 severity="info",
-                reason=f"{label} hash is of acceptable strength.",
+                reason=f"{label} hash is of acceptable strength.{_DRAFT_NOTES.get(label, '')}",
             )
 
     return Finding(
