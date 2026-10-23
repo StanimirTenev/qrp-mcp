@@ -620,7 +620,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z])slh[-_]?dsa|(?<![A-Za-z])sphincs", re.IGNORECASE,
     )),
     ("Falcon", "Falcon (FN-DSA) usage", re.compile(
-        r"(?<![A-Za-z])falcon[-_]?(512|1024)|(?<![A-Za-z])fn[-_]?dsa|"
+        # The padded variant: liboqs OQS_SIG_alg_falcon_padded_512 (src/sig/sig.h), PQClean
+        # FALCONPADDED512, oqs-provider falconpadded512 (ALGORITHMS.md), row 76.
+        r"(?<![A-Za-z])falcon[-_]?(?:padded[-_]?)?(512|1024)|(?<![A-Za-z])fn[-_]?dsa|"
         r"\bwc_falcon_\w+|[<\"]wolfssl/wolfcrypt/falcon\.h[>\"]", re.IGNORECASE,
     )),
     ("Classic McEliece", "Classic McEliece usage", re.compile(
