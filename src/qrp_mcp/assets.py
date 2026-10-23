@@ -629,10 +629,31 @@ def _tls_version_name(match: re.Match) -> str:
     return f"TLSv1.{minor}"
 
 
+# FreeRADIUS writes the version bare: `tls_min_version = "1.0"` in raddb/mods-available/eap
+# ("Allowed values are "1.0", "1.1", "1.2", and "1.3"", v3.2.x, read 23.10.2026). The
+# spellings above need `TLSv1`/`TLS1.x`, so the EAP-TLS minimum gave nothing
+# (ZA-OPRAVYANE row 103).
+_BARE_TLS_VERSION_SETTING = re.compile(
+    r"^\s*tls_(?:min|max)_version\s*=\s*[\"']?1\.([0-3])[\"']?\s*(?:#.*)?$")
+
+
 def scan_protocols(line: str) -> list[dict[str, Any]]:
     """Protocol versions pinned on this line, as assets with no algorithm claim."""
     out: list[dict[str, Any]] = []
     seen: set[tuple[str, bool]] = set()
+    bare = _BARE_TLS_VERSION_SETTING.match(line)
+    if bare:
+        name = f"TLSv1.{bare.group(1)}"
+        seen.add((name, False))
+        out.append({
+            "protocol": "tls",
+            "version": name,
+            "banned": False,
+            "basis": "configured_protocol",
+            "deprecated": name in _DEPRECATED_TLS,
+            "description": (f"{name} is configured here. Which algorithms it negotiates "
+                            f"is not stated by the version."),
+        })
     for macro in _VERSION_MACRO.finditer(line):
         raw = macro.group(1)
         name = (f"SSLv{raw[3]}" if raw.startswith("SSL")
