@@ -27,6 +27,11 @@ from typing import Any
 # deployment writes them far more often than it writes .pem.
 CERTIFICATE_EXTENSIONS = {
     ".pem", ".der", ".crt", ".cer", ".cert", ".csr", ".key", ".pub", ".p12", ".pfx",
+    # Java keystores. JKS keeps its certificates in clear DER -- only the integrity check
+    # needs the password -- so their object identifiers read like a .der's
+    # (ZA-OPRAVYANE row 84: spring-security-samples' server.jks, 65 SHA1withRSA
+    # certificates, unread). A keystore keytool wrote as PKCS#12 reads like a .p12.
+    ".jks", ".keystore",
 }
 
 _PEM_BLOCK = re.compile(
