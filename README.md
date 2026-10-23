@@ -245,7 +245,9 @@ classical is), `no_quantum_vulnerable_detected`, `not_established` (one of the r
 withheld because the scan did not read or determine everything — from 0.34.0) or `unknown`. Until 0.28.0 a file holding only
 SIKE read `no_quantum_vulnerable_detected` (raised by Larisa Ghazaryan). `pqc_pre_standard_count`
 and `broken_pqc_count` sit beside `pqc_ready_count`, and `list_algorithms` answers with the same
-classification a scan gives.
+classification a scan gives. From 0.35.0 `summary.by_role` gives the same value for key
+establishment and for signatures apart, with the families in each (`none_found` for a part with
+none).
 
 **Which module implements it, where the file says.** Validation belongs to a module, not to an
 algorithm, and `@noble/post-quantum` and Go's `crypto/mlkem` used to give identical findings
@@ -308,7 +310,7 @@ is neither `pqc_ready` nor a mechanism, and stays out of `pqc_readiness`. Trust 
 `merkle` alone. Raised by Delta Li.
 
 **Certificates and keys** — `.pem`, `.der`, `.crt`, `.cer`, `.cert`, `.csr`, `.key`, `.pub`,
-`.p12`, `.pfx`. Algorithms are resolved from the object identifiers inside the DER and from
+`.p12`, `.pfx`, and from 0.35.0 the Java keystores `.jks` and `.keystore`. Algorithms are resolved from the object identifiers inside the DER and from
 PEM labels and OpenSSH key types, and private key material is reported separately. This does
 not parse X.509: it matches the object identifiers already in the classifier against the bytes.
 A file that is not a certificate but contains an identifier's bytes **is** reported, and the
@@ -675,8 +677,8 @@ configuration and nowhere else:
 `basis` is `configured_group` for a setting that chooses key-exchange groups,
 `configured_protocol` for a pinned version and, from 0.32.0, `configured_cipher_suite` for a
 setting that chooses cipher suites; from 0.33.0 `configured_listener` for an HAProxy `bind … ssl`. `null` when the tree configures no TLS; SSH configuration is
-not counted here. On certbot: 39 places (22 protocol pins, 16 cipher-suite settings, 1 group
-setting; 23 before 0.32.0); on OpenSSH: none. The statement stays out of the CBOM, like
+not counted here. On certbot: 42 places (25 protocol pins, 16 cipher-suite settings, 1 group
+setting; 23 before 0.32.0, 39 before 0.33.0; measured on 0.34.0 and 0.35.0); on OpenSSH: none. The statement stays out of the CBOM, like
 `files_read`.
 
 From 0.31.0 the caveat is also beside every TLS setting, not only once per scan. Every evidence
@@ -722,9 +724,9 @@ line as group settings; the names are HAProxy's own (Configuration Manual 3.5,
 `doc/configuration.txt`, read 22 Oct 2026). `ecdhe <curve>` is not read: ECDHE is in nearly every
 cipher suite. Of the other terminators, Envoy (`tls_minimum_protocol_version: TLSv1_2`,
 `ecdh_curves`, `cipher_suites`) was already read; **Traefik** (`minVersion: VersionTLS12`, a
-`curvePreferences` list over several lines) and **Caddy** (a `Caddyfile` has no extension and is
-not read; `protocols tls1.2`, `curves x25519` in it are not recognised) are not, tested on
-22 Oct 2026.
+`curvePreferences` list over several lines) and **Caddy** (a `Caddyfile` has no extension and was
+not read; from 0.35.0 it is, and `x25519` in it is found as X25519, but `protocols tls1.2` and
+the `curves` line are still not recognised as a TLS place) are not, tested on 22 Oct 2026.
 
 **From 0.33.0**, after a local probe of 22 Oct 2026 that put a network scan of three TLS
 endpoints beside a scan of the repository that configures them, five things that probe showed
@@ -772,8 +774,9 @@ the code scan missing:
   to the configuration it mounts from the tree (`serves`, `serves_group_places`); without a mount
   the pin and the groups are named side by side, not joined. In the probe the repository set
   X25519MLKEM768 for a service that ops ran on nginx:1.24.0 with a classical hotfix mounted
-  instead; nginx refused the repository's configuration. A `Dockerfile` is not a file type this
-  scanner reads, so `FROM nginx:1.24.0` is not seen, and a package pin is not read for this. The
+  instead; nginx refused the repository's configuration. A `Dockerfile` is read from 0.35.0 for
+  the algorithms it names, but its `FROM nginx:1.24.0` is not read as a pin, and a package pin is
+  not read for this. The
   places and the mounts are not part of the finding's identity in `closure`; in the CBOM it is a
   `container` component. On OpenSSH and certbot: none.
 
@@ -801,8 +804,8 @@ where the evidence beside it was not:
   `"1 of 2 files were not read (50.0% read); see coverage.not_examined"`. A value that warns is
   never withheld. In practice nearly every real repository has a file the scanner does not
   read (a `README.md`, a `LICENSE`), so on a real tree these four values give way to
-  `not_established`, with the would-be value beside it. The case: ML-KEM in a module and a `Caddyfile` with `curves x25519`, which is not
-  read; the summary said `pqc_ready` about the one file it had not opened (raised by Chandra
+  `not_established`, with the would-be value beside it. The case: ML-KEM in a module and a `Caddyfile` with `curves x25519`, which was not
+  read (it is from 0.35.0, and the same tree now reads `hybrid_partial`); the summary said `pqc_ready` about the one file it had not opened (raised by Chandra
   Devadass). Files removed by the directory exclusions do not withhold it; they are named in the
   verdict instead (below).
 - **The verdict names what the directory exclusions removed.** The directories left out before
@@ -863,6 +866,96 @@ evidence line: `make_key(elliptic_curve="nothere", key_type='ecdsa')` under `wit
 pytest.raises(…, match='Unsupported elliptic curve…'):` in a test is now a call, not a ban (ECDSA
 was found elsewhere anyway); its summary gains `deprecated_protocols`. No file in OpenSSH,
 certbot or wolfSSL is UTF-16 without a BOM.
+
+**From 0.35.0**, after three probes of 22 and 23 Oct 2026 — a swarm that wrote each library's
+own spellings as tests, a corpus probe with the expected inventory written before the scan,
+and points raised on LinkedIn — what is read and named grows, and the summary says more:
+
+- **Library spellings, each checked against the library's source.** OpenSSL's `DSA_sign`,
+  `DH_compute_key`, `NID_ffdhe*`, `EVP_PKEY_CTX_set_rsa_*`, `RSA_size`, `MD5()`/`SHA1()`,
+  `DES_ecb3_encrypt` and the `rsa.h`/`dsa.h`/`dh.h`/`md5.h` headers; Ed25519 glued into an
+  identifier (`ED25519_sign`, `EVP_PKEY_ED25519`, `Ed25519PrivateKey`, `ed25519_dalek`,
+  `x509.PureEd25519`); libsodium and PyNaCl (`crypto_sign_detached` is Ed25519, `crypto_box_*`,
+  `crypto_kx_*`, `crypto_scalarmult*` and `nacl.public` are X25519 — not the
+  `crypto_sign_keypair`/`crypto_sign_open` every post-quantum reference implementation also
+  exports); JCA names by a table (`KeyFactory`/`KeyAgreement`, `DH`, `XDH` — X25519 unless
+  initialised otherwise — `DES`, `DESede`, `ARCFOUR`, `SHA`, BCPQC `Falcon`) and the JCA EC types
+  (`ECGenParameterSpec`, `ECPublicKey` …); Node's `'rsa-pss'`/`'dsa'`/`'dh'` key types,
+  `crypto.publicEncrypt` and friends, `'des-cbc'`, node-forge `pki.rsa`; .NET `DSA.Create`,
+  `DES.Create`, `SHA1/MD5.HashData`, `HashAlgorithmName.SHA1`, `CngAlgorithm.Rsa`;
+  pycryptodome (`ECC`, `pkcs1_15`, `pss`, `PKCS1_OAEP`, `DES`, `DES3`, `Hash.MD5/SHA1`), python-rsa
+  `newkeys`, paramiko `DSSKey`; wolfCrypt's whole classical API (`wc_*Rsa*`, `wc_ecc_*`,
+  `wc_Dh*`, `wc_Md5*`, `wc_Sha*`, `wc_Des3_*`, `wc_falcon_*`) and headers; Mbed TLS `dhm`, `ecp`,
+  `md5`, `sha1`, `des`, `des3` and the PSA RSA/DH/ECC key types; Bouncy Castle's `RSAEngine`,
+  `DESEngine`, `RC4Engine`, `MD5Digest`, `SHA1Digest`, `FalconSigner`; ring/aws-lc-rs
+  `RsaKeyPair` and `RSA_PKCS1_*`, rustls `SignatureScheme::RSA_PSS_*`, RustCrypto `Md5`/`Sha1`,
+  `p256::`, `@noble/curves`; strongSwan's `KEY_RSA`, `SIGN_RSA_*`, `ENCRYPT_RSA_*` and `MODP_*`
+  (OpenSSH's `KEY_RSA` too); liboqs's HQC by level (`hqc_1`) and UOV as `uov_ov_*`/`OV_*`;
+  Falcon's padded variant; X-Wing (ML-KEM-768 + X25519, both halves) and CIRCL's
+  `eddilithium2/3` (with their Ed25519/Ed448 halves); the classical half of oqs-provider's
+  hybrids (`p384_mlkem768` is ECDH + ML-KEM, `p256_mldsa44` ECDSA + ML-DSA, `rsa3072_*` RSA).
+  Three deliberate differences from the probe's expectation: pycryptodome's
+  `Crypto.Protocol.DH` takes only ECC keys and is ECDH, not DH; `Crypto.Signature.DSS` signs
+  with a DSA or an ECC key, so its import names neither; Go's `tls.CurveP256` is ECDH, as the
+  TLS group table already files it.
+- **Four lookalikes are not the algorithm.** `LMS_SHARED_SECRET` (not HSS/LMS),
+  `personal_signature` (not the `personal_sign` call), Node's `createSign('SHA256')` (the key
+  decides; `createSign('RSA-SHA256')` is still RSA) and `ml_dsa.sign` (not DSA).
+- **Files that were "no extension" or "type not claimed".** `Dockerfile`, `Dockerfile-*`,
+  `*.Dockerfile`, `Containerfile`, `Kconfig*`, a `Caddyfile`, extensionless files under
+  `mods-available`/`mods-enabled`/`sites-available`/`sites-enabled` (FreeRADIUS's EAP-TLS module,
+  Debian's nginx sites), `.jsx`/`.tsx`, and the Java keystores `.jks`/`.keystore`, whose
+  certificates are clear DER. A lockfile is still read for its packages and no longer matched as
+  source: `ecdsa-sig-formatter` in a `package-lock.json` was "ECDSA usage".
+- **A TLS group offered alone is a finding of its family.** `Groups = x448:mlkem768` put X448 in
+  `evidence.tls_groups` and nowhere else, and the summary said `pqc_ready`; `ffdhe2048` likewise
+  gives DH.
+- **What a PKCS#12 file says in clear.** Its bag encryption (`pbeWithSHAAnd40BitRC2-CBC` → RC2,
+  `…3-KeyTripleDES-CBC` → 3DES, the RC4 forms) and its SHA-1 MAC are named from the unencrypted
+  wrapper; the file is still `claimed_but_not_decoded`, because the bags were not read. RC2 is a
+  new weak family.
+- **COSE algorithm identifiers** on a WebAuthn or COSE line (`{"type": "public-key", "alg": -7}`
+  is ES256), from IANA's registry. A bare `"alg": -7` stays a number.
+- **RFC 8784, two narrowings.** strongSwan's `ppk_required` defaults to `no` (its swanctl.opt),
+  so a `ppk_id` without `ppk_required = yes` is an optional PPK and protects nothing; and a family
+  is protected only when every use of it sits under a required PPK — EC in a second tunnel
+  without one was counted protected by the first.
+- **Two shapes of the denial block.** A block a condition opens (`} catch
+  (UnsupportedAlgorithmError) {`) is the code that runs then, not a list of banned names, so a
+  declaration inside it is a use; a `pytest.raises`/`assertRaises` block whose line says
+  "unsupported" is a test that the call inside is rejected, so the call is a ban.
+- **Who owns a place.** `.github/CODEOWNERS`, `CODEOWNERS` or `docs/CODEOWNERS` (GitHub's order;
+  then `.gitlab/CODEOWNERS`) is read, never matched for algorithms, and every evidence item gets
+  `owners` and `owners_source` (`.github/CODEOWNERS:3`) from the last matching line — per place,
+  not per component, because one algorithm sits in many teams' code. In the CBOM it is an
+  `[owners: … per FILE:N]` tag on the occurrence: the schema has no field for it. It is the
+  file's assumption, not a fact about who runs the code; `codeowners` says which file was used.
+- **Key establishment and signatures apart.** `summary.by_role` gives each its families and its
+  own readiness: nginx offering X25519MLKEM768 with an ECDSA certificate is `hybrid_partial` for
+  key establishment and `classical_only` for signatures, where the whole read only
+  `hybrid_partial`. RSA and EC go where their lines' roles put them and are listed under
+  `role_not_determined` where a line's role could not be read; a reassuring part is withheld
+  with the whole.
+- **de-bsi follows the 2026 documents.** TR-02102-1 2026-01 recommends FrodoKEM-976/1344 and
+  Classic McEliece beside ML-KEM, each in hybrid; the BMDS/BMI/BSI Leitlinie of 11 Sep 2026 asks
+  for the initial cryptographic inventory by the end of 2026 (§4.3) and high-risk use cases by
+  2030. A McEliece or FrodoKEM finding under `de-bsi` keeps NIST's `candidate` and says, in
+  `profile_standing`, that the BSI recommends it.
+- **A DNSSEC algorithm number with no family is named.** A `DNSKEY 257 3 253` record
+  (PRIVATEDNS) was dropped without a word; it is now a protocol asset with `dnssec_algorithm` and
+  IANA's mnemonic, no family is invented, and it withholds `pqc_ready` like an unread file.
+- **FreeRADIUS's `tls_min_version = "1.0"`** is TLS 1.0, deprecated.
+- **SHA-224, SHA3-224 and AES-ECB are seen**, with what NIST SP 800-131A Rev. 3 proposes —
+  quoted from its initial public draft of October 2024 and said as a draft (no final revision
+  on CSRC on 23 Oct 2026). Their classification is unchanged (hash, symmetric).
+
+On OpenSSH the files read, the coverage (84.77%), the findings, the readiness and the verdict are
+the same as in 0.34.0; the evidence gains 865 lines (761 Ed25519 identifiers such as `KEY_ED25519`
+and `ed25519_pk`, 85 `KEY_RSA`, 11 DH headers and `DH_compute_key`, 8 more RSA) and loses none.
+On certbot 9 more files are read (four Dockerfiles, four nginx `sites-*` files, `CODEOWNERS`):
+coverage 65.84% → 66.56%; the findings, the readiness and the 42 TLS places are the same; one
+evidence line moves from a call to a ban (`make_key(… key_type='ecdsa')` under
+`pytest.raises(… 'Unsupported elliptic curve …')`).
 
 ### A classical group offered on its own
 
@@ -1300,8 +1393,8 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
 - **What a TLS library defaults to is not stated** (from 0.33.0 the absence is): an HAProxy
   listener without `ssl-min-ver` or a cipher list says the defaults apply, not which. nginx's
   `proxy_ssl_verify` is off by default and only an explicit `off` is reported. Which TLS library
-  an image carries is known for one image (`nginx:1.24.0`); a `Dockerfile` is not read, so a
-  `FROM` pin is not joined to anything.
+  an image carries is known for one image (`nginx:1.24.0`); a `Dockerfile`'s `FROM` line is not
+  read as a pin (the file itself is read from 0.35.0), so it is not joined to anything.
 - **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
   scope by design.** This tool reports what a cryptographically relevant quantum computer would
   break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,
