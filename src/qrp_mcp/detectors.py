@@ -250,6 +250,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # invisible to this rule.
         r"asymmetric\s+import\s+[^\n#]*\bec\b|"
         r"\bec\.(?:generate_private_key|derive_private_key|SECP\w+|SECT\w+)\b|"
+        # The curve as an identifier: RustCrypto's p256/p384/p521 crates (`p256::SecretKey`)
+        # and @noble/curves' NIST exports (src/nist.ts: `export const p256`), row 75.
+        r"\bp(?:224|256|384|521)::|@noble/curves/(?:nist|p256|p384|p521)\b|"
+        r"\bimport\s*\{[^}]*\bp(?:256|384|521)\b[^}]*\}\s*from\s*[\"']@noble/curves|"
         # pycryptodome's ECC module (Crypto/PublicKey/ECC.py), row 71.
         r"Crypto(?:dome)?\.PublicKey\s+import\s+[^\n#]*\bECC\b|Crypto(?:dome)?\.PublicKey\.ECC\b|"
         r"\bECC\.(?:generate|import_key|construct)\b|"
@@ -305,6 +309,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # .NET 5+ one-shots and the hash name a signature call takes (MD5.cs,
         # HashAlgorithmName.cs; row 70).
         r"\bMD5\.HashData(?:Async)?\b|\bHashAlgorithmName\.MD5\b|"
+        r"\b[Mm]d5::|"                                   # Rust md-5 / md5 crates, row 75
         # pycryptodome (Crypto/Hash/MD5.py), row 71.
         r"Crypto(?:dome)?\.Hash\s+import\s+[^\n#]*\bMD5\b|Crypto(?:dome)?\.Hash\.MD5\b|\bMD5\.new\b",
         re.IGNORECASE,
@@ -320,6 +325,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # sha.h declares SHA-256 and SHA-512 as well.
         r"\bSHA1\(|"
         r"\bSHA1\.HashData(?:Async)?\b|\bHashAlgorithmName\.SHA1\b|"     # .NET, row 70
+        r"\b[Ss]ha1::|"                                  # RustCrypto sha1 (src/lib.rs), row 75
         # pycryptodome (Crypto/Hash/SHA1.py, and SHA.py, its old alias), row 71.
         r"Crypto(?:dome)?\.Hash\s+import\s+[^\n#]*\bSHA1?\b|Crypto(?:dome)?\.Hash\.SHA1?\b|\bSHA1\.new\b",
         re.IGNORECASE,
@@ -354,6 +360,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bOPENSSL_KEYTYPE_RSA\b|\bTPM_ALG_RSA\w*|\bKeyType\.RSA\b|"             # enum families
         r"\*?\brsa\.(?:PublicKey|PrivateKey)\b|\bParseRSA(?:Private|Public)KeyFromPEM\b|"  # Go
         r"\bRSA(?:Signature|Encryption)Padding\.\w+|"                               # .NET
+        # ring / aws-lc-rs (src/rsa/keypair.rs, verification.rs) and rustls's
+        # SignatureScheme (src/crypto/enums.rs), ZA-OPRAVYANE row 75.
+        r"\bRsaKeyPair\b|\bRSA_PKCS1_\w+|\bRSA_PSS_\w+|"
         # A JWK names its key type in `kty`; the value in any other field is a label.
         r"\bkty[\"']?\s*(?::|==|!=|=)\s*[\"']RSA[\"']|[\"']kty[\"']\)\s*(?:==|!=)\s*[\"']RSA[\"']",
     )),
@@ -533,7 +542,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # finite-field DH (row 71).
         r"Crypto(?:dome)?\.Protocol\.DH\b|Crypto(?:dome)?\.Protocol\s+import\s+[^\n#]*\bDH\b|"
         # .NET's elliptic-curve Diffie-Hellman; it was filed under finite-field DH.
-        r"\bECDiffieHellman(?:Cng|OpenSsl)?\b",
+        r"\bECDiffieHellman(?:Cng|OpenSsl)?\b|"
+        # Go's TLS curve IDs (crypto/tls/common.go): a key exchange group, as the TLS
+        # group table files curvep256 (row 75).
+        r"\btls\.CurveP(?:256|384|521)\b",
         re.IGNORECASE,
     )),
     ("Ed448", "Ed448 usage", re.compile(
