@@ -30,10 +30,15 @@ def _key():
     return ec.generate_private_key(ec.SECP256R1())
 
 
+# Since 0.35.0 a Caddyfile is read (row 79), so the file left unread here is a template
+# type no reader claims; the terminator inside it is the same.
+UNREAD = "Caddyfile.tmpl"
+
+
 def test_unread_terminator_withholds_pqc_ready(tmp_path):
     (tmp_path / "app").mkdir()
     (tmp_path / "app" / "kem.py").write_text(KEM)
-    (tmp_path / "Caddyfile").write_text(CADDY)
+    (tmp_path / UNREAD).write_text(CADDY)
     result = scan_directory(tmp_path)
     summary = result["summary"]
     assert summary["pqc_readiness"] == "not_established"
@@ -42,6 +47,15 @@ def test_unread_terminator_withholds_pqc_ready(tmp_path):
         "1 of 2 files were not read (50.0% read); see coverage.not_examined"]
     # The CBOM is built from the same result and does not restate the readiness.
     assert build(result)["components"]
+
+
+def test_the_caddyfile_itself_is_read(tmp_path):
+    # Row 52's own case, now that the Caddyfile is read: its x25519 is the classical half.
+    (tmp_path / "kem.py").write_text(KEM)
+    (tmp_path / "Caddyfile").write_text(CADDY)
+    summary = scan_directory(tmp_path)["summary"]
+    assert summary["pqc_readiness"] == "hybrid_partial"
+    assert summary["readiness_not_established"] is None
 
 
 def test_every_file_read_still_says_pqc_ready(tmp_path):
@@ -95,7 +109,7 @@ def test_the_runs_own_output_file_does_not_withhold_it(tmp_path):
 def test_the_tool_carries_it_at_every_level(tmp_path):
     from qrp_mcp import server
     (tmp_path / "kem.py").write_text(KEM)
-    (tmp_path / "Caddyfile").write_text(CADDY)
+    (tmp_path / UNREAD).write_text(CADDY)
     for level in ("full", "masked", "trimmed"):
         summary = server.scan_repo(str(tmp_path), level=level)["summary"]
         assert summary["pqc_readiness"] == "not_established"
