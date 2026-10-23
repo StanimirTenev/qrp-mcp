@@ -185,7 +185,7 @@ def _profile_block(profile: str) -> dict[str, Any]:
     p = profiles.PROFILES[profile]
     block = {"name": profile, "authority": p["authority"], "addresses": p["addresses"],
              "hybrid": p["hybrid"], "source": profiles.source(profile)}
-    for key in ("dates", "symmetric", "absent"):
+    for key in ("dates", "symmetric", "absent", "also_reads"):
         if p.get(key):
             block[key] = p[key]
     return block

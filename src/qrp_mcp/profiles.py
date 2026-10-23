@@ -103,8 +103,15 @@ PROFILES: dict[str, dict[str, Any]] = {
         "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/"
                "TG02102/BSI-TR-02102-1.pdf?__blob=publicationFile",
         "addresses": "recommendations of a BSI Technical Guideline",
-        "key_establishment": "ML-KEM-768 or ML-KEM-1024, in hybrid with a classical key "
-                             "agreement",
+        # key_establishment, dates and recommends re-read 23.10.2026 (ZA-OPRAVYANE row 101):
+        # the 2026-01 edition added FrodoKEM and Classic McEliece ("Recommendation of
+        # FrodoKEM and Classic McEliece with appropriate security parameters for PQC
+        # applications in conjunction with a previously recommended asymmetric mechanism";
+        # sections 2.4.1 and 2.4.2, Tables 2.5 and 2.6), which the reading of 27.09 missed.
+        "key_establishment": "ML-KEM-768 or ML-KEM-1024; FrodoKEM-976 or FrodoKEM-1344; or "
+                             "Classic McEliece (mceliece460896, mceliece6688128, "
+                             "mceliece8192128, or their 'f' variants) -- each in hybrid with a "
+                             "classical key agreement",
         "signatures": "ML-DSA-65 or ML-DSA-87 in the 'hedged' variant, in hybrid with a "
                       "classical signature; or a hash-based signature alone",
         "firmware": "hash-based signatures: SLH-DSA, or stateful LMS/HSS or XMSS/XMSS^MT, which "
@@ -113,7 +120,22 @@ PROFILES: dict[str, dict[str, Any]] = {
                   "only recommends the hybrid use' of quantum-safe methods. Hash-based signatures "
                   "may stand alone.",
         "dates": "Classical key agreement alone is recommended only until the end of 2031 "
-                 "(the end of 2030 for very high protection requirements).",
+                 "(the end of 2030 for very high protection requirements). The joint "
+                 "guideline of BMDS, BMI and BSI (Leitlinie zur Umstellung auf PQC, 11 "
+                 "September 2026): the initial cryptographic inventory should be complete by "
+                 "the end of 2026 (section 4.3); high-risk use cases quantum-safe by the end of "
+                 "2030 and medium-risk ones by the end of 2035 (section 3).",
+        "also_reads": "Leitlinie zur Umstellung auf PQC, joint guideline of BMDS, BMI and BSI, "
+                      "11 September 2026 (sections 3 and 4.3)",
+        # Families the document recommends that NIST did not standardise: their finding
+        # still says `candidate` (that is NIST's standing), and says this beside it.
+        "recommends": {
+            "FrodoKEM": "recommended (FrodoKEM-976, FrodoKEM-1344) in hybrid with a "
+                        "classical key agreement, TR-02102-1 2026-01 section 2.4.1",
+            "Classic McEliece": "recommended (mceliece460896, mceliece6688128, "
+                                "mceliece8192128 and the 'f' variants) in hybrid with a "
+                                "classical key agreement, TR-02102-1 2026-01 section 2.4.2",
+        },
         "weak_hash": "SHA-256, SHA-512/256, SHA-384 or SHA-512; or SHA3-256, SHA3-384 or SHA3-512 "
                      "(TR-02102-1, Table 4.1)",
         "weak_rsa": "at least 3000 bits, the guideline's 'recommended minimum bit length'",
@@ -198,3 +220,11 @@ def source(profile: str) -> dict[str, str]:
     p = PROFILES[profile]
     return {"standard": f"{p['authority']}: {p['document']}", "what": p["version"],
             "url": p["url"], "read_on": READ_ON}
+
+
+def standing(profile: str, family: str) -> dict[str, Any] | None:
+    """What the profile's document says of a family it recommends beyond NIST's standards."""
+    said = PROFILES.get(profile, {}).get("recommends", {}).get(family)
+    if not said:
+        return None
+    return {"profile": profile, "standing": said, "source": source(profile)}

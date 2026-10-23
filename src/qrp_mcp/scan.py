@@ -457,5 +457,10 @@ def _with_replacement(finding: dict[str, Any],
                                      profile)
     if suggestion is not None:
         finding["replacement"] = suggestion
+    # A family the chosen profile recommends beyond NIST's standards (ZA-OPRAVYANE row 101:
+    # Classic McEliece under de-bsi read only "candidate").
+    said = profiles.standing(profile, finding.get("algorithm_family"))
+    if said:
+        finding["profile_standing"] = said
     return finding
 
