@@ -173,6 +173,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bRSA_(?:sign|verify)(?:_ASN1_OCTET_STRING)?\b|\bRSA_verify_PKCS1_PSS(?:_mgf1)?\b|"
         r"\bRSA_padding_(?:add|check)_(?:PKCS1_PSS(?:_mgf1)?|PKCS1_type_1|X931)\b|\bRSA_PKCS1_PSS_PADDING\b|"
         r"\bEVP_PKEY_RSA\b|\bEVP_RSA_gen\b|\bPEM_read_\w*RSA\w*|\bd2i_RSA\w*|"
+        # The EVP control calls and the size accessor (include/openssl/rsa.h), and the
+        # header itself (ZA-OPRAVYANE row 65).
+        r"\bEVP_PKEY_CTX_set_rsa_\w+|\bRSA_size\s*\(|[<\"]openssl/rsa\.h[>\"]|"
         # .NET / PowerShell: a Windows estate keeps its certificate handling here.
         r"\bRSACryptoServiceProvider\b|\bRSACng\b|\bRSAOpenSsl\b|\bRSA\.Create\b|"
         r"\bRSACertificateExtensions\b|\bGetRSAPublicKey\b|\bGetRSAPrivateKey\b|"
@@ -192,6 +195,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bCKM_DSA_\w+|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
         r"\bDSA_new\b|\bDSA_generate_key\w*|\bEVP_PKEY_DSA\b|"
+        # include/openssl/dsa.h: the signing calls and the header (row 65).
+        r"\bDSA_(?:do_)?(?:sign|verify)\b|[<\"]openssl/dsa\.h[>\"]|"
         r"\bDSACryptoServiceProvider\b|\bDSACng\b|"
         r"(?<![A-Za-z])ssh-dss(?![A-Za-z])",
         re.IGNORECASE,
@@ -258,6 +263,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|(?<!EC)Diffie[- ]?Hellman|"
         r"asymmetric\s+import\s+[^\n#]*\bdh\b|\bdh\.generate_parameters\b|"
         r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
+        # include/openssl/dh.h and the RFC 7919 group NIDs (crypto/objects/objects.txt).
+        r"\bDH_compute_key(?:_padded)?\b|\bNID_ffdhe\d+\b|[<\"]openssl/dh\.h[>\"]|"
         # Ruby, the Rust openssl crate, and BouncyCastle -- the vocabulary a rival
         # reads and this scanner did not. Fix #9 of the September comparison.
         r"\bdh\.compute_key\b|\bDh::generate_params\b|\bDh::from_params\b|"
@@ -275,7 +282,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # The idioms the comparison found in the wild: pyca objects, hashlib.new,
         # the BSD-style C calls and headers, and Go used without its import line.
         r"hashes\.MD5\s*\(|hashlib\.new\(\s*[\"']md5[\"']|"
-        r"\bMD5(?:Init|Update|Final|Transform)\b|<md5\.h>|\bmd5\.(?:New|Sum)\b",
+        r"\bMD5(?:Init|Update|Final|Transform)\b|<md5\.h>|\bmd5\.(?:New|Sum)\b|"
+        # OpenSSL's one-shot MD5() (include/openssl/md5.h) and its header (row 65).
+        r"\bMD5\(|[<\"]openssl/md5\.h[>\"]",
         re.IGNORECASE,
     )),
     ("SHA1", "SHA-1 usage", re.compile(
@@ -284,7 +293,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bSHA1_Init\b|\bSHA1_Update\b|\bEVP_sha1\b|"
         r"\bSHA1CryptoServiceProvider\b|\bSHA1Managed\b|\bSHA1\.Create\b|"
         r"hashes\.SHA1\s*\(|hashlib\.new\(\s*[\"']sha-?1[\"']|"
-        r"\bSHA1(?:Init|Update|Final|Transform)\b|<sha1\.h>|\bsha1\.(?:New|Sum)\b",
+        r"\bSHA1(?:Init|Update|Final|Transform)\b|<sha1\.h>|\bsha1\.(?:New|Sum)\b|"
+        # OpenSSL's one-shot SHA1() (include/openssl/sha.h), row 65. Not the header:
+        # sha.h declares SHA-256 and SHA-512 as well.
+        r"\bSHA1\(",
         re.IGNORECASE,
     )),
     ("RC4", "RC4 usage", re.compile(
@@ -356,7 +368,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("3DES", "3DES (triple DES) usage", re.compile(
         # No word boundaries: the real spellings are glued into identifiers
         # (OPT_3DES_WRAP, OIDEncryptionAlgorithmDESEDE3CBC, NewTripleDESCipher).
-        r"3DES|DES[-_]?EDE3?|TripleDES|EVP_des_ede3\w*",
+        r"3DES|DES[-_]?EDE3?|TripleDES|EVP_des_ede3\w*|"
+        # include/openssl/des.h: three-key DES in ECB, by its own name (row 65).
+        r"\bDES_ecb3_encrypt\b",
         re.IGNORECASE,
     )),
     ("DES", "DES usage", re.compile(
