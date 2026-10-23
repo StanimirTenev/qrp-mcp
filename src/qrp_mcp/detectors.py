@@ -574,6 +574,18 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\btls\.CurveP(?:256|384|521)\b",
         re.IGNORECASE,
     )),
+    # oqs-provider names its hybrids by prefix: p384_mlkem768, bp256_mlkem512,
+    # p256_mldsa44, rsa3072_mldsa44 (ALGORITHMS.md, read 23.10.2026). The post-quantum half
+    # was seen and the classical one was not, so `Groups = p384_mlkem768` read pqc_ready
+    # (ZA-OPRAVYANE row 82). x25519_ and x448_ were already reached by their own rules.
+    ("ECDH", "ECDH half of an oqs-provider hybrid key exchange", re.compile(
+        r"(?<![A-Za-z0-9])b?p(?:256|384|512|521)_(?=e?frodo|bikel|hqc|mlkem|kyber)",
+        re.IGNORECASE)),
+    ("ECDSA", "ECDSA half of an oqs-provider composite signature", re.compile(
+        r"(?<![A-Za-z0-9])p(?:256|384|521)_(?=mldsa|falcon|mayo|snova|mqom|OV_|sphincs|slhdsa)",
+        re.IGNORECASE)),
+    ("RSA", "RSA half of an oqs-provider composite signature", re.compile(
+        r"(?<![A-Za-z0-9])rsa(?:2048|3072)_(?=mldsa|falcon|sphincs|slhdsa)", re.IGNORECASE)),
     ("Ed448", "Ed448 usage", re.compile(
         r"(?<![A-Za-z])Ed448(?![0-9])|asymmetric\s+import\s+[^\n#]*\bed448\b|"
         r"\bNID_ED448\b|\bEVP_PKEY_ED448\b|\bEd448(?:Signer|KeyPairGenerator)\b",
