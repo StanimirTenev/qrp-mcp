@@ -390,6 +390,21 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("3DES", "3DES named by the wolfCrypt API", re.compile(
         r"\bwc_Des3_\w+|[<\"]wolfssl/wolfcrypt/des3\.h[>\"]")),
     ("DES", "DES named by the wolfCrypt API", re.compile(r"\bwc_Des_\w+")),
+    # Mbed TLS beyond mbedtls_rsa_/ecdsa/ecdh, and its PSA key types and algorithms
+    # (ZA-OPRAVYANE row 73). Checked against mbedtls-3.6 include/mbedtls/{dhm,ecp,md5,sha1,
+    # des,md}.h and include/psa/crypto_values.h (read 23.10.2026).
+    ("DH", "DH named by the Mbed TLS API", re.compile(
+        r"\bmbedtls_dhm_\w+|\bMBEDTLS_DHM_\w+|\bPSA_ALG_FFDH\b|\bPSA_KEY_TYPE_DH_\w+")),
+    ("RSA", "RSA named by the PSA Crypto API", re.compile(
+        r"\bPSA_KEY_TYPE_RSA_\w+|\bPSA_ALG_RSA_\w+")),
+    ("EC", "EC named by the Mbed TLS API", re.compile(
+        r"\bmbedtls_ecp_\w+|\bMBEDTLS_ECP_DP_\w+|\bPSA_KEY_TYPE_ECC_\w+")),
+    ("MD5", "MD5 named by the Mbed TLS API", re.compile(
+        r"\bmbedtls_md5\w*|\bMBEDTLS_MD_MD5\b|\bPSA_ALG_MD5\b")),
+    ("SHA1", "SHA-1 named by the Mbed TLS API", re.compile(
+        r"\bmbedtls_sha1\w*|\bMBEDTLS_MD_SHA1\b|\bPSA_ALG_SHA_1\b")),
+    ("3DES", "3DES named by the Mbed TLS API", re.compile(r"\bmbedtls_des3_\w+")),
+    ("DES", "DES named by the Mbed TLS API", re.compile(r"\bmbedtls_des_\w+")),
     ("RSA", "RSA named as a JOSE/JWT algorithm", re.compile(
         r"[\"'](?:RS|PS)(?:256|384|512)[\"']|"
         r"\bSigningMethod(?:RS|PS)(?:256|384|512)\b|\bAlgorithm::(?:RS|PS)(?:256|384|512)\b|"
