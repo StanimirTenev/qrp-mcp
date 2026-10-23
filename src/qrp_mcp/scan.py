@@ -11,7 +11,7 @@ from typing import Any
 
 from . import (__version__, assets, aws_tls, certificates, coverage, detectors, dnssec, ike,
                opcua, profiles, remediation)
-from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint, summarize
+from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint, known_algorithms, summarize
 
 
 def _version() -> str:
@@ -94,6 +94,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
     notes, set_aside, protected = _what_the_evidence_adds(scan_result, response.findings,
                                                           detected_by_name)
     summary = summarize(response.findings, set_aside, protected)
+    summary.by_role = _by_role(response.findings, roles, detected_by_name, set_aside, protected)
 
     coverage_block = coverage.build(
         repo_path=repo_path,
@@ -149,6 +150,10 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
     )
 
     _withhold_reassurance(summary, coverage_block, scan_result, response.findings)
+    if summary.readiness_not_established:
+        for part in ("key_establishment", "signature"):
+            if summary.by_role[part]["pqc_readiness"] in _REASSURING:
+                summary.by_role[part]["pqc_readiness"] = "not_established"
     # ZA-OPRAVYANE row 63: evidence.protocols said TLSv1.0 was enabled; the summary did not.
     summary.deprecated_protocols = sorted({
         p["version"] for p in scan_result["protocol_findings"]
@@ -301,6 +306,46 @@ def _withhold_reassurance(summary: Any, block: dict[str, Any], scan_result: dict
         summary.readiness_not_established = {"would_read": summary.pqc_readiness,
                                              "because": because}
         summary.pqc_readiness = "not_established"
+
+
+def _by_role(findings: list[Any], roles: dict[str, dict[str, int]],
+             detected_by_name: dict[str, str], set_aside: set[str],
+             protected: set[str]) -> dict[str, Any]:
+    """Readiness for key establishment and for signatures apart (ZA-OPRAVYANE row 100: nginx
+    with X25519MLKEM768 and an ECDSA certificate read only `hybrid_partial`, which says
+    nothing about which half is post-quantum).
+
+    A family's role is the classifier's own `kind`. RSA and EC have none of their own; they
+    go where the lines read for them showed a role (`_read_roles`), to both where both, and
+    are named under `role_not_determined` where any line's role could not be read. The
+    readiness of each part is `summarize` over that part's findings only; `none_found` where
+    the part has none."""
+    kinds = {a["family"]: a["kind"] for a in known_algorithms()}
+    parts: dict[str, list[Any]] = {"key_establishment": [], "signature": []}
+    undetermined: set[str] = set()
+    for f in findings:
+        kind = kinds.get(f.algorithm_family)
+        if kind == "key_exchange":
+            parts["key_establishment"].append(f)
+        elif kind == "signature":
+            parts["signature"].append(f)
+        elif kind == "public_key":
+            seen = roles.get(detected_by_name.get(f.raw_value, f.algorithm_family)) or {}
+            for part in parts:
+                if seen.get(part):
+                    parts[part].append(f)
+            if seen.get("undetermined") or not (seen.get("key_establishment")
+                                                or seen.get("signature")):
+                undetermined.add(f.algorithm_family)
+    out: dict[str, Any] = {}
+    for part, chosen in parts.items():
+        out[part] = {
+            "families": sorted({f.algorithm_family for f in chosen}),
+            "pqc_readiness": (summarize(chosen, set_aside, protected).pqc_readiness
+                              if chosen else "none_found"),
+        }
+    out["role_not_determined"] = sorted(undetermined)
+    return out
 
 
 def _in_use(scan_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:

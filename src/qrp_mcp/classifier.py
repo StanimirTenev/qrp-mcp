@@ -512,6 +512,9 @@ class FingerprintSummary(BaseModel):
     # Deprecated protocol versions enabled somewhere in the tree. Not in weak_count, which
     # counts keys and algorithms; until 0.34.0 nothing in the summary carried them.
     deprecated_protocols: list[str] = Field(default_factory=list)
+    # The same readiness for key establishment and for signatures apart, with the families in
+    # each (ZA-OPRAVYANE row 100). None where the summary was not built from a scan.
+    by_role: dict[str, Any] | None = None
 
 
 class FingerprintResponse(BaseModel):
