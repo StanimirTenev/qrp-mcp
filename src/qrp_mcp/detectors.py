@@ -1878,6 +1878,25 @@ def scan_source_file(path: Path, rel_path: str,
                 "evidence_kind": ("comment" if _in_spans(pos, spans) else kind),
                 "in_test_code": in_test_code(rel_path),
             })
+        # A classical group offered in a TLS group setting is a use of its family, as
+        # evidence.tls_groups already says. Lowercase `x448` -- OpenSSL's group name --
+        # reached tls_groups and never became a finding, because the X448 rule is
+        # case-sensitive to keep Bitcoin's `x448` service flag out (ZA-OPRAVYANE row 83).
+        # Not a second family where the line already named the curve (prime256v1 is EC).
+        for group in scan_tls_groups(line):
+            family = group["family"]
+            if family in seen_on_line or (family == "ECDH" and "EC" in seen_on_line):
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} offered as the TLS group {group['group']}",
+                "excerpt": line.strip()[:200],
+                "evidence_kind": kind,
+                "in_test_code": in_test_code(rel_path),
+            })
         # DNSSEC algorithm numbers, in the shape of a DNSKEY, DS or RRSIG record.
         for family, pos, said, curve in dnssec.scan_records(line):
             if family in seen_on_line or _in_blob(pos, blobs):
