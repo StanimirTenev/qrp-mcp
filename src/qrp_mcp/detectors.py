@@ -439,10 +439,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # C files using them had no RSA finding, while KEY_ECDSA was seen in all 68 (ZA-OPRAVYANE
     # row 80, swarm C). From credentials/keys/{public_key,private_key}.h and
     # crypto/key_exchange.h in strongSwan; the plugins' own prefixes (gmp_rsa_*,
-    # openssl_rsa_*, botan_rsa_*, wolfssl_rsa_*) from src/libstrongswan/plugins.
-    ("RSA", "RSA named by the strongSwan API", re.compile(
+    # openssl_rsa_*, botan_rsa_*, wolfssl_rsa_*) from src/libstrongswan/plugins. OpenSSH's
+    # sshkey.h has the same KEY_RSA, so the description names neither project.
+    ("RSA", "RSA named by a key-type or scheme constant (KEY_RSA, SIGN_RSA_*, ...)", re.compile(
         r"\bKEY_RSA\b|\bSIGN_RSA_\w+|\bENCRYPT_RSA_\w+|\b(?:gmp|openssl|botan|wolfssl)_rsa_\w+")),
-    ("DH", "DH named by the strongSwan API", re.compile(
+    ("DH", "DH named by an IKE MODP group constant (strongSwan)", re.compile(
         r"\bMODP_(?:\d+_(?:BIT|\d+)|CUSTOM)\b")),
     # Mbed TLS beyond mbedtls_rsa_/ecdsa/ecdh, and its PSA key types and algorithms
     # (ZA-OPRAVYANE row 73). Checked against mbedtls-3.6 include/mbedtls/{dhm,ecp,md5,sha1,
