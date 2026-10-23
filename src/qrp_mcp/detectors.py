@@ -906,6 +906,35 @@ _JCA_NAME_FAMILY = {
 }
 
 
+# COSE algorithm identifiers (IANA "COSE Algorithms", algorithms.csv, read 23.10.2026), as
+# WebAuthn's pubKeyCredParams and mdoc requests write them: `{"type": "public-key",
+# "alg": -7}` is ES256. A bare `"alg": -7` is a number, so the line has to say COSE or
+# public-key as well (ZA-OPRAVYANE row 87, identity-samples CredentialManagerUtil.kt).
+COSE_ALGORITHMS = {
+    -7: ("ECDSA", "ES256"), -9: ("ECDSA", "ESP256"), -35: ("ECDSA", "ES384"),
+    -36: ("ECDSA", "ES512"), -47: ("ECDSA", "ES256K"), -51: ("ECDSA", "ESP384"),
+    -52: ("ECDSA", "ESP512"), -8: ("EdDSA", "EdDSA"), -19: ("Ed25519", "Ed25519"),
+    -53: ("Ed448", "Ed448"), -37: ("RSA", "PS256"), -38: ("RSA", "PS384"),
+    -39: ("RSA", "PS512"), -257: ("RSA", "RS256"), -258: ("RSA", "RS384"),
+    -259: ("RSA", "RS512"), -48: ("ML-DSA", "ML-DSA-44"), -49: ("ML-DSA", "ML-DSA-65"),
+    -50: ("ML-DSA", "ML-DSA-87"),
+}
+_COSE_ALG = re.compile(r"[\"']?\balg[\"']?\s*[:=]\s*(-\d{1,3})(?![0-9])")
+_COSE_CONTEXT = re.compile(r"public-key|pubKeyCredParams|\bcose", re.IGNORECASE)
+
+
+def scan_cose_algorithms(line: str) -> list[tuple[str, int, str]]:
+    """(family, position, name) for each COSE algorithm identifier on a COSE/WebAuthn line."""
+    if not _COSE_CONTEXT.search(line):
+        return []
+    out: list[tuple[str, int, str]] = []
+    for m in _COSE_ALG.finditer(line):
+        named = COSE_ALGORITHMS.get(int(m.group(1)))
+        if named:
+            out.append((named[0], m.start(), f"{named[1]} ({m.group(1)})"))
+    return out
+
+
 def scan_jca_names(line: str) -> list[tuple[str, int, str]]:
     """Families named as the algorithm of a JCA getInstance call, with the name used."""
     out: list[tuple[str, int, str]] = []
@@ -1837,6 +1866,19 @@ def scan_source_file(path: Path, rel_path: str,
                 "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
             })
 
+        for family, pos, name in scan_cose_algorithms(line):
+            if family in seen_on_line or _in_blob(pos, blobs):
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} named by the COSE algorithm identifier {name}",
+                "excerpt": line.strip()[:200],
+                "evidence_kind": "comment" if _in_spans(pos, spans) else kind,
+                "in_test_code": in_test_code(rel_path),
+            })
         for family, pos, name in scan_jca_names(line):
             if family in seen_on_line or _in_blob(pos, blobs) or _in_spans(pos, spans):
                 continue
