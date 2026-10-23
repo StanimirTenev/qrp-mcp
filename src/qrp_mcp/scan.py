@@ -244,6 +244,11 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
 # not the key, says whether the preshared key is required.
 _PPK_NOT_REQUIRED = re.compile(r"(?<![A-Za-z])ppk(?:_required)?\s*=\s*(?:no|false|never)\b",
                                re.IGNORECASE)
+# strongSwan's connection options. `ppk_required` defaults to `no` (swanctl.opt:
+# "connections.<conn>.ppk_required = no"), so a `ppk_id` without `ppk_required = yes` is an
+# optional PPK too (ZA-OPRAVYANE row 89).
+_PPK_ID = re.compile(r"(?<![A-Za-z])ppk_id\s*=", re.IGNORECASE)
+_PPK_REQUIRED = re.compile(r"(?<![A-Za-z])ppk_required\s*=\s*(?:yes|true)\b", re.IGNORECASE)
 
 
 # Values that say nothing classical is present. Each is withheld while the scan did not
@@ -307,8 +312,9 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
     the image limits the place, not ML-KEM used by the code beside it.
 
     An RFC 8784 preshared key `protects` the families used in the files that configure
-    it, and nothing in a file where it is optional or off (`ppk_required = no`):
-    ZA-OPRAVYANE rows 57 and 58. Per family, not per occurrence."""
+    it, and nothing in a file where it is optional or off (`ppk_required = no`, or a
+    strongSwan `ppk_id` without `ppk_required = yes`): ZA-OPRAVYANE rows 57, 58 and 89. A
+    family is protected only when every use of it is in such a file (row 92)."""
     family_of = {detected_by_name[f.raw_value]: f.algorithm_family for f in findings
                  if f.raw_value in detected_by_name}
     pqc = {f.algorithm_family for f in findings
@@ -361,12 +367,23 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
 
     protected: set[str] = set()
     ppk_files: dict[str, bool] = {}
+    with_id: set[str] = set()
+    required: set[str] = set()
     for item in uses.get("PPK", []):
-        optional = bool(_PPK_NOT_REQUIRED.search(item.get("excerpt") or ""))
+        excerpt = item.get("excerpt") or ""
+        optional = bool(_PPK_NOT_REQUIRED.search(excerpt))
         ppk_files[item["path"]] = ppk_files.get(item["path"], False) or optional
+        if _PPK_ID.search(excerpt):
+            with_id.add(item["path"])
+        if _PPK_REQUIRED.search(excerpt):
+            required.add(item["path"])
+    for path in with_id - required:
+        ppk_files[path] = True
     if ppk_files:
+        # Every use of the family, not any: EC in a second tunnel with no PPK is not
+        # covered by the PPK of the first (ZA-OPRAVYANE row 92).
         for name, items in uses.items():
-            if name != "PPK" and name in family_of and any(
+            if name != "PPK" and name in family_of and all(
                     ppk_files.get(i["path"]) is False for i in items):
                 protected.add(family_of[name])
         mechanism = family_of.get("PPK")
