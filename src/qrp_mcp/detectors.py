@@ -813,6 +813,83 @@ DNSSEC_CURVES = {
     "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)": ("P-384", 384),
 }
 
+
+# A cheap test before each pattern (ZA-OPRAVYANE row 114). 0.35.0 runs 95 patterns per
+# line instead of 60, and a full OpenSSH scan went from 88.7 s to 133.5 s. Most lines
+# name no algorithm at all, so each pattern gets the literal strings one of which every
+# match of it must contain, read off the regex itself -- never written by hand, because
+# a hand-written list is where a lost finding would come from. A line holding none of
+# them cannot match, and the pattern is not run. A pattern with no such string always
+# runs. The literals are lower-cased and checked against the lower-cased line, which can
+# only let more lines through; a non-ASCII line runs every pattern, because under
+# IGNORECASE `s` also matches `ſ` and `k` the Kelvin sign, which .lower() does not give.
+try:
+    from re import _constants as _sre, _parser as _sre_parse
+except ImportError:  # Python 3.10
+    import sre_constants as _sre  # type: ignore[no-redef]
+    import sre_parse as _sre_parse  # type: ignore[no-redef]
+
+_REPEATS = {_sre.MAX_REPEAT, _sre.MIN_REPEAT, getattr(_sre, "POSSESSIVE_REPEAT", None)} - {None}
+
+
+def _required_literals(items) -> frozenset[str] | None:
+    """Lower-cased strings, one of which every match of the parsed `items` contains.
+
+    None when the regex promises no literal. Every element of a sequence must match, so
+    any one element's set will do; the one with the fewest strings is kept (strings of
+    three or more characters preferred), because it is the one checked fastest.
+    """
+    best: frozenset[str] | None = None
+    run = ""
+
+    def take(found: frozenset[str] | None) -> None:
+        nonlocal best
+        def rank(s: frozenset[str]) -> tuple[int, int, int]:
+            shortest = min(map(len, s))
+            return (min(shortest, 3), -len(s), shortest)
+        if found and (best is None or rank(found) > rank(best)):
+            best = found
+
+    for op, av in items:
+        if op is _sre.LITERAL:
+            run += chr(av).lower()
+            continue
+        take(frozenset({run}) if run else None)
+        run = ""
+        if op is _sre.SUBPATTERN:
+            take(_required_literals(av[-1]))
+        elif op is _sre.BRANCH:
+            alternatives = [_required_literals(a) for a in av[1]]
+            if all(alternatives):
+                take(frozenset().union(*alternatives))
+        elif op in _REPEATS and av[0] >= 1:
+            take(_required_literals(av[2]))
+    take(frozenset({run}) if run else None)
+    if best is None:
+        return None
+    # "rsa_new" is implied by "rsa": a line without the shorter has neither.
+    return frozenset(s for s in best if not any(t != s and t in s for t in best))
+
+
+def _prefilter(pattern: re.Pattern) -> tuple[str, ...] | None:
+    try:
+        found = _required_literals(_sre_parse.parse(pattern.pattern, pattern.flags))
+    except Exception:  # unfamiliar regex internals: run the pattern on every line
+        return None
+    if not found or not all(s.isascii() for s in found):
+        return None
+    return tuple(sorted(found))
+
+
+# ALGORITHM_PATTERNS with each pattern's literals; its shape is a public count, so the
+# literals ride alongside instead of inside it.
+_FILTERED_PATTERNS = [(algorithm, description, pattern, _prefilter(pattern))
+                      for algorithm, description, pattern in ALGORITHM_PATTERNS]
+# Any literal of any pattern: most lines hold none, and then no pattern is tried at all.
+# One pattern without literals and the gate is the empty regex, which every line passes.
+_ANY_LITERAL = re.compile("" if any(f[3] is None for f in _FILTERED_PATTERNS) else
+                          "|".join(sorted({re.escape(s) for f in _FILTERED_PATTERNS for s in f[3]})))
+
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(r"\bgpg\s+(--detach-sign|--sign|-s)\b")),
@@ -1839,11 +1916,16 @@ def scan_source_file(path: Path, rel_path: str,
         experimental: list[tuple[int, int]] = []
         blobs = _blob_spans(line)
         searched = _masked(line, blobs)
-        for algorithm, description, pattern in ALGORITHM_PATTERNS:
+        lowered = searched.lower() if searched.isascii() else None
+        candidates = (_FILTERED_PATTERNS if lowered is None or _ANY_LITERAL.search(lowered)
+                      else ())
+        for algorithm, description, pattern, literals in candidates:
             if algorithm in seen_on_line:
                 continue
             # "ML-KEM (Kyber)": the line names the standard and gives its old name.
             if description == KYBER_BY_NAME_ONLY and "ML-KEM" in seen_on_line:
+                continue
+            if lowered is not None and literals and not any(s in lowered for s in literals):
                 continue
             # Every match on the line, not the first: a cipher string can both ban
             # and allow the same family -- "ALL:!ECDH:ECDHE-RSA-AES256" -- and
