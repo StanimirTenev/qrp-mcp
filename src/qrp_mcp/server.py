@@ -38,9 +38,11 @@ def scan_repo(
         Field(
             description=(
                 "Directory to scan, absolute or relative to the working directory: a "
-                "checked-out repository, a service directory, a config tree. Vendored "
-                "and build directories (.git, node_modules, vendor, dist, build, "
-                "target) are excluded and do not count toward files_present."
+                "checked-out repository, a service directory, a config tree. Vendored, "
+                "build and cache directories (.git, node_modules, vendor, venv, .venv, "
+                "dist, build, target, .tox, __pycache__, .pytest_cache, .mypy_cache, "
+                ".ruff_cache) are excluded and do not count toward files_present; the "
+                "verdict names how many files each one held, .git excepted."
             )
         ),
     ],
