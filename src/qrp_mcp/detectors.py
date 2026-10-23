@@ -590,6 +590,14 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # of the scheme. A word boundary refuses both. What does the protective work is
     # the lookbehind for a LETTER -- it is why "FXMSS" still does not match XMSS.
     ("ML-KEM", "ML-KEM usage", re.compile(r"(?<![A-Za-z])ml[-_]?kem", re.IGNORECASE)),
+    # X-Wing (draft-connolly-cfrg-xwing-kem) is ML-KEM-768 with X25519 -- CIRCL's
+    # kem/xwing/xwing.go holds an mlkem768 key and an x25519 key -- and was in no table
+    # (ZA-OPRAVYANE row 77). Both halves, as for X25519MLKEM768. Only library spellings:
+    # bare "X-Wing" is a starfighter.
+    *[(family, "X-Wing hybrid KEM (ML-KEM-768 + X25519)", re.compile(
+        r"crypto_kem_xwing\w*|kem/xwing\b|"
+        r"\bxwing\.(?:Scheme|GenerateKeyPair|DeriveKeyPair|NewKeyFromSeed|Encapsulate\w*|"
+        r"Decapsulate)\b|(?i:x-?wing[-_ ]?kem)")) for family in ("ML-KEM", "X25519")],
     # Round-3 Kyber is not ML-KEM: FIPS 203 Appendix C, a different Fujisaki-Okamoto
     # variant, and the two do not interoperate. Until 0.28.0 every spelling below was
     # reported as standardised ML-KEM (Mehrdad Daei, 5 Oct 2026). These are the names
@@ -614,8 +622,16 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("ML-DSA-44-Ed25519 experimental", EXPERIMENTAL_SSH_MLDSA, re.compile(
         r"(?<![A-Za-z])ssh-mldsa44-ed25519@openssh\.com", re.IGNORECASE)),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
-        r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])dilithium|pqcrystals[-_]?dilithium", re.IGNORECASE,
+        # CIRCL's eddilithium2/3 hybrids carry Dilithium after "ed" (row 77).
+        r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])(?:ed)?dilithium|pqcrystals[-_]?dilithium",
+        re.IGNORECASE,
     )),
+    # Their classical halves (sign/eddilithium2/eddilithium.go: "Ed25519-Dilithium2",
+    # eddilithium3: "Ed448-Dilithium3"), read 23.10.2026.
+    ("Ed25519", "Ed25519 half of the Ed25519-Dilithium2 hybrid (CIRCL eddilithium2)",
+     re.compile(r"(?<![A-Za-z])eddilithium2(?![0-9])", re.IGNORECASE)),
+    ("Ed448", "Ed448 half of the Ed448-Dilithium3 hybrid (CIRCL eddilithium3)",
+     re.compile(r"(?<![A-Za-z])eddilithium3(?![0-9])", re.IGNORECASE)),
     ("SLH-DSA", "SLH-DSA (SPHINCS+) usage", re.compile(
         r"(?<![A-Za-z])slh[-_]?dsa|(?<![A-Za-z])sphincs", re.IGNORECASE,
     )),
