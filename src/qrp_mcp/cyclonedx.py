@@ -281,6 +281,11 @@ def _context(item: dict[str, Any]) -> str:
         tags.append(f"[{item['evidence_kind']}]")
     if item.get("in_test_code"):
         tags.append("[test]")
+    # The owner of this place, by CODEOWNERS (ZA-OPRAVYANE row 94). Per occurrence, because
+    # a component is an algorithm and one algorithm sits in many teams' code; with the line
+    # that said it, because it is the file's assumption and not a fact.
+    if item.get("owners"):
+        tags.append(f"[owners: {' '.join(item['owners'])} per {item['owners_source']}]")
     return f"{''.join(tags)} {text}" if tags else text
 
 

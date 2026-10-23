@@ -2127,6 +2127,72 @@ def scan_iac_file(path: Path, rel_path: str,
     return algorithm_findings, embedded_key_findings
 
 
+# Who owns a place, as the repository's CODEOWNERS says (ZA-OPRAVYANE row 94, Dhiraj S.,
+# 23.10.2026: "one CBOM, many owners ... the device teams own their rows"). GitHub reads the
+# first of .github/CODEOWNERS, CODEOWNERS, docs/CODEOWNERS; the last matching line wins; the
+# patterns follow most of gitignore's rules (GitHub Docs, "About code owners", read
+# 23.10.2026). GitLab's .gitlab/CODEOWNERS is read last; its [Section] headers are skipped.
+# An owner is put on each place -- an occurrence, not a component -- with the line that
+# said it: an assumption from that file, not a fact about who runs the code.
+CODEOWNERS_LOCATIONS = (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS",
+                        ".gitlab/CODEOWNERS")
+
+
+def _codeowners_pattern(pattern: str) -> re.Pattern:
+    """A CODEOWNERS pattern as a regex over a file's path from the root.
+
+    gitignore's rules: a slash at the start or in the middle anchors the pattern at the
+    root, otherwise it matches at any depth; a trailing slash matches a directory and
+    everything beneath it; `*` stays within one path segment and `**` crosses them. A
+    pattern that names a directory owns what is beneath it, except where its last
+    segment is a wildcard: GitHub's own example says `docs/*` matches
+    docs/getting-started.md and not docs/build-app/troubleshooting.md.
+    """
+    directory = pattern.endswith("/")
+    body = pattern.strip("/")
+    anchored = pattern.startswith("/") or "/" in body
+    out, i = "", 0
+    while i < len(body):
+        if body.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif body.startswith("/**", i) and i + 3 == len(body):
+            out, i = out + "/.*", i + 3
+        elif body[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif body[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(body[i]), i + 1
+    last = body.rsplit("/", 1)[-1]
+    tail = "/.*" if directory else ("" if ("*" in last or "?" in last) else "(?:/.*)?")
+    return re.compile(("^" if anchored else "^(?:.*/)?") + out + tail + "$")
+
+
+def _read_codeowners(path: str, lines: list[str]) -> list[tuple[re.Pattern, list[str], str]]:
+    rules: list[tuple[re.Pattern, list[str], str]] = []
+    for number, line in enumerate(lines, 1):
+        text = line.split(" #", 1)[0].strip()
+        if not text or text.startswith(("#", "[", "^[")):
+            continue
+        pattern, *owners = text.split()
+        rules.append((_codeowners_pattern(pattern), owners, f"{path}:{number}"))
+    return rules
+
+
+def _attach_owners(items: list[dict[str, Any]],
+                   rules: list[tuple[re.Pattern, list[str], str]]) -> None:
+    """The owners of each item's path by the last matching CODEOWNERS line. A matching line
+    that names no owner leaves the place unowned, as GitHub reads it."""
+    for item in items:
+        path = item.get("path")
+        if not isinstance(path, str):
+            continue
+        match = next((rule for rule in reversed(rules) if rule[0].match(path)), None)
+        if match and match[1]:
+            item["owners"] = list(match[1])
+            item["owners_source"] = match[2]
+
+
 def _sizes_by_algorithm(findings: list[dict[str, Any]]) -> dict[str, list[int]]:
     out: dict[str, list[int]] = {}
     for f in findings:
@@ -2201,6 +2267,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # Every file actually read, by path. A count says how much was read; only the
     # names let a later run tell a file that was fixed from a file that is gone.
     files_read: list[str] = []
+    # CODEOWNERS files read, by location (see CODEOWNERS_LOCATIONS).
+    codeowners: dict[str, list[str]] = {}
     resolved_exclude = None
     if exclude is not None:
         try:
@@ -2233,7 +2301,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # declared boundary and the real one differed, the count said the tool
         # does not claim these, and the lower-casing in the report concealed the
         # case-sensitivity in the match.
-        claimed = (is_ci or path.suffix.lower() in IAC_EXTENSIONS
+        claimed = (is_ci or rel_path in CODEOWNERS_LOCATIONS
+                   or path.suffix.lower() in IAC_EXTENSIONS
                    or path.suffix.lower() in SOURCE_EXTENSIONS
                    or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
                    or is_certificate_file(path) or is_manifest(path))
@@ -2324,7 +2393,12 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             pins.extend((eco, pkg, ver, rel_path, n)
                         for eco, pkg, ver, n in pinned_versions(path, lines))
 
-        if path.name in LOCKFILES:
+        if rel_path in CODEOWNERS_LOCATIONS:
+            # Read for who owns what, not matched for algorithms: its paths name
+            # directories (`/crypto/rsa/`), not uses.
+            files_scanned["config"] += 1
+            codeowners[rel_path] = lines
+        elif path.name in LOCKFILES:
             # A lockfile is read for its packages (dependency_findings, above), by its
             # structure. Its text is package names, versions and hashes: matching it as
             # source made `ecdsa-sig-formatter` an "ECDSA usage" beside the dependencies row
@@ -2432,11 +2506,23 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         content_parts.append(f"{rel}\0{kind}")
 
     _link_signing_keys(ci_findings, key_files)
+    owners_file = next((p for p in CODEOWNERS_LOCATIONS if p in codeowners), None)
+    if owners_file:
+        _attach_owners(
+            source_findings + ci_findings + iac_findings + embedded_key_findings
+            + protocol_findings + dependency_findings + tls_group_findings
+            + static_rsa_findings + ssh_kex_findings + weak_key_findings,
+            _read_codeowners(owners_file, codeowners[owners_file]))
     _join_pins(source_findings + iac_findings, pins)
     _join_fips(source_findings + iac_findings, fips_findings)
     return {
         "files_scanned": files_scanned,
         "files_read": sorted(files_read),
+        # The CODEOWNERS file the owners on the evidence come from, or None.
+        "codeowners": ({"path": owners_file,
+                        "meaning": "owners on evidence items are this file's last matching "
+                                   "line for the item's path: an assumption, not a fact"}
+                       if owners_file else None),
         # Directories that could not be entered or listed; their files are unknown.
         "unreadable_directories": sorted(set(unreadable_dirs)),
         # Seen, not followed. Where the target sits is stated; the target path

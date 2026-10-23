@@ -128,6 +128,8 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             "config_filenames": sorted(detectors.CONFIG_FILENAMES),
             "config_filename_pattern": [detectors.CONFIG_FILENAME_PATTERN.pattern],
             "config_extensionless_in_directories": sorted(detectors.CONFIG_DIRECTORIES),
+            # Read for owners only (ZA-OPRAVYANE row 94), never matched for algorithms.
+            "codeowners": list(detectors.CODEOWNERS_LOCATIONS),
             "ci_filenames": sorted(detectors.CI_CONFIG_FILENAMES),
             # Read as bytes rather than lines, and missing from this list while the
             # scan was reporting findings from them.
@@ -188,6 +190,9 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         # otherwise. None when nothing here configures TLS. Outside `coverage`, so it
         # does not travel into the CBOM.
         "tls_termination": assets.tls_termination(scan_result),
+        # Where the owners on evidence items come from: a CODEOWNERS file, read as an
+        # assumption about who owns a path. None when the tree has none.
+        "codeowners": scan_result.get("codeowners"),
         "named_but_not_used": scan_result["named_but_not_used"],
         "unreadable_files": scan_result["unreadable_files"],
         "symlinks_not_followed": scan_result["symlinks_not_followed"],
