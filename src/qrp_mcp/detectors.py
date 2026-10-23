@@ -402,7 +402,16 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # "X25519MLKEM768" reports the post-quantum half only, and the component Shor
     # actually breaks disappears from the inventory.
     ("X25519", "X25519 key agreement usage", re.compile(
-        r"(?<![A-Za-z])x25519|(?<![A-Za-z])curve25519", re.IGNORECASE,
+        r"(?<![A-Za-z])x25519|(?<![A-Za-z])curve25519|"
+        # NaCl/libsodium never name it: crypto_box is curve25519xsalsa20poly1305,
+        # crypto_kx is x25519blake2b, crypto_scalarmult is curve25519 (their own
+        # *_PRIMITIVE, include/sodium/*.h); PyNaCl's nacl.public is the same box
+        # (ZA-OPRAVYANE row 67). Not crypto_scalarmult_ed25519 or _ristretto255.
+        r"\b(?:sodium_)?crypto_box_(?:keypair|seed_keypair|easy|open_easy|detached|"
+        r"open_detached|beforenm|afternm|easy_afternm|open_easy_afternm|detached_afternm|"
+        r"open_detached_afternm|open_afternm|seal|seal_open|open)\b|\bcrypto_box\s*\(|"
+        r"\b(?:sodium_)?crypto_kx_\w+|\b(?:sodium_)?crypto_scalarmult(?:_base)?\b|"
+        r"\bnacl\.public\b", re.IGNORECASE,
     )),
     # Uppercase X448 is unambiguous. Lowercase x448 is not: Bitcoin Core lists
     # node service flags in hex -- "x1, x5, x9, x408, x448, xc08" -- and three of
@@ -450,7 +459,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # (BoringSSL), EVP_PKEY_ED25519, NID_ED25519, wc_ed25519_*, Ed25519PrivateKey,
         # ed25519_dalek, Go's x509.PureEd25519 (ZA-OPRAVYANE row 66). `\b` refused all of them.
         r"(?<![A-Za-z])ed25519|\bPureEd25519\b|tweetnacl|\bnacl\.sign\b|@solana/web3\.js|solana_program::|"
-        r"sodium_crypto_sign|\bEd25519(?:Signer|KeyPairGenerator)\b",
+        r"sodium_crypto_sign|\bEd25519(?:Signer|KeyPairGenerator)\b|"
+        # libsodium's crypto_sign is Ed25519 (crypto_sign_PRIMITIVE) and PyNaCl's
+        # nacl.signing wraps it (row 67). Only the names the NIST/SUPERCOP signature API
+        # does not share: crypto_sign_keypair, crypto_sign_open and the *BYTES constants
+        # are also every post-quantum reference implementation's.
+        r"\bcrypto_sign_(?:detached|verify_detached|seed_keypair|init|update|"
+        r"final_create|final_verify|state|statebytes)\b|\bnacl\.signing\b",
         re.IGNORECASE,
     )),
     ("Schnorr", "Schnorr signature usage", re.compile(
