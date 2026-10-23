@@ -369,6 +369,27 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bDsa(?:KeyPair|Parameters)Generator\b|"                                  # Bouncy Castle
         r"\bOPENSSL_KEYTYPE_DSA\b|\bx509\.DSAWithSHA\d+\b|\bKeyType\.DSA\b",
     )),
+    # wolfCrypt, wolfSSL's crypto library: its classical API names the family only inside
+    # a wc_ identifier, and a whole wolfSSL program scanned as empty (ZA-OPRAVYANE row 72).
+    # Every prefix checked against wolfssl/wolfcrypt/{rsa,ecc,dh,md5,sha,hash,des3,falcon}.h
+    # in the corpus copy. Case-sensitive: wolfCrypt writes them exactly so.
+    ("RSA", "RSA named by the wolfCrypt API", re.compile(
+        r"\bwc_\w*Rsa\w*|\bWC_RSA_\w+|\bRsaKey\b|[<\"]wolfssl/wolfcrypt/rsa\.h[>\"]")),
+    ("ECDSA", "ECDSA named by the wolfCrypt API", re.compile(r"\bwc_ecc_(?:sign|verify)\w*")),
+    ("ECDH", "ECDH named by the wolfCrypt API", re.compile(r"\bwc_ecc_shared_secret\w*")),
+    ("EC", "EC named by the wolfCrypt API", re.compile(
+        r"\bwc_ecc_\w+|\bwc_Ecc\w+|\becc_key\b|[<\"]wolfssl/wolfcrypt/ecc\.h[>\"]")),
+    ("DH", "DH named by the wolfCrypt API", re.compile(
+        r"\bwc_(?:Dh|InitDhKey|FreeDhKey)\w*|\bDhKey\b|[<\"]wolfssl/wolfcrypt/dh\.h[>\"]")),
+    ("MD5", "MD5 named by the wolfCrypt API", re.compile(
+        r"\bwc_(?:InitMd5|Md5)\w*|[<\"]wolfssl/wolfcrypt/md5\.h[>\"]")),
+    # SHA-1 only: wc_Sha256*, wc_Sha3_* and wc_Shake* are other functions.
+    ("SHA1", "SHA-1 named by the wolfCrypt API", re.compile(
+        r"\bwc_(?:InitSha(?:_ex)?|Sha(?:Copy|Final(?:Raw)?|Free|GetFlags|GetHash|SetFlags|"
+        r"SizeSet|Transform|Update|Hash))\b|[<\"]wolfssl/wolfcrypt/sha\.h[>\"]")),
+    ("3DES", "3DES named by the wolfCrypt API", re.compile(
+        r"\bwc_Des3_\w+|[<\"]wolfssl/wolfcrypt/des3\.h[>\"]")),
+    ("DES", "DES named by the wolfCrypt API", re.compile(r"\bwc_Des_\w+")),
     ("RSA", "RSA named as a JOSE/JWT algorithm", re.compile(
         r"[\"'](?:RS|PS)(?:256|384|512)[\"']|"
         r"\bSigningMethod(?:RS|PS)(?:256|384|512)\b|\bAlgorithm::(?:RS|PS)(?:256|384|512)\b|"
@@ -560,7 +581,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z])slh[-_]?dsa|(?<![A-Za-z])sphincs", re.IGNORECASE,
     )),
     ("Falcon", "Falcon (FN-DSA) usage", re.compile(
-        r"(?<![A-Za-z])falcon[-_]?(512|1024)|(?<![A-Za-z])fn[-_]?dsa", re.IGNORECASE,
+        r"(?<![A-Za-z])falcon[-_]?(512|1024)|(?<![A-Za-z])fn[-_]?dsa|"
+        r"\bwc_falcon_\w+|[<\"]wolfssl/wolfcrypt/falcon\.h[>\"]", re.IGNORECASE,
     )),
     ("Classic McEliece", "Classic McEliece usage", re.compile(
         r"(?<![A-Za-z])classic[-_ ]?mceliece|(?<![A-Za-z])mceliece", re.IGNORECASE,
