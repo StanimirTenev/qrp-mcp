@@ -11,6 +11,7 @@ from typing import Any
 
 from . import aws_tls, dnssec, ike, opcua
 from .classifier import _PQC_SCHEMES
+from .assets import _LOCKFILES as LOCKFILES
 from .assets import (_group_setting, image_pins, is_manifest, library_support, pinned_versions,
                      scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
@@ -2307,7 +2308,13 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             pins.extend((eco, pkg, ver, rel_path, n)
                         for eco, pkg, ver, n in pinned_versions(path, lines))
 
-        if is_certificate_file(path) or peeked_key:
+        if path.name in LOCKFILES:
+            # A lockfile is read for its packages (dependency_findings, above), by its
+            # structure. Its text is package names, versions and hashes: matching it as
+            # source made `ecdsa-sig-formatter` an "ECDSA usage" beside the dependencies row
+            # that already says "declared, not observed" (ZA-OPRAVYANE row 88).
+            files_scanned["config"] += 1
+        elif is_certificate_file(path) or peeked_key:
             # Certificates and keys are read as bytes, not lines: a .der carries no
             # lines at all, and a .pem that fails to decode must still be counted.
             files_scanned["certificate"] += 1
