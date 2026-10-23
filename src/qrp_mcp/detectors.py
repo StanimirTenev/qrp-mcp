@@ -446,7 +446,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         re.IGNORECASE,
     )),
     ("Ed25519", "Ed25519 usage", re.compile(
-        r"\bed25519\b|tweetnacl|\bnacl\.sign\b|@solana/web3\.js|solana_program::|"
+        # The name glued into an identifier as well as standing alone: ED25519_sign
+        # (BoringSSL), EVP_PKEY_ED25519, NID_ED25519, wc_ed25519_*, Ed25519PrivateKey,
+        # ed25519_dalek, Go's x509.PureEd25519 (ZA-OPRAVYANE row 66). `\b` refused all of them.
+        r"(?<![A-Za-z])ed25519|\bPureEd25519\b|tweetnacl|\bnacl\.sign\b|@solana/web3\.js|solana_program::|"
         r"sodium_crypto_sign|\bEd25519(?:Signer|KeyPairGenerator)\b",
         re.IGNORECASE,
     )),
