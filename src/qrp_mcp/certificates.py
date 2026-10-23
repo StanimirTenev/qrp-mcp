@@ -352,6 +352,25 @@ _PKCS12_KEY_BAGS = {
 }
 
 
+# What a PKCS#12 file names outside its encryption: the password-based scheme its bags are
+# encrypted with (RFC 7292 Appendix C, pkcs-12PbeIds) and the digest of its MAC. Both are
+# readable without the password and were not reported -- the file said only
+# "claimed_but_not_decoded" (ZA-OPRAVYANE row 85: spring-security-samples' dianne/rod/scott
+# .p12, 40-bit RC2 and a SHA-1 MAC).
+_PKCS12_PBE = {
+    "1.2.840.113549.1.12.1.1": ("RC4", "pbeWithSHAAnd128BitRC4"),
+    "1.2.840.113549.1.12.1.2": ("RC4", "pbeWithSHAAnd40BitRC4"),
+    "1.2.840.113549.1.12.1.3": ("3DES", "pbeWithSHAAnd3-KeyTripleDES-CBC"),
+    "1.2.840.113549.1.12.1.4": ("3DES", "pbeWithSHAAnd2-KeyTripleDES-CBC"),
+    "1.2.840.113549.1.12.1.5": ("RC2", "pbeWithSHAAnd128BitRC2-CBC"),
+    "1.2.840.113549.1.12.1.6": ("RC2", "pbeWithSHAAnd40BitRC2-CBC"),
+}
+_PKCS12_MARKERS = set(_PKCS12_PBE) | _PKCS12_KEY_BAGS | {
+    "1.2.840.113549.1.12.10.1.3",  # certBag
+}
+_SHA1_OID = "1.3.14.3.2.26"
+
+
 def is_certificate_file(path: Path) -> bool:
     return path.suffix.lower() in CERTIFICATE_EXTENSIONS
 
@@ -526,10 +545,31 @@ def scan_certificate_file(path: Path, rel_path: str,
                                 "encrypted and was not decoded, so the algorithm is unknown"),
             })
 
+    # PKCS#12's own algorithms, from the wrapper (see _PKCS12_PBE). After the key bag above,
+    # which is said only when nothing else was. The SHA-1 identifier is named only in a file
+    # that is PKCS#12 by its identifiers: there the bags are encrypted, and what is left in
+    # clear is where the format names its MAC digest. Marked, so the file still counts as
+    # not decoded: its contents were not read, only the wrapper.
+    wrapper_oids = _iter_oids(raw)
+    if wrapper_oids & _PKCS12_MARKERS:
+        for oid in sorted(wrapper_oids & set(_PKCS12_PBE)):
+            family, name = _PKCS12_PBE[oid]
+            if family in seen:
+                continue
+            record(family, f"{family}: PKCS#12 bags encrypted with {name} ({oid}), named in "
+                           f"the file's unencrypted wrapper", 1, oid, kind="reference")
+            algorithms[-1]["pkcs12_wrapper"] = True
+        if _SHA1_OID in wrapper_oids and "SHA1" not in seen:
+            record("SHA1", f"SHA-1 object identifier {_SHA1_OID} in the unencrypted wrapper "
+                           f"of a PKCS#12 file, where the format names its MAC digest",
+                   1, _SHA1_OID, kind="reference")
+            algorithms[-1]["pkcs12_wrapper"] = True
+
     return algorithms, keys
 
 
 def is_undecoded(algorithms: list, keys: list) -> bool:
-    """A claimed file that gave up nothing an algorithm can be named from."""
-    return not algorithms and not any(
+    """A claimed file that gave up nothing an algorithm can be named from. A PKCS#12
+    wrapper's own encryption and MAC are not its contents."""
+    return not [a for a in algorithms if not a.get("pkcs12_wrapper")] and not any(
         key.get("type") != "PKCS#12 shrouded key bag" for key in keys)

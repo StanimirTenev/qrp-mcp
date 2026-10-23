@@ -76,6 +76,7 @@ _PRIMITIVE_BY_FAMILY = {
     "DES": "block-cipher",
     "3DES": "block-cipher",
     "RC4": "stream-cipher",
+    "RC2": "block-cipher",
     "PPK (RFC 8784)": "other",
     # Not an algorithm: a certificate format whose strength is the CA's and cosigners'.
     "MTC": "other",

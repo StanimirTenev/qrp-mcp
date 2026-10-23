@@ -227,6 +227,9 @@ _WEAK_TOKENS: list[tuple[str, str]] = [
     ("TRIPLEDES", "3DES is deprecated"),
     ("3DES", "3DES is deprecated"),
     ("DES", "DES is broken"),
+    # PKCS#12's legacy bag encryption (ZA-OPRAVYANE row 85); its 40-bit form is the
+    # export-grade key length the scheme's name states.
+    ("RC2", "RC2 is obsolete; PKCS#12's 40-bit RC2 has an export-grade key"),
 ]
 
 _SYMMETRIC_TOKENS: list[tuple[str, str]] = [
