@@ -405,6 +405,18 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bmbedtls_sha1\w*|\bMBEDTLS_MD_SHA1\b|\bPSA_ALG_SHA_1\b")),
     ("3DES", "3DES named by the Mbed TLS API", re.compile(r"\bmbedtls_des3_\w+")),
     ("DES", "DES named by the Mbed TLS API", re.compile(r"\bmbedtls_des_\w+")),
+    # Bouncy Castle's lightweight API names the algorithm in a class name glued to
+    # Engine/Digest/Signer/KeyPairGenerator (ZA-OPRAVYANE row 74). Each class checked in
+    # bc-java core/src/main/java/org/bouncycastle (read 23.10.2026). DESedeEngine is already
+    # 3DES by its own rule.
+    ("RSA", "RSA named by the Bouncy Castle API", re.compile(
+        r"\bRSA(?:Blinded)?Engine\b|\bRSAKeyPairGenerator\b")),
+    ("DES", "DES named by the Bouncy Castle API", re.compile(r"\bDESEngine\b")),
+    ("RC4", "RC4 named by the Bouncy Castle API", re.compile(r"\bRC4Engine\b")),
+    ("MD5", "MD5 named by the Bouncy Castle API", re.compile(r"\bMD5Digest\b")),
+    ("SHA1", "SHA-1 named by the Bouncy Castle API", re.compile(r"\bSHA1Digest\b")),
+    ("Falcon", "Falcon named by the Bouncy Castle API", re.compile(
+        r"\bFalcon(?:Signer|KeyPairGenerator)\b")),
     ("RSA", "RSA named as a JOSE/JWT algorithm", re.compile(
         r"[\"'](?:RS|PS)(?:256|384|512)[\"']|"
         r"\bSigningMethod(?:RS|PS)(?:256|384|512)\b|\bAlgorithm::(?:RS|PS)(?:256|384|512)\b|"
