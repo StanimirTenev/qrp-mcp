@@ -44,6 +44,9 @@ SOURCE_EXTENSIONS = {
     # files_skipped_by_type named them all along.
     ".kt", ".kts", ".scala", ".sc", ".groovy",
     ".mjs", ".cjs", ".mts", ".cts",
+    # React's JSX and TSX: a WebCrypto call in a component was "type not claimed"
+    # (ZA-OPRAVYANE row 96), though the comment rules already knew both.
+    ".jsx", ".tsx",
 }
 
 EXCLUDED_DIRS = {
