@@ -680,7 +680,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         re.IGNORECASE,
     )),
     ("BIKE", "BIKE usage", re.compile(r"(?<![A-Za-z])bike[-_]?l[135]", re.IGNORECASE)),
-    ("HQC", "HQC usage", re.compile(r"(?<![A-Za-z])hqc[-_]?(128|192|256)", re.IGNORECASE)),
+    # liboqs and oqs-provider now name HQC by security level: OQS_KEM_alg_hqc_1/3/5 and
+    # hqc1/hqc3/hqc5 (src/kem/kem.h, ALGORITHMS.md; ZA-OPRAVYANE row 81).
+    ("HQC", "HQC usage", re.compile(r"(?<![A-Za-z])hqc[-_]?(?:128|192|256|[135])(?![0-9])",
+                                    re.IGNORECASE)),
     ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss", re.IGNORECASE)),
     # Stateful hash-based, SP 800-208. CNSA 2.0 requires LMS or XMSS for firmware
     # and code signing, so a firmware pipeline that had complied scanned as empty.
@@ -706,7 +709,12 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("SDitH", "SDitH usage", re.compile(r"(?<![A-Za-z])sdith", re.IGNORECASE)),
     ("MQOM", "MQOM usage", re.compile(r"(?<![A-Za-z])mqom", re.IGNORECASE)),
     ("QR-UOV", "QR-UOV usage", re.compile(r"(?<![A-Za-z])qr[-_]?uov", re.IGNORECASE)),
-    ("UOV", "UOV usage", re.compile(r"(?<![A-Za-z])uov[-_]?(i|ip|iii|v|s|pkc)", re.IGNORECASE)),
+    # liboqs's OQS_SIG_alg_uov_ov_Is and oqs-provider's OV_Is_pkc (src/sig/sig.h,
+    # ALGORITHMS.md; row 81). OV_* only in liboqs's own capitalisation.
+    ("UOV", "UOV usage", re.compile(
+        r"(?<![A-Za-z])uov[-_]?(i|ip|iii|v|s|pkc)|(?<![A-Za-z])uov[-_]ov[-_]|"
+        r"(?-i:(?<![A-Za-z0-9])OV_(?:Is|Ip|III|V)(?:_pkc(?:_skc)?)?(?![A-Za-z0-9]))",
+        re.IGNORECASE)),
     ("MAYO", "MAYO usage", re.compile(r"(?<![A-Za-z])mayo[-_]?[1235]", re.IGNORECASE)),
     ("CROSS", "CROSS usage (dropped by NIST)", re.compile(
         r"(?<![A-Za-z])cross[-_]?r?[-_]?sdp", re.IGNORECASE,
