@@ -50,6 +50,39 @@ _RECORDS = re.compile(
     r")")
 
 
+# Numbers this scanner gives no family, with IANA's mnemonic where the registry has one
+# (iana-dnssec.csv, read 23.10.2026). Until 0.35.0 a record with such a number was dropped
+# without a word -- a zone signed with 253 (PRIVATEDNS) read as if it had no key at all
+# (ZA-OPRAVYANE row 102, Georgi Ivanov's post-quantum DNSSEC experiments). Now it is named
+# as a number this scan does not name, never given a family.
+UNNAMED_MNEMONICS: dict[int, str] = {
+    0: "DELETE", 12: "ECC-GOST", 23: "ECC-GOST12", 252: "INDIRECT", 253: "PRIVATEDNS",
+    254: "PRIVATEOID",
+}
+
+
+def unnamed_records(line: str) -> list[dict[str, Any]]:
+    """A DNSKEY, DS or RRSIG record whose algorithm number has no family here, as a
+    protocol asset that says so."""
+    out: list[dict[str, Any]] = []
+    for m in _RECORDS.finditer(line):
+        rtype = m.group("kt") or m.group("dt") or m.group("rt")
+        number = int(m.group("ka") or m.group("da") or m.group("ra"))
+        if number in ALGORITHMS:
+            continue
+        mnemonic = UNNAMED_MNEMONICS.get(number)
+        out.append({
+            "protocol": "dns", "version": None, "dnssec_algorithm": number,
+            "dnssec_mnemonic": mnemonic, "basis": "unnamed_algorithm_number",
+            "deprecated": False,
+            "description": (f"DNSSEC algorithm {number}"
+                            f"{f' ({mnemonic})' if mnemonic else ' (unassigned or reserved)'} "
+                            f"in a {rtype} record: a number this scan does not give a family. "
+                            f"What signs with it is not determined here."),
+        })
+    return out
+
+
 def scan_records(line: str) -> list[tuple[str, int, str, str | None]]:
     """(family, position, description, curve) for each DNSSEC algorithm number this line
     gives in a record."""

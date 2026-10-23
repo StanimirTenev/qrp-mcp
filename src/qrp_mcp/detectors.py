@@ -2375,6 +2375,10 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             for asset in _policy_assets(text_line):
                 asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
                 protocol_findings.append(asset)
+            if not text_line.lstrip().startswith(_NOT_A_SETTING):
+                for asset in dnssec.unnamed_records(text_line):
+                    asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
+                    protocol_findings.append(asset)
         # A load-balancer listener that serves HTTPS or TLS and names no policy gets
         # the provider's: said as a default, with the reason, on the resource.
         for number in aws_tls.listeners_without_policy(path.suffix.lower(), lines):

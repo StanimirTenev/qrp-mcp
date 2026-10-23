@@ -282,6 +282,12 @@ def _withhold_reassurance(summary: Any, block: dict[str, Any], scan_result: dict
     if scope["files_not_examined"]:
         because.append(f"{scope['files_not_examined']} of {scope['files_present']} files were "
                        f"not read ({scope['coverage_pct']}% read); see coverage.not_examined")
+    # A zone signed with an algorithm number this scan gives no family (row 102). 0 is
+    # DELETE, a signal and not an algorithm.
+    for asset in scan_result.get("protocol_findings") or []:
+        if asset.get("dnssec_algorithm") not in (None, 0):
+            because.append(f"DNSSEC algorithm {asset['dnssec_algorithm']} at "
+                           f"{asset['path']}:{asset['line']} is not named by this scan")
     # A key whose algorithm no line of the same place names: what it is was not determined.
     named_at = {(i["path"], i["line"]) for items in _in_use(scan_result).values()
                 for i in items}
