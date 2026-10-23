@@ -78,7 +78,22 @@ CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
                     # Build files list the algorithm sources a tree compiles.
                     "Makefile", "makefile", "GNUmakefile", "CMakeLists.txt",
                     # SSH key inventories: the key type is named on every line.
-                    "known_hosts", "authorized_keys"}
+                    "known_hosts", "authorized_keys",
+                    # Container builds pass the algorithms as build arguments
+                    # (`ARG SIG_ALG="mldsa65"`; oqs-demos keeps 17 such files), Kconfig
+                    # selects a bootloader's signature type, and a Caddyfile is a TLS
+                    # server's whole configuration (ZA-OPRAVYANE rows 79 and 52).
+                    "Dockerfile", "Containerfile", "Kconfig", "Caddyfile"}
+
+# The same names with a variant after them (Dockerfile-QUIC, Dockerfile.alpine,
+# Kconfig.defconfig) or before them (nginx.Dockerfile).
+CONFIG_FILENAME_PATTERN = re.compile(
+    r"^(?:Dockerfile|Containerfile|Kconfig)[-.][\w.-]+$|^[\w.-]+\.(?:Dockerfile|Containerfile)$")
+
+# Directories whose files are configuration without an extension: FreeRADIUS keeps its
+# EAP-TLS settings in raddb/mods-available/eap (ZA-OPRAVYANE row 103), and Debian's nginx
+# and Apache keep their sites as sites-available/default.
+CONFIG_DIRECTORIES = {"mods-available", "mods-enabled", "sites-available", "sites-enabled"}
 
 # (algorithm, description, compiled regex matched against a single source line)
 # Test code, named rather than judged. Measured 2026-09-26: comparing this scanner
@@ -1108,7 +1123,9 @@ def is_ci_config_file(path: Path, repo_path: Path) -> bool:
 
 def is_config_file(path: Path) -> bool:
     """A configuration file, by extension or by one of the extensionless names."""
-    return path.suffix.lower() in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
+    return (path.suffix.lower() in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
+            or bool(CONFIG_FILENAME_PATTERN.match(path.name))
+            or (not path.suffix and path.parent.name in CONFIG_DIRECTORIES))
 
 
 # Returned when the platform cannot open relative to a directory descriptor, to

@@ -1020,8 +1020,9 @@ TLS_SETTING_NOTE = (
 #   1.24.0 (stable/debian/Dockerfile: FROM debian:bullseye-slim), whose OpenSSL is 1.1.1
 #   (packages.debian.org, bullseye: openssl 1.1.1w). Every other tag, an -alpine one
 #   included, is "not established".
-# Pins are read from `image:` lines (compose, Kubernetes); a Dockerfile is not a file
-# type this scanner reads, and a package pin is not read for this. A compose service is
+# Pins are read from `image:` lines (compose, Kubernetes); a Dockerfile's `FROM` line is
+# not read for this (the file is read since 0.35.0, for the algorithms it names), and a
+# package pin is not read for this. A compose service is
 # joined to the configuration file it mounts (short volume syntax, inside the tree);
 # without such a mount the pin and the group are named side by side, not joined.
 HYBRID_TLS_GROUPS = {

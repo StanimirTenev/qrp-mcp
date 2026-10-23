@@ -126,6 +126,8 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             "iac": sorted(detectors.IAC_EXTENSIONS),
             "config": sorted(detectors.CONFIG_EXTENSIONS),
             "config_filenames": sorted(detectors.CONFIG_FILENAMES),
+            "config_filename_pattern": [detectors.CONFIG_FILENAME_PATTERN.pattern],
+            "config_extensionless_in_directories": sorted(detectors.CONFIG_DIRECTORIES),
             "ci_filenames": sorted(detectors.CI_CONFIG_FILENAMES),
             # Read as bytes rather than lines, and missing from this list while the
             # scan was reporting findings from them.
