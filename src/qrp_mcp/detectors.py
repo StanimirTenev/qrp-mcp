@@ -139,7 +139,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # Ruby, Java, Node, Rust, PKCS#11.
         r"OpenSSL::PKey::RSA\b|"
         r"\w*withRSA(?:andMGF1)?\b|Cipher\.getInstance\(\s*[\"']RSA[/\"']|"
-        r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']rsa[\"']|"
+        r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']rsa(?:-pss)?[\"']|"
+        # Node's RSA-only calls (doc/api/crypto.md) and node-forge's rsa namespace
+        # (lib/rsa.js: forge.pki.rsa), ZA-OPRAVYANE row 69.
+        r"\bcrypto\.(?:publicEncrypt|privateDecrypt|privateEncrypt|publicDecrypt)\b|"
+        r"\bforge\.pki\.rsa\b|\bpki\.rsa\.|"
         r"\bcreate(?:Sign|Verify)\(\s*[\"'](?:RSA-)?SHA\d+[\"']|"
         r"\bcreate(?:Sign|Verify)\(\s*[\"']RSA[-\w]*[\"']|"
         r"\bRsaPrivateKey\b|\bRsaPublicKey\b|"
@@ -195,6 +199,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bCKM_DSA_\w+|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
         r"\bDSA_new\b|\bDSA_generate_key\w*|\bEVP_PKEY_DSA\b|"
+        r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']dsa[\"']|"     # Node, row 69
         # include/openssl/dsa.h: the signing calls and the header (row 65).
         r"\bDSA_(?:do_)?(?:sign|verify)\b|[<\"]openssl/dsa\.h[>\"]|"
         r"\bDSACryptoServiceProvider\b|\bDSACng\b|"
@@ -263,6 +268,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"hazmat\.primitives\.asymmetric\.dh\b|crypto/dh\b|(?<!EC)Diffie[- ]?Hellman|"
         r"asymmetric\s+import\s+[^\n#]*\bdh\b|\bdh\.generate_parameters\b|"
         r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
+        r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']dh[\"']|"      # Node, row 69
         # include/openssl/dh.h and the RFC 7919 group NIDs (crypto/objects/objects.txt).
         r"\bDH_compute_key(?:_padded)?\b|\bNID_ffdhe\d+\b|[<\"]openssl/dh\.h[>\"]|"
         # Ruby, the Rust openssl crate, and BouncyCastle -- the vocabulary a rival
@@ -384,7 +390,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # Single DES only: the triple-DES spellings have their own rule above, and
         # the EVP_des_ede* family (two- and three-key) must not fall in here.
         r"crypto/des\b|\bDES_set_key\w*|\bDES_ecb_encrypt\b|"
-        r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b|\bdes\.NewCipher\b", re.IGNORECASE,
+        r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b|\bdes\.NewCipher\b|"
+        # Node passes the cipher name to OpenSSL: single DES in one of its modes, not
+        # des-ede3-* (row 69).
+        r"\bcreate(?:Cipheriv|Decipheriv|Cipher|Decipher)\(\s*[\"']des(?:-(?:cbc|ecb|cfb|cfb1|cfb8|ofb))?[\"']",
+        re.IGNORECASE,
     )),
     # Blockchain / wallet signing. These map onto the same classical primitives -- a
     # secp256k1 signature is ECDSA, and Shor breaks it like any other elliptic curve.
