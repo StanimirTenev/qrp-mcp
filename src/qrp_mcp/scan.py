@@ -113,6 +113,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             "pem_labels": len(certificates._LABEL_ALGORITHMS),
             "cipher_suite_components": len(detectors._SUITE_COMPONENT),
             "openssl3_fetch_names": len(detectors._FETCH_NAME_FAMILY),
+            "jca_names": len(detectors._JCA_NAME_FAMILY),
             "tls_group_names": len(assets.CLASSICAL_GROUPS),
             # Names that stand for several algorithms at once, each from its own table.
             "opcua_security_policies": len(opcua.POLICIES),

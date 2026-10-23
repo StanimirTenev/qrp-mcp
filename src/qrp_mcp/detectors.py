@@ -332,6 +332,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # A JWK names its key type in `kty`; the value in any other field is a label.
         r"\bkty[\"']?\s*(?::|==|!=|=)\s*[\"']RSA[\"']|[\"']kty[\"']\)\s*(?:==|!=)\s*[\"']RSA[\"']",
     )),
+    # The JCA's elliptic-curve types (java.security.spec, java.security.interfaces). Where
+    # the curve comes from a constant or a resource, they are the only trace of EC key
+    # generation (ZA-OPRAVYANE row 86, identity-samples). Case-sensitive, as above.
+    ("EC", "EC named by a JCA type", re.compile(
+        r"\bEC(?:GenParameterSpec|ParameterSpec|PublicKeySpec|PrivateKeySpec|PublicKey|"
+        r"PrivateKey|Point)\b",
+    )),
     ("DSA", "DSA named by a library API", re.compile(
         r"\bDSA(?:Public|Private)Key(?:Spec)?\b|\bDSAParams\b|"                     # JCA
         r"\bDsa(?:KeyPair|Parameters)Generator\b|"                                  # Bouncy Castle
@@ -708,6 +715,41 @@ _FETCH_NAME_FAMILY = {
     "SHA1": "SHA1", "SHA-1": "SHA1", "MD5": "MD5",
     "DES-EDE3-CBC": "3DES", "DES-EDE3": "3DES", "DES-CBC": "DES", "RC4": "RC4",
 }
+
+
+# The Java Cryptography Architecture names the algorithm the same way: a string to
+# getInstance. Only KeyPairGenerator and Cipher next to RSA/EC/DSA were read, so
+# KeyFactory/KeyAgreement and the JDK's own aliases were not (ZA-OPRAVYANE row 68). The
+# names and aliases are the JDK's: com/sun/crypto/provider/SunJCE.java, sun/security/ec/
+# SunEC.java and sun/security/util/KnownOIDs.java (DiffieHellman alias DH, ARCFOUR alias
+# RC4, SHA-1 aliases SHA and SHA1), read 23.10.2026; `XDH` generates X25519 unless
+# initialised otherwise (XDHKeyPairGenerator.DEFAULT_PARAM_SPEC). FALCON is Bouncy
+# Castle's BCPQC name (org/bouncycastle/pqc/jcajce/provider/Falcon.java). A Cipher
+# transformation is read by its algorithm, the part before the first `/`.
+_JCA_CALL = re.compile(
+    r"\b(?:KeyFactory|KeyAgreement|KeyPairGenerator|Signature|Cipher|MessageDigest|"
+    r"KeyGenerator|SecretKeyFactory|AlgorithmParameters|AlgorithmParameterGenerator|KEM)"
+    r"\.getInstance\(\s*[\"']([A-Za-z0-9][A-Za-z0-9._\-]*)[\"'/]")
+
+_JCA_NAME_FAMILY = {
+    "RSA": "RSA", "RSASSA-PSS": "RSA", "EC": "EC", "ECDSA": "ECDSA", "ECDH": "ECDH",
+    "DH": "DH", "DIFFIEHELLMAN": "DH", "DSA": "DSA",
+    "XDH": "X25519", "X25519": "X25519", "X448": "X448",
+    "EDDSA": "EdDSA", "ED25519": "Ed25519", "ED448": "Ed448",
+    "DES": "DES", "DESEDE": "3DES", "TRIPLEDES": "3DES", "ARCFOUR": "RC4", "RC4": "RC4",
+    "SHA": "SHA1", "SHA-1": "SHA1", "SHA1": "SHA1", "MD5": "MD5",
+    "FALCON": "Falcon", "FALCON-512": "Falcon", "FALCON-1024": "Falcon",
+}
+
+
+def scan_jca_names(line: str) -> list[tuple[str, int, str]]:
+    """Families named as the algorithm of a JCA getInstance call, with the name used."""
+    out: list[tuple[str, int, str]] = []
+    for m in _JCA_CALL.finditer(line):
+        family = _JCA_NAME_FAMILY.get(m.group(1).upper())
+        if family:
+            out.append((family, m.start(), m.group(1)))
+    return out
 
 
 def scan_openssl3_names(line: str) -> list[tuple[str, int]]:
@@ -1627,6 +1669,22 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": f"{family} named in an OpenSSL 3 fetch or keygen call",
                 "excerpt": line.strip()[:200],
                 "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
+            })
+
+        for family, pos, name in scan_jca_names(line):
+            if family in seen_on_line or _in_blob(pos, blobs) or _in_spans(pos, spans):
+                continue
+            seen_on_line.add(family)
+            said = (" (XDH, which generates X25519 unless initialised for X448)"
+                    if name.upper() == "XDH" else f" ({name})")
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} named in a JCA getInstance call{said}",
+                "excerpt": line.strip()[:200],
+                "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial, code) else kind,
+                "in_test_code": in_test_code(rel_path),
             })
 
         # Names that stand for a configuration of several algorithms: an OPC UA
