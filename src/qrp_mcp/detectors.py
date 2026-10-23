@@ -144,7 +144,6 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # (lib/rsa.js: forge.pki.rsa), ZA-OPRAVYANE row 69.
         r"\bcrypto\.(?:publicEncrypt|privateDecrypt|privateEncrypt|publicDecrypt)\b|"
         r"\bforge\.pki\.rsa\b|\bpki\.rsa\.|"
-        r"\bcreate(?:Sign|Verify)\(\s*[\"'](?:RSA-)?SHA\d+[\"']|"
         r"\bcreate(?:Sign|Verify)\(\s*[\"']RSA[-\w]*[\"']|"
         r"\bRsaPrivateKey\b|\bRsaPublicKey\b|"
         # josepy's RSA key classes, and the signature OIDs of Python's `cryptography`.
@@ -201,7 +200,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # that text has no "withDSA" in it.
         # Not ML-DSA.Sign() or SLH-DSA.Sign(): those are the post-quantum
         # replacements, and naming them DSA is the worst way to be wrong.
-        r"(?<![A-Za-z-])dsa\.(?:GenerateKey|GenerateParameters|Sign|Verify)\b|"
+        # Nor ml_dsa.sign / slh_dsa.sign, the same names with an underscore (row 78).
+        r"(?<![A-Za-z_-])dsa\.(?:GenerateKey|GenerateParameters|Sign|Verify)\b|"
         r"OpenSSL::PKey::DSA\b|\w*withDSA\b|\bDsa::generate\b|\bDSA\.generate\b|"
         r"\bCKM_DSA_\w+|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
@@ -481,7 +481,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("ECDSA", "secp256k1 (ECDSA) usage", re.compile(
         r"secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
         r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|\bweb3\b|"
-        r"eth_sign|personal_sign|signTypedData",
+        # Whole method names: `personal_signature` is a form field, not the JSON-RPC
+        # call (ZA-OPRAVYANE row 78).
+        r"(?<![A-Za-z0-9])(?:eth_sign\w*|personal_sign)(?![A-Za-z0-9])|signTypedData",
         re.IGNORECASE,
     )),
     # RFC 8784. Quantum resistance with no post-quantum algorithm to find, so it
@@ -659,7 +661,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # Stateful hash-based, SP 800-208. CNSA 2.0 requires LMS or XMSS for firmware
     # and code signing, so a firmware pipeline that had complied scanned as empty.
     ("HSS/LMS", "LMS/HSS stateful signature usage", re.compile(
-        r"(?<![A-Za-z])lms[-_]?sha|(?<![A-Za-z])hss[-_/]?lms|(?<![A-Za-z])lms[-_]?(sha256|shake)|"
+        # `lms_sha` needs its digest after it: LMS_SHARED_SECRET is a learning
+        # management system's setting (row 78).
+        r"(?<![A-Za-z])lms[-_]?sha(?=\d|ke)|(?<![A-Za-z])hss[-_/]?lms|(?<![A-Za-z])lms[-_]?(sha256|shake)|"
         r"(?<![A-Za-z])hsslms|lms_sha256_m\d+_h\d+|"
         # Through the library API (ZA-OPRAVYANE row 50): wolfSSL's wc_LmsKey_* (lms.h),
         # hash-sigs' hss_* entry points, Bouncy Castle's LMS/HSS signers. Whole names only:
