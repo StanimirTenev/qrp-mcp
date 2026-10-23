@@ -90,9 +90,9 @@ whoever receives them. Both print the SHA-256 of what they wrote.
 
 | Tool | What it does |
 | --- | --- |
-| `scan_repo(path)` | Scans a directory's source, CI/CD configs and infrastructure-as-code; returns findings, a summary, and the coverage block below |
-| `export_cbom(path)` | The same reading as a CycloneDX 1.6 CBOM, with the coverage block inside it |
-| `compare_coverage(a, b)` | Whether two scans produced numbers that can be compared at all |
+| `scan_repo(path, level, profile)` | Scans a directory's source, CI/CD configs and infrastructure-as-code; returns findings, a summary, and the coverage block below |
+| `export_cbom(path, level)` | The same reading as a CycloneDX 1.6 CBOM, with the coverage block inside it |
+| `compare_coverage(first, second)` | Whether two scans produced numbers that can be compared at all |
 | `prove_closure(before, after)` | Which findings a change actually closed, from two saved scans of one tree — only if the two runs can be compared for it |
 | `list_algorithms()` | The algorithm families the server recognises and how each is classified |
 
@@ -101,7 +101,8 @@ whoever receives them. Both print the SHA-256 of what they wrote.
 **Chain and wallet code** — `secp256k1`, `ecrecover`, ethers, web3, bitcoinjs, `ECPair`,
 `btcec`, tweetnacl, `@solana/web3.js`, `solana_program`, `bls12-381`, blst, `@chainsafe/bls`,
 BIP340/Taproot Schnorr. Solidity (`.sol`), Rust (`.rs`), Move and Cairo are scanned alongside
-Python, Go, Java, JS/TS, Ruby, PHP, C/C++/C# — headers included — PowerShell, Perl and shell.
+Python, Go, Java, Kotlin, Scala, Groovy, JS/TS, Ruby, PHP, C/C++/C# — headers included — PowerShell,
+Perl and shell.
 
 **Classical crypto anywhere else** — RSA, DSA, DH, ECDSA and elliptic-curve usage, plus MD5,
 SHA-1, RC4 and DES/3DES. Not only through library calls: the names the protocols themselves use
@@ -195,7 +196,8 @@ it is the component Shor breaks.
 Classic McEliece, BIKE, HQC, FrodoKEM, XMSS, and the stateful LMS/HSS of SP 800-208 that
 CNSA 2.0 requires for firmware signing. The nine schemes NIST advanced to its third
 additional-signatures round in May 2026 — FAEST, HAWK, MAYO, MQOM, QR-UOV, SDitH, SNOVA,
-SQIsign, UOV — are recognised as candidates, and CROSS as dropped from that process.
+SQIsign, UOV — are recognised, the eight other than HAWK as candidates and HAWK as withdrawn
+(below), and CROSS as dropped from that process.
 
 Each carries the mathematical family it rests on (structured or unstructured lattice,
 code-based, hash-based, isogeny-based, multivariate, symmetric-based) and where it stands:
