@@ -1601,6 +1601,19 @@ _ALGORITHM_LIST_LINE = re.compile(
     r"cipher[-_]?(?:list|suites?)|\w*[Aa]lgorithms)\s*[:=]?\s", re.IGNORECASE)
 
 
+# A block a condition opens -- `if (err === 'ERR_UNSUPPORTED') {`, `} catch
+# (UnsupportedAlgorithmError) {`, `except UnsupportedAlgorithm:` -- is the code that runs
+# in that case, not a list of what is banned. Row 54 (0.34.0) stopped such a block from
+# turning calls into bans; a declaration inside it (`const curve = 'prime256v1'`) was still
+# one (ZA-OPRAVYANE row 90).
+_CONDITION_OPENER = re.compile(
+    r"^\s*\}?\s*(?:if|else|elif|elsif|catch|except|rescue|try|finally|switch|case|when|"
+    r"while|for|unless)\b")
+# A test that a call is rejected: everything in its block is attempted in order to fail,
+# calls included (row 91, certbot crypto_util_test.py:236).
+_REJECTION_TEST = re.compile(r"\b(?:pytest\.raises|assertRaises(?:Regex)?|assertThrows)\s*\(")
+
+
 def _opens_a_denial_block(line: str) -> bool:
     """`forbiddenAlgorithms:` on its own line, with the names indented below it.
 
@@ -1610,7 +1623,8 @@ def _opens_a_denial_block(line: str) -> bool:
     """
     stripped = line.rstrip()
     return bool(stripped.endswith((":", "= [", "=[", "{", "(", "["))
-                and _DENIAL_WORDS.search(stripped))
+                and _DENIAL_WORDS.search(stripped)
+                and not _CONDITION_OPENER.match(stripped))
 
 
 def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
@@ -1776,6 +1790,7 @@ def scan_source_file(path: Path, rel_path: str,
     inside_block = False
     inside_doc = ""
     denial_block_indent: int | None = None
+    denial_block_calls = False
     for line_no, line in enumerate(lines, start=1):
         was_inside = inside_block or bool(inside_doc)
         spans, inside_block = _comment_spans(line, ext, inside_block)
@@ -1790,9 +1805,10 @@ def scan_source_file(path: Path, rel_path: str,
         # The block governs list entries and declarations, never a call. `if (err.code
         # === 'ERR_UNSUPPORTED') {` opened one, and the classical fallback generated
         # inside it read as a ban (ZA-OPRAVYANE row 54).
-        in_denial = denial_block_indent is not None and kind != "call"
+        in_denial = denial_block_indent is not None and (kind != "call" or denial_block_calls)
         if _opens_a_denial_block(code):
             denial_block_indent = indent
+            denial_block_calls = bool(_REJECTION_TEST.search(code))
         # One line, one finding per algorithm. Several patterns can carry the same
         # name -- ECDSA is matched both by its own name and by secp256k1, X448 by
         # its upper and lower case forms -- and counting each pattern separately
