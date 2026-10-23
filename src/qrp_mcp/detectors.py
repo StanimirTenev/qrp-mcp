@@ -151,6 +151,12 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # certbot loads its account keys as `jose.JWKRSA.load(...)` in 19 files and none
         # was a finding.
         r"\bJWKRSA\b|\bComparableRSAKey\b|\bRSA_WITH_(?:MD5|SHA)\w*|"
+        # pycryptodome's RSA schemes (Crypto.Signature.pkcs1_15/pss/PKCS1_v1_5,
+        # Crypto.Cipher.PKCS1_OAEP/PKCS1_v1_5; also packaged as Cryptodome) and
+        # python-rsa's newkeys (rsa/key.py), ZA-OPRAVYANE row 71.
+        r"Crypto(?:dome)?\.(?:Signature|Cipher)\s+import\s+[^\n#]*\b(?:pkcs1_15|pss|PKCS1_OAEP|PKCS1_v1_5)\b|"
+        r"Crypto(?:dome)?\.(?:Signature\.(?:pkcs1_15|pss)|Cipher\.PKCS1_OAEP|(?:Signature|Cipher)\.PKCS1_v1_5)\b|"
+        r"\bpkcs1_15\.new\b|\bPKCS1_OAEP\.new\b|\brsa\.newkeys\b|"
         r"\bCKM_RSA_\w+|"
         # The names protocols and APIs use for the key type itself. OpenSSH's default
         # algorithm list, sshd_config, Vault's key types and AWS key specs name RSA
@@ -201,6 +207,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"KeyPairGenerator\.getInstance\(\s*[\"']DSA[\"']|openssl\s+dsaparam|"
         r"\bDSA_new\b|\bDSA_generate_key\w*|\bEVP_PKEY_DSA\b|"
         r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']dsa[\"']|"     # Node, row 69
+        r"\bDSSKey\b|"                                    # paramiko dsskey.py, row 71
         # include/openssl/dsa.h: the signing calls and the header (row 65).
         r"\bDSA_(?:do_)?(?:sign|verify)\b|[<\"]openssl/dsa\.h[>\"]|"
         r"\bDSACryptoServiceProvider\b|\bDSACng\b|\bDSA\.Create\b|"     # DSA.cs, row 70
@@ -243,6 +250,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # invisible to this rule.
         r"asymmetric\s+import\s+[^\n#]*\bec\b|"
         r"\bec\.(?:generate_private_key|derive_private_key|SECP\w+|SECT\w+)\b|"
+        # pycryptodome's ECC module (Crypto/PublicKey/ECC.py), row 71.
+        r"Crypto(?:dome)?\.PublicKey\s+import\s+[^\n#]*\bECC\b|Crypto(?:dome)?\.PublicKey\.ECC\b|"
+        r"\bECC\.(?:generate|import_key|construct)\b|"
         r"KeyPairGenerator\.getInstance\(\s*[\"']EC[\"']|openssl\s+ecparam|"
         r"\bEC_KEY_new\w*|\bEC_KEY_generate_key\b|\bEC_GROUP_new\w*|\bEVP_PKEY_EC\b|\bEC_POINT_\w+|"
         r"OpenSSL::PKey::EC\b|\bgenerateKeyPair(?:Sync)?\(\s*[\"']ec[\"']|"
@@ -294,7 +304,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bMD5\(|[<\"]openssl/md5\.h[>\"]|"
         # .NET 5+ one-shots and the hash name a signature call takes (MD5.cs,
         # HashAlgorithmName.cs; row 70).
-        r"\bMD5\.HashData(?:Async)?\b|\bHashAlgorithmName\.MD5\b",
+        r"\bMD5\.HashData(?:Async)?\b|\bHashAlgorithmName\.MD5\b|"
+        # pycryptodome (Crypto/Hash/MD5.py), row 71.
+        r"Crypto(?:dome)?\.Hash\s+import\s+[^\n#]*\bMD5\b|Crypto(?:dome)?\.Hash\.MD5\b|\bMD5\.new\b",
         re.IGNORECASE,
     )),
     ("SHA1", "SHA-1 usage", re.compile(
@@ -307,7 +319,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # OpenSSL's one-shot SHA1() (include/openssl/sha.h), row 65. Not the header:
         # sha.h declares SHA-256 and SHA-512 as well.
         r"\bSHA1\(|"
-        r"\bSHA1\.HashData(?:Async)?\b|\bHashAlgorithmName\.SHA1\b",     # .NET, row 70
+        r"\bSHA1\.HashData(?:Async)?\b|\bHashAlgorithmName\.SHA1\b|"     # .NET, row 70
+        # pycryptodome (Crypto/Hash/SHA1.py, and SHA.py, its old alias), row 71.
+        r"Crypto(?:dome)?\.Hash\s+import\s+[^\n#]*\bSHA1?\b|Crypto(?:dome)?\.Hash\.SHA1?\b|\bSHA1\.new\b",
         re.IGNORECASE,
     )),
     ("RC4", "RC4 usage", re.compile(
@@ -388,7 +402,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # (OPT_3DES_WRAP, OIDEncryptionAlgorithmDESEDE3CBC, NewTripleDESCipher).
         r"3DES|DES[-_]?EDE3?|TripleDES|EVP_des_ede3\w*|"
         # include/openssl/des.h: three-key DES in ECB, by its own name (row 65).
-        r"\bDES_ecb3_encrypt\b",
+        r"\bDES_ecb3_encrypt\b|"
+        # pycryptodome (Crypto/Cipher/DES3.py), row 71.
+        r"Crypto(?:dome)?\.Cipher\s+import\s+[^\n#]*\bDES3\b|Crypto(?:dome)?\.Cipher\.DES3\b|\bDES3\.new\b",
         re.IGNORECASE,
     )),
     ("DES", "DES usage", re.compile(
@@ -397,6 +413,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"crypto/des\b|\bDES_set_key\w*|\bDES_ecb_encrypt\b|"
         r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b|\bdes\.NewCipher\b|"
         r"\bDES\.Create\b|"                             # .NET DES.cs, row 70
+        r"Crypto(?:dome)?\.Cipher\s+import\s+[^\n#]*\bDES\b|Crypto(?:dome)?\.Cipher\.DES\b|"   # row 71
         # Node passes the cipher name to OpenSSL: single DES in one of its modes, not
         # des-ede3-* (row 69).
         r"\bcreate(?:Cipheriv|Decipheriv|Cipher|Decipher)\(\s*[\"']des(?:-(?:cbc|ecb|cfb|cfb1|cfb8|ofb))?[\"']",
@@ -463,6 +480,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # invisible while claiming the family was covered.
         r"(?<![A-Za-z])ECDHE?(?![A-Za-z])|\bECDH_compute_key\b|\bEVP_PKEY_ECDH\b|"
         r"\bec\.ECDH\b|(?<![A-Za-z])ecdh-sha2-nistp(?:256|384|521)|"
+        # pycryptodome's Crypto.Protocol.DH takes ECC keys only -- NIST curves,
+        # Curve25519, Curve448 (Crypto/Protocol/DH.py) -- so it is ECDH, not
+        # finite-field DH (row 71).
+        r"Crypto(?:dome)?\.Protocol\.DH\b|Crypto(?:dome)?\.Protocol\s+import\s+[^\n#]*\bDH\b|"
         # .NET's elliptic-curve Diffie-Hellman; it was filed under finite-field DH.
         r"\bECDiffieHellman(?:Cng|OpenSsl)?\b",
         re.IGNORECASE,
