@@ -6,9 +6,10 @@ a-c-biblioteki`, 23.10.2026): 35 % of the classical names were found, GnuTLS's `
 0 of 91, Mbed TLS's `PSA_WANT_` 4 of 55, OpenSSL's `DH_` 4 of 145. Every name below is
 from that measurement's tables, which read them from the libraries' own headers.
 
-The negatives are the measurement's own control: identifiers that contain the letters
-without naming the algorithm, 36 written by hand and 218 drawn from the same headers. They
-were all silent before and must stay silent.
+The negatives come from the measurement's own control: identifiers that contain the letters
+without naming the algorithm -- its 36 hand-written lines, 100 of its 218 library names, and
+four lines from the Linux kernel's headers. They were all silent before and must stay
+silent; the control itself (all 218) is re-run with the measurement's scripts.
 """
 
 import re
