@@ -758,6 +758,54 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bXEC(?:Key|PrivateKey|PublicKey|PrivateKeySpec|PublicKeySpec)\b")),
     ("BLS", "BLS named by a Bouncy Castle class", re.compile(r"\bBLS(?:Signer|KeyPairGenerator)\b")),
     ("Schnorr", "Schnorr named by a Bouncy Castle class", re.compile(r"\bBIP340Signer\b")),
+    # ---- ZA-OPRAVYANE row 138: JCA and Bouncy Castle algorithm names the `withRSA`/`withDSA`
+    # rules stopped short of (B classes C08, C10, C17, C18, C28, C29, C30, 23.10.2026): a
+    # suffix after the family (`...WithRSAEncryption`, `...inP1363Format`), the digest/scheme
+    # spelling (`SHA256/RSA`), and the EC and DH schemes not spelled ECDSA/ECDH. Names from
+    # the Bouncy Castle r1rv86v2 provider and JDK 27 Standard Names.
+    ("RSA", "RSA named by a JCA/Bouncy Castle signature or padding name", re.compile(
+        r"\w*with(?:RSAEncryption|RSASSA[-_]PSS|RSA/?PSS|RSA/X9\.31|RSA/ISO9796-2)\b|"
+        r"(?-i:(?<![A-Za-z0-9_])RAWRSA(?:SSA-PSS|PSS)?(?![A-Za-z0-9_]))|"
+        r"\bpadding\.(?:PSS|OAEP|PKCS1v15)\b|\bPKCS1v15\s*\(", re.IGNORECASE)),
+    ("RSA", "RSA named as <digest>/RSA", re.compile(
+        r"(?<![A-Za-z0-9])(?:MD[245]|SHA[-0-9()]*|RIPEMD\d+|RMD\d+)/RSA(?![A-Za-z])")),
+    ("DSA", "DSA named by a JCA/Bouncy Castle signature name", re.compile(
+        r"\w*withDSAinP1363Format\b|(?<![A-Za-z0-9])DSAwithSHA|"
+        r"(?<![A-Za-z0-9])(?:SHA[-0-9()]*|RIPEMD\d+)/DSA(?![A-Za-z])|"
+        r"(?-i:(?<![A-Za-z0-9_])(?:RAW|DET)DSA(?![A-Za-z0-9_]))|\w*with(?:DET|D)DSA\b",
+        re.IGNORECASE)),
+    ("ECDSA", "ECDSA named by a JCA/Bouncy Castle signature name", re.compile(
+        r"\w*withECDSAinP1363Format\b|(?:\w*with|(?<![A-Za-z0-9]))(?:DETECDSA|ECDDSA)\b",
+        re.IGNORECASE)),
+    # EC schemes that are not ECDSA or ECDH by name: Nyberg-Rueppel and ECCSI (RFC 6507) sign,
+    # ECIES and ECMQV agree a key on the curve; the cofactor and unified ECDH variants.
+    ("EC", "EC signature named as ECNR or ECCSI", re.compile(
+        r"(?:\w*with|(?<![A-Za-z0-9]))ECNR(?:Signer)?\b|\bECCSI\w*", re.IGNORECASE)),
+    ("ECDH", "ECDH named as ECIES, ECMQV or a cofactor/unified ECDH variant", re.compile(
+        r"(?<![A-Za-z])ECIES\w*|(?<![A-Za-z])EC(?:C?DH[CU]?|MQV)(?:with\w*?C?KDF)?(?![A-Za-z])|"
+        r"\bECDHC(?:Basic|Raw|Staged|Unified)Agreement\b|\bECMQV(?:Basic|Raw)Agreement\b|"
+        r"(?<![A-Za-z])MQVwith\w*?KDF\b|\bhpke\.(?:New)?DHKEM\w*", re.IGNORECASE)),
+    ("DH", "DH named by a KDF agreement, DHIES or a Bouncy Castle class", re.compile(
+        r"(?i:(?<![A-Za-z])DHU?with\w*?C?KDF\b|(?<![A-Za-z])DHIES\w*)|"
+        r"\bDH(?:Agreement|UnifiedAgreement|StandardGroups|BasicKeyPairGenerator)\b|"
+        r"\bMQVBasicAgreement\b")),
+    ("X25519", "XDH named by a Bouncy Castle agreement (X25519, or X448)", re.compile(
+        r"\bXDH(?:Basic|Unified)Agreement\b|(?<![A-Za-z])XDHwith\w+")),
+    ("ElGamal", "ElGamal named by Go's openpgp packages", re.compile(
+        r"\belgamal\.\w+|\w+ElGamal\w*")),
+    # The digest glued to the scheme in a signature or PBE name (`MD5withRSA`, `MD2/RSA`,
+    # `PBEWITHMD5ANDDES`). SHA-1 in the same shapes is row 143.
+    *[(family, f"{family} named in a signature or PBE name", re.compile(
+        rf"(?<![A-Za-z0-9]){family}(?=with|/|and)|PBEWITH{family}AND", re.IGNORECASE))
+      for family in ("MD5", "MD2", "MD4")],
+    # PKCS#12 and PKCS#5 PBE names: PKCS#12's bare `SHA` is SHA-1, DES2KEY/DES3KEY two- and
+    # three-key triple DES.
+    ("SHA1", "SHA-1 named in a PBE name", re.compile(r"PBEWITHSHA(?:-?1)?AND", re.IGNORECASE)),
+    ("RC2", "RC2 named in a PBE name", re.compile(r"PBEWITH\w*?AND\d*(?:BIT)?RC2", re.IGNORECASE)),
+    ("RC4", "RC4 named in a PBE name", re.compile(r"PBEWITH\w*?AND\d*(?:BIT)?RC4", re.IGNORECASE)),
+    ("3DES", "3DES named in a PBE name", re.compile(r"PBEWITH\w*?ANDDES[23]KEY", re.IGNORECASE)),
+    ("DES", "DES named in a PBE name", re.compile(
+        r"PBEWITH(?:MD2|MD5|SHA-?1?)ANDDES(?:-CBC)?(?![A-Za-z0-9])", re.IGNORECASE)),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
@@ -1144,6 +1192,12 @@ _JCA_NAME_FAMILY.update({
     "BIKE": "BIKE", "HAETAE": "HAETAE", "SMAUGT": "SMAUG-T", "SMAUG-T": "SMAUG-T",
     "AIMER": "AIMer", "NTRULPRIME": "NTRU", "SNTRUPRIME": "NTRU", "NTRUPLUS": "NTRU",
     "HQC": "HQC", "UOV": "UOV", "MAYO": "MAYO", "CMCE": "Classic McEliece",
+})
+# Row 138: Bouncy Castle's bare scheme names. DHKEM is HPKE's, over X25519/X448 or a NIST
+# curve (RFC 9180, JDK's DHKEM), so elliptic-curve.
+_JCA_NAME_FAMILY.update({
+    "OAEP": "RSA", "PSS": "RSA", "RSAPSS": "RSA", "RSA-KTS-KEM-KWS": "RSA", "DDSA": "DSA",
+    "DHKEM": "ECDH",
 })
 
 
