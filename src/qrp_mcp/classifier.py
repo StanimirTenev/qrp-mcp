@@ -121,6 +121,11 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("MIKE", "MIKE", "pqc_ready", "key_exchange"),
     ("CSIDH", "CSIDH/CTIDH", "pqc_ready", "key_exchange"),
     ("CTIDH", "CSIDH/CTIDH", "pqc_ready", "key_exchange"),
+    # Korea's KpqC selections (January 2025), which Bouncy Castle ships; no NIST or IETF
+    # standard behind any of them (ZA-OPRAVYANE row 139). NTRU+ is under NTRU above.
+    ("HAETAE", "HAETAE", "pqc_ready", "signature"),
+    ("AIMER", "AIMer", "pqc_ready", "signature"),
+    ("SMAUGT", "SMAUG-T", "pqc_ready", "key_exchange"),
     # Merkle Tree Certificates. Not an algorithm, and not a mechanism that protects
     # anything by being present: code naming MTC issues or verifies them, and whether
     # that authentication resists a quantum computer is the CA's and the cosigners'
@@ -148,6 +153,12 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     # hardness and fall to Shor exactly as ECDSA does.
     ("SCHNORR", "Schnorr", "classical_vulnerable", "signature"),
     ("BLS", "BLS", "classical_vulnerable", "signature"),
+    # Discrete-log schemes Shor breaks like the rest, which had no family: the Russian and
+    # Chinese elliptic-curve standards and ElGamal (row 139). SM2 used to be called EC.
+    ("GOSTR3410", "GOST R 34.10", "classical_vulnerable", "signature"),
+    ("GOST3410", "GOST R 34.10", "classical_vulnerable", "signature"),
+    ("SM2", "SM2", "classical_vulnerable", "signature"),
+    ("ELGAMAL", "ElGamal", "classical_vulnerable", "public_key"),
     ("DIFFIEHELLMAN", "DH", "classical_vulnerable", "key_exchange"),
     ("DHE", "DH", "classical_vulnerable", "key_exchange"),
     ("DH", "DH", "classical_vulnerable", "key_exchange"),
@@ -202,6 +213,10 @@ _PQC_SCHEMES: dict[str, tuple[str, str]] = {
     "CROSS": ("code-based", "eliminated"),
     "MIKE": ("isogeny-based", "research"),
     "CSIDH/CTIDH": ("isogeny-based", "research"),
+    # Recommended by a national body (KpqC, Korea), so candidate in the sense above.
+    "HAETAE": ("structured lattice", "candidate"),
+    "SMAUG-T": ("structured lattice", "candidate"),
+    "AIMer": ("symmetric-based", "candidate"),
 }
 
 _PQC_UNSAFE = ("withdrawn", "broken", "eliminated")
@@ -230,6 +245,9 @@ _WEAK_TOKENS: list[tuple[str, str]] = [
     # PKCS#12's legacy bag encryption (ZA-OPRAVYANE row 85); its 40-bit form is the
     # export-grade key length the scheme's name states.
     ("RC2", "RC2 is obsolete; PKCS#12's 40-bit RC2 has an export-grade key"),
+    # RFC 6150 and RFC 6149 moved both to Historic (row 139).
+    ("MD4", "MD4 is broken (RFC 6150)"),
+    ("MD2", "MD2 is broken (RFC 6149)"),
 ]
 
 _SYMMETRIC_TOKENS: list[tuple[str, str]] = [
@@ -324,6 +342,8 @@ _WORDLIKE_SUFFIX: dict[str, str] = {
     # "MIKEY" is RFC 3830, and "mtctr" is a PowerPC instruction in OpenSSL.
     "MIKE": r"(?!)",
     "MTC": r"(?!)",
+    # "aimer" is French for "to love" (row 139).
+    "AIMER": r"[-_]?(128|192|256)",
     # ECB is a block-cipher mode, not elliptic curves: "AES-ECB" read as EC (row 104).
     "EC": r"(?![Bb])",
 }

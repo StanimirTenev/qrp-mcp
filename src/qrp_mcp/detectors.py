@@ -638,6 +638,55 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("BLS", "BLS signature usage", re.compile(
         r"bls12[-_]?381|\bblst\b|@chainsafe/bls|\bbls_sig\b", re.IGNORECASE,
     )),
+    # ---- ZA-OPRAVYANE row 139: families the vocabulary did not have. Measured 23.10.2026
+    # (qrp-kachestvo/imena-2026-10-23): GOST R 34.10 in 331 library names, RC2 264, MD2 112,
+    # MD4 76, SM2 47, ElGamal, the KpqC schemes -- all unreported, and SM2 called EC. Names
+    # from Bouncy Castle r1rv86v2, OpenSSL 3.6 (include/openssl/{rc2,md2,md4}.h), pyca,
+    # pycryptodome and RustCrypto. A short name only glued to an API word or in a call.
+    ("GOST R 34.10", "GOST R 34.10 usage", re.compile(
+        r"(?:(?<![A-Za-z])|(?<=with))(?:EC)?GOST[-_ ]?R?[-_ ]?34\.?10|"
+        r"(?<![A-Za-z0-9])ECVKO|\bgost20(?:01|12)(?:_(?:256|512))?\b",
+        re.IGNORECASE)),
+    ("SM2", "SM2 usage", re.compile(
+        r"\bSM2(?:Engine|Signer|KeyPairGenerator|KeyExchange|ParameterSpec|WITH|with)|"
+        r"(?:WITH|With|with)SM2\b|\bcurveSM2\b|\bEVP_PKEY_SM2\b|\bsm2p256v1\b")),
+    ("ElGamal", "ElGamal usage", re.compile(r"\bElGamal\w*|\bELGAMAL\w*")),
+    ("RC2", "RC2 usage", re.compile(
+        r"\bRC2(?:Engine|WrapEngine|ParameterSpec|CryptoServiceProvider)\b|\bRC2\.Create\b|"
+        r"\bEVP_rc2\w*|\bRC2_(?:set_key|ecb_encrypt|encrypt|decrypt|cbc_encrypt|cfb64_encrypt|"
+        r"ofb64_encrypt)\b|[<\"]openssl/rc2\.h[>\"]|\balgorithms\.RC2\b|\bARC2\.(?:new|MODE_\w+)\b|"
+        r"Crypto(?:dome)?\.Cipher\s+import\s+[^\n#]*\bARC2\b|Crypto(?:dome)?\.Cipher\.ARC2\b|"
+        r"\brc2::|\bforge\.rc2\b|(?i:[\"']rc2-(?:40-|64-|128-)?(?:cbc|ecb|cfb|ofb)[\"'])")),
+    ("MD4", "MD4 usage", re.compile(
+        r"\bMD4(?:Digest|_Init|_Update|_Final|Init|Update|Final)\b|\bEVP_md4\b|\bmd4::|"
+        r"hashlib\.new\(\s*[\"']md4[\"']|Crypto(?:dome)?\.Hash(?:\s+import\s+[^\n#]*\b|\.)MD4\b|"
+        r"\bMD4\.new\b|[<\"]openssl/md4\.h[>\"]")),
+    ("MD2", "MD2 usage", re.compile(
+        r"\bMD2(?:Digest|_Init|_Update|_Final|Init|Update|Final)\b|\bEVP_md2\b|\bmd2::|"
+        r"Crypto(?:dome)?\.Hash(?:\s+import\s+[^\n#]*\b|\.)MD2\b|\bMD2\.new\b|[<\"]openssl/md2\.h[>\"]")),
+    # NIST's name for triple DES and the RC4 alias; neither is a word.
+    ("3DES", "3DES named as TDEA", re.compile(r"(?<![A-Za-z0-9])TDEA(?:WRAP)?(?![A-Za-z0-9])")),
+    ("RC4", "RC4 named as ARCFOUR", re.compile(
+        r"(?<![A-Za-z0-9])arcfour(?:128|256)?(?![A-Za-z0-9])", re.IGNORECASE)),
+    # Korea's KpqC selections and BIKE by Bouncy Castle's parameter names. "Smaug" is a
+    # dragon and "aimer" French, so both need their T or a parameter set or an API word.
+    ("HAETAE", "HAETAE usage (KpqC)", re.compile(r"(?<![A-Za-z])haetae", re.IGNORECASE)),
+    ("SMAUG-T", "SMAUG-T usage (KpqC)", re.compile(r"(?<![A-Za-z])(?i:smaug[-_]?t)(?![a-z])")),
+    ("AIMer", "AIMer usage (KpqC)", re.compile(
+        r"(?<![A-Za-z])AIM(?:er|ER)(?=[-_]?(?:128|192|256)|[A-Z])|"
+        r"(?i:(?<![A-Za-z])aimer[-_]?(?:128|192|256)[fs]?)")),
+    ("BIKE", "BIKE usage", re.compile(r"(?<![A-Za-z])BIKE(?:128|192|256)(?![0-9])")),
+    # Bouncy Castle's lightweight classes for the post-quantum schemes (org/bouncycastle/
+    # pqc/crypto/*), whose names put the API word straight after the scheme.
+    *[(family, f"{family} named by a Bouncy Castle class", re.compile(
+        rf"\b(?:{names})(?:KEMExtractor|KEMGenerator|KeyGenerationParameters|KeyPairGenerator|"
+        rf"PrivateKeyParameters|PublicKeyParameters|Signer)\b"))
+      for names, family in (("HQC", "HQC"), ("UOV", "UOV"), ("CMCE", "Classic McEliece"),
+                            ("Falcon", "Falcon"), ("NTRU|NTRUPlus|NTRULPRime|SNTRUPrime", "NTRU"),
+                            ("HAETAE", "HAETAE"), ("AIMer", "AIMer"), ("SmaugT", "SMAUG-T"),
+                            ("Mayo", "MAYO"), ("LMS|HSS", "HSS/LMS"))],
+    ("HSS/LMS", "HSS/LMS named by a Bouncy Castle class", re.compile(
+        r"\bLM(?:Ots|Sig)Parameters\b")),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
@@ -709,8 +758,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # spelled ntruhps2048509 / ntruhrss701 / ntru_prime, so they are named rather
     # than left to a boundary that cannot tell them from an ordinary word.
     ("NTRU", "NTRU usage", re.compile(
-        r"(?<![A-Za-z])ntru(?:hps|hrss|prime|[-_\d]|(?![A-Za-z]))|"
-        r"(?<![A-Za-z])sntrup\d+",
+        # NTRU LPRime and NTRU+ (KpqC) by Bouncy Castle's names, row 139.
+        r"(?<![A-Za-z])ntru(?:hps|hrss|prime|lpr|plus|[-_\d]|(?![A-Za-z]))|"
+        r"(?<![A-Za-z])sntrup(?:\d+|rime)",
         re.IGNORECASE,
     )),
     ("BIKE", "BIKE usage", re.compile(r"(?<![A-Za-z])bike[-_]?l[135]", re.IGNORECASE)),
@@ -718,7 +768,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # hqc1/hqc3/hqc5 (src/kem/kem.h, ALGORITHMS.md; ZA-OPRAVYANE row 81).
     ("HQC", "HQC usage", re.compile(r"(?<![A-Za-z])hqc[-_]?(?:128|192|256|[135])(?![0-9])",
                                     re.IGNORECASE)),
-    ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss", re.IGNORECASE)),
+    # Also hash-then-sign, SHA256WITHXMSSMT (Bouncy Castle), row 139.
+    ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss|(?<=with)xmss", re.IGNORECASE)),
     # Stateful hash-based, SP 800-208. CNSA 2.0 requires LMS or XMSS for firmware
     # and code signing, so a firmware pipeline that had complied scanned as empty.
     ("HSS/LMS", "LMS/HSS stateful signature usage", re.compile(
@@ -980,7 +1031,7 @@ _FETCH_CALL = re.compile(
 # alone rather than turned into a family nobody can check.
 _FETCH_NAME_FAMILY = {
     "RSA": "RSA", "RSA-PSS": "RSA", "RSASSA-PSS": "RSA",
-    "EC": "EC", "ECDSA": "ECDSA", "ECDH": "ECDH", "SM2": "EC",
+    "EC": "EC", "ECDSA": "ECDSA", "ECDH": "ECDH", "SM2": "SM2",     # SM2: row 139
     "ED25519": "Ed25519", "ED448": "Ed448", "X25519": "X25519", "X448": "X448",
     "DSA": "DSA", "DH": "DH", "DHX": "DH",
     "ML-KEM": "ML-KEM", "ML-KEM-512": "ML-KEM", "ML-KEM-768": "ML-KEM", "ML-KEM-1024": "ML-KEM",
@@ -1014,6 +1065,15 @@ _JCA_NAME_FAMILY = {
     "SHA": "SHA1", "SHA-1": "SHA1", "SHA1": "SHA1", "MD5": "MD5",
     "FALCON": "Falcon", "FALCON-512": "Falcon", "FALCON-1024": "Falcon",
 }
+# Row 139: the families added then, and Bouncy Castle's names for the post-quantum ones
+# (BouncyCastlePQCProvider, read in r1rv86v2).
+_JCA_NAME_FAMILY.update({
+    "SM2": "SM2", "ELGAMAL": "ElGamal", "RC2": "RC2", "RC2WRAP": "RC2", "TDEA": "3DES",
+    "TDEAWRAP": "3DES", "MD2": "MD2", "MD4": "MD4", "LMS": "HSS/LMS", "HSS": "HSS/LMS",
+    "BIKE": "BIKE", "HAETAE": "HAETAE", "SMAUGT": "SMAUG-T", "SMAUG-T": "SMAUG-T",
+    "AIMER": "AIMer", "NTRULPRIME": "NTRU", "SNTRUPRIME": "NTRU", "NTRUPLUS": "NTRU",
+    "HQC": "HQC", "UOV": "UOV", "MAYO": "MAYO", "CMCE": "Classic McEliece",
+})
 
 
 # COSE algorithm identifiers (IANA "COSE Algorithms", algorithms.csv, read 23.10.2026), as
