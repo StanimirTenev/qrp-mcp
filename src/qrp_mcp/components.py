@@ -72,6 +72,10 @@ _MODULE_FAMILY = {"DHparams": "DH", "DSAparams": "DSA"}
 # digits, a lower-case word. `RSAPrivateKey` is RSA + Private + Key; `Arc4Process` is
 # Arc4 + Process; `sha1WithRSAEncryption` is sha1 + With + RSA + Encryption.
 _PART = re.compile(r"[A-Z0-9]+(?=[A-Z][a-z])|[A-Z][a-z]+[0-9]*|[A-Z0-9]+|[a-z]+[0-9]*")
+# A hash or cipher beside one of these is a MAC or a key derivation (row 131).
+_MAC = {"HMAC", "MAC", "CMAC", "PRF"}
+_KDF = {"KDF", "PBKDF", "PBKDF1", "PBKDF2", "PBE", "PBES1", "PBES2"}
+MAC_OR_KDF_NOTE = "a quantum computer does not break it"
 
 
 def components(name: str) -> list[str]:
@@ -101,7 +105,7 @@ def components(name: str) -> list[str]:
 
 
 def families(parts: list[str]) -> list[tuple[str, str | None]]:
-    """(family, use) for each algorithm component, in order."""
+    """(family, use) for each algorithm component, in order; use is "MAC", "KDF" or None."""
     out: list[tuple[str, str | None]] = []
     for i, p in enumerate(parts):
         # A size glued on: FFDHE6144, RSA2048, DSA1024.
@@ -112,11 +116,19 @@ def families(parts: list[str]) -> list[tuple[str, str | None]]:
             family = "ECDH"
         if not family or any(f == family for f, _ in out):
             continue
-        out.append((family, None))
+        near = set(parts[max(0, i - 2):i + 3])
+        use = None
+        if family in {"MD5", "SHA1", "SHA224", "SHA3-224"}:
+            use = "MAC" if near & _MAC else "KDF" if near & _KDF else None
+        elif family in {"DES", "3DES"} and near & _MAC:     # CBC-MAC; PBE's cipher encrypts
+            use = "MAC"
+        out.append((family, use))
     return out
 
 
 def _describe(family: str, use: str | None, name: str) -> str:
+    if use:
+        return f"{family} used in a {use} ({name}); {MAC_OR_KDF_NOTE}"
     return f"{family} named as a component of {name}"
 
 
@@ -174,5 +186,6 @@ def _names(line: str) -> list[tuple[str, int, str]]:
                                                               for p in parts):
             continue
         for family, use in found:
-            out.append((family, m.start(1), f"{family} named by the algorithm name {name}"))
+            out.append((family, m.start(1), (_describe(family, use, name) if use else
+                                             f"{family} named by the algorithm name {name}")))
     return out

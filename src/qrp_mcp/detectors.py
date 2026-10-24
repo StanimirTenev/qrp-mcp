@@ -805,6 +805,19 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\b(?:X509_V_FLAG_USE_MTC_DRAFT_PLANTS_\d+|NID_(?:alg_mtcProof|pe_mtcCertificationAuthority)_draft|"
         r"MTCAnchor|kVerifyMTCs|VerifyMTCs|verify-mtcs)\b",
     )),
+    # MD5, SHA-1 and DES as a MAC or inside a key derivation: HmacSHA1, sshd's `MACs
+    # hmac-sha1`, PBKDF2WithHmacSHA1, strongSwan's prfsha1, Bouncy Castle's DESMAC. Reported
+    # as the hash or cipher it is, with the use and that a quantum computer does not break
+    # it -- an inventory that skips it is silent about it (ZA-OPRAVYANE row 131, decided
+    # 24.10.2026). Names from the JDK standard names, BC, .NET, Go x/crypto/ssh, ring, the
+    # IANA SSH registry and strongSwan (qrp-kachestvo/imena-2026-10-23, class C09).
+    ("SHA1", "SHA-1 in HMAC (a MAC, or the PRF of a key derivation); " + components.MAC_OR_KDF_NOTE,
+     re.compile(r"(?:pbkdf2?[-_]?(?:with)?|pbe(?:with)?)?(?:hmac(?:pbe)?|prf)[-_/]?sha-?1"
+                r"(?:[-_]?96)?(?![0-9])", re.IGNORECASE)),
+    ("MD5", "MD5 in HMAC (a MAC, or the PRF of a key derivation); " + components.MAC_OR_KDF_NOTE,
+     re.compile(r"(?:hmac|prf)[-_/]?md5(?:[-_]?96)?(?![0-9])", re.IGNORECASE)),
+    ("DES", "DES as a MAC (CBC-MAC, ISO 9797); " + components.MAC_OR_KDF_NOTE,
+     re.compile(r"(?<![A-Za-z0-9])DES(?:C?MAC(?:64)?|64|(?:WITH)?ISO9797\w*)")),
 ]
 
 # The curve a DNSSEC mnemonic names, by the rule that matched it.
