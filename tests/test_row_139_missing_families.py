@@ -116,3 +116,9 @@ def test_sm2_is_no_longer_plain_ec():
 ])
 def test_lookalikes_stay_silent(line, name):
     assert _families(line, name) == set(), line
+
+
+def test_the_cbom_names_their_primitives():
+    from qrp_mcp.cyclonedx import _primitive
+    assert _primitive("SMAUG-T") == "kem"
+    assert _primitive("MD2") == "hash" and _primitive("MD4") == "hash"

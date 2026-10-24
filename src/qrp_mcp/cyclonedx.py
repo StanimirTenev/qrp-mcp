@@ -69,6 +69,7 @@ _PRIMITIVE_BY_KIND = {
 }
 _KEM_FAMILIES = {
     "ML-KEM", "Kyber", "FrodoKEM", "Classic McEliece", "NTRU", "BIKE", "HQC", "SIKE",
+    "SMAUG-T",      # ZA-OPRAVYANE row 139
 }
 _PRIMITIVE_BY_FAMILY = {
     "MD5": "hash",
@@ -77,6 +78,8 @@ _PRIMITIVE_BY_FAMILY = {
     "3DES": "block-cipher",
     "RC4": "stream-cipher",
     "RC2": "block-cipher",
+    "MD2": "hash",      # MD2 and MD4: row 139
+    "MD4": "hash",
     "SHA-224": "hash",
     "SHA3-224": "hash",
     "AES-ECB": "block-cipher",
