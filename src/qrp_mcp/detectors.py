@@ -311,7 +311,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bDHBasicAgreement\b|\bDHKeyPairGenerator\b|\bDHParametersGenerator\b|"
         # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
         # finite-field Diffie-Hellman.
-        r"(?<![A-Za-z])modp(?:1024|1536|2048|3072|4096|6144|8192)(?![0-9])",
+        r"(?<![A-Za-z])modp(?:768|1024|1536|2048|3072|4096|6144|8192)(?![0-9])",   # 768: row 141
         re.IGNORECASE,
     )),
     ("MD5", "MD5 usage", re.compile(
@@ -874,6 +874,57 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RC2", "RC2 named by a package, enum or constant", re.compile(
         r"\bCipherAlgorithmType\.Rc2\b|CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?"
         r"RC2(?:CryptoServiceProvider)?\"")),
+    # ---- ZA-OPRAVYANE row 141: protocol settings (B classes C04, C11-C15, 23.10.2026). Names
+    # from IANA's TLS SignatureScheme, SSH, JOSE, COSE and DNSSEC registries (read 21.10 to
+    # 29.09.2026), Go crypto/tls and strongSwan 6.1.0's proposal keywords. Short words only
+    # under the key that gives them their meaning; the match starts at the key.
+    ("RSA", "RSA named by a TLS SignatureScheme, SSH or JOSE/COSE name", re.compile(
+        r"(?<![A-Za-z0-9_])rsa_(?:pss_(?:rsae|pss)_sha(?:256|384|512)|"
+        r"pkcs1_(?:sha1|sha224|sha256|sha384|sha512|md5)(?:_legacy)?)(?![A-Za-z0-9_])|"
+        r"\btls\.(?:PKCS1|PSS)WithSHA\d+\b|"
+        r"(?<![A-Za-z0-9-])(?:rsa(?:1024|2048)-sha(?:1|256)|(?:spki|pgp)-sign-rsa|"
+        r"x509v3-rsa2048-sha256)(?![A-Za-z0-9-])|(?<![A-Za-z])RSAES-OAEP\b|"
+        r"[\"']alg[\"']\s*:\s*[\"']RS1[\"']")),
+    ("DSA", "DSA named by an SSH host key type or a BIND algorithm", re.compile(
+        r"(?<![A-Za-z0-9-])(?:spki|pgp)-sign-dss(?![A-Za-z0-9-])|"
+        r"\balgorithm\s+[\"']?dsa[\"']?\s*;", re.IGNORECASE)),
+    ("DH", "DH named by an SSH GSS key exchange or a BIND algorithm", re.compile(
+        r"(?<![A-Za-z0-9-])gss-(?:group\d+|gex)-sha\d+-|\balgorithm\s+[\"']?dh[\"']?\s*;",
+        re.IGNORECASE)),
+    ("SM2", "SM2 named by a TLS SignatureScheme or DNSSEC mnemonic", re.compile(
+        r"(?<![A-Za-z0-9])(?:sm2sig_sm3|sm2sm3)(?![A-Za-z0-9])", re.IGNORECASE)),
+    ("GOST R 34.10", "GOST R 34.10 named by a DNSSEC mnemonic", re.compile(
+        r"(?<![A-Za-z0-9-])ecc-gost(?:12)?(?![A-Za-z0-9-])", re.IGNORECASE)),
+    ("DES", "DES named as an SSH cipher", re.compile(
+        r"(?<![A-Za-z0-9])des-cbc(?:@ssh\.com)?(?![A-Za-z0-9-])", re.IGNORECASE)),
+    ("MD5", "MD5 named as an SSH MAC", re.compile(
+        r"(?<![A-Za-z0-9-])hmac-md5(?:-96)?(?:-etm@openssh\.com)?(?![A-Za-z0-9-])")),
+    # strongSwan proposals (swanctl.conf `proposals`, ipsec.conf `ike`/`esp`/`ah`): the
+    # keywords between dashes, read only on such a line.
+    *[(family, f"{family} named in a strongSwan proposal", re.compile(
+        rf"\b(?:proposals|ike|esp|ah)\s*=\s*[^#\n]*?(?<![A-Za-z0-9_])(?:{words})(?=[-,!\s]|$)",
+        re.IGNORECASE))
+      for family, words in (("DES", "des"), ("SHA1", "sha1?|sha1_160"), ("MD5", "md5(?:_128)?"))],
+    ("EC", "EC named by a strongSwan brainpool group", re.compile(
+        r"(?<![A-Za-z])ecp(?:224|256|384|512)bp(?![0-9A-Za-z])", re.IGNORECASE)),
+    # JOSE (RFC 7518, draft-ietf-jose-hpke-encrypt) and COSE (RFC 9864) names, only as an
+    # `alg` value or a quoted name: HPKE-0..2 and 7 are NIST curves, 3-4 X25519, 5-6 X448.
+    ("SHA1", "SHA-1 named as a JOSE algorithm (RS1, HS1)", re.compile(
+        r"[\"']alg[\"']\s*:\s*[\"'][RH]S1[\"']")),
+    ("ECDSA", "ECDSA named as a fully specified JOSE/COSE algorithm (ESP*, ESB*)", re.compile(
+        r"[\"'](?:ESP(?:256|384|512)|ESB(?:256|320|384|512))[\"']")),
+    ("ECDH", "ECDH named as a JOSE HPKE algorithm (P-256, P-384, P-521)", re.compile(
+        r"[\"']HPKE-[0127](?:-KE)?[\"']")),
+    ("X25519", "X25519 named as a JOSE HPKE algorithm", re.compile(r"[\"']HPKE-[34](?:-KE)?[\"']")),
+    ("X448", "X448 named as a JOSE HPKE algorithm", re.compile(r"[\"']HPKE-[56](?:-KE)?[\"']")),
+    # A JWK/COSE key's curve and type (RFC 7518 6.2, RFC 9053 7.1).
+    ("EC", "EC named by a JWK or COSE key's crv or kty", re.compile(
+        r"[\"']crv[\"']\s*:\s*[\"'](?:P-(?:256|384|521)|brainpoolP\d{3}r1|secp256k1)[\"']|"
+        r"[\"']kty[\"']\s*:\s*[\"']EC2?[\"']")),
+    ("X448", "X448 named by Node's key generation", re.compile(
+        r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']x448[\"']")),
+    # Curve448 by name: OpenSSH's curve448-sha512, strongSwan's curve448, pycryptodome.
+    ("X448", "X448 named as curve448", re.compile(r"(?<![A-Za-z])curve448(?![0-9])", re.IGNORECASE)),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
@@ -1282,7 +1333,16 @@ COSE_ALGORITHMS = {
     -259: ("RSA", "RS512"), -48: ("ML-DSA", "ML-DSA-44"), -49: ("ML-DSA", "ML-DSA-65"),
     -50: ("ML-DSA", "ML-DSA-87"),
 }
-_COSE_ALG = re.compile(r"[\"']?\balg[\"']?\s*[:=]\s*(-\d{1,3})(?![0-9])")
+# Row 141: RS1 (-65535), the brainpool ESB* (-265..-268), HSS-LMS (-46), RSAES-OAEP
+# (-40..-42), ECDH-ES/SS with and without key wrap (-25..-34) and SHA-1 (-14).
+COSE_ALGORITHMS.update({
+    -65535: ("RSA", "RS1"), -265: ("ECDSA", "ESB256"), -266: ("ECDSA", "ESB320"),
+    -267: ("ECDSA", "ESB384"), -268: ("ECDSA", "ESB512"), -46: ("HSS/LMS", "HSS-LMS"),
+    -40: ("RSA", "RSAES-OAEP"), -41: ("RSA", "RSAES-OAEP w/ SHA-256"),
+    -42: ("RSA", "RSAES-OAEP w/ SHA-512"), -14: ("SHA1", "SHA-1"),
+    **{n: ("ECDH", f"ECDH ({n})") for n in range(-34, -24)},
+})
+_COSE_ALG = re.compile(r"[\"']?\balg[\"']?\s*[:=]\s*(-\d{1,5})(?![0-9])")
 _COSE_CONTEXT = re.compile(r"public-key|pubKeyCredParams|\bcose", re.IGNORECASE)
 
 
