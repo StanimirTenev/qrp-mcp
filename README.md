@@ -140,7 +140,7 @@ DNSSEC Algorithm Numbers, read 22 Oct 2026), only in the shape of a record — `
 `flags 3 alg`, `DS`/`CDS` `tag alg digest-type digest`, `RRSIG type alg`, and BIND's
 `static-key`/`initial-key`/`static-ds`/`initial-ds` trust anchors: 1, 5, 7, 8, 10 RSA; 2 DH;
 3, 6 DSA; 13, 14 ECDSA with the curve; 15 Ed25519; 16 Ed448; 17 SM2; 18 ML-DSA. A bare `8`
-is a number, not RSA. ECC-GOST (12, 23) has no family here and is left unnamed. `.zone` files are
+is a number, not RSA. ECC-GOST (12, 23) is GOST R 34.10 from 0.36.0 (before, it was left unnamed). `.zone` files are
 read. Not read: PowerDNS's `ecdsa256`/`ecdsa384` as DNSSEC names — they are found as ECDSA by the
 ordinary rule, without a curve, because the same word is a variable name in OpenSSH; a bare `DSA`
 (algorithm 3) as a mnemonic; the `.private` files `dnssec-keygen` writes; zone files saved under
@@ -956,6 +956,66 @@ On certbot 9 more files are read (four Dockerfiles, four nginx `sites-*` files, 
 coverage 65.84% → 66.56%; the findings, the readiness and the 42 TLS places are the same; one
 evidence line moves from a call to a ban (`make_key(… key_type='ecdsa')` under
 `pytest.raises(… 'Unsupported elliptic curve …')`).
+
+**From 0.36.0**, after a measurement of 23 Oct 2026 that took the names each crypto library
+publishes in its own public headers (OpenSSL, BoringSSL, Mbed TLS, wolfSSL, libsodium, liboqs,
+NSS, GnuTLS, libgcrypt, libssh2) and from registries and language APIs (JCA/Bouncy Castle, Go,
+.NET, Rust, Python, IANA TLS/SSH/DNSSEC/JOSE/COSE), and ran every name through the scanner. Rules
+written from examples found the examples; the names below were missed:
+
+- **An algorithm as a whole part of a library identifier.** A name that starts with a prefix the
+  library owns is split at `_` and case changes, and each part that names an algorithm reports
+  its family: `GNUTLS_SIGN_DSA_SHA256`, `GCRY_MD_SHA1`, `LIBSSH2_HOSTKEY_HASH_MD5`,
+  `PSA_WANT_ALG_*`, `OPENSSL_NO_DSA`, `RSA_R_*` error codes, `d2i_DSAPublicKey`,
+  `PEM_write_bio_RSAPrivateKey`, `gnutls_pubkey_export_rsa_raw`. Without a prefix only OpenSSL's
+  module API counts, and only where it is called or declared (`DSA_free(`, `SHA224_Init(`):
+  `DH_STATUS_OK`, `DESCRIPTION` and `rsa_logo_draw` stay silent, and `ML_DSA` is not DSA.
+- **OIDs, by name and by number.** `NID_`/`SN_`/`LN_`/`OBJ_`/`SEC_OID_` names, X.509 object names
+  as strings (`sha1WithRSAEncryption`, `id-ecPublicKey`), and the well-known dotted OIDs from their
+  RFCs (`"1.2.840.113549.1.1.5"` is RSA with SHA-1), also as Go `asn1.ObjectIdentifier{…}`.
+- **PKCS#11:** `CKK_*`, `CKM_*` and `CKA_*` name the algorithm (`CKK_RSA`, `CKM_ECMQV_DERIVE`).
+- **Cipher suites name what they imply:** OpenSSL's `TLS1_CK_*`/`SSL3_CK_*`, JSSE `SSL_*`, and
+  OpenSSL strings such as `DES-CBC-SHA` and `EXP-RC4-MD5` now report the RSA or DH they leave
+  unspoken, and the SHA-1 of the record MAC.
+- **Headers, C types and classes:** `<openssl/ec.h>`, `<mbedtls/dhm.h>`, `EC_GROUP`, `MD5_CTX`,
+  `RC4_KEY`, Bouncy Castle and JCA classes such as `DSASigner`, `ECDHBasicAgreement`,
+  `RSAKeyGenParameterSpec`.
+- **JCA and Bouncy Castle spellings:** `SHA256WithRSAEncryption`, `SHA256/RSA`,
+  `…inP1363Format`, PSS/OAEP/`PKCS1v15()`, ECIES/ECMQV/det-ECDSA, PBE names with their digest
+  and cipher, ElGamal.
+- **Families that were not in the vocabulary:** GOST R 34.10, SM2 (reported as EC before),
+  ElGamal — all quantum-vulnerable; MD2, MD4 and RC2 as weak; HAETAE, SMAUG-T and AIMer as
+  candidates, never `pqc_ready`; BIKE, NTRU LPRime, XMSS^MT and LMS/HSS class names.
+- **Language qualifiers:** Go `dsa.`, `elliptic.`, `crypto.SHA1`, `x509.DSA`, `ssh.KeyAlgoRSA`;
+  Rust `k256::`, rustls and ring constants; .NET Cng types, padding modes and CryptoConfig
+  names; pycryptodome `RSA.generate`, python-rsa.
+- **Protocol settings:** TLS SignatureScheme `rsa_pss_*`/`rsa_pkcs1_*`; sshd `des-cbc`,
+  `hmac-md5`, `curve448`; strongSwan proposals; rare `Groups =` curves; DNSSEC `dsa`, GOST and
+  SM2; JOSE/COSE `RS1`, `HPKE-*` and numbers; JWK `"kty":"EC"`.
+- **Both halves of a hybrid:** `MLDsa65WithECDsaP256`, `ssh-mldsa87-p384`,
+  `KeyExchangeMLKEM768X25519`, `SHA512WITHMLDSA65`.
+- **SHA-1 joined to something** (`HmacSHA1`, `SHA1_`, `-SHA1`), never `sha1sum` or a sentence;
+  X448 in camelCase, all `efrodokem_*`, the LMS constants of wolfSSL, liboqs and Mbed TLS.
+
+Two policies decided with it. **MD5, SHA-1 or DES used as a MAC, PRF or KDF is reported**, under
+the hash or cipher, and its description says the use and that a quantum computer does not break
+it: an inventory that drops a use silently is the defect we would name in another tool. **An
+algorithm named in prose is not a finding** — in a comment, as before, and now in a sentence
+inside a string (`"supports Ed25519 and ML-KEM"`: three or more words, one of them a word
+only prose uses); it goes to `named_but_not_used`. A name as
+a whole part of an identifier is a finding.
+
+On OpenSSH the files read (740 of 873, 84.77%), the readiness by role and the verdict are the same
+as in 0.35.0; the findings grow from 65 to 70 (DES, GOST R 34.10 from the bundled `pkcs11.h`,
+RC4, SHA-224, SHA3-224 are new families) and the evidence from 8,016 to 8,659 lines; no family
+loses a line. On certbot the files read (832 of 1,250), the findings and the readiness are the
+same; the evidence grows from 628 to 656 lines (TSIG `HMAC-SHA1`, `-SHA` suites in server
+configs, pyca `ec.EllipticCurve*`). No family loses an evidence line in either. A scan of OpenSSH
+took 28 s against 26 s for 0.35.0 on the same machine (one run each).
+
+⚠️ What is not claimed: recall on real code. The rules were written against the measured names;
+how much of a real codebase's cryptography is named this way was not measured. Still not seen:
+the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
 ### A classical group offered on its own
 
