@@ -2108,7 +2108,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "in_test_code": in_test_code(rel_path),
             })
         # The algorithm as a component of a library's own name: GNUTLS_SIGN_DSA_SHA256,
-        # d2i_DSAPublicKey (ZA-OPRAVYANE rows 132 and 133; see components.py).
+        # d2i_DSAPublicKey, CKK_RSA (ZA-OPRAVYANE rows 132, 133, 135; see components.py).
         for family, pos, said in components.scan(searched):
             if family in seen_on_line or _in_blob(pos, blobs):
                 continue

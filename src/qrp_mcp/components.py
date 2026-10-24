@@ -1,7 +1,7 @@
-"""Algorithm names as components of library identifiers (ZA-OPRAVYANE rows 132 and 133).
+"""Algorithm names as components of library identifiers (ZA-OPRAVYANE rows 132, 133, 135).
 
 A C library names the algorithm inside a longer name -- GNUTLS_SIGN_DSA_SHA256,
-d2i_DSAPublicKey, wc_curve448_make_key -- and the family patterns in detectors.py
+d2i_DSAPublicKey, wc_curve448_make_key, CKK_RSA -- and the family patterns in detectors.py
 did not reach them: over the public headers of ten libraries (qrp-kachestvo/imena-2026-10-23,
 measured 23.10.2026) 35 % of the classical names were found, GnuTLS's 0 of 91. One rule
 over one vocabulary instead: a name is split into its components, at `_` and where the case
@@ -40,14 +40,14 @@ _SIZED = re.compile(r"(FFDHE|RSA|DSA|DHE|DH)\d{3,5}")
 
 # Prefixes a library owns: after one, every component is an algorithm slot. GnuTLS,
 # libgcrypt, libssh2, Mbed TLS / PSA, OpenSSL (feature macros, EVP, PEM, DER, providers,
-# engines) and wolfSSL. SSL_ only before a lower-case function part: SSL_RSA_WITH_* is
-# a suite.
+# engines), wolfSSL and PKCS#11 (CKK_ key types, CKM_ mechanisms, CKA_ attributes). SSL_
+# only before a lower-case function part: SSL_RSA_WITH_* is a suite.
 _PREFIXES = (
     "GNUTLS_", "gnutls_", "GCRY_", "gcry_", "LIBSSH2_", "libssh2_",
     "MBEDTLS_", "mbedtls_", "PSA_WANT_", "PSA_ALG_", "PSA_KEY_TYPE_", "psa_",
     "OPENSSL_NO_", "EVP_", "PEM_", "d2i_", "i2d_",
     "OSSL_", "PROV_NAMES_", "ENGINE_", "ERR_R_", "BN_",
-    "WC_", "wc_", "WOLFSSL_", "wolfSSL_", "CTC_",
+    "CKK_", "CKM_", "CKA_", "WC_", "wc_", "WOLFSSL_", "wolfSSL_", "CTC_",
     "PKCS5_", "PKCS12_",
 )
 # Also OpenSSL's: SSL_ calls, and every library's reason and function codes (X509_R_*,
