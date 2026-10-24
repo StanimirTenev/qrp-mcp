@@ -2085,6 +2085,27 @@ def _code_only(line: str, spans: list[tuple[int, int]]) -> str:
     return "".join(chars)
 
 
+# A sentence in a string is read the way a comment is: `"supports Ed25519 and ML-KEM"` is
+# help text, not a configuration, and it was a finding (ZA-OPRAVYANE row 132). A string is
+# a sentence when it has three or more words, two of them lower-case words, and one of them
+# a word only prose uses. "openssl genrsa -out key.pem 2048" has no such word and stays code.
+_STRING_LITERAL = re.compile(r'"(?:[^"\\\n]|\\.)*"|' r"'(?:[^'\\\n]|\\.)*'")
+_PROSE_WORDS = {"a", "an", "the", "and", "or", "is", "are", "was", "were", "be", "not",
+                "of", "for", "with", "from", "to", "in", "on", "by", "this", "that", "it",
+                "supports", "support", "uses", "use", "using", "vs"}
+
+
+def _prose_spans(code: str) -> list[tuple[int, int]]:
+    "String literals on this line whose text is a sentence."
+    spans: list[tuple[int, int]] = []
+    for m in _STRING_LITERAL.finditer(code):
+        words = m.group(0)[1:-1].split()
+        lower = [w for w in words if w.isalpha() and w.islower()]
+        if len(words) >= 3 and len(lower) >= 2 and _PROSE_WORDS & set(lower):
+            spans.append((m.start(), m.end()))
+    return spans
+
+
 def _evidence_kind(line: str, inside_block_comment: bool, code: str | None = None) -> str:
     """The kind of evidence the CODE on this line carries.
 
@@ -2365,6 +2386,7 @@ def scan_source_file(path: Path, rel_path: str,
         # inflates the headline number by however many ways the line could be
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
+        prose = _prose_spans(code) if ('"' in code or "'" in code) else []
         # The finding a row 136-143 pattern made, with where it matched (see components below).
         by_pattern: dict[str, tuple[dict[str, Any], list[tuple[int, int]]]] = {}
         experimental: list[tuple[int, int]] = []
@@ -2403,7 +2425,8 @@ def scan_source_file(path: Path, rel_path: str,
             # Position decides, not the line. A match that sits inside a comment is
             # comment evidence even where the code around it is a call, and a match
             # in the code is not a comment merely because the line ends in one.
-            in_comment = all(_in_spans(m.start(), spans) for m in matches)
+            in_comment = all(_in_spans(m.start(), spans) or _in_spans(m.start(), prose)
+                             for m in matches)
             if banned:
                 evidence = "ban"
             elif in_comment:
@@ -2590,7 +2613,8 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": said,
                 "excerpt": line.strip()[:200],
                 "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code) else
-                                  "comment" if _in_spans(pos, spans) else kind),
+                                  "comment" if _in_spans(pos, spans) or _in_spans(pos, prose)
+                                  else kind),
                 "in_test_code": in_test_code(rel_path),
             })
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):

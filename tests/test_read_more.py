@@ -21,8 +21,9 @@ def test_c_include_fragment_is_read(tmp_path):
 
 def test_perl_test_recipe_is_read(tmp_path):
     # openssl/test/recipes/*.t — tests are code; we do not skip tests silently.
-    assert "ML-KEM" in families(tmp_path, "03-test_evp_extra_ml_kem.t",
-                                "plan skip_all => 'ML-KEM is not supported'\n")
+    # The string is a sentence, so the name is read and kept as named, not used (row 132).
+    (tmp_path / "03-test_evp_extra_ml_kem.t").write_text("plan skip_all => 'ML-KEM is not supported'\n")
+    assert "ML-KEM" in scan_directory(str(tmp_path))["named_but_not_used"]
 
 
 def test_hcl_configuration_is_read(tmp_path):

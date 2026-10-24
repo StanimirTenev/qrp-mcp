@@ -99,7 +99,9 @@ def test_triple_des_glued_to_identifier(tmp_path, line):
     f = tmp_path / "a.c"
     f.write_text(line + "\n")
     result = scan_directory(tmp_path)
-    assert "3DES" in result["detected_algorithms"], line
+    # A sentence in a string is prose: named, not used (ZA-OPRAVYANE row 132).
+    key = "named_but_not_used" if line.startswith('"Use') else "detected_algorithms"
+    assert "3DES" in result[key], line
 
 
 def test_documentation_example_is_not_key_material(tmp_path):
