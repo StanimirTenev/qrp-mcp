@@ -925,6 +925,26 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']x448[\"']")),
     # Curve448 by name: OpenSSH's curve448-sha512, strongSwan's curve448, pycryptodome.
     ("X448", "X448 named as curve448", re.compile(r"(?<![A-Za-z])curve448(?![0-9])", re.IGNORECASE)),
+    # ---- ZA-OPRAVYANE row 142: composites and hybrids with a half unreported (B classes C03
+    # and C31, 23.10.2026). .NET 10 CompositeMLDsaAlgorithm members, Go 1.27 crypto/hpke and
+    # x/crypto/ssh, OpenSSL's curveSM2MLKEM768, Bouncy Castle's hash-then-sign and X-Wing
+    # classes. The post-quantum scheme glued after `with` is read in capitals only.
+    ("ML-DSA", "ML-DSA named by a composite or hash-then-sign name", re.compile(
+        r"(?<=[Ww][Ii][Tt][Hh])ML-?DSA|\bHashMLDSASigner\b|\bCompositeMLDsa\w*")),
+    ("SLH-DSA", "SLH-DSA named by a hash-then-sign name", re.compile(
+        r"(?<=[Ww][Ii][Tt][Hh])(?:SLH-?DSA|SPHINCS)|\bHashSLHDSASigner\b")),
+    ("ECDSA", "ECDSA half of an ML-DSA composite", re.compile(
+        r"(?i:MLDsa\d+WithECDsa)|(?<![A-Za-z0-9])ssh-mldsa\d+-(?:nist)?p(?:256|384|521)(?![0-9])")),
+    ("Ed25519", "Ed25519 half of an ML-DSA composite", re.compile(r"(?i:MLDsa\d+WithEd25519)")),
+    ("Ed448", "Ed448 half of an ML-DSA composite", re.compile(r"(?i:MLDsa\d+WithEd448)")),
+    ("RSA", "RSA half of an ML-DSA composite", re.compile(r"(?i:MLDsa\d+WithRSA)")),
+    ("ECDH", "ECDH half of an ML-KEM hybrid (NIST curve)", re.compile(
+        r"(?i:(?<![A-Za-z])MLKEM(?:768|1024)[-_]?P(?:256|384|521))(?![0-9])")),
+    ("ML-KEM", "ML-KEM half of a Go ssh hybrid key exchange", re.compile(r"\bssh\.KeyExchangeMLKEM\w*")),
+    ("SM2", "SM2 half of the curveSM2MLKEM768 hybrid", re.compile(r"\bcurveSM2MLKEM\d+\b")),
+    *[(family, "X-Wing hybrid KEM (ML-KEM-768 + X25519), Bouncy Castle class", re.compile(
+        r"\bXWing(?:KeyGenerationParameters|KeyPairGenerator|KeyParameters|PrivateKeyParameters|"
+        r"PublicKeyParameters|KEMExtractor|KEMGenerator)\b")) for family in ("ML-KEM", "X25519")],
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
