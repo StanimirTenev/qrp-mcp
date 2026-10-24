@@ -638,6 +638,21 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("BLS", "BLS signature usage", re.compile(
         r"bls12[-_]?381|\bblst\b|@chainsafe/bls|\bbls_sig\b", re.IGNORECASE,
     )),
+    # MD5, SHA-1 and DES as a MAC or inside a key derivation: HmacSHA1, sshd's `MACs
+    # hmac-sha1`, PBKDF2WithHmacSHA1, strongSwan's prfsha1, Bouncy Castle's DESMAC. Reported
+    # as the hash or cipher it is, with the use and that a quantum computer does not break
+    # it -- an inventory that skips it is silent about it (ZA-OPRAVYANE row 131, decided
+    # 24.10.2026). Names from the JDK standard names, BC, .NET, Go x/crypto/ssh, ring, the
+    # IANA SSH registry and strongSwan (qrp-kachestvo/imena-2026-10-23, class C09).
+    # Before rows 136-143, whose generic SHA-1 and MD5 names would otherwise claim the line
+    # first and drop the use; a lower-case word glued on is a variable (`hmac_md5_count`).
+    ("SHA1", "SHA-1 in HMAC (a MAC, or the PRF of a key derivation); " + components.MAC_OR_KDF_NOTE,
+     re.compile(r"(?:pbkdf2?[-_]?(?:with)?|pbe(?:with)?)?(?:hmac(?:pbe)?|prf)[-_/]?sha-?1"
+                r"(?:[-_]?96)?(?![0-9])(?!_?(?-i:[a-z]))", re.IGNORECASE)),
+    ("MD5", "MD5 in HMAC (a MAC, or the PRF of a key derivation); " + components.MAC_OR_KDF_NOTE,
+     re.compile(r"(?:hmac|prf)[-_/]?md5(?:[-_]?96)?(?![0-9])(?!_?(?-i:[a-z]))", re.IGNORECASE)),
+    ("DES", "DES as a MAC (CBC-MAC, ISO 9797); " + components.MAC_OR_KDF_NOTE,
+     re.compile(r"(?<![A-Za-z0-9])DES(?:C?MAC(?:64)?|64|(?:WITH)?ISO9797\w*)")),
     # ---- ZA-OPRAVYANE row 139: families the vocabulary did not have. Measured 23.10.2026
     # (qrp-kachestvo/imena-2026-10-23): GOST R 34.10 in 331 library names, RC2 264, MD2 112,
     # MD4 76, SM2 47, ElGamal, the KpqC schemes -- all unreported, and SM2 called EC. Names
@@ -1146,19 +1161,6 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\b(?:X509_V_FLAG_USE_MTC_DRAFT_PLANTS_\d+|NID_(?:alg_mtcProof|pe_mtcCertificationAuthority)_draft|"
         r"MTCAnchor|kVerifyMTCs|VerifyMTCs|verify-mtcs)\b",
     )),
-    # MD5, SHA-1 and DES as a MAC or inside a key derivation: HmacSHA1, sshd's `MACs
-    # hmac-sha1`, PBKDF2WithHmacSHA1, strongSwan's prfsha1, Bouncy Castle's DESMAC. Reported
-    # as the hash or cipher it is, with the use and that a quantum computer does not break
-    # it -- an inventory that skips it is silent about it (ZA-OPRAVYANE row 131, decided
-    # 24.10.2026). Names from the JDK standard names, BC, .NET, Go x/crypto/ssh, ring, the
-    # IANA SSH registry and strongSwan (qrp-kachestvo/imena-2026-10-23, class C09).
-    ("SHA1", "SHA-1 in HMAC (a MAC, or the PRF of a key derivation); " + components.MAC_OR_KDF_NOTE,
-     re.compile(r"(?:pbkdf2?[-_]?(?:with)?|pbe(?:with)?)?(?:hmac(?:pbe)?|prf)[-_/]?sha-?1"
-                r"(?:[-_]?96)?(?![0-9])", re.IGNORECASE)),
-    ("MD5", "MD5 in HMAC (a MAC, or the PRF of a key derivation); " + components.MAC_OR_KDF_NOTE,
-     re.compile(r"(?:hmac|prf)[-_/]?md5(?:[-_]?96)?(?![0-9])", re.IGNORECASE)),
-    ("DES", "DES as a MAC (CBC-MAC, ISO 9797); " + components.MAC_OR_KDF_NOTE,
-     re.compile(r"(?<![A-Za-z0-9])DES(?:C?MAC(?:64)?|64|(?:WITH)?ISO9797\w*)")),
 ]
 
 # The curve a DNSSEC mnemonic names, by the rule that matched it.
@@ -2323,6 +2325,12 @@ def _attach_providers(findings: list[dict[str, Any]], lines: list[str]) -> None:
             f["provider"] = names[0]
 
 
+_IDENTIFIER_END = re.compile(r"\w*")
+# The patterns after row 131's MAC and KDF names: rows 136-143 and the list's tail.
+_NAMES_A_PIECE = frozenset(f[2] for f in ALGORITHM_PATTERNS[
+    max(i for i, f in enumerate(ALGORITHM_PATTERNS) if components.MAC_OR_KDF_NOTE in f[1]) + 1:])
+
+
 def scan_source_file(path: Path, rel_path: str,
                      lines: list[str] | None = None,
                      cipher_exclusions: bool = False) -> list[dict[str, Any]]:
@@ -2357,6 +2365,8 @@ def scan_source_file(path: Path, rel_path: str,
         # inflates the headline number by however many ways the line could be
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
+        # The finding a row 136-143 pattern made, with where it matched (see components below).
+        by_pattern: dict[str, tuple[dict[str, Any], list[tuple[int, int]]]] = {}
         experimental: list[tuple[int, int]] = []
         blobs = _blob_spans(line)
         searched = _masked(line, blobs)
@@ -2416,6 +2426,8 @@ def scan_source_file(path: Path, rel_path: str,
             if description in DNSSEC_CURVES:
                 item["curve"], item["key_size"] = DNSSEC_CURVES[description]
             findings.append(item)
+            if pattern in _NAMES_A_PIECE:
+                by_pattern[algorithm] = (item, [(m.start(), m.end()) for m in matches])
         for family, pos in scan_openssl3_names(line):
             if family in seen_on_line or _in_blob(pos, blobs):
                 continue
@@ -2554,7 +2566,21 @@ def scan_source_file(path: Path, rel_path: str,
         # d2i_DSAPublicKey, CKK_RSA, "sha1WithRSAEncryption"; and its OID as a number
         # (ZA-OPRAVYANE rows 132-135; see components.py and oids.py).
         for family, pos, said in components.scan(searched) + oids.scan(searched):
-            if family in seen_on_line or _in_blob(pos, blobs):
+            if _in_blob(pos, blobs):
+                continue
+            # Rows 136-143 name a piece; rows 131-135 read the identifier whole. Where the
+            # piece lies inside it -- curve448 in wc_curve448_make_key, SHA_1 in
+            # CKM_SHA_1_HMAC_GENERAL -- the finding stays, with this description, which
+            # names the identifier and the MAC or KDF use. The rules before row 131 keep
+            # theirs (merge of rows 131-143).
+            if family in by_pattern:
+                end = _IDENTIFIER_END.match(searched, pos).end()
+                item, spans_found = by_pattern[family]
+                if all(pos <= a and b <= end for a, b in spans_found):
+                    item["description"] = said
+                    del by_pattern[family]
+                continue
+            if family in seen_on_line:
                 continue
             seen_on_line.add(family)
             findings.append({
