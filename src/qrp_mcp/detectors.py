@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import aws_tls, components, dnssec, ike, opcua
+from . import aws_tls, components, dnssec, ike, oids, opcua
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import (_group_setting, image_pins, is_manifest, library_support, pinned_versions,
@@ -2108,8 +2108,9 @@ def scan_source_file(path: Path, rel_path: str,
                 "in_test_code": in_test_code(rel_path),
             })
         # The algorithm as a component of a library's own name: GNUTLS_SIGN_DSA_SHA256,
-        # d2i_DSAPublicKey, CKK_RSA (ZA-OPRAVYANE rows 132, 133, 135; see components.py).
-        for family, pos, said in components.scan(searched):
+        # d2i_DSAPublicKey, CKK_RSA, "sha1WithRSAEncryption"; and its OID as a number
+        # (ZA-OPRAVYANE rows 132-135; see components.py and oids.py).
+        for family, pos, said in components.scan(searched) + oids.scan(searched):
             if family in seen_on_line or _in_blob(pos, blobs):
                 continue
             seen_on_line.add(family)

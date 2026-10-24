@@ -39,15 +39,15 @@ FAMILY = {
 _SIZED = re.compile(r"(FFDHE|RSA|DSA|DHE|DH)\d{3,5}")
 
 # Prefixes a library owns: after one, every component is an algorithm slot. GnuTLS,
-# libgcrypt, libssh2, Mbed TLS / PSA, OpenSSL (feature macros, EVP, PEM, DER, providers,
-# engines), wolfSSL and PKCS#11 (CKK_ key types, CKM_ mechanisms, CKA_ attributes). SSL_
-# only before a lower-case function part: SSL_RSA_WITH_* is a suite.
+# libgcrypt, libssh2, Mbed TLS / PSA, OpenSSL (feature macros, OIDs, EVP, PEM, DER,
+# providers, engines), NSS, wolfSSL and PKCS#11 (CKK_ key types, CKM_ mechanisms, CKA_
+# attributes). SSL_ only before a lower-case function part: SSL_RSA_WITH_* is a suite.
 _PREFIXES = (
     "GNUTLS_", "gnutls_", "GCRY_", "gcry_", "LIBSSH2_", "libssh2_",
     "MBEDTLS_", "mbedtls_", "PSA_WANT_", "PSA_ALG_", "PSA_KEY_TYPE_", "psa_",
-    "OPENSSL_NO_", "EVP_", "PEM_", "d2i_", "i2d_",
+    "OPENSSL_NO_", "NID_", "SN_", "LN_", "OBJ_", "EVP_", "PEM_", "d2i_", "i2d_",
     "OSSL_", "PROV_NAMES_", "ENGINE_", "ERR_R_", "BN_",
-    "CKK_", "CKM_", "CKA_", "WC_", "wc_", "WOLFSSL_", "wolfSSL_", "CTC_",
+    "SEC_OID_", "CKK_", "CKM_", "CKA_", "WC_", "wc_", "WOLFSSL_", "wolfSSL_", "CTC_",
     "PKCS5_", "PKCS12_",
 )
 # Also OpenSSL's: SSL_ calls, and every library's reason and function codes (X509_R_*,
@@ -107,6 +107,9 @@ def families(parts: list[str]) -> list[tuple[str, str | None]]:
         # A size glued on: FFDHE6144, RSA2048, DSA1024.
         sized = _SIZED.fullmatch(p)
         family = FAMILY.get(sized.group(1) if sized else p)
+        # dhSinglePass-stdDH-* and -cofactorDH-* are the X9.63 ECDH schemes (RFC 5753).
+        if family == "DH" and "SINGLE" in parts and "PASS" in parts:
+            family = "ECDH"
         if not family or any(f == family for f, _ in out):
             continue
         out.append((family, None))
@@ -134,5 +137,42 @@ def scan(line: str) -> list[tuple[str, int, str]]:
             continue
         for family, use in families(components(name)):
             out.append((family, start, _describe(family, use, name)))
+    if "'" in line or '"' in line:
+        out += _names(line)
     return out
 
+
+# X.509 / PKIX algorithm names as a whole string, as OpenSSL's objects.txt, node-forge's
+# oids.js and pyca's OID names write them: "sha1WithRSAEncryption", "id-ecPublicKey",
+# "ecdsa-with-SHA224", "RSA-SHA1" (row 134). A compound only: a bare 'rsa' value is row 126.
+# One algorithm name alone needs the shape of an object name around it -- Encryption, With,
+# Agreement, an `id-` start or PublicKey -- because "rsa-logo", "ec-window", the SSH key
+# file 'id_rsa' and the measurement's negative control "md5_checksum_column_name" are
+# strings too.
+_NAME_STRING = re.compile(r"(?<![A-Za-z0-9_])[\"']([A-Za-z][A-Za-z0-9]*(?:[-_][A-Za-z0-9]+)*)[\"']")
+_OBJECT_WORDS = {"ENCRYPTION", "WITH", "AGREEMENT"}
+_PUBLIC_KEY = {"RSA", "DSA", "DH", "EC", "ECDSA", "ECDH", "X25519", "X448", "Ed25519", "Ed448",
+               "EdDSA"}
+_SUITE_PARTS = ("AES", "CBC", "GCM", "CCM", "CAMELLIA", "ARIA", "CHACHA", "POLY1305", "SEED",
+                "IDEA", "NULL", "EXP", "ADH", "AECDH", "PSK", "SRP", "KRB5")
+
+
+def _names(line: str) -> list[tuple[str, int, str]]:
+    out: list[tuple[str, int, str]] = []
+    for m in _NAME_STRING.finditer(line):
+        name = m.group(1)
+        parts = components(name)
+        if len(parts) < 2:
+            continue
+        found = families(parts)
+        shaped = bool(_OBJECT_WORDS & set(parts)) or name.startswith("id-") or "PUBLIC" in parts
+        public_key = _PUBLIC_KEY & {f for f, _ in found}
+        if not found or not shaped and (len(found) == 1 or not public_key):
+            continue
+        # A cipher suite is read as a suite (scan_cipher_suites), not as a name.
+        if parts[0] in {"TLS", "SSL", "TLS1", "SSL3"} or any(p.startswith(_SUITE_PARTS)
+                                                              for p in parts):
+            continue
+        for family, use in found:
+            out.append((family, m.start(1), f"{family} named by the algorithm name {name}"))
+    return out
