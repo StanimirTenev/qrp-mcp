@@ -33,7 +33,7 @@ def _sig(name: str) -> str:
     ('use(Cipher.getInstance("RSA-KTS-KEM-KWS", "BC"));', {"RSA"}),
     (_sig("SHA256withECDSAinP1363Format"), {"ECDSA"}),
     (_sig("NONEwithDSAinP1363Format"), {"DSA"}), (_sig("SHA256withDSAinP1363Format"), {"DSA"}),
-    (_sig("DSAwithSHA1"), {"DSA"}), (_sig("SHA256/DSA"), {"DSA"}), (_sig("RAWDSA"), {"DSA"}),
+    (_sig("DSAwithSHA1"), {"DSA", "SHA1"}),     # SHA1: row 143 (_sig("SHA256/DSA"), {"DSA"}), (_sig("RAWDSA"), {"DSA"}),
     (_sig("DETDSA"), {"DSA"}), (_sig("SHA256WITHDETDSA"), {"DSA"}), (_sig("DDSA"), {"DSA"}),
     (_sig("SHA256WITHDETECDSA"), {"ECDSA"}), (_sig("SHA256WITHECDDSA"), {"ECDSA"}),
     (_sig("SHA256WITHECNR"), {"EC"}), ("use(new ECNRSigner());", {"EC"}),

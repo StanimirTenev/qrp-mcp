@@ -83,7 +83,7 @@ def test_settings(line, name, family):
 
 
 @pytest.mark.parametrize("line,name", [
-    ("des = 'description'", "a.py"), ("sha1 = digest_of(x)", "a.py"),
+    ("des = 'description'", "a.py"), ("sha = digest_of(x)", "a.py"),
     ("connections { des { local_addrs = 1.2.3.4 } }", "swanctl.conf"),
     ("proposals = aes256gcm16-prfsha384-ecp384", "swanctl.conf"),  # P-384 only: EC, not DES/SHA1
     ('{"alg": "RS256"}', "jwks.json"), ('{"name": "RS1 bike"}', "a.json"),

@@ -945,6 +945,32 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     *[(family, "X-Wing hybrid KEM (ML-KEM-768 + X25519), Bouncy Castle class", re.compile(
         r"\bXWing(?:KeyGenerationParameters|KeyPairGenerator|KeyParameters|PrivateKeyParameters|"
         r"PublicKeyParameters|KEMExtractor|KEMGenerator)\b")) for family in ("ML-KEM", "X25519")],
+    # ---- ZA-OPRAVYANE row 143: narrow gaps (A-C sections 4-5, 23.10.2026). SHA-1 was found
+    # for 29 of 535 library names: the rule above lists calls, and SHA1 glued to a scheme,
+    # a separator or a camel-case word was never read. SHA-1 as a whole name here, after
+    # `with`/`and`/`hmac`/`md5`/`mgf1`, or as `Sha1` after a lower-case letter; never before
+    # a digit (SHA-128, SHA1024) or a lower-case word (`sha1sum` is a tool, not a name part)
+    # other than with/and/kdf. Joined on at least one side (`_`, `-`, `.`, `/`, `=`, a glued
+    # word, a capital) or quoted alone: "legacy SHA1 path removed" is prose, not a name (the
+    # A-C negative control). Bare `SHA` only glued to `with` or `/` and a signature.
+    ("SHA1", "SHA-1 named in a compound name", re.compile(
+        r"(?:(?<=[_./=-])|(?<=[Ww][Ii][Tt][Hh])|(?<=[Aa][Nn][Dd])|(?<=[Hh][Mm][Aa][Cc])|"
+        r"(?<=[Mm][Dd]5)|(?<=[Mm][Gg][Ff]1))(?i:sha[-_]?1)(?:(?![0-9a-z])|(?=with|and|kdf|ckdf))|"
+        r"(?<![A-Za-z0-9])(?i:sha[-_]?1)(?=[_(-]|[A-Z]|with|and|kdf|ckdf)|"
+        r"(?<=[\"'])(?i:sha-?1)(?=[\"'])|"
+        r"(?<=[a-z])Sha1(?![0-9a-z])|(?<=[0-9])SHA1(?![0-9a-z])|"   # DH14SHA1, MD5SHA1
+        r"(?<![A-Za-z0-9])SHA(?=(?:with|WITH|With)(?:RSA|DSA|ECDSA)|/(?:RSA|DSA|ECDSA)\b)")),
+    # X448 and Ed25519 inside a camel-case name (wolfSSL's SetX448KeyGenCb, libgcrypt-style
+    # HpkeDhKemX448Sha512), and libsodium's old batch Ed25519 signature.
+    ("X448", "X448 named in a camel-case name", re.compile(r"(?<=[a-z])X448(?=[A-Z_])")),
+    ("Ed25519", "Ed25519 named in a camel-case name or libsodium's batch signature", re.compile(
+        r"(?<=[a-z])Ed25519(?=[A-Z_])|\bcrypto_sign_edwards25519sha512batch\w*|"
+        r"[<\"]sodium/crypto_sign_edwards25519sha512batch\.h[>\"]")),
+    # LMS through wolfSSL's parameter sets, liboqs's ids and Mbed TLS's API and types
+    # (wolfssl/wolfcrypt/wc_lms.h, oqs/sig_stfl.h, mbedtls/lms.h).
+    ("HSS/LMS", "HSS/LMS named by the wolfSSL, liboqs or Mbed TLS API", re.compile(
+        r"\bWC_LMS_PARM_\w+|\bOQS_LMS_ID_\w+|\bmbedtls_lms_\w+|\bMBEDTLS_LMS_\w+|"
+        r"\b(?:MBEDTLS_)?LMOTS_(?:SHA256|SHAKE)_N\d+_W\d+\b|\bMBEDTLS_LMOTS_\w+")),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
@@ -1063,7 +1089,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z])cross[-_]?r?[-_]?sdp", re.IGNORECASE,
     )),
     ("FrodoKEM", "FrodoKEM usage", re.compile(
-        r"(?<![A-Za-z])frodokem|(?<![A-Za-z])frodo[-_]?(640|976|1344)", re.IGNORECASE,
+        # e-: liboqs's ephemeral eFrodoKEM (OQS_KEM_alg_efrodokem_*), row 143.
+        r"(?<![A-Za-z])e?frodokem|(?<![A-Za-z])e?frodo[-_]?(640|976|1344)", re.IGNORECASE,
     )),
     # Recognising these two is the point: both are post-quantum by design and
     # neither is safe to rely on. Unrecognised, they read as "nothing found".
