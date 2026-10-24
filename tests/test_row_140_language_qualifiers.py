@@ -101,6 +101,8 @@ def test_python(line, family):
     ("_ = ssh.KeyAlgoUnknown", "a.go"), ("var a = CngAlgorithm.Sha256;", "a.cs"),
     ('var a = CryptoConfig.CreateFromName("SHA256");', "a.cs"), ("let _ = p256k::Thing;", "a.rs"),
     ("x = mrsa.sign", "a.py"), ("x = coarse.sign", "a.py"), ("_ = sha1sum.Size", "a.go"),
+    # `namespace dsa` / `des` in C++: data structures and algorithms, a design system.
+    ("dsa::LinkedList<int> list;", "a.cpp"), ("auto b = des::Button();", "a.cpp"),
 ])
 def test_lookalikes_stay_silent(line, name):
     assert _families(line, name) == set(), line

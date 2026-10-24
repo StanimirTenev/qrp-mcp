@@ -814,7 +814,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # writes its names exactly so. Only named members where the package is also a word.
     ("DSA", "DSA named by a package, enum or constant", re.compile(
         r"(?<![A-Za-z_-])dsa\.(?:Parameters|PublicKey|PrivateKey|ParameterSizes|"
-        r"ErrInvalidPublicKey|L\d{4}N\d{3})\b|\bdsa::|\bx509\.DSA\b|"
+        r"ErrInvalidPublicKey|L\d{4}N\d{3})\b|"
+        # RustCrypto's dsa crate by its own items: `namespace dsa` is also data structures
+        # and algorithms in C++.
+        r"\bdsa::(?:OID|Signature|SigningKey|VerifyingKey|Components|KeySize|BoxedUint)\b|"
+        r"\bx509\.DSA\b|"
         r"\bssh\.(?:Insecure)?(?:KeyAlgo|CertAlgo|CertSigAlgo|SigAlgo)DSA\w*|"
         r"\bpacket\.(?:PubKeyAlgo|New)DSA\w*|\bSignatureAlgorithm::DSA\b|"
         r"\bCngAlgorithmGroup\.Dsa\b|\bDSA(?:OpenSsl|Parameters|Signature(?:De)?[Ff]ormatter|"
@@ -865,7 +869,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("MD4", "MD4 named by a package or constant", re.compile(
         r"\bcrypto\.MD4\b|\bmd4\.(?:New|Size|BlockSize|Sum)\b")),
     ("DES", "DES named by a package, enum or constant", re.compile(
-        r"\bdes\.(?:BlockSize|KeySizeError)\b|\bdes::|\bDES_(?:FOR_LEGACY_USE_ONLY|KEY_LEN|"
+        r"\bdes\.(?:BlockSize|KeySizeError)\b|\bdes::(?:Des|WeakKeyError)\b|"
+        r"\bDES_(?:FOR_LEGACY_USE_ONLY|KEY_LEN|"
         r"CBC_IV_LEN)\b|\bCipherAlgorithmType\.Des\b|"
         r"CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?DES\"|xmlenc#des-cbc\b")),
     ("3DES", "3DES named by a package, enum or constant", re.compile(
