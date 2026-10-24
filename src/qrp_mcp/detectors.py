@@ -1225,6 +1225,54 @@ _FILTERED_PATTERNS = [(algorithm, description, pattern, _prefilter(pattern))
 # One pattern without literals and the gate is the empty regex, which every line passes.
 _ANY_LITERAL = re.compile("" if any(f[3] is None for f in _FILTERED_PATTERNS) else
                           "|".join(sorted({re.escape(s) for f in _FILTERED_PATTERNS for s in f[3]})))
+# Which patterns a line can match, from the literals it holds. Rows 136-143 doubled the
+# patterns, and checking each one's literals on every line came to cost more than the
+# regexes did (OpenSSH 26 s -> 37 s). One scan finds, at every position, the longest
+# literal starting there; any other literal on the line is a prefix of one of those, so
+# the literals inside the ones found are exactly the literals present. The patterns tried
+# are those holding one of them -- the same set the per-pattern check selects -- in list
+# order, plus any pattern without literals.
+def _trie_regex(words: list[str]) -> str:
+    """The words as one regex shaped like a prefix tree, so each position is tried one
+    branch per next character rather than one per word; at a position it matches the
+    longest word starting there (children before the end of a word)."""
+    tree: dict = {}
+    for word in words:
+        node = tree
+        for ch in word:
+            node = node.setdefault(ch, {})
+        node[""] = {}
+
+    def build(node: dict) -> str:
+        branches = [re.escape(ch) + build(child) for ch, child in sorted(node.items()) if ch]
+        if "" in node:
+            branches.append("")
+        if len(branches) == 1:
+            return branches[0]
+        return "(?:" + "|".join(branches) + ")"
+    return build(tree)
+
+
+_ALL_LITERALS = sorted({s for f in _FILTERED_PATTERNS if f[3] for s in f[3]},
+                       key=lambda s: (-len(s), s))
+_LITERAL_AT = re.compile("(?=(" + _trie_regex(_ALL_LITERALS) + "))")
+_INSIDE = {s: frozenset(t for t in _ALL_LITERALS if t in s) for s in _ALL_LITERALS}
+_PATTERNS_WITH = {s: frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if f[3] and s in f[3])
+                  for s in _ALL_LITERALS}
+_ALWAYS_TRIED = frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if not f[3])
+
+
+def _candidate_patterns(lowered: str | None) -> list:
+    """The patterns worth trying on a line; every pattern for a non-ASCII line."""
+    if lowered is None:
+        return _FILTERED_PATTERNS
+    present: set[str] = set()
+    for m in _LITERAL_AT.finditer(lowered):
+        present |= _INSIDE[m.group(1)]
+    indices = set(_ALWAYS_TRIED)
+    for s in present:
+        indices |= _PATTERNS_WITH[s]
+    return [_FILTERED_PATTERNS[i] for i in sorted(indices)]
 
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
@@ -2295,8 +2343,7 @@ def scan_source_file(path: Path, rel_path: str,
         blobs = _blob_spans(line)
         searched = _masked(line, blobs)
         lowered = searched.lower() if searched.isascii() else None
-        candidates = (_FILTERED_PATTERNS if lowered is None or _ANY_LITERAL.search(lowered)
-                      else ())
+        candidates = _candidate_patterns(lowered)
         for algorithm, description, pattern, literals in candidates:
             if algorithm in seen_on_line:
                 continue
