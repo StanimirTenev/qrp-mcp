@@ -942,18 +942,29 @@ _SUITE_COMPONENT = {
     "ECDSA": "ECDSA", "AECDSA": "ECDSA",
     "3DES": "3DES", "CBC3": "3DES", "EDE3": "3DES", "DES": "DES", "DES40": "DES",
     "RC4": "RC4", "MD5": "MD5",
+    # ZA-OPRAVYANE row 136. `SHA` alone is the record MAC, HMAC-SHA-1 (SHA256 and SHA384 are
+    # other parts); MD5 and SHA-1 as a MAC are reported. RC2 is the export suites' cipher,
+    # ECCPWD (RFC 8492) an elliptic-curve password exchange.
+    "SHA": "SHA1", "RC2": "RC2", "ECCPWD": "EC",
 }
 # A line is read as a cipher list only when it carries a suite-shaped token: at least
 # three dash-joined parts, or an IANA TLS_ name. "rsa-2048" is not a suite.
+# Row 136: OpenSSL's own constants (`TLS1_CK_`, `SSL3_TXT_`, include/openssl/{tls1,ssl3}.h),
+# JSSE's `SSL_*_WITH_*` names, and IANA's lowercase `anon` (TLS_DH_anon_WITH_...).
 _SUITE_TOKEN = re.compile(
-    r"(?<![A-Za-z0-9])(?:TLS_[A-Z0-9_]+|[A-Za-z0-9]+(?:-[A-Za-z0-9]+){2,})(?![A-Za-z0-9])")
+    r"(?<![A-Za-z0-9])(?:TLS_[A-Z0-9_]+(?:anon_[A-Z0-9_]+)?|"
+    r"(?:SSL3|TLS1(?:_[123])?)_(?:CK|TXT|RFC)_[A-Z0-9_]+|"
+    r"SSL_(?:[A-Z0-9]+_|anon_)+?WITH_[A-Z0-9_]+|"
+    r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+){2,})(?![A-Za-z0-9])")
+_SUITE_PREFIX = re.compile(r"TLS_|(?:SSL3|TLS1(?:_[123])?)_(?:CK|TXT|RFC)_|SSL_\w+_WITH_")
 
 
 # What makes a dash-joined token a cipher suite rather than an ordinary hyphenated
 # string: it names a bulk cipher AND a mode or MAC. Anything looser produced real
 # false positives on real trees: "ML-DSA-65" read as DSA, "slh-dsa-sha2-128s" read as
 # DSA, and a French translation ("Remplacer-par-des-frais") read as DES.
-_SUITE_CIPHER = ("AES", "CAMELLIA", "CHACHA", "SEED", "IDEA", "RC4", "DES", "3DES", "NULL")
+_SUITE_CIPHER = ("AES", "CAMELLIA", "CHACHA", "SEED", "IDEA", "RC4", "DES", "3DES", "NULL",
+                 "ARIA", "RC2")     # row 136
 _SUITE_MODE_OR_MAC = ("CBC", "GCM", "CCM", "POLY1305", "SHA", "MD5", "UMAC")
 
 
@@ -1054,6 +1065,10 @@ def scan_openssl3_names(line: str) -> list[tuple[str, int]]:
     return out
 
 
+_ARIA_RSA_SUITES = {"ECDHE-ARIA128-GCM-SHA256", "ECDHE-ARIA256-GCM-SHA384",
+                    "ECDH-ARIA128-GCM-SHA256", "ECDH-ARIA256-GCM-SHA384"}
+
+
 def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
     """Families named inside cipher-suite tokens, with the position that named them.
 
@@ -1066,7 +1081,7 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
         pos = token.start()
         parts = re.split(r"[-_+]", text)
         upper = [part.upper() for part in parts]
-        looks_like_suite = text.upper().startswith("TLS_") or (
+        looks_like_suite = bool(_SUITE_PREFIX.match(text)) or (
             any(part.startswith(_SUITE_CIPHER) for part in upper)
             and any(part.startswith(_SUITE_MODE_OR_MAC) for part in upper))
         if not looks_like_suite:
@@ -1077,6 +1092,9 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
         # bare DES part is the same cipher named twice, not a second one.
         if "3DES" in families:
             families = [family for family in families if family != "DES"]
+        # OpenSSL's names for TLS_ECDH(E)_RSA_WITH_ARIA_* leave the RSA out (tls1.h), row 136.
+        if text.upper() in _ARIA_RSA_SUITES:
+            families.append("RSA")
         out.extend((family, pos) for family in families)
     return out
 

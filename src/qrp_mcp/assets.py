@@ -831,6 +831,9 @@ STATIC_RSA_SUITES = (
     "CAMELLIA256-GCM-SHA384", "CAMELLIA256-SHA", "CAMELLIA256-SHA256",
     "DES-CBC3-SHA", "IDEA-CBC-SHA", "NULL-MD5", "NULL-SHA", "NULL-SHA256",
     "RC4-MD5", "RC4-SHA", "SEED-SHA", "SM4-CCM-SM3", "SM4-GCM-SM3",
+    # The single-DES and export suites, removed from openssl-ciphers(1) but still named in
+    # include/openssl/{ssl3,tls1}.h (OpenSSL 3.6.5), ZA-OPRAVYANE row 136.
+    "DES-CBC-SHA", "EXP-DES-CBC-SHA", "EXP-RC2-CBC-MD5", "EXP-RC4-MD5",
 )
 _STATIC_RSA = re.compile(
     r"(?<![A-Za-z0-9_-])("
