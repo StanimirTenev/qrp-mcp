@@ -806,6 +806,74 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("3DES", "3DES named in a PBE name", re.compile(r"PBEWITH\w*?ANDDES[23]KEY", re.IGNORECASE)),
     ("DES", "DES named in a PBE name", re.compile(
         r"PBEWITH(?:MD2|MD5|SHA-?1?)ANDDES(?:-CBC)?(?![A-Za-z0-9])", re.IGNORECASE)),
+    # ---- ZA-OPRAVYANE row 140: the family named only by the package, enum or constant it
+    # is reached through (B classes C20-C24, C32, C33, C35, 23.10.2026). Members from Go
+    # 1.27.3 and x/crypto v0.58.0 (crypto, crypto/{dsa,elliptic,rsa,des,md5,sha1,x509},
+    # ssh, ssh/agent, openpgp/packet), RustCrypto, rustls 0.23.46, ring 0.17.14, aws-lc-rs
+    # 1.18.2, .NET v10.0.13 and pycryptodome/python-rsa. Case-sensitive: each library
+    # writes its names exactly so. Only named members where the package is also a word.
+    ("DSA", "DSA named by a package, enum or constant", re.compile(
+        r"(?<![A-Za-z_-])dsa\.(?:Parameters|PublicKey|PrivateKey|ParameterSizes|"
+        r"ErrInvalidPublicKey|L\d{4}N\d{3})\b|\bdsa::|\bx509\.DSA\b|"
+        r"\bssh\.(?:Insecure)?(?:KeyAlgo|CertAlgo|CertSigAlgo|SigAlgo)DSA\w*|"
+        r"\bpacket\.(?:PubKeyAlgo|New)DSA\w*|\bSignatureAlgorithm::DSA\b|"
+        r"\bCngAlgorithmGroup\.Dsa\b|\bDSA(?:OpenSsl|Parameters|Signature(?:De)?[Ff]ormatter|"
+        r"CertificateExtensions)\b|CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?DSA\"")),
+    ("EC", "EC named by a package, enum or constant", re.compile(
+        r"\belliptic\.(?:GenerateKey|Marshal|MarshalCompressed|Unmarshal|UnmarshalCompressed|"
+        r"Curve|CurveParams)\b|\belliptic_curve::|\bk256::|\bCngKeyBlobFormat\.Ecc\w+|\bECCurve\b")),
+    ("RSA", "RSA named by a package, enum or constant", re.compile(
+        r"\brsa\.(?:EncryptOAEPWithOptions|PSSOptions|PSSSaltLength\w+|DecryptPKCS1v15SessionKey|"
+        r"PKCS1v15DecryptOptions|OAEPOptions|PrecomputedValues|CRTValue|ErrMessageTooLong|"
+        r"ErrDecryption|ErrVerification|encrypt|decrypt|sign|verify|find_signature_hash|"
+        r"compute_hash|sign_hash)\b|\brsa::|\bx509\.RSA\b|"
+        r"\bssh\.(?:Insecure)?(?:KeyAlgo|CertAlgo|CertSigAlgo|SigAlgo)RSA\w*|"
+        r"\bagent\.SignatureFlagRsa\w*|\bpacket\.(?:PubKeyAlgo|New)RSA\w*|"
+        r"\bSignatureAlgorithm::RSA\b|\bOAEP_SHA\d+_MGF1SHA\d+\b|\bCngAlgorithmGroup\.Rsa\b|"
+        r"\bRSA(?:Encryption|Signature)Padding(?:Mode\.\w+)?\b|\bRSAParameters\b|"
+        r"\bRSA(?:OAEP|PKCS1)(?:KeyExchange|Signature)(?:De)?[Ff]ormatter\b|"
+        r"\bPKCS1MaskGenerationMethod\b|\bExchangeAlgorithmType\.Rsa\w+|"
+        r"\bRSA\.(?:generate|import_key|importKey|construct)\b|"
+        r"CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?RSA\"")),
+    ("ECDSA", "ECDSA named by a Go ssh or openpgp constant", re.compile(
+        r"\bssh\.(?:KeyAlgo|CertAlgo)(?:SK)?ECDSA\w*|\bpacket\.(?:PubKeyAlgo|New)ECDSA\w*")),
+    ("ECDH", "ECDH named by a package, enum or constant", re.compile(
+        r"\bssh\.KeyExchangeECDH\w*|\bpacket\.PubKeyAlgoECDH\b|\bECDiffieHellman\w+|"
+        r"\bDH\.key_agreement\b")),    # pycryptodome's Crypto.Protocol.DH is ECDH (row 71)
+    ("DH", "DH named by a package, enum or constant", re.compile(
+        r"\bssh\.(?:Insecure)?KeyExchangeDH\w*|\bNamedGroup::FFDHE\d+\b")),
+    ("X25519", "X25519 named by a Go ssh constant", re.compile(r"\bssh\.KeyExchangeCurve25519\w*")),
+    ("X448", "X448 named as a pycryptodome curve", re.compile(
+        r"\bECC\.generate\([^)\n]*curve\s*=\s*[\"'][Cc]urve448[\"']")),
+    ("Ed25519", "Ed25519 named by a Go ssh constant", re.compile(
+        r"\bssh\.(?:KeyAlgo|CertAlgo)(?:SK)?ED25519\w*")),
+    ("ML-DSA", "ML-DSA named by a Go ssh constant", re.compile(
+        r"\bssh\.(?:KeyAlgo|CertAlgo)MLDSA\w*")),
+    ("RC4", "RC4 named by a package, enum or constant", re.compile(
+        r"\bssh\.InsecureCipherRC4\w*|\b(?:CipherAlgorithmType|CngAlgorithm)\.Rc4\b")),
+    ("MD5", "MD5 named by a package, enum or constant", re.compile(
+        r"\bcrypto\.MD5(?:SHA1)?\b|\bmd5\.(?:Size|BlockSize)\b|\bssh\.FingerprintLegacyMD5\b|"
+        r"\bHashAlgorithm::MD5\b|\bCngAlgorithm\.MD5\b|\bHashAlgorithmType\.Md5\b|"
+        r"CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?MD5(?:Cng|Managed|"
+        r"CryptoServiceProvider)?\"|xmldsig-more#(?:rsa-)?md5\b")),
+    ("SHA1", "SHA-1 named by a package, enum or constant", re.compile(
+        r"\bcrypto\.(?:MD5)?SHA1\b|\bsha1\.(?:Size|BlockSize)\b|\bHashAlgorithm::SHA1\b|"
+        r"\b(?:HKDF_)?SHA1_(?:FOR_LEGACY_USE_ONLY|OUTPUT_LEN)\b|\bCngAlgorithm\.Sha1\b|"
+        r"\b(?:HashAlgorithmType|X509SubjectKeyIdentifierHashAlgorithm)\.(?:Sha1|ShortSha1|"
+        r"CapiSha1)\b|\bSHA\.new\b|CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?"
+        r"SHA1?(?:Cng|Managed|CryptoServiceProvider)?\"|xmldsig#(?:rsa-|dsa-|hmac-)?sha1\b")),
+    ("MD4", "MD4 named by a package or constant", re.compile(
+        r"\bcrypto\.MD4\b|\bmd4\.(?:New|Size|BlockSize|Sum)\b")),
+    ("DES", "DES named by a package, enum or constant", re.compile(
+        r"\bdes\.(?:BlockSize|KeySizeError)\b|\bdes::|\bDES_(?:FOR_LEGACY_USE_ONLY|KEY_LEN|"
+        r"CBC_IV_LEN)\b|\bCipherAlgorithmType\.Des\b|"
+        r"CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?DES\"|xmlenc#des-cbc\b")),
+    ("3DES", "3DES named by a package, enum or constant", re.compile(
+        r"\bTDES_FOR_LEGACY_USE_ONLY\b|\bCipherAlgorithmType\.TripleDes\b|"
+        r"CryptoConfig\.\w+\(\s*\"Triple ?DES\"|xmlenc#tripledes-cbc\b")),
+    ("RC2", "RC2 named by a package, enum or constant", re.compile(
+        r"\bCipherAlgorithmType\.Rc2\b|CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?"
+        r"RC2(?:CryptoServiceProvider)?\"")),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
