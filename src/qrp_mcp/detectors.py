@@ -311,7 +311,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bDHBasicAgreement\b|\bDHKeyPairGenerator\b|\bDHParametersGenerator\b|"
         # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
         # finite-field Diffie-Hellman.
-        r"(?<![A-Za-z])modp(?:1024|1536|2048|3072|4096|6144|8192)(?![0-9])",
+        r"(?<![A-Za-z])modp(?:768|1024|1536|2048|3072|4096|6144|8192)(?![0-9])",   # 768: row 141
         re.IGNORECASE,
     )),
     ("MD5", "MD5 usage", re.compile(
@@ -638,6 +638,344 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("BLS", "BLS signature usage", re.compile(
         r"bls12[-_]?381|\bblst\b|@chainsafe/bls|\bbls_sig\b", re.IGNORECASE,
     )),
+    # ---- ZA-OPRAVYANE row 139: families the vocabulary did not have. Measured 23.10.2026
+    # (qrp-kachestvo/imena-2026-10-23): GOST R 34.10 in 331 library names, RC2 264, MD2 112,
+    # MD4 76, SM2 47, ElGamal, the KpqC schemes -- all unreported, and SM2 called EC. Names
+    # from Bouncy Castle r1rv86v2, OpenSSL 3.6 (include/openssl/{rc2,md2,md4}.h), pyca,
+    # pycryptodome and RustCrypto. A short name only glued to an API word or in a call.
+    ("GOST R 34.10", "GOST R 34.10 usage", re.compile(
+        r"(?:(?<![A-Za-z])|(?<=with))(?:EC)?GOST[-_ ]?R?[-_ ]?34\.?10|"
+        r"(?<![A-Za-z0-9])ECVKO|\bgost20(?:01|12)(?:_(?:256|512))?\b",
+        re.IGNORECASE)),
+    ("SM2", "SM2 usage", re.compile(
+        r"\bSM2(?:Engine|Signer|KeyPairGenerator|KeyExchange|ParameterSpec|WITH|with)|"
+        r"(?:WITH|With|with)SM2\b|\bcurveSM2\b|\bEVP_PKEY_SM2\b|\bsm2p256v1\b")),
+    ("ElGamal", "ElGamal usage", re.compile(r"\bElGamal\w*|\bELGAMAL\w*")),
+    ("RC2", "RC2 usage", re.compile(
+        r"\bRC2(?:Engine|WrapEngine|ParameterSpec|CryptoServiceProvider)\b|\bRC2\.Create\b|"
+        r"\bEVP_rc2\w*|\bRC2_(?:set_key|ecb_encrypt|encrypt|decrypt|cbc_encrypt|cfb64_encrypt|"
+        r"ofb64_encrypt)\b|[<\"]openssl/rc2\.h[>\"]|\balgorithms\.RC2\b|\bARC2\.(?:new|MODE_\w+)\b|"
+        r"Crypto(?:dome)?\.Cipher\s+import\s+[^\n#]*\bARC2\b|Crypto(?:dome)?\.Cipher\.ARC2\b|"
+        r"\brc2::|\bforge\.rc2\b|(?i:[\"']rc2-(?:40-|64-|128-)?(?:cbc|ecb|cfb|ofb)[\"'])")),
+    ("MD4", "MD4 usage", re.compile(
+        r"\bMD4(?:Digest|_Init|_Update|_Final|Init|Update|Final)\b|\bEVP_md4\b|\bmd4::|"
+        r"hashlib\.new\(\s*[\"']md4[\"']|Crypto(?:dome)?\.Hash(?:\s+import\s+[^\n#]*\b|\.)MD4\b|"
+        r"\bMD4\.new\b|[<\"]openssl/md4\.h[>\"]")),
+    ("MD2", "MD2 usage", re.compile(
+        r"\bMD2(?:Digest|_Init|_Update|_Final|Init|Update|Final)\b|\bEVP_md2\b|\bmd2::|"
+        r"Crypto(?:dome)?\.Hash(?:\s+import\s+[^\n#]*\b|\.)MD2\b|\bMD2\.new\b|[<\"]openssl/md2\.h[>\"]")),
+    # NIST's name for triple DES and the RC4 alias; neither is a word.
+    ("3DES", "3DES named as TDEA", re.compile(r"(?<![A-Za-z0-9])TDEA(?:WRAP)?(?![A-Za-z0-9])")),
+    ("RC4", "RC4 named as ARCFOUR", re.compile(
+        r"(?<![A-Za-z0-9])arcfour(?:128|256)?(?![A-Za-z0-9])", re.IGNORECASE)),
+    # Korea's KpqC selections and BIKE by Bouncy Castle's parameter names. "Smaug" is a
+    # dragon and "aimer" French, so both need their T or a parameter set or an API word.
+    ("HAETAE", "HAETAE usage (KpqC)", re.compile(r"(?<![A-Za-z])haetae", re.IGNORECASE)),
+    ("SMAUG-T", "SMAUG-T usage (KpqC)", re.compile(r"(?<![A-Za-z])(?i:smaug[-_]?t)(?![a-z])")),
+    ("AIMer", "AIMer usage (KpqC)", re.compile(
+        r"(?<![A-Za-z])AIM(?:er|ER)(?=[-_]?(?:128|192|256)|[A-Z])|"
+        r"(?i:(?<![A-Za-z])aimer[-_]?(?:128|192|256)[fs]?)")),
+    ("BIKE", "BIKE usage", re.compile(r"(?<![A-Za-z])BIKE(?:128|192|256)(?![0-9])")),
+    # Bouncy Castle's lightweight classes for the post-quantum schemes (org/bouncycastle/
+    # pqc/crypto/*), whose names put the API word straight after the scheme.
+    *[(family, f"{family} named by a Bouncy Castle class", re.compile(
+        rf"\b(?:{names})(?:KEMExtractor|KEMGenerator|KeyGenerationParameters|KeyPairGenerator|"
+        rf"PrivateKeyParameters|PublicKeyParameters|Signer)\b"))
+      for names, family in (("HQC", "HQC"), ("UOV", "UOV"), ("CMCE", "Classic McEliece"),
+                            ("Falcon", "Falcon"), ("NTRU|NTRUPlus|NTRULPRime|SNTRUPrime", "NTRU"),
+                            ("HAETAE", "HAETAE"), ("AIMer", "AIMer"), ("SmaugT", "SMAUG-T"),
+                            ("Mayo", "MAYO"), ("LMS|HSS", "HSS/LMS"))],
+    ("HSS/LMS", "HSS/LMS named by a Bouncy Castle class", re.compile(
+        r"\bLM(?:Ots|Sig)Parameters\b")),
+    # ---- ZA-OPRAVYANE row 137: the header a C file includes and the types it declares its
+    # keys with (A-C classes G and H, 23.10.2026), and the Java/Bouncy Castle classes whose
+    # API word follows the algorithm (B class C25). Header and type names from OpenSSL 3.6.5,
+    # BoringSSL, Mbed TLS 3.6.7, wolfSSL 5.9.4, liboqs 0.16.0 and NSS 3.132; classes from
+    # JDK 27 java.security.{spec,interfaces} and Bouncy Castle r1rv86v2; pyca 50.0.2.
+    *[(family, f"{family} named by a library header", re.compile(rf"[<\"](?:{paths})\.h[>\"]"))
+      for family, paths in (
+          ("RSA", r"openssl/rsaerr|mbedtls/rsa"),
+          ("DSA", r"openssl/dsaerr|wolfssl/wolfcrypt/dsa"),
+          ("DH", r"openssl/dherr|mbedtls/dhm"),
+          ("EC", r"openssl/ec(?:_key)?|mbedtls/ec(?:p|jpake)|wolfssl/wolfcrypt/(?:eccsi|sakke)"),
+          ("DES", r"openssl/des|mbedtls/des"), ("MD5", r"mbedtls/md5"), ("SHA1", r"mbedtls/sha1"),
+          ("MD4", r"wolfssl/wolfcrypt/md4"), ("MD2", r"wolfssl/wolfcrypt/md2"),
+          ("RC2", r"wolfssl/wolfcrypt/rc2"), ("X448", r"wolfssl/wolfcrypt/curve448"),
+          ("SM2", r"wolfssl/wolfcrypt/sm2"),
+          ("HSS/LMS", r"mbedtls/lms|wolfssl/wolfcrypt/wc_lms|oqs/sig_stfl_lms(?:_wrap)?"),
+          ("BIKE", r"oqs/kem_bike"), ("HQC", r"oqs/kem_hqc"), ("Falcon", r"oqs/sig_falcon"),
+          ("MAYO", r"oqs/sig_mayo"), ("UOV", r"oqs/sig_uov"))],
+    # C types. `RSA`, `DSA` and `DH` alone are words, so only as a pointer declaration.
+    *[(family, f"{family} named by a C type", re.compile(
+        rf"\b(?:{names})\b" + (rf"|(?<![\w.>])(?:const\s+)?{bare}\s*\*+\s*(?:const\s+)?[A-Za-z_]"
+                                if bare else "")))
+      for family, bare, names in (
+          ("RSA", "RSA", r"RSA_METHOD|RSA_OAEP_PARAMS|RSA_PSS_PARAMS|rsa_st|rsa_meth_st|"
+                         r"rsa_(?:pss|oaep)_params_st|RSA(?:Private|Public)KeyStr|RsaPadding|RsaNb|"
+                         r"sp_rsa_ctx|gnutls_rsa_params_t"),
+          ("DSA", "DSA", r"DSA_SIG|DSA_SIG_st|DSA_METHOD|dsa_st|DSA(?:Private|Public)KeyStr|DsaKey|"
+                         r"WOLFSSL_DSA"),
+          ("DH", "DH", r"DH_METHOD|dh_st|DHParams(?:Str)?|DH(?:Private|Public)Key(?:Str)?|"
+                       r"SECKEYDHParams|DhParams|DhNb|WOLFSSL_DH|sp_dh_ctx|gnutls_dh_params_t|"
+                       r"psa_dh_family_t"),
+          ("EC", "", r"EC_(?:KEY|GROUP|POINT|METHOD|KEY_METHOD)|ec_key_st|"
+                     r"WOLFSSL_EC_(?:KEY|GROUP|POINT|METHOD|BUILTIN_CURVE)|ecc_point|ecc_set_type|"
+                     r"ecc_curve_id|ecc_oid_t|ECParams(?:Str)?|ECFieldID(?:Str)?|"
+                     r"EC(?:Private|Public)KeyStr|psa_ecc_family_t|mbedtls_ecjpake_context"),
+          ("DES", "", r"(?:const_)?DES_cblock|DES_key_schedule|DES_ks|DES_LONG|DESContext(?:Str)?"),
+          ("MD5", "", r"MD5_CTX|MD5Context(?:Str)?|MD5state_st|md5_state_st"),
+          ("MD4", "", r"MD4_CTX|MD4state_st|md4_state_st|wc_Md4"),
+          ("MD2", "", r"MD2_CTX|MD2_INT|MD2Context(?:Str)?|MD2state_st|wc_Md2"),
+          ("SHA1", "", r"SHA_CTX|SHA1Context(?:Str)?|wc_Sha"),
+          ("RC4", "", r"RC4_KEY|rc4_key_st|RC4Context(?:Str)?"),
+          ("RC2", "", r"RC2_KEY|RC2_INT|rc2_key_st|RC2Context(?:Str)?|wc_Rc2"),
+          ("X448", "", r"curve448_key"), ("Falcon", "", r"falcon_key"),
+          ("HSS/LMS", "", r"LmsKey|LmsParams|HssPrivKey|wc_Lms(?:Parm|Rc|State)|oqs_lms_\w+"))],
+    # Java and Bouncy Castle classes (C25), and the JS/Python/Rust equivalents.
+    ("DSA", "DSA named by a Java/Bouncy Castle class", re.compile(
+        r"\bDSA(?:Signer|DigestSigner|KeyPairGenerator|ParametersGenerator|Key|"
+        r"GenParameterSpec|ParameterSpec)\b|\bPlainDSAEncoding\b|\bdsa\.DSA\w+")),
+    ("ECDH", "ECDH named by a Bouncy Castle class", re.compile(
+        r"\bECDH(?:Basic|Raw|C)Agreement\b|\bECDHCUnifiedAgreement\b")),
+    ("EC", "EC named by a Java/Bouncy Castle class", re.compile(
+        r"\bECKey(?:PairGenerator)?\b|\bEllipticCurve\b|\bec\.(?:EllipticCurve\w*|Brainpool\w+)")),
+    ("RSA", "RSA named by a Java/Bouncy Castle class", re.compile(
+        r"\bRSA(?:KeyGenParameterSpec|PrivateCrtKey|MultiPrimePrivateCrtKey(?:Spec)?|"
+        r"OtherPrimeInfo|DigestSigner|BlindingEngine|BlindingFactorGenerator|"
+        r"BlindSignature(?:Client|Server)|KEMExtractor|KEMGenerator|KeyEncapsulation)\b|"
+        r"\b(?:ISO9796d2(?:PSS)?|PSS|X931)Signer\b|\b(?:ISO9796d1|OAEP|PKCS1)Encoding\b|"
+        r"\b(?:PSS|OAEP)ParameterSpec\b|\brsa\.RSA\w+|"
+        r"\bforge\.pki\.(?:wrap|encrypt|decrypt)RsaPrivateKey\b|\bpublicKeyToRSAPublicKey(?:Pem)?\b")),
+    ("DH", "DH named by a Java/pyca class", re.compile(
+        r"\bDH(?:Key|GenParameterSpec|ParameterSpec|PrivateKeySpec|PublicKeySpec)\b|\bdh\.DH\w+")),
+    ("DES", "DES named by a Java/Bouncy Castle class", re.compile(
+        r"\bDES(?:KeyGenerator|KeySpec)\b|\bforge\.des\.")),
+    ("3DES", "3DES named by the RustCrypto des crate", re.compile(r"\bdes::Tdes\w+")),
+    ("EdDSA", "EdDSA named by a JCA type", re.compile(
+        r"\bEdEC(?:Key|PrivateKey|PublicKey|Point|PrivateKeySpec|PublicKeySpec)\b|"
+        r"\bEdDSAParameterSpec\b")),
+    ("X25519", "XDH named by a JCA type (X25519, or X448)", re.compile(
+        r"\bXEC(?:Key|PrivateKey|PublicKey|PrivateKeySpec|PublicKeySpec)\b")),
+    ("BLS", "BLS named by a Bouncy Castle class", re.compile(r"\bBLS(?:Signer|KeyPairGenerator)\b")),
+    ("Schnorr", "Schnorr named by a Bouncy Castle class", re.compile(r"\bBIP340Signer\b")),
+    # ---- ZA-OPRAVYANE row 138: JCA and Bouncy Castle algorithm names the `withRSA`/`withDSA`
+    # rules stopped short of (B classes C08, C10, C17, C18, C28, C29, C30, 23.10.2026): a
+    # suffix after the family (`...WithRSAEncryption`, `...inP1363Format`), the digest/scheme
+    # spelling (`SHA256/RSA`), and the EC and DH schemes not spelled ECDSA/ECDH. Names from
+    # the Bouncy Castle r1rv86v2 provider and JDK 27 Standard Names.
+    ("RSA", "RSA named by a JCA/Bouncy Castle signature or padding name", re.compile(
+        r"\w*with(?:RSAEncryption|RSASSA[-_]PSS|RSA/?PSS|RSA/X9\.31|RSA/ISO9796-2)\b|"
+        r"(?-i:(?<![A-Za-z0-9_])RAWRSA(?:SSA-PSS|PSS)?(?![A-Za-z0-9_]))|"
+        r"\bpadding\.(?:PSS|OAEP|PKCS1v15)\b|\bPKCS1v15\s*\(", re.IGNORECASE)),
+    ("RSA", "RSA named as <digest>/RSA", re.compile(
+        r"(?<![A-Za-z0-9])(?:MD[245]|SHA[-0-9()]*|RIPEMD\d+|RMD\d+)/RSA(?![A-Za-z])")),
+    ("DSA", "DSA named by a JCA/Bouncy Castle signature name", re.compile(
+        r"\w*withDSAinP1363Format\b|(?<![A-Za-z0-9])DSAwithSHA|"
+        r"(?<![A-Za-z0-9])(?:SHA[-0-9()]*|RIPEMD\d+)/DSA(?![A-Za-z])|"
+        r"(?-i:(?<![A-Za-z0-9_])(?:RAW|DET)DSA(?![A-Za-z0-9_]))|\w*with(?:DET|D)DSA\b",
+        re.IGNORECASE)),
+    ("ECDSA", "ECDSA named by a JCA/Bouncy Castle signature name", re.compile(
+        r"\w*withECDSAinP1363Format\b|(?:\w*with|(?<![A-Za-z0-9]))(?:DETECDSA|ECDDSA)\b",
+        re.IGNORECASE)),
+    # EC schemes that are not ECDSA or ECDH by name: Nyberg-Rueppel and ECCSI (RFC 6507) sign,
+    # ECIES and ECMQV agree a key on the curve; the cofactor and unified ECDH variants.
+    ("EC", "EC signature named as ECNR or ECCSI", re.compile(
+        r"(?:\w*with|(?<![A-Za-z0-9]))ECNR(?:Signer)?\b|\bECCSI\w*", re.IGNORECASE)),
+    ("ECDH", "ECDH named as ECIES, ECMQV or a cofactor/unified ECDH variant", re.compile(
+        r"(?<![A-Za-z])ECIES\w*|(?<![A-Za-z])EC(?:C?DH[CU]?|MQV)(?:with\w*?C?KDF)?(?![A-Za-z])|"
+        r"\bECDHC(?:Basic|Raw|Staged|Unified)Agreement\b|\bECMQV(?:Basic|Raw)Agreement\b|"
+        r"(?<![A-Za-z])MQVwith\w*?KDF\b|\bhpke\.(?:New)?DHKEM\w*", re.IGNORECASE)),
+    ("DH", "DH named by a KDF agreement, DHIES or a Bouncy Castle class", re.compile(
+        r"(?i:(?<![A-Za-z])DHU?with\w*?C?KDF\b|(?<![A-Za-z])DHIES\w*)|"
+        r"\bDH(?:Agreement|UnifiedAgreement|StandardGroups|BasicKeyPairGenerator)\b|"
+        r"\bMQVBasicAgreement\b")),
+    ("X25519", "XDH named by a Bouncy Castle agreement (X25519, or X448)", re.compile(
+        r"\bXDH(?:Basic|Unified)Agreement\b|(?<![A-Za-z])XDHwith\w+")),
+    ("ElGamal", "ElGamal named by Go's openpgp packages", re.compile(
+        r"\belgamal\.\w+|\w+ElGamal\w*")),
+    # The digest glued to the scheme in a signature or PBE name (`MD5withRSA`, `MD2/RSA`,
+    # `PBEWITHMD5ANDDES`). SHA-1 in the same shapes is row 143.
+    *[(family, f"{family} named in a signature or PBE name", re.compile(
+        rf"(?<![A-Za-z0-9]){family}(?=with|/|and)|PBEWITH{family}AND", re.IGNORECASE))
+      for family in ("MD5", "MD2", "MD4")],
+    # PKCS#12 and PKCS#5 PBE names: PKCS#12's bare `SHA` is SHA-1, DES2KEY/DES3KEY two- and
+    # three-key triple DES.
+    ("SHA1", "SHA-1 named in a PBE name", re.compile(r"PBEWITHSHA(?:-?1)?AND", re.IGNORECASE)),
+    ("RC2", "RC2 named in a PBE name", re.compile(r"PBEWITH\w*?AND\d*(?:BIT)?RC2", re.IGNORECASE)),
+    ("RC4", "RC4 named in a PBE name", re.compile(r"PBEWITH\w*?AND\d*(?:BIT)?RC4", re.IGNORECASE)),
+    ("3DES", "3DES named in a PBE name", re.compile(r"PBEWITH\w*?ANDDES[23]KEY", re.IGNORECASE)),
+    ("DES", "DES named in a PBE name", re.compile(
+        r"PBEWITH(?:MD2|MD5|SHA-?1?)ANDDES(?:-CBC)?(?![A-Za-z0-9])", re.IGNORECASE)),
+    # ---- ZA-OPRAVYANE row 140: the family named only by the package, enum or constant it
+    # is reached through (B classes C20-C24, C32, C33, C35, 23.10.2026). Members from Go
+    # 1.27.3 and x/crypto v0.58.0 (crypto, crypto/{dsa,elliptic,rsa,des,md5,sha1,x509},
+    # ssh, ssh/agent, openpgp/packet), RustCrypto, rustls 0.23.46, ring 0.17.14, aws-lc-rs
+    # 1.18.2, .NET v10.0.13 and pycryptodome/python-rsa. Case-sensitive: each library
+    # writes its names exactly so. Only named members where the package is also a word.
+    ("DSA", "DSA named by a package, enum or constant", re.compile(
+        r"(?<![A-Za-z_-])dsa\.(?:Parameters|PublicKey|PrivateKey|ParameterSizes|"
+        r"ErrInvalidPublicKey|L\d{4}N\d{3})\b|"
+        # RustCrypto's dsa crate by its own items: `namespace dsa` is also data structures
+        # and algorithms in C++.
+        r"\bdsa::(?:OID|Signature|SigningKey|VerifyingKey|Components|KeySize|BoxedUint)\b|"
+        r"\bx509\.DSA\b|"
+        r"\bssh\.(?:Insecure)?(?:KeyAlgo|CertAlgo|CertSigAlgo|SigAlgo)DSA\w*|"
+        r"\bpacket\.(?:PubKeyAlgo|New)DSA\w*|\bSignatureAlgorithm::DSA\b|"
+        r"\bCngAlgorithmGroup\.Dsa\b|\bDSA(?:OpenSsl|Parameters|Signature(?:De)?[Ff]ormatter|"
+        r"CertificateExtensions)\b|CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?DSA\"")),
+    ("EC", "EC named by a package, enum or constant", re.compile(
+        r"\belliptic\.(?:GenerateKey|Marshal|MarshalCompressed|Unmarshal|UnmarshalCompressed|"
+        r"Curve|CurveParams)\b|\belliptic_curve::|\bk256::|\bCngKeyBlobFormat\.Ecc\w+|\bECCurve\b")),
+    ("RSA", "RSA named by a package, enum or constant", re.compile(
+        r"\brsa\.(?:EncryptOAEPWithOptions|PSSOptions|PSSSaltLength\w+|DecryptPKCS1v15SessionKey|"
+        r"PKCS1v15DecryptOptions|OAEPOptions|PrecomputedValues|CRTValue|ErrMessageTooLong|"
+        r"ErrDecryption|ErrVerification|encrypt|decrypt|sign|verify|find_signature_hash|"
+        r"compute_hash|sign_hash)\b|\brsa::|\bx509\.RSA\b|"
+        r"\bssh\.(?:Insecure)?(?:KeyAlgo|CertAlgo|CertSigAlgo|SigAlgo)RSA\w*|"
+        r"\bagent\.SignatureFlagRsa\w*|\bpacket\.(?:PubKeyAlgo|New)RSA\w*|"
+        r"\bSignatureAlgorithm::RSA\b|\bOAEP_SHA\d+_MGF1SHA\d+\b|\bCngAlgorithmGroup\.Rsa\b|"
+        r"\bRSA(?:Encryption|Signature)Padding(?:Mode\.\w+)?\b|\bRSAParameters\b|"
+        r"\bRSA(?:OAEP|PKCS1)(?:KeyExchange|Signature)(?:De)?[Ff]ormatter\b|"
+        r"\bPKCS1MaskGenerationMethod\b|\bExchangeAlgorithmType\.Rsa\w+|"
+        r"\bRSA\.(?:generate|import_key|importKey|construct)\b|"
+        r"CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?RSA\"")),
+    ("ECDSA", "ECDSA named by a Go ssh or openpgp constant", re.compile(
+        r"\bssh\.(?:KeyAlgo|CertAlgo)(?:SK)?ECDSA\w*|\bpacket\.(?:PubKeyAlgo|New)ECDSA\w*")),
+    ("ECDH", "ECDH named by a package, enum or constant", re.compile(
+        r"\bssh\.KeyExchangeECDH\w*|\bpacket\.PubKeyAlgoECDH\b|\bECDiffieHellman\w+|"
+        r"\bDH\.key_agreement\b")),    # pycryptodome's Crypto.Protocol.DH is ECDH (row 71)
+    ("DH", "DH named by a package, enum or constant", re.compile(
+        r"\bssh\.(?:Insecure)?KeyExchangeDH\w*|\bNamedGroup::FFDHE\d+\b")),
+    ("X25519", "X25519 named by a Go ssh constant", re.compile(r"\bssh\.KeyExchangeCurve25519\w*")),
+    ("X448", "X448 named as a pycryptodome curve", re.compile(
+        r"\bECC\.generate\([^)\n]*curve\s*=\s*[\"'][Cc]urve448[\"']")),
+    ("Ed25519", "Ed25519 named by a Go ssh constant", re.compile(
+        r"\bssh\.(?:KeyAlgo|CertAlgo)(?:SK)?ED25519\w*")),
+    ("ML-DSA", "ML-DSA named by a Go ssh constant", re.compile(
+        r"\bssh\.(?:KeyAlgo|CertAlgo)MLDSA\w*")),
+    ("RC4", "RC4 named by a package, enum or constant", re.compile(
+        r"\bssh\.InsecureCipherRC4\w*|\b(?:CipherAlgorithmType|CngAlgorithm)\.Rc4\b")),
+    ("MD5", "MD5 named by a package, enum or constant", re.compile(
+        r"\bcrypto\.MD5(?:SHA1)?\b|\bmd5\.(?:Size|BlockSize)\b|\bssh\.FingerprintLegacyMD5\b|"
+        r"\bHashAlgorithm::MD5\b|\bCngAlgorithm\.MD5\b|\bHashAlgorithmType\.Md5\b|"
+        r"CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?MD5(?:Cng|Managed|"
+        r"CryptoServiceProvider)?\"|xmldsig-more#(?:rsa-)?md5\b")),
+    ("SHA1", "SHA-1 named by a package, enum or constant", re.compile(
+        r"\bcrypto\.(?:MD5)?SHA1\b|\bsha1\.(?:Size|BlockSize)\b|\bHashAlgorithm::SHA1\b|"
+        r"\b(?:HKDF_)?SHA1_(?:FOR_LEGACY_USE_ONLY|OUTPUT_LEN)\b|\bCngAlgorithm\.Sha1\b|"
+        r"\b(?:HashAlgorithmType|X509SubjectKeyIdentifierHashAlgorithm)\.(?:Sha1|ShortSha1|"
+        r"CapiSha1)\b|\bSHA\.new\b|CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?"
+        r"SHA1?(?:Cng|Managed|CryptoServiceProvider)?\"|xmldsig#(?:rsa-|dsa-|hmac-)?sha1\b")),
+    ("MD4", "MD4 named by a package or constant", re.compile(
+        r"\bcrypto\.MD4\b|\bmd4\.(?:New|Size|BlockSize|Sum)\b")),
+    ("DES", "DES named by a package, enum or constant", re.compile(
+        r"\bdes\.(?:BlockSize|KeySizeError)\b|\bdes::(?:Des|WeakKeyError)\b|"
+        r"\bDES_(?:FOR_LEGACY_USE_ONLY|KEY_LEN|"
+        r"CBC_IV_LEN)\b|\bCipherAlgorithmType\.Des\b|"
+        r"CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?DES\"|xmlenc#des-cbc\b")),
+    ("3DES", "3DES named by a package, enum or constant", re.compile(
+        r"\bTDES_FOR_LEGACY_USE_ONLY\b|\bCipherAlgorithmType\.TripleDes\b|"
+        r"CryptoConfig\.\w+\(\s*\"Triple ?DES\"|xmlenc#tripledes-cbc\b")),
+    ("RC2", "RC2 named by a package, enum or constant", re.compile(
+        r"\bCipherAlgorithmType\.Rc2\b|CryptoConfig\.\w+\(\s*\"(?:System\.Security\.Cryptography\.)?"
+        r"RC2(?:CryptoServiceProvider)?\"")),
+    # ---- ZA-OPRAVYANE row 141: protocol settings (B classes C04, C11-C15, 23.10.2026). Names
+    # from IANA's TLS SignatureScheme, SSH, JOSE, COSE and DNSSEC registries (read 21.10 to
+    # 29.09.2026), Go crypto/tls and strongSwan 6.1.0's proposal keywords. Short words only
+    # under the key that gives them their meaning; the match starts at the key.
+    ("RSA", "RSA named by a TLS SignatureScheme, SSH or JOSE/COSE name", re.compile(
+        r"(?<![A-Za-z0-9_])rsa_(?:pss_(?:rsae|pss)_sha(?:256|384|512)|"
+        r"pkcs1_(?:sha1|sha224|sha256|sha384|sha512|md5)(?:_legacy)?)(?![A-Za-z0-9_])|"
+        r"\btls\.(?:PKCS1|PSS)WithSHA\d+\b|"
+        r"(?<![A-Za-z0-9-])(?:rsa(?:1024|2048)-sha(?:1|256)|(?:spki|pgp)-sign-rsa|"
+        r"x509v3-rsa2048-sha256)(?![A-Za-z0-9-])|(?<![A-Za-z])RSAES-OAEP\b|"
+        r"[\"']alg[\"']\s*:\s*[\"']RS1[\"']")),
+    ("DSA", "DSA named by an SSH host key type or a BIND algorithm", re.compile(
+        r"(?<![A-Za-z0-9-])(?:spki|pgp)-sign-dss(?![A-Za-z0-9-])|"
+        r"\balgorithm\s+[\"']?dsa[\"']?\s*;", re.IGNORECASE)),
+    ("DH", "DH named by an SSH GSS key exchange or a BIND algorithm", re.compile(
+        r"(?<![A-Za-z0-9-])gss-(?:group\d+|gex)-sha\d+-|\balgorithm\s+[\"']?dh[\"']?\s*;",
+        re.IGNORECASE)),
+    ("SM2", "SM2 named by a TLS SignatureScheme or DNSSEC mnemonic", re.compile(
+        r"(?<![A-Za-z0-9])(?:sm2sig_sm3|sm2sm3)(?![A-Za-z0-9])", re.IGNORECASE)),
+    ("GOST R 34.10", "GOST R 34.10 named by a DNSSEC mnemonic", re.compile(
+        r"(?<![A-Za-z0-9-])ecc-gost(?:12)?(?![A-Za-z0-9-])", re.IGNORECASE)),
+    ("DES", "DES named as an SSH cipher", re.compile(
+        r"(?<![A-Za-z0-9])des-cbc(?:@ssh\.com)?(?![A-Za-z0-9-])", re.IGNORECASE)),
+    ("MD5", "MD5 named as an SSH MAC", re.compile(
+        r"(?<![A-Za-z0-9-])hmac-md5(?:-96)?(?:-etm@openssh\.com)?(?![A-Za-z0-9-])")),
+    # strongSwan proposals (swanctl.conf `proposals`, ipsec.conf `ike`/`esp`/`ah`): the
+    # keywords between dashes, read only on such a line.
+    *[(family, f"{family} named in a strongSwan proposal", re.compile(
+        rf"\b(?:proposals|ike|esp|ah)\s*=\s*[^#\n]*?(?<![A-Za-z0-9_])(?:{words})(?=[-,!\s]|$)",
+        re.IGNORECASE))
+      for family, words in (("DES", "des"), ("SHA1", "sha1?|sha1_160"), ("MD5", "md5(?:_128)?"))],
+    ("EC", "EC named by a strongSwan brainpool group", re.compile(
+        r"(?<![A-Za-z])ecp(?:224|256|384|512)bp(?![0-9A-Za-z])", re.IGNORECASE)),
+    # JOSE (RFC 7518, draft-ietf-jose-hpke-encrypt) and COSE (RFC 9864) names, only as an
+    # `alg` value or a quoted name: HPKE-0..2 and 7 are NIST curves, 3-4 X25519, 5-6 X448.
+    ("SHA1", "SHA-1 named as a JOSE algorithm (RS1, HS1)", re.compile(
+        r"[\"']alg[\"']\s*:\s*[\"'][RH]S1[\"']")),
+    ("ECDSA", "ECDSA named as a fully specified JOSE/COSE algorithm (ESP*, ESB*)", re.compile(
+        r"[\"'](?:ESP(?:256|384|512)|ESB(?:256|320|384|512))[\"']")),
+    ("ECDH", "ECDH named as a JOSE HPKE algorithm (P-256, P-384, P-521)", re.compile(
+        r"[\"']HPKE-[0127](?:-KE)?[\"']")),
+    ("X25519", "X25519 named as a JOSE HPKE algorithm", re.compile(r"[\"']HPKE-[34](?:-KE)?[\"']")),
+    ("X448", "X448 named as a JOSE HPKE algorithm", re.compile(r"[\"']HPKE-[56](?:-KE)?[\"']")),
+    # A JWK/COSE key's curve and type (RFC 7518 6.2, RFC 9053 7.1).
+    ("EC", "EC named by a JWK or COSE key's crv or kty", re.compile(
+        r"[\"']crv[\"']\s*:\s*[\"'](?:P-(?:256|384|521)|brainpoolP\d{3}r1|secp256k1)[\"']|"
+        r"[\"']kty[\"']\s*:\s*[\"']EC2?[\"']")),
+    ("X448", "X448 named by Node's key generation", re.compile(
+        r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']x448[\"']")),
+    # Curve448 by name: OpenSSH's curve448-sha512, strongSwan's curve448, pycryptodome.
+    ("X448", "X448 named as curve448", re.compile(r"(?<![A-Za-z])curve448(?![0-9])", re.IGNORECASE)),
+    # ---- ZA-OPRAVYANE row 142: composites and hybrids with a half unreported (B classes C03
+    # and C31, 23.10.2026). .NET 10 CompositeMLDsaAlgorithm members, Go 1.27 crypto/hpke and
+    # x/crypto/ssh, OpenSSL's curveSM2MLKEM768, Bouncy Castle's hash-then-sign and X-Wing
+    # classes. The post-quantum scheme glued after `with` is read in capitals only.
+    ("ML-DSA", "ML-DSA named by a composite or hash-then-sign name", re.compile(
+        r"(?<=[Ww][Ii][Tt][Hh])ML-?DSA|\bHashMLDSASigner\b|\bCompositeMLDsa\w*")),
+    ("SLH-DSA", "SLH-DSA named by a hash-then-sign name", re.compile(
+        r"(?<=[Ww][Ii][Tt][Hh])(?:SLH-?DSA|SPHINCS)|\bHashSLHDSASigner\b")),
+    ("ECDSA", "ECDSA half of an ML-DSA composite", re.compile(
+        r"(?i:MLDsa\d+WithECDsa)|(?<![A-Za-z0-9])ssh-mldsa\d+-(?:nist)?p(?:256|384|521)(?![0-9])")),
+    ("Ed25519", "Ed25519 half of an ML-DSA composite", re.compile(r"(?i:MLDsa\d+WithEd25519)")),
+    ("Ed448", "Ed448 half of an ML-DSA composite", re.compile(r"(?i:MLDsa\d+WithEd448)")),
+    ("RSA", "RSA half of an ML-DSA composite", re.compile(r"(?i:MLDsa\d+WithRSA)")),
+    ("ECDH", "ECDH half of an ML-KEM hybrid (NIST curve)", re.compile(
+        r"(?i:(?<![A-Za-z])MLKEM(?:768|1024)[-_]?P(?:256|384|521))(?![0-9])")),
+    ("ML-KEM", "ML-KEM half of a Go ssh hybrid key exchange", re.compile(r"\bssh\.KeyExchangeMLKEM\w*")),
+    ("SM2", "SM2 half of the curveSM2MLKEM768 hybrid", re.compile(r"\bcurveSM2MLKEM\d+\b")),
+    *[(family, "X-Wing hybrid KEM (ML-KEM-768 + X25519), Bouncy Castle class", re.compile(
+        r"\bXWing(?:KeyGenerationParameters|KeyPairGenerator|KeyParameters|PrivateKeyParameters|"
+        r"PublicKeyParameters|KEMExtractor|KEMGenerator)\b")) for family in ("ML-KEM", "X25519")],
+    # ---- ZA-OPRAVYANE row 143: narrow gaps (A-C sections 4-5, 23.10.2026). SHA-1 was found
+    # for 29 of 535 library names: the rule above lists calls, and SHA1 glued to a scheme,
+    # a separator or a camel-case word was never read. SHA-1 as a whole name here, after
+    # `with`/`and`/`hmac`/`md5`/`mgf1`, or as `Sha1` after a lower-case letter; never before
+    # a digit (SHA-128, SHA1024) or a lower-case word (`sha1sum` is a tool, not a name part)
+    # other than with/and/kdf. Joined on at least one side (`_`, `-`, `.`, `/`, `=`, a glued
+    # word, a capital) or quoted alone: "legacy SHA1 path removed" is prose, not a name (the
+    # A-C negative control). Bare `SHA` only glued to `with` or `/` and a signature.
+    ("SHA1", "SHA-1 named in a compound name", re.compile(
+        r"(?:(?<=[_./=-])|(?<=[Ww][Ii][Tt][Hh])|(?<=[Aa][Nn][Dd])|(?<=[Hh][Mm][Aa][Cc])|"
+        r"(?<=[Mm][Dd]5)|(?<=[Mm][Gg][Ff]1))(?i:sha[-_]?1)(?:(?![0-9a-z])|(?=with|and|kdf|ckdf))|"
+        r"(?<![A-Za-z0-9])(?i:sha[-_]?1)(?=[_(-]|[A-Z]|with|and|kdf|ckdf)|"
+        r"(?<=[\"'])(?i:sha-?1)(?=[\"'])|"
+        r"(?<=[a-z])Sha1(?![0-9a-z])|(?<=[0-9])SHA1(?![0-9a-z])|"   # DH14SHA1, MD5SHA1
+        r"(?<![A-Za-z0-9])SHA(?=(?:with|WITH|With)(?:RSA|DSA|ECDSA)|/(?:RSA|DSA|ECDSA)\b)")),
+    # X448 and Ed25519 inside a camel-case name (wolfSSL's SetX448KeyGenCb, libgcrypt-style
+    # HpkeDhKemX448Sha512), and libsodium's old batch Ed25519 signature.
+    ("X448", "X448 named in a camel-case name", re.compile(r"(?<=[a-z])X448(?=[A-Z_])")),
+    ("Ed25519", "Ed25519 named in a camel-case name or libsodium's batch signature", re.compile(
+        r"(?<=[a-z])Ed25519(?=[A-Z_])|\bcrypto_sign_edwards25519sha512batch\w*|"
+        r"[<\"]sodium/crypto_sign_edwards25519sha512batch\.h[>\"]")),
+    # LMS through wolfSSL's parameter sets, liboqs's ids and Mbed TLS's API and types
+    # (wolfssl/wolfcrypt/wc_lms.h, oqs/sig_stfl.h, mbedtls/lms.h).
+    ("HSS/LMS", "HSS/LMS named by the wolfSSL, liboqs or Mbed TLS API", re.compile(
+        r"\bWC_LMS_PARM_\w+|\bOQS_LMS_ID_\w+|\bmbedtls_lms_\w+|\bMBEDTLS_LMS_\w+|"
+        r"\b(?:MBEDTLS_)?LMOTS_(?:SHA256|SHAKE)_N\d+_W\d+\b|\bMBEDTLS_LMOTS_\w+")),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
@@ -709,8 +1047,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # spelled ntruhps2048509 / ntruhrss701 / ntru_prime, so they are named rather
     # than left to a boundary that cannot tell them from an ordinary word.
     ("NTRU", "NTRU usage", re.compile(
-        r"(?<![A-Za-z])ntru(?:hps|hrss|prime|[-_\d]|(?![A-Za-z]))|"
-        r"(?<![A-Za-z])sntrup\d+",
+        # NTRU LPRime and NTRU+ (KpqC) by Bouncy Castle's names, row 139.
+        r"(?<![A-Za-z])ntru(?:hps|hrss|prime|lpr|plus|[-_\d]|(?![A-Za-z]))|"
+        r"(?<![A-Za-z])sntrup(?:\d+|rime)",
         re.IGNORECASE,
     )),
     ("BIKE", "BIKE usage", re.compile(r"(?<![A-Za-z])bike[-_]?l[135]", re.IGNORECASE)),
@@ -718,7 +1057,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # hqc1/hqc3/hqc5 (src/kem/kem.h, ALGORITHMS.md; ZA-OPRAVYANE row 81).
     ("HQC", "HQC usage", re.compile(r"(?<![A-Za-z])hqc[-_]?(?:128|192|256|[135])(?![0-9])",
                                     re.IGNORECASE)),
-    ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss", re.IGNORECASE)),
+    # Also hash-then-sign, SHA256WITHXMSSMT (Bouncy Castle), row 139.
+    ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss|(?<=with)xmss", re.IGNORECASE)),
     # Stateful hash-based, SP 800-208. CNSA 2.0 requires LMS or XMSS for firmware
     # and code signing, so a firmware pipeline that had complied scanned as empty.
     ("HSS/LMS", "LMS/HSS stateful signature usage", re.compile(
@@ -754,7 +1094,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z])cross[-_]?r?[-_]?sdp", re.IGNORECASE,
     )),
     ("FrodoKEM", "FrodoKEM usage", re.compile(
-        r"(?<![A-Za-z])frodokem|(?<![A-Za-z])frodo[-_]?(640|976|1344)", re.IGNORECASE,
+        # e-: liboqs's ephemeral eFrodoKEM (OQS_KEM_alg_efrodokem_*), row 143.
+        r"(?<![A-Za-z])e?frodokem|(?<![A-Za-z])e?frodo[-_]?(640|976|1344)", re.IGNORECASE,
     )),
     # Recognising these two is the point: both are post-quantum by design and
     # neither is safe to rely on. Unrecognised, they read as "nothing found".
@@ -902,6 +1243,54 @@ _FILTERED_PATTERNS = [(algorithm, description, pattern, _prefilter(pattern))
 # One pattern without literals and the gate is the empty regex, which every line passes.
 _ANY_LITERAL = re.compile("" if any(f[3] is None for f in _FILTERED_PATTERNS) else
                           "|".join(sorted({re.escape(s) for f in _FILTERED_PATTERNS for s in f[3]})))
+# Which patterns a line can match, from the literals it holds. Rows 136-143 doubled the
+# patterns, and checking each one's literals on every line came to cost more than the
+# regexes did (OpenSSH 26 s -> 37 s). One scan finds, at every position, the longest
+# literal starting there; any other literal on the line is a prefix of one of those, so
+# the literals inside the ones found are exactly the literals present. The patterns tried
+# are those holding one of them -- the same set the per-pattern check selects -- in list
+# order, plus any pattern without literals.
+def _trie_regex(words: list[str]) -> str:
+    """The words as one regex shaped like a prefix tree, so each position is tried one
+    branch per next character rather than one per word; at a position it matches the
+    longest word starting there (children before the end of a word)."""
+    tree: dict = {}
+    for word in words:
+        node = tree
+        for ch in word:
+            node = node.setdefault(ch, {})
+        node[""] = {}
+
+    def build(node: dict) -> str:
+        branches = [re.escape(ch) + build(child) for ch, child in sorted(node.items()) if ch]
+        if "" in node:
+            branches.append("")
+        if len(branches) == 1:
+            return branches[0]
+        return "(?:" + "|".join(branches) + ")"
+    return build(tree)
+
+
+_ALL_LITERALS = sorted({s for f in _FILTERED_PATTERNS if f[3] for s in f[3]},
+                       key=lambda s: (-len(s), s))
+_LITERAL_AT = re.compile("(?=(" + _trie_regex(_ALL_LITERALS) + "))")
+_INSIDE = {s: frozenset(t for t in _ALL_LITERALS if t in s) for s in _ALL_LITERALS}
+_PATTERNS_WITH = {s: frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if f[3] and s in f[3])
+                  for s in _ALL_LITERALS}
+_ALWAYS_TRIED = frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if not f[3])
+
+
+def _candidate_patterns(lowered: str | None) -> list:
+    """The patterns worth trying on a line; every pattern for a non-ASCII line."""
+    if lowered is None:
+        return _FILTERED_PATTERNS
+    present: set[str] = set()
+    for m in _LITERAL_AT.finditer(lowered):
+        present |= _INSIDE[m.group(1)]
+    indices = set(_ALWAYS_TRIED)
+    for s in present:
+        indices |= _PATTERNS_WITH[s]
+    return [_FILTERED_PATTERNS[i] for i in sorted(indices)]
 
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
@@ -955,18 +1344,29 @@ _SUITE_COMPONENT = {
     "ECDSA": "ECDSA", "AECDSA": "ECDSA",
     "3DES": "3DES", "CBC3": "3DES", "EDE3": "3DES", "DES": "DES", "DES40": "DES",
     "RC4": "RC4", "MD5": "MD5",
+    # ZA-OPRAVYANE row 136. `SHA` alone is the record MAC, HMAC-SHA-1 (SHA256 and SHA384 are
+    # other parts); MD5 and SHA-1 as a MAC are reported. RC2 is the export suites' cipher,
+    # ECCPWD (RFC 8492) an elliptic-curve password exchange.
+    "SHA": "SHA1", "RC2": "RC2", "ECCPWD": "EC",
 }
 # A line is read as a cipher list only when it carries a suite-shaped token: at least
 # three dash-joined parts, or an IANA TLS_ name. "rsa-2048" is not a suite.
+# Row 136: OpenSSL's own constants (`TLS1_CK_`, `SSL3_TXT_`, include/openssl/{tls1,ssl3}.h),
+# JSSE's `SSL_*_WITH_*` names, and IANA's lowercase `anon` (TLS_DH_anon_WITH_...).
 _SUITE_TOKEN = re.compile(
-    r"(?<![A-Za-z0-9])(?:TLS_[A-Z0-9_]+|[A-Za-z0-9]+(?:-[A-Za-z0-9]+){2,})(?![A-Za-z0-9])")
+    r"(?<![A-Za-z0-9])(?:TLS_[A-Z0-9_]+(?:anon_[A-Z0-9_]+)?|"
+    r"(?:SSL3|TLS1(?:_[123])?)_(?:CK|TXT|RFC)_[A-Z0-9_]+|"
+    r"SSL_(?:[A-Z0-9]+_|anon_)+?WITH_[A-Z0-9_]+|"
+    r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+){2,})(?![A-Za-z0-9])")
+_SUITE_PREFIX = re.compile(r"TLS_|(?:SSL3|TLS1(?:_[123])?)_(?:CK|TXT|RFC)_|SSL_\w+_WITH_")
 
 
 # What makes a dash-joined token a cipher suite rather than an ordinary hyphenated
 # string: it names a bulk cipher AND a mode or MAC. Anything looser produced real
 # false positives on real trees: "ML-DSA-65" read as DSA, "slh-dsa-sha2-128s" read as
 # DSA, and a French translation ("Remplacer-par-des-frais") read as DES.
-_SUITE_CIPHER = ("AES", "CAMELLIA", "CHACHA", "SEED", "IDEA", "RC4", "DES", "3DES", "NULL")
+_SUITE_CIPHER = ("AES", "CAMELLIA", "CHACHA", "SEED", "IDEA", "RC4", "DES", "3DES", "NULL",
+                 "ARIA", "RC2")     # row 136
 _SUITE_MODE_OR_MAC = ("CBC", "GCM", "CCM", "POLY1305", "SHA", "MD5", "UMAC")
 
 
@@ -982,7 +1382,7 @@ _FETCH_CALL = re.compile(
 # alone rather than turned into a family nobody can check.
 _FETCH_NAME_FAMILY = {
     "RSA": "RSA", "RSA-PSS": "RSA", "RSASSA-PSS": "RSA",
-    "EC": "EC", "ECDSA": "ECDSA", "ECDH": "ECDH", "SM2": "EC",
+    "EC": "EC", "ECDSA": "ECDSA", "ECDH": "ECDH", "SM2": "SM2",     # SM2: row 139
     "ED25519": "Ed25519", "ED448": "Ed448", "X25519": "X25519", "X448": "X448",
     "DSA": "DSA", "DH": "DH", "DHX": "DH",
     "ML-KEM": "ML-KEM", "ML-KEM-512": "ML-KEM", "ML-KEM-768": "ML-KEM", "ML-KEM-1024": "ML-KEM",
@@ -1016,6 +1416,21 @@ _JCA_NAME_FAMILY = {
     "SHA": "SHA1", "SHA-1": "SHA1", "SHA1": "SHA1", "MD5": "MD5",
     "FALCON": "Falcon", "FALCON-512": "Falcon", "FALCON-1024": "Falcon",
 }
+# Row 139: the families added then, and Bouncy Castle's names for the post-quantum ones
+# (BouncyCastlePQCProvider, read in r1rv86v2).
+_JCA_NAME_FAMILY.update({
+    "SM2": "SM2", "ELGAMAL": "ElGamal", "RC2": "RC2", "RC2WRAP": "RC2", "TDEA": "3DES",
+    "TDEAWRAP": "3DES", "MD2": "MD2", "MD4": "MD4", "LMS": "HSS/LMS", "HSS": "HSS/LMS",
+    "BIKE": "BIKE", "HAETAE": "HAETAE", "SMAUGT": "SMAUG-T", "SMAUG-T": "SMAUG-T",
+    "AIMER": "AIMer", "NTRULPRIME": "NTRU", "SNTRUPRIME": "NTRU", "NTRUPLUS": "NTRU",
+    "HQC": "HQC", "UOV": "UOV", "MAYO": "MAYO", "CMCE": "Classic McEliece",
+})
+# Row 138: Bouncy Castle's bare scheme names. DHKEM is HPKE's, over X25519/X448 or a NIST
+# curve (RFC 9180, JDK's DHKEM), so elliptic-curve.
+_JCA_NAME_FAMILY.update({
+    "OAEP": "RSA", "PSS": "RSA", "RSAPSS": "RSA", "RSA-KTS-KEM-KWS": "RSA", "DDSA": "DSA",
+    "DHKEM": "ECDH",
+})
 
 
 # COSE algorithm identifiers (IANA "COSE Algorithms", algorithms.csv, read 23.10.2026), as
@@ -1031,7 +1446,16 @@ COSE_ALGORITHMS = {
     -259: ("RSA", "RS512"), -48: ("ML-DSA", "ML-DSA-44"), -49: ("ML-DSA", "ML-DSA-65"),
     -50: ("ML-DSA", "ML-DSA-87"),
 }
-_COSE_ALG = re.compile(r"[\"']?\balg[\"']?\s*[:=]\s*(-\d{1,3})(?![0-9])")
+# Row 141: RS1 (-65535), the brainpool ESB* (-265..-268), HSS-LMS (-46), RSAES-OAEP
+# (-40..-42), ECDH-ES/SS with and without key wrap (-25..-34) and SHA-1 (-14).
+COSE_ALGORITHMS.update({
+    -65535: ("RSA", "RS1"), -265: ("ECDSA", "ESB256"), -266: ("ECDSA", "ESB320"),
+    -267: ("ECDSA", "ESB384"), -268: ("ECDSA", "ESB512"), -46: ("HSS/LMS", "HSS-LMS"),
+    -40: ("RSA", "RSAES-OAEP"), -41: ("RSA", "RSAES-OAEP w/ SHA-256"),
+    -42: ("RSA", "RSAES-OAEP w/ SHA-512"), -14: ("SHA1", "SHA-1"),
+    **{n: ("ECDH", f"ECDH ({n})") for n in range(-34, -24)},
+})
+_COSE_ALG = re.compile(r"[\"']?\balg[\"']?\s*[:=]\s*(-\d{1,5})(?![0-9])")
 _COSE_CONTEXT = re.compile(r"public-key|pubKeyCredParams|\bcose", re.IGNORECASE)
 
 
@@ -1067,6 +1491,10 @@ def scan_openssl3_names(line: str) -> list[tuple[str, int]]:
     return out
 
 
+_ARIA_RSA_SUITES = {"ECDHE-ARIA128-GCM-SHA256", "ECDHE-ARIA256-GCM-SHA384",
+                    "ECDH-ARIA128-GCM-SHA256", "ECDH-ARIA256-GCM-SHA384"}
+
+
 def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
     """Families named inside cipher-suite tokens, with the position that named them.
 
@@ -1079,7 +1507,7 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
         pos = token.start()
         parts = re.split(r"[-_+]", text)
         upper = [part.upper() for part in parts]
-        looks_like_suite = text.upper().startswith("TLS_") or (
+        looks_like_suite = bool(_SUITE_PREFIX.match(text)) or (
             any(part.startswith(_SUITE_CIPHER) for part in upper)
             and any(part.startswith(_SUITE_MODE_OR_MAC) for part in upper))
         if not looks_like_suite:
@@ -1090,6 +1518,9 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
         # bare DES part is the same cipher named twice, not a second one.
         if "3DES" in families:
             families = [family for family in families if family != "DES"]
+        # OpenSSL's names for TLS_ECDH(E)_RSA_WITH_ARIA_* leave the RSA out (tls1.h), row 136.
+        if text.upper() in _ARIA_RSA_SUITES:
+            families.append("RSA")
         out.extend((family, pos) for family in families)
     return out
 
@@ -1930,8 +2361,7 @@ def scan_source_file(path: Path, rel_path: str,
         blobs = _blob_spans(line)
         searched = _masked(line, blobs)
         lowered = searched.lower() if searched.isascii() else None
-        candidates = (_FILTERED_PATTERNS if lowered is None or _ANY_LITERAL.search(lowered)
-                      else ())
+        candidates = _candidate_patterns(lowered)
         for algorithm, description, pattern, literals in candidates:
             if algorithm in seen_on_line:
                 continue

@@ -55,9 +55,10 @@ _HYBRID = ("During the transition a hybrid (classical + post-quantum) is accommo
 _BY_FAMILY: dict[str, dict[str, Any]] = {}
 for fam in ("X25519", "X448", "ECDH", "DH"):
     _BY_FAMILY[fam] = {"options": [_KEM], "note": _HYBRID}
-for fam in ("ECDSA", "EdDSA", "Ed25519", "Ed448", "DSA"):
+for fam in ("ECDSA", "EdDSA", "Ed25519", "Ed448", "DSA", "GOST R 34.10"):
     _BY_FAMILY[fam] = {"options": [_SIG, _SIG_FIRMWARE], "note": _HYBRID}
-for fam in ("RSA", "EC"):
+# SM2 and ElGamal sign and encrypt alike (row 139).
+for fam in ("RSA", "EC", "SM2", "ElGamal"):
     _BY_FAMILY[fam] = {
         "options": [_KEM, _SIG, _SIG_FIRMWARE],
         "note": ("The scan does not tell whether this key is used to establish keys or to "

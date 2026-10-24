@@ -831,6 +831,9 @@ STATIC_RSA_SUITES = (
     "CAMELLIA256-GCM-SHA384", "CAMELLIA256-SHA", "CAMELLIA256-SHA256",
     "DES-CBC3-SHA", "IDEA-CBC-SHA", "NULL-MD5", "NULL-SHA", "NULL-SHA256",
     "RC4-MD5", "RC4-SHA", "SEED-SHA", "SM4-CCM-SM3", "SM4-GCM-SM3",
+    # The single-DES and export suites, removed from openssl-ciphers(1) but still named in
+    # include/openssl/{ssl3,tls1}.h (OpenSSL 3.6.5), ZA-OPRAVYANE row 136.
+    "DES-CBC-SHA", "EXP-DES-CBC-SHA", "EXP-RC2-CBC-MD5", "EXP-RC4-MD5",
 )
 _STATIC_RSA = re.compile(
     r"(?<![A-Za-z0-9_-])("
@@ -903,6 +906,18 @@ CLASSICAL_GROUPS = {
     "ffdhe2048": "DH", "ffdhe3072": "DH", "ffdhe4096": "DH", "ffdhe6144": "DH",
     "ffdhe8192": "DH",
 }
+# The rest of IANA's TLS Supported Groups an OpenSSL `Groups =` accepts: the deprecated
+# binary and small prime curves, secp256k1, the GOST curves (RFC 9189) and SM2 (RFC 8998),
+# ZA-OPRAVYANE row 141.
+CLASSICAL_GROUPS.update({
+    **{f"sect{n}": "ECDH" for n in ("163k1", "163r1", "163r2", "193r1", "193r2", "233k1",
+                                     "233r1", "239k1", "283k1", "283r1", "409k1", "409r1",
+                                     "571k1", "571r1")},
+    **{f"secp{n}": "ECDH" for n in ("160k1", "160r1", "160r2", "192k1", "192r1", "224k1",
+                                     "224r1", "256k1")},
+    **{f"gc{n}": "GOST R 34.10" for n in ("256a", "256b", "256c", "256d", "512a", "512b", "512c")},
+    "curvesm2": "SM2",
+})
 
 _GROUP_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 

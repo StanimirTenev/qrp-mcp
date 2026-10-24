@@ -10,8 +10,8 @@ Algorithm Numbers" registry (read 22.10.2026). The mnemonics are matched in
 `detectors.ALGORITHM_PATTERNS`; the numbers here, and only in the shape of a record --
 `DNSKEY flags 3 alg`, `DS tag alg digest-type digest`, `RRSIG type alg` and BIND's
 trust-anchor `static-key`/`initial-key`/`static-ds`/`initial-ds` -- because a bare 8 is a
-number, not RSA. ECC-GOST (12) and ECC-GOST12 (23) have no family in this scanner and
-are left unnamed rather than invented.
+number, not RSA. ECC-GOST (12) and ECC-GOST12 (23) were left unnamed until GOST R 34.10
+had a family (ZA-OPRAVYANE rows 139 and 141).
 
 The size budget: `max-udp-size` is the largest UDP response BIND sends and
 `edns-udp-size` the buffer it advertises for responses it receives. Both default to
@@ -38,8 +38,11 @@ ALGORITHMS: dict[int, tuple[str, str, str | None]] = {
     14: ("ECDSAP384SHA384", "ECDSA", "P-384"),
     15: ("ED25519", "Ed25519", None),
     16: ("ED448", "Ed448", None),
-    17: ("SM2SM3", "EC", "SM2"),
+    17: ("SM2SM3", "SM2", None),
     18: ("MLDSA44", "ML-DSA", None),
+    # GOST R 34.10 has a family since ZA-OPRAVYANE row 139; named from row 141.
+    12: ("ECC-GOST", "GOST R 34.10", None),
+    23: ("ECC-GOST12", "GOST R 34.10", None),
 }
 
 _RECORDS = re.compile(
@@ -56,7 +59,7 @@ _RECORDS = re.compile(
 # (ZA-OPRAVYANE row 102, Georgi Ivanov's post-quantum DNSSEC experiments). Now it is named
 # as a number this scan does not name, never given a family.
 UNNAMED_MNEMONICS: dict[int, str] = {
-    0: "DELETE", 12: "ECC-GOST", 23: "ECC-GOST12", 252: "INDIRECT", 253: "PRIVATEDNS",
+    0: "DELETE", 252: "INDIRECT", 253: "PRIVATEDNS",
     254: "PRIVATEOID",
 }
 

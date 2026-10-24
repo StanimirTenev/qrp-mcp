@@ -53,7 +53,8 @@ def test_static_rsa_suites_are_a_key_exchange_finding(tmp_path):
     # The Apache line now names RSA as well as 3DES, and RSA is quantum-vulnerable.
     apache = {f["algorithm"] for f in result["evidence"]["source_code"]
               if f["path"] == "ssl.conf" and f["line"] == 3}
-    assert apache == {"RSA", "3DES"}
+    # SHA1 is the suites' record MAC, `-SHA` (reported since row 136).
+    assert apache == {"RSA", "3DES", "SHA1"}
     rsa = next(f for f in result["findings"] if f["algorithm_family"] == "RSA")
     assert rsa["quantum_vulnerable"] is True
 
