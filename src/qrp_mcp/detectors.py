@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import aws_tls, dnssec, ike, opcua
+from . import aws_tls, components, dnssec, ike, opcua
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import (_group_setting, image_pins, is_manifest, library_support, pinned_versions,
@@ -2105,6 +2105,22 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": f"RSA key exchange named by the cipher suite {suite}",
                 "excerpt": line.strip()[:200],
                 "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
+                "in_test_code": in_test_code(rel_path),
+            })
+        # The algorithm as a component of a library's own name: GNUTLS_SIGN_DSA_SHA256,
+        # d2i_DSAPublicKey (ZA-OPRAVYANE rows 132 and 133; see components.py).
+        for family, pos, said in components.scan(searched):
+            if family in seen_on_line or _in_blob(pos, blobs):
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": said,
+                "excerpt": line.strip()[:200],
+                "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code) else
+                                  "comment" if _in_spans(pos, spans) else kind),
                 "in_test_code": in_test_code(rel_path),
             })
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
