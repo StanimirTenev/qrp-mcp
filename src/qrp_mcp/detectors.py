@@ -687,6 +687,77 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
                             ("Mayo", "MAYO"), ("LMS|HSS", "HSS/LMS"))],
     ("HSS/LMS", "HSS/LMS named by a Bouncy Castle class", re.compile(
         r"\bLM(?:Ots|Sig)Parameters\b")),
+    # ---- ZA-OPRAVYANE row 137: the header a C file includes and the types it declares its
+    # keys with (A-C classes G and H, 23.10.2026), and the Java/Bouncy Castle classes whose
+    # API word follows the algorithm (B class C25). Header and type names from OpenSSL 3.6.5,
+    # BoringSSL, Mbed TLS 3.6.7, wolfSSL 5.9.4, liboqs 0.16.0 and NSS 3.132; classes from
+    # JDK 27 java.security.{spec,interfaces} and Bouncy Castle r1rv86v2; pyca 50.0.2.
+    *[(family, f"{family} named by a library header", re.compile(rf"[<\"](?:{paths})\.h[>\"]"))
+      for family, paths in (
+          ("RSA", r"openssl/rsaerr|mbedtls/rsa"),
+          ("DSA", r"openssl/dsaerr|wolfssl/wolfcrypt/dsa"),
+          ("DH", r"openssl/dherr|mbedtls/dhm"),
+          ("EC", r"openssl/ec(?:_key)?|mbedtls/ec(?:p|jpake)|wolfssl/wolfcrypt/(?:eccsi|sakke)"),
+          ("DES", r"openssl/des|mbedtls/des"), ("MD5", r"mbedtls/md5"), ("SHA1", r"mbedtls/sha1"),
+          ("MD4", r"wolfssl/wolfcrypt/md4"), ("MD2", r"wolfssl/wolfcrypt/md2"),
+          ("RC2", r"wolfssl/wolfcrypt/rc2"), ("X448", r"wolfssl/wolfcrypt/curve448"),
+          ("SM2", r"wolfssl/wolfcrypt/sm2"),
+          ("HSS/LMS", r"mbedtls/lms|wolfssl/wolfcrypt/wc_lms|oqs/sig_stfl_lms(?:_wrap)?"),
+          ("BIKE", r"oqs/kem_bike"), ("HQC", r"oqs/kem_hqc"), ("Falcon", r"oqs/sig_falcon"),
+          ("MAYO", r"oqs/sig_mayo"), ("UOV", r"oqs/sig_uov"))],
+    # C types. `RSA`, `DSA` and `DH` alone are words, so only as a pointer declaration.
+    *[(family, f"{family} named by a C type", re.compile(
+        rf"\b(?:{names})\b" + (rf"|(?<![\w.>])(?:const\s+)?{bare}\s*\*+\s*(?:const\s+)?[A-Za-z_]"
+                                if bare else "")))
+      for family, bare, names in (
+          ("RSA", "RSA", r"RSA_METHOD|RSA_OAEP_PARAMS|RSA_PSS_PARAMS|rsa_st|rsa_meth_st|"
+                         r"rsa_(?:pss|oaep)_params_st|RSA(?:Private|Public)KeyStr|RsaPadding|RsaNb|"
+                         r"sp_rsa_ctx|gnutls_rsa_params_t"),
+          ("DSA", "DSA", r"DSA_SIG|DSA_SIG_st|DSA_METHOD|dsa_st|DSA(?:Private|Public)KeyStr|DsaKey|"
+                         r"WOLFSSL_DSA"),
+          ("DH", "DH", r"DH_METHOD|dh_st|DHParams(?:Str)?|DH(?:Private|Public)Key(?:Str)?|"
+                       r"SECKEYDHParams|DhParams|DhNb|WOLFSSL_DH|sp_dh_ctx|gnutls_dh_params_t|"
+                       r"psa_dh_family_t"),
+          ("EC", "", r"EC_(?:KEY|GROUP|POINT|METHOD|KEY_METHOD)|ec_key_st|"
+                     r"WOLFSSL_EC_(?:KEY|GROUP|POINT|METHOD|BUILTIN_CURVE)|ecc_point|ecc_set_type|"
+                     r"ecc_curve_id|ecc_oid_t|ECParams(?:Str)?|ECFieldID(?:Str)?|"
+                     r"EC(?:Private|Public)KeyStr|psa_ecc_family_t|mbedtls_ecjpake_context"),
+          ("DES", "", r"(?:const_)?DES_cblock|DES_key_schedule|DES_ks|DES_LONG|DESContext(?:Str)?"),
+          ("MD5", "", r"MD5_CTX|MD5Context(?:Str)?|MD5state_st|md5_state_st"),
+          ("MD4", "", r"MD4_CTX|MD4state_st|md4_state_st|wc_Md4"),
+          ("MD2", "", r"MD2_CTX|MD2_INT|MD2Context(?:Str)?|MD2state_st|wc_Md2"),
+          ("SHA1", "", r"SHA_CTX|SHA1Context(?:Str)?|wc_Sha"),
+          ("RC4", "", r"RC4_KEY|rc4_key_st|RC4Context(?:Str)?"),
+          ("RC2", "", r"RC2_KEY|RC2_INT|rc2_key_st|RC2Context(?:Str)?|wc_Rc2"),
+          ("X448", "", r"curve448_key"), ("Falcon", "", r"falcon_key"),
+          ("HSS/LMS", "", r"LmsKey|LmsParams|HssPrivKey|wc_Lms(?:Parm|Rc|State)|oqs_lms_\w+"))],
+    # Java and Bouncy Castle classes (C25), and the JS/Python/Rust equivalents.
+    ("DSA", "DSA named by a Java/Bouncy Castle class", re.compile(
+        r"\bDSA(?:Signer|DigestSigner|KeyPairGenerator|ParametersGenerator|Key|"
+        r"GenParameterSpec|ParameterSpec)\b|\bPlainDSAEncoding\b|\bdsa\.DSA\w+")),
+    ("ECDH", "ECDH named by a Bouncy Castle class", re.compile(
+        r"\bECDH(?:Basic|Raw|C)Agreement\b|\bECDHCUnifiedAgreement\b")),
+    ("EC", "EC named by a Java/Bouncy Castle class", re.compile(
+        r"\bECKey(?:PairGenerator)?\b|\bEllipticCurve\b|\bec\.(?:EllipticCurve\w*|Brainpool\w+)")),
+    ("RSA", "RSA named by a Java/Bouncy Castle class", re.compile(
+        r"\bRSA(?:KeyGenParameterSpec|PrivateCrtKey|MultiPrimePrivateCrtKey(?:Spec)?|"
+        r"OtherPrimeInfo|DigestSigner|BlindingEngine|BlindingFactorGenerator|"
+        r"BlindSignature(?:Client|Server)|KEMExtractor|KEMGenerator|KeyEncapsulation)\b|"
+        r"\b(?:ISO9796d2(?:PSS)?|PSS|X931)Signer\b|\b(?:ISO9796d1|OAEP|PKCS1)Encoding\b|"
+        r"\b(?:PSS|OAEP)ParameterSpec\b|\brsa\.RSA\w+|"
+        r"\bforge\.pki\.(?:wrap|encrypt|decrypt)RsaPrivateKey\b|\bpublicKeyToRSAPublicKey(?:Pem)?\b")),
+    ("DH", "DH named by a Java/pyca class", re.compile(
+        r"\bDH(?:Key|GenParameterSpec|ParameterSpec|PrivateKeySpec|PublicKeySpec)\b|\bdh\.DH\w+")),
+    ("DES", "DES named by a Java/Bouncy Castle class", re.compile(
+        r"\bDES(?:KeyGenerator|KeySpec)\b|\bforge\.des\.")),
+    ("3DES", "3DES named by the RustCrypto des crate", re.compile(r"\bdes::Tdes\w+")),
+    ("EdDSA", "EdDSA named by a JCA type", re.compile(
+        r"\bEdEC(?:Key|PrivateKey|PublicKey|Point|PrivateKeySpec|PublicKeySpec)\b|"
+        r"\bEdDSAParameterSpec\b")),
+    ("X25519", "XDH named by a JCA type (X25519, or X448)", re.compile(
+        r"\bXEC(?:Key|PrivateKey|PublicKey|PrivateKeySpec|PublicKeySpec)\b")),
+    ("BLS", "BLS named by a Bouncy Castle class", re.compile(r"\bBLS(?:Signer|KeyPairGenerator)\b")),
+    ("Schnorr", "Schnorr named by a Bouncy Castle class", re.compile(r"\bBIP340Signer\b")),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
