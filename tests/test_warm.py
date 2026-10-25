@@ -87,8 +87,8 @@ def test_the_derived_rule_data_is_what_the_rules_give():
     for _, _, pattern, literals in detectors._FILTERED_PATTERNS:
         assert literals == detectors._prefilter(pattern)
     gate = detectors.LINE_GATE
-    assert gate.words == sorted(w for w in set(linegate.LITERALS)
-                                if not any(v != w and v in w for v in linegate.LITERALS))
+    words = set(linegate.LITERALS) | {n.lower() for n in detectors.HYBRIDS}
+    assert gate.words == sorted(w for w in words if not any(v != w and v in w for v in words))
     everything = detectors._ALL_LITERALS
     assert detectors._INSIDE == {s: frozenset(t for t in everything if t in s)
                                  for s in everything}

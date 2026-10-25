@@ -29,8 +29,7 @@ except ImportError:
 
 
 def _gate(core: bool) -> linegate.Gate:
-    gate = linegate.Gate([f[3] for f in d._FILTERED_PATTERNS],
-                         [f[2] for f in d._FILTERED_PATTERNS], d._BLOB.pattern, use_core=core)
+    gate = d.line_gate(use_core=core)
     if core and gate.compiled() is None:
         pytest.skip("qrp-mcp-core is not installed")
     return gate
@@ -61,7 +60,33 @@ EDGES = {
     "edge.js": ("const blob = 'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVphYmNkZWZnaGlqa2xtbm9wcXJzdHV2"
                 "d3h5ejAxMjM0NTY3ODk=RSA'; createHash('md5')\n"),
     "edge.conf": "ssl_ciphers 'AES128-SHA:!MD5';\nKexAlgorithms -diffie-hellman-group1-sha1\n",
+    # Release 3c: the suite, version and hybrid gates as their rules read them, and denial
+    # blocks opened on lines no rule matches, behind a comment or a docstring.
+    "edge3c.c": ("static const char *deny_list[] = {  /* forbidden, see below */\n"
+                 "  \"RSA\", \"MD5\",\n};\nCurl_ssl_init(); ssl_config.version = x;\n"
+                 "int s = TLS_RSA_WITH_AES_128_CBC_SHA; /* SSL_RSA_WITH_RC4_128_SHA */\n"
+                 "x = TLS1_TXT_RSA_WITH_AES_128_SHA; y = SSL3_CK_RSA_DES_192_CBC3_SHA;\n"
+                 "v = SSL3_VERSION; w = TLS1_2_VERSION; z = curl_version();\n"),
+    "edge3c.py": ('BLOCKED = [\n    "ecdsa",\n]\n"""\nunsupported:\n"""\nk = rsa.generate()\n'
+                  "following = 'x-wing and x25519kyber768draft00'\n"
+                  "groups = ['X25519MLKEM768']\n"),
+    "edge3c.tf": 'tls_min_version = "1.0"\nTLS_MIN_VERSION = "1.1"\n',
+    "edge3c.yaml": ("rejected:\n  - sha1\n  # removed:\nallowed:\n  - rsa\n"
+                    "no longer supported:\n  - DES\n"),
+    "edge3c.cfg": ("global\n  ssl-default-bind-ciphers AES128-SHA:ECDHE-RSA-AES128-GCM-SHA256\n"
+                   "  ssl-default-bind-curves X25519:P-256\nfrontend f\n"
+                   "  bind :443 ssl crt /x.pem curves X25519MLKEM768:X25519 ciphers AES256-SHA\n"
+                   "  server s 10.0.0.1:443 ssl ciphersuites TLS_AES_128_GCM_SHA256\n"
+                   "groups = X25519:secp384r1\nCipherString = DEFAULT:AES128-SHA\n"
+                   "ssl_ecdh_curve X25519:prime256v1;\nssl_ciphers 'DES-CBC3-SHA';\n"),
 }
+
+
+def test_the_setting_patterns_port_to_both_engines():
+    """The cipher and group settings are searched as their own regexes (release 3c); one that
+    did not port would make the gate read every line."""
+    assert all(linegate.scoped_regex(p) and literals for p, literals in d._SETTING_PATTERNS)
+    assert not d.LINE_GATE.everything
 
 
 @pytest.mark.parametrize("core", ENGINES)
@@ -84,7 +109,7 @@ RULES = [assets.scan_protocols, assets.scan_tls_groups, assets.scan_hybrid_group
          d.scan_hybrid_names, assets.scan_static_rsa_kex, assets.scan_ssh_kex, d._policy_assets,
          dnssec.unnamed_records, d.scan_openssl3_names, d.scan_cose_algorithms, d.scan_jca_names,
          opcua.scan, aws_tls.scan, ike.fortios_addke, dnssec.scan_records, d.scan_cipher_suites,
-         assets.static_rsa_positions, d.PPK_CONFIG_ASSIGN.search, d._DENIAL_WORDS.search]
+         assets.static_rsa_positions, d.PPK_CONFIG_ASSIGN.search]
 ON_MASKED = [d._key_type_values, components.scan, oids.scan]
 
 
@@ -103,6 +128,9 @@ def test_no_rule_matches_a_line_the_gate_passes_over(core):
             masked = d._masked(line, d._blob_spans(line))
             for rule in RULES:
                 assert not rule(line), f"{rule.__name__} on {rel}:{i + 1}: {line!r}"
+            # A line that may open a denial block is read for that (Hot.state, release 3c).
+            if i not in hot.state:
+                assert not d._DENIAL_WORDS.search(line), f"a denial word on {rel}:{i + 1}"
             for rule in ON_MASKED:
                 assert not rule(masked), f"{rule.__name__} on {rel}:{i + 1}: {line!r}"
             if i not in hot.patterns:

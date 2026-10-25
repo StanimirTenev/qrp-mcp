@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from . import __version__, closure, config, coverage, cyclonedx, mandates, profiles, sarif
+from . import __version__, closure, config, coverage, cyclonedx, jsonout, mandates, profiles, sarif
 from . import baseline as baseline_mod
 from .classifier import known_algorithms
 from .scan import scan_directory
@@ -495,7 +495,8 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
 
 
 def _write(result: dict[str, Any], out_path: Path | None, label: str) -> int:
-    data = (json.dumps(result, indent=2, ensure_ascii=False) + "\n").encode()
+    # json.dumps(result, indent=2, ensure_ascii=False), byte for byte (jsonout).
+    data = (jsonout.dumps(result) + "\n").encode()
     if out_path is not None:
         try:
             out_path.write_bytes(data)

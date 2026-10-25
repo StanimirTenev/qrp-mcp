@@ -21,6 +21,7 @@ _warm.start_regex()
 from . import aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, suppression
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
+from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
                      library_support, names_none_of, pinned_versions,
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
@@ -2182,9 +2183,7 @@ def _is_excluded(line: str, start: int) -> bool:
 _BLOB = re.compile(r"(?:[0-9a-fA-F]{32,}|[A-Za-z0-9+/]{40,}={0,2})")
 
 # The lines of a file any rule could match, in one search of the file (release D; see
-# linegate.py). The other lines are passed over by every per-line rule.
-LINE_GATE = linegate.Gate([f[3] for f in _FILTERED_PATTERNS], [f[2] for f in _FILTERED_PATTERNS],
-                          _BLOB.pattern)
+# linegate.py), are LINE_GATE's: it is built below _HYBRID_NAME, whose names it is given.
 
 
 def _blob_spans(line: str) -> list[tuple[int, int]]:
@@ -2831,7 +2830,9 @@ def scan_source_file(path: Path, rel_path: str,
     ext = path.suffix.lower()
     if hot is _ALL_LINES_UNKNOWN:
         hot = hot_lines(lines, ext)
-    read, patterns, allowed = (None, None, None) if hot is None else hot
+    read, patterns, allowed = (None, None, None) if hot is None else hot[:3]
+    # Lines read for the denial block they may open, by no rule (linegate.Hot.state).
+    state_only = getattr(hot, "state", frozenset())
     inside_block = False
     inside_doc = ""
     denial_block_indent: int | None = None
@@ -2841,6 +2842,22 @@ def scan_source_file(path: Path, rel_path: str,
         if read is not None and line_no - 1 not in read and not (
                 line_no - 1 in patterns
                 and _a_pattern_matches(line, allowed.get(line_no - 1) if allowed else None)):
+            if line_no - 1 in state_only:
+                # Only a denial word: the steps below that move state -- comments,
+                # docstrings, the denial block ending and opening -- and no rule.
+                spans, inside_block = _comment_spans(line, ext, inside_block)
+                if ext in _DOCSTRING_EXT:
+                    doc_spans, inside_doc = _docstring_spans(line, inside_doc)
+                    spans = spans + doc_spans
+                code = _code_only(line, spans)
+                indent = len(line) - len(line.lstrip())
+                if (denial_block_indent is not None and line.strip()
+                        and indent <= denial_block_indent):
+                    denial_block_indent = None
+                if _opens_a_denial_block(code):
+                    denial_block_indent = indent
+                    denial_block_calls = bool(_REJECTION_TEST.search(code))
+                continue
             # No rule can match this line (linegate). Only what a later line reads moves:
             # a block comment or docstring opening or closing, a denial block ending.
             if "/*" in line or "*/" in line:
@@ -3388,6 +3405,28 @@ HYBRIDS: dict[str, tuple[str, tuple[tuple[str, str | None], ...]]] = {
 _HYBRID_NAME = re.compile(
     r"(?<![A-Za-z0-9])(" + "|".join(re.escape(n) for n in sorted(HYBRIDS, key=len, reverse=True))
     + r")(?:@openssh\.com)?(?![A-Za-z0-9])", re.IGNORECASE)
+
+
+def line_gate(use_core: bool = True) -> linegate.Gate:
+    """The line gate of these rules (linegate.Gate): every match of _HYBRID_NAME holds one of
+    the HYBRIDS names, which are its words for scan_hybrid_names, and the cipher and group
+    settings are their own regexes (release 3c)."""
+    return linegate.Gate([f[3] for f in _FILTERED_PATTERNS], [f[2] for f in _FILTERED_PATTERNS],
+                         _BLOB.pattern, use_core=use_core, rule_words=tuple(HYBRIDS),
+                         rule_patterns=_SETTING_PATTERNS)
+
+
+# assets._cipher_setting and assets._group_setting are true only where one of these matches
+# the raw line; the rules behind them (static RSA suites, cipher strings, TLS groups, hybrid
+# groups) report nothing elsewhere. The line gate searches them as they are (release 3c).
+_SETTING_PATTERNS = tuple(
+    (p, _warm.derived("prefilter", (p.pattern, p.flags), lambda p=p: _prefilter(p)))
+    for p in (_TLS_CIPHER_SETTING, _HAPROXY_CIPHERS, _TLS_GROUP_SETTING, _HAPROXY_CURVES))
+
+
+# The lines of a file any rule could match, in one search of the file (release D). The other
+# lines are passed over by every per-line rule.
+LINE_GATE = line_gate()
 
 
 def scan_hybrid_names(line: str) -> list[str]:
