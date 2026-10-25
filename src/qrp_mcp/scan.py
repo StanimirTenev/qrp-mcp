@@ -298,8 +298,12 @@ def _withhold_reassurance(summary: Any, block: dict[str, Any], scan_result: dict
     if not block["accounts_for_every_file"]:
         because.append("the reasons given for files not read do not add up to the files "
                        "present")
-    if scope["files_not_examined"]:
-        because.append(f"{scope['files_not_examined']} of {scope['files_present']} files were "
+    # A report found in the tree was read and recognised (row 144): nothing in it is
+    # unread code, so it does not withhold the headline on its own.
+    unread = scope["files_not_examined"] - sum(
+        r["count"] for r in block["not_examined"] if r["reason"] == "report_document")
+    if unread:
+        because.append(f"{unread} of {scope['files_present']} files were "
                        f"not read ({scope['coverage_pct']}% read); see coverage.not_examined")
     # A zone signed with an algorithm number this scan gives no family (row 102). 0 is
     # DELETE, a signal and not an algorithm.

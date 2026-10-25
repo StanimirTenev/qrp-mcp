@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import posixpath
 import re
@@ -2814,6 +2815,35 @@ def _sizes_by_algorithm(findings: list[dict[str, Any]]) -> dict[str, list[int]]:
     return out
 
 
+def report_document(raw: bytes) -> str | None:
+    """What kind of report this file is, or None when it is not one.
+
+    ZA-OPRAVYANE row 144: our own scan result and CBOM saved in the tree, or any vendor's
+    CycloneDX `bom.json`, were matched as code and turned an RSA-only tree `hybrid_partial`.
+    A report is a statement about cryptography written by a tool, not cryptography in use.
+    Recognised by content: a top-level JSON object that is a CycloneDX document
+    (`bomFormat` is required by every CycloneDX JSON schema) or a qrp-mcp result (its
+    coverage block names the instrument). A file that only quotes `bomFormat` -- the
+    CycloneDX schema itself -- is not one.
+    """
+    body = raw.lstrip(b"\xef\xbb\xbf \t\r\n")
+    if not body.startswith(b"{") or (b'"bomFormat"' not in body and b'"qrp-mcp"' not in body):
+        return None
+    try:
+        document = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    if document.get("bomFormat") == "CycloneDX":
+        return "CycloneDX document"
+    block = document.get("coverage")
+    instrument = block.get("instrument") if isinstance(block, dict) else None
+    if isinstance(instrument, dict) and instrument.get("tool") == "qrp-mcp":
+        return "qrp-mcp scan result"
+    return None
+
+
 def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     """`exclude` is a single path left out of the scan and named in the scope.
 
@@ -2831,6 +2861,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     files_scanned = {"source": 0, "ci_config": 0, "iac": 0, "config": 0, "certificate": 0}
 
     unreadable: list[str] = []
+    # Reports (CycloneDX documents, qrp-mcp results) read and recognised, not matched.
+    reports: list[str] = []
     # Claimed file types that were opened and gave up nothing nameable.
     undecoded: list[str] = []
     # What this run actually read, and what it deliberately did not. A commit does
@@ -2958,6 +2990,10 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # different findings. No extra I/O; these are the bytes already in hand.
         content_parts.append(
             rel_path + "\0" + hashlib.sha256(raw).hexdigest())
+        if report_document(raw):
+            # Named under its own reason in the coverage block (row 144), never matched.
+            reports.append(rel_path)
+            continue
         files_read.append(rel_path)
 
         for number, text_line in enumerate(lines, 1):
@@ -3170,6 +3206,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # "0 findings" can be checked against a denominator instead of trusted.
         "unreadable_files": unreadable,
         "claimed_but_not_decoded": undecoded,
+        # Read, recognised as a report about cryptography, and not matched (row 144).
+        "report_documents": reports,
         "protocol_findings": protocol_findings,
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,

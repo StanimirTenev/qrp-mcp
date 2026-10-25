@@ -37,6 +37,9 @@ REASONS = {
     "unreadable": "opened and could not be read; attempted and failed",
     "symlink_not_followed": ("a symbolic link, not followed: its target is chosen by "
                              "the scanned tree rather than by the caller"),
+    "report_document": ("a report about cryptography -- a CycloneDX document or a qrp-mcp "
+                        "result -- recognised by its content and not matched: what a tool "
+                        "wrote about some code is not that code (ZA-OPRAVYANE row 144)"),
     "claimed_but_not_decoded": ("a claimed file type that was read and gave up no "
                                 "algorithm: encrypted content, or a structure this "
                                 "tool does not parse"),
@@ -336,6 +339,14 @@ def build(
             "meaning": REASONS["symlink_not_followed"],
             "count": len(file_links),
             "paths": [e.get("path") for e in file_links],
+        })
+    reports = scan_result.get("report_documents") or []
+    if reports:
+        not_examined.append({
+            "reason": "report_document",
+            "meaning": REASONS["report_document"],
+            "count": len(reports),
+            "paths": reports,
         })
     accounted = examined + sum(r["count"] for r in not_examined)
     # Counted as read -- it was read -- and named anyway: a claimed type that
