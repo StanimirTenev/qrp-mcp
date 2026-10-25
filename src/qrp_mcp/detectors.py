@@ -1174,6 +1174,57 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # The RFC 7919 groups as a word of their own: `groups=ffdhe6144` in an mbedtls test.
     ("DH", "DH named by an RFC 7919 FFDHE group", re.compile(
         r"(?<![A-Za-z0-9_])ffdhe(?:2048|3072|4096|6144|8192)(?![A-Za-z0-9])", re.IGNORECASE)),
+    # ---- Release 3e (qrp-pokazateli kragg-3 DEV-2 corpus, 25.10.2026): Python, Go, Java and
+    # JavaScript kinds a substring matcher found and these rules did not. Each is a vocabulary
+    # from the specification or API that defines it, not the lines the corpus held:
+    # * XML-DSig / XML-Enc algorithm URIs: W3C xmldsig-core1 §6 and xmlenc-core1 §5, RFC 6931
+    #   (xmldsig-more) and RFC 9231 (EdDSA); the key-value types of xmldsig-core1 §4.5.2.
+    # * the libraries' names for them: pysaml2 saml2.xmldsig SIG_*, JSR 105
+    #   javax.xml.crypto.dsig.SignatureMethod (also signxml's SignatureMethod), python-xmlsec
+    #   xmlsec.constants.Transform*.
+    # * pyOpenSSL OpenSSL.crypto.TYPE_RSA/TYPE_DSA/TYPE_EC/TYPE_DH; the DH-parameter calls
+    #   ssl.SSLContext.load_dh_params, OpenSSL.SSL.Context.load_tmp_dh / set_tmp_ecdh, and
+    #   Node's tls.createSecureContext `dhparam` option.
+    # * key specs: AWS KMS KeySpec (RSA_2048 is above; ECC_NIST_P256, ECC_SECG_P256K1), ACM
+    #   KeyAlgorithm (EC_prime256v1), Google Cloud KMS CryptoKeyVersionAlgorithm
+    #   (RSA_SIGN_PSS_2048_SHA256, EC_SIGN_P256_SHA256), a size glued to the family
+    #   (RSA2048, ECCPRIME256V1, as Lemur and many key-type enums write it), and cfssl's key
+    #   request (csr.KeyRequest "algo"). The glued and Cloud KMS names only as a whole quoted
+    #   value: `rsa1024-leaf.der` is a fixture's file name, and the name in a sentence ("RSA_SIGN_
+    #   PKCS1_2048_SHA256 is refused by the policy") is not a request for it.
+    # * COSE algorithm constants as go-webauthn's webauthncose names them (AlgES256, AlgEdDSA).
+    # * SSH key-exchange messages: RFC 4253 §8 KEXDH_*, RFC 4419 KEX_DH_GEX_*, RFC 5656 §7.1
+    #   KEX_ECDH_*.
+    ("RSA", "RSA named by an XML-DSig/XML-Enc URI, a key spec or a library constant (release 3e)",
+     re.compile(
+        r"(?i:(?:xmldsig(?:11|-more)?|xmlenc(?:11)?)#(?:[a-z0-9]+-)?rsa(?![a-z])|xmldsig#RSAKeyValue)|"
+        r"\bSIG_RSA_\w+|\bSignatureMethod\.(?:SHA\d+_)?RSA\w*|\bTransformRsa\w*|"
+        r"\bxmlsec\.Transform\.RSA_\w+|\bcrypto\.TYPE_RSA\b|"
+        r"[\"'](?i:rsa)(?:1024|2048|3072|4096|8192)[\"']|"
+        r"[\"']RSA_(?:SIGN_(?:PSS|PKCS1|RAW_PKCS1)|DECRYPT_OAEP)_(?:2048|3072|4096)\w*[\"']|"
+        r"(?i:\b(?:key_?algo|algo)[\"']?\s*[:=]\s*[\"']rsa[\"'])|\bAlg(?:RS|PS)(?:1|256|384|512)\b")),
+    ("DSA", "DSA named by an XML-DSig URI or a library constant (release 3e)", re.compile(
+        r"(?i:xmldsig(?:11)?#dsa-|xmldsig#DSAKeyValue)|\bSIG_DSA_\w+|\bSignatureMethod\.DSA_\w+|"
+        r"\bTransformDsa\w*|\bcrypto\.TYPE_DSA\b")),
+    ("ECDSA", "ECDSA named by an XML-DSig URI, a key spec or a library constant (release 3e)",
+     re.compile(
+        r"(?i:xmldsig(?:11|-more)?#ecdsa-)|\bSIG_ECDSA_\w+|\bSignatureMethod\.ECDSA_\w+|"
+        r"\bTransformEcdsa\w*|[\"']EC_SIGN_(?:P256|P384|SECP256K1)_SHA\d+[\"']|\bECC_SECG_P256K1\b|"
+        r"(?i:\b(?:key_?algo|algo)[\"']?\s*[:=]\s*[\"']ecdsa[\"'])|\bAlgES(?:256K?|384|512)\b")),
+    ("EC", "EC named by a key spec or a library constant (release 3e)", re.compile(
+        r"\bECC_NIST_P(?:256|384|521)\b|\bEC_(?:prime256v1|secp384r1|secp521r1)\b|"
+        r"[\"'](?i:ECC(?:PRIME256V1|SECP(?:224|256|384|521)R1))[\"']|"
+        r"\bcrypto\.TYPE_EC\b")),
+    ("ECDH", "ECDH named by an XML-Enc URI, an SSH message or a TLS call (release 3e)", re.compile(
+        r"(?i:xmlenc11#ECDH-ES)|\.set_tmp_ecdh\s*\(|\b(?:SSH_MSG_)?KEX_?ECDH_(?:INIT|REPLY)\b")),
+    ("DH", "DH named by an XML-Enc URI, an SSH message or a DH-parameter call (release 3e)",
+     re.compile(
+        r"(?i:xmlenc(?:11)?#dh(?:-es)?(?![\w-])|xmlenc#DHKeyValue)|\.load_dh_params\s*\(|"
+        r"\.load_tmp_dh\s*\(|\bcrypto\.TYPE_DH\b|(?<![\w$.-])dhparam\s*:|"
+        r"\b(?:SSH_MSG_)?KEXDH_(?:INIT|REPLY)\b|"
+        r"\b(?:SSH_MSG_)?KEX_DH_GEX_(?:REQUEST(?:_OLD)?|GROUP|INIT|REPLY)\b")),
+    ("EdDSA", "EdDSA named by an XML-DSig URI or a COSE constant (release 3e)", re.compile(
+        r"(?i:xmldsig-more#eddsa-ed(?:25519|448))|\bAlgEd(?:DSA|25519|448)\b")),
 ]
 
 # The curve a DNSSEC mnemonic names, by the rule that matched it.
@@ -2137,14 +2188,24 @@ _TRIPLE = ('"""', "'''")
 
 
 def _docstring_spans(line: str, inside: str) -> tuple[list[tuple[int, int]], str]:
-    "Triple-quoted regions on this line, and which delimiter is still open."
+    """Triple-quoted regions on this line, and which delimiter is still open.
+
+    A value's triple-quoted string (`KEY = b\"\"\"`) is code, not documentation; it is
+    carried as "v" + its delimiter (release 3e), so that its closing delimiter, alone on
+    its line, is not read as a docstring's opener -- which swapped code and comment for
+    the rest of the file (mitmproxy certs.py)."""
     # Almost every line has no triple quote in it. Asking that once is a string
     # search; asking it per character through a generator cost 13% of a scan.
     if not inside and (chr(34) * 3) not in line and (chr(39) * 3) not in line:
         return [], ""
     spans: list[tuple[int, int]] = []
     i, n = 0, len(line)
-    if inside:
+    if inside.startswith("v"):
+        end = line.find(inside[1:])
+        if end == -1:
+            return [], inside
+        i = end + 3
+    elif inside:
         end = line.find(inside)
         if end == -1:
             return [(0, n)], inside
@@ -2160,7 +2221,11 @@ def _docstring_spans(line: str, inside: str) -> tuple[list[tuple[int, int]], str
         # exactly what this scanner is for. Anything before the delimiter
         # other than indentation means this is a string, not documentation.
         if line[:i].strip():
-            return spans, inside
+            end = line.find(opener, i + 3)
+            if end == -1:
+                return spans, "v" + opener
+            i = end + 3
+            continue
         end = line.find(opener, i + 3)
         if end == -1:
             spans.append((i, n))
@@ -2709,6 +2774,7 @@ def scan_source_file(path: Path, rel_path: str,
     signature_lines: set[int] = set()
     # Release 3b: rows from identifiers alone, kept only if the file turns out to hold crypto.
     by_identifier: list[dict[str, Any]] = []
+    standing_alone: list[dict[str, Any]] = []   # release 3e: kept without that (stands_alone)
     for line_no, line in enumerate(lines, start=1):
         if read is not None and line_no - 1 not in read and not (
                 line_no - 1 in patterns
@@ -2726,7 +2792,7 @@ def scan_source_file(path: Path, rel_path: str,
                     and len(line) - len(line.lstrip()) <= denial_block_indent):
                 denial_block_indent = None
             continue
-        was_inside = inside_block or bool(inside_doc)
+        was_inside = inside_block or (bool(inside_doc) and not inside_doc.startswith("v"))
         raw: list[tuple[int, int]] = []
         if ext == ".go" and (inside_raw or "`" in line):
             raw, inside_raw = _go_raw_spans(line, inside_raw, inside_block)
@@ -3051,11 +3117,17 @@ def scan_source_file(path: Path, rel_path: str,
         bare = (_STRING_LITERAL.sub(lambda m: " " * len(m.group(0)),
                                     _code_only(_masked(code, blobs), raw))
                 if registry.might_carry_a_family(code) else "")
-        for family, pos, said in registry.identifiers(bare):
+        named_here: dict[str, dict[str, Any]] = {}
+        for family, pos, said in registry.identifiers(bare, members=not cipher_exclusions):
+            alone = registry.stands_alone(registry._MEMBER.match(bare, pos).group(0))
             if family in seen_on_line:
+                # The line's row for the family stands alone if any identifier for it does.
+                held = named_here.get(family)
+                if alone and held is not None and held not in standing_alone:
+                    standing_alone.append(held)
                 continue
             seen_on_line.add(family)
-            by_identifier.append({
+            item = {
                 "path": rel_path,
                 "line": line_no,
                 "algorithm": family,
@@ -3064,7 +3136,11 @@ def scan_source_file(path: Path, rel_path: str,
                 "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code)
                                   else "identifier"),
                 "in_test_code": in_test_code(rel_path),
-            })
+            }
+            by_identifier.append(item)
+            named_here[family] = item
+            if alone:
+                standing_alone.append(item)
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
             findings.append({
                 "path": rel_path,
@@ -3073,8 +3149,11 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": "RFC 8784 postquantum preshared key",
                 "excerpt": line.strip()[:200],
             })
-    if by_identifier and (any(f.get("evidence_kind") not in ("comment", "ban") for f in findings)
-                          or registry.CRYPTO_IMPORT.search("\n".join(lines))):
+    # Release 3e: in a file without crypto context, the identifiers that stand alone.
+    if by_identifier and not (any(f.get("evidence_kind") not in ("comment", "ban") for f in findings)
+                              or registry.CRYPTO_IMPORT.search("\n".join(lines))):
+        by_identifier = standing_alone
+    if by_identifier:
         findings = sorted(findings + by_identifier, key=lambda f: f["line"])
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)

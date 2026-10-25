@@ -315,6 +315,11 @@ def scan(line: str) -> list[tuple[str, int, str, dict[str, Any]]]:
 
 # --- 2. identifiers --------------------------------------------------------------------------
 _IDENT = re.compile(r"(?<![A-Za-z0-9_$.@-])[A-Za-z_][A-Za-z0-9_]*(?![A-Za-z0-9_@-])")
+# In source code a name after a member access is an identifier too (release 3e):
+# `KeyUtils.RSA_ALGORITHM`, `WrappingAlgorithm.RSA_OAEP_SHA1_MGF1`, `ds.SIG_RSA_SHA256` were
+# silent on the DEV-2 corpus. Not in configuration, where a dotted key is a setting's name
+# (`transport.rsa_enabled`, a flag).
+_MEMBER = re.compile(r"(?<![A-Za-z0-9_$@-])[A-Za-z_][A-Za-z0-9_]*(?![A-Za-z0-9_@-])")
 # Components that say an identifier is about keys, signatures or key exchange: what a two-letter
 # family word (EC, DH) or DES needs beside it to be read as the algorithm.
 _CRYPTO_WORDS = {"KEY", "KEYS", "KEYPAIR", "PUBKEY", "PRIVKEY", "PUB", "PRIV", "PUBLIC", "PRIVATE",
@@ -361,13 +366,14 @@ def might_carry_a_family(code: str) -> bool:
     return bool(_HINT.search(code))
 
 
-def identifiers(code: str) -> list[tuple[str, int, str]]:
+def identifiers(code: str, members: bool = False) -> list[tuple[str, int, str]]:
     """(family, position, description) for identifiers in `code` (comments and strings already
-    blanked) that carry an algorithm family among their components."""
+    blanked) that carry an algorithm family among their components; with `members`, names after
+    a member access too."""
     if sum(1 for w in _WORD.findall(code) if w in _PROSE) >= 3:
         return []
     out: list[tuple[str, int, str]] = []
-    for m in _IDENT.finditer(code):
+    for m in (_MEMBER if members else _IDENT).finditer(code):
         name = m.group(0)
         if len(name) < 3 or not _HINT.search(name):
             continue
@@ -376,6 +382,22 @@ def identifiers(code: str) -> list[tuple[str, int, str]]:
 
 
 _WORD = re.compile(r"[A-Za-z]+")
+# An identifier that needs no crypto elsewhere in its file (release 3e): a public-key family
+# beside an operation on it or one of its own schemes -- `generate_rsa_keys`,
+# `_create_raw_rsa_keyring`, `RSA_OAEP_SHA1_MGF1` in AWS Encryption SDK tests that import
+# nothing from a crypto library. A name without an operation (`rsaKey`, `KEY_RSA_CERT`)
+# still needs the file's context, as do the two-letter EC / DH / DSS; hashes and ciphers too.
+_ALONE_FAMILIES = {"RSA", "DSA", "ECDSA", "ECDH", "Ed25519", "Ed448", "EdDSA", "X25519", "X448"}
+_ALONE_WORDS = {"GENERATE", "GEN", "KEYGEN", "SIGN", "SIG", "SIGNATURE", "VERIFY", "ENCRYPT",
+                "DECRYPT", "DERIVE", "AGREE", "COMPUTE", "EXCHANGE", "KEX", "CREATE",
+                "OAEP", "PSS", "PKCS1", "MGF1"}
+
+
+def stands_alone(name: str) -> bool:
+    """Whether identifier `name` names a public-key family without the file's crypto context."""
+    if not set(components.components(name)) & _ALONE_WORDS:
+        return False
+    return any(family in _ALONE_FAMILIES for family, _ in _carried(name))
 
 
 @lru_cache(maxsize=1 << 16)

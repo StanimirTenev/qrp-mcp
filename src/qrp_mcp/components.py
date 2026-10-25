@@ -27,6 +27,8 @@ FAMILY = {
     "RSA": "RSA", "RSASSA": "RSA", "RSAES": "RSA",
     "DSA": "DSA", "DSS": "DSA",
     "DH": "DH", "DHE": "DH", "DHM": "DH", "DHX": "DH", "FFDH": "DH",
+    # DH parameters as one word (release 3e): mitmproxy's load_dhparam, DEFAULT_DHPARAM.
+    "DHPARAM": "DH", "DHPARAMS": "DH",
     "EC": "EC", "ECC": "EC", "ECP": "EC", "ECPK": "EC",
     "ECDSA": "ECDSA", "ECDH": "ECDH", "ECDHE": "ECDH", "ECDH1": "ECDH", "ECDHX": "ECDH",
     "FFDHE": "DH",
