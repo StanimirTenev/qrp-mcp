@@ -325,6 +325,78 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
     return out
 
 
+# pyproject.toml and Pipfile (ZA-OPRAVYANE rows 125, 149): read by their tables, line by
+# line, so that each package keeps its line (tomllib gives none, and is 3.11+). PEP 621
+# `[project] dependencies`, `[project.optional-dependencies]`, PEP 735 `[dependency-groups]`
+# (arrays of PEP 508 strings); Poetry's `[tool.poetry.dependencies]`, its dev and group
+# tables, and Pipfile's `[packages]`/`[dev-packages]` (`name = "spec"` or an inline table
+# with `version`). What a package asks for is kept as written: a range is a request.
+_TOML_TABLE = re.compile(r"^\s*\[\[?\s*([^\]]+?)\s*\]\]?\s*(?:#.*)?$")
+_TOML_ARRAY_KEY = re.compile(r"^\s*([A-Za-z0-9_.\"'-]+)\s*=\s*\[")
+_TOML_KEY_VALUE = re.compile(r"""^\s*["']?([A-Za-z0-9][A-Za-z0-9._-]*)["']?\s*=\s*(.+?)\s*$""")
+_TOML_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"|\'([^\']*)\'')
+_PEP508 = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*([^;]*)")
+_INLINE_VERSION = re.compile(r"""\bversion\s*=\s*["']([^"']*)["']""")
+_KEY_VALUE_TABLES = re.compile(
+    r"^(?:tool\.poetry\.(?:dev-)?dependencies|tool\.poetry\.group\.[^.]+\.dependencies|"
+    r"packages|dev-packages)$")
+
+
+def _without_comment(text: str) -> str:
+    strings = [m.span() for m in _TOML_STRING.finditer(text)]
+    for i, char in enumerate(text):
+        if char == "#" and not any(s <= i < e for s, e in strings):
+            return text[:i]
+    return text
+
+
+def _requested(spec: str) -> str | None:
+    spec = spec.strip()
+    return None if spec in {"", "*"} else spec
+
+
+def _pep_requests(name: str, lines: list[str]) -> list[tuple[str, int, str | None]]:
+    """(package, line, what it asks for) from a pyproject.toml or a Pipfile."""
+    out: list[tuple[str, int, str | None]] = []
+    table, in_array = "", False
+    for number, text in enumerate(lines, 1):
+        stripped = text.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        header = _TOML_TABLE.match(text) if not in_array else None
+        if header:
+            table = header.group(1).strip()
+            continue
+        if not in_array and name == "pyproject.toml":
+            key = _TOML_ARRAY_KEY.match(text)
+            if key and ((table == "project" and key.group(1) == "dependencies")
+                        or table in {"project.optional-dependencies", "dependency-groups"}):
+                in_array = True
+                text = text[key.end():]
+        if in_array:
+            code = _without_comment(text)
+            for match in _TOML_STRING.finditer(code):
+                requirement = _PEP508.match(match.group(1) or match.group(2) or "")
+                if requirement:
+                    out.append((requirement.group(1), number, _requested(requirement.group(2))))
+            if "]" in _TOML_STRING.sub("", code):
+                in_array = False
+            continue
+        if _KEY_VALUE_TABLES.match(table):
+            pair = _TOML_KEY_VALUE.match(text)
+            if not pair or pair.group(1) in {"python", "python_version", "python_full_version"}:
+                continue
+            value = pair.group(2)
+            if value.startswith("{"):
+                version = _INLINE_VERSION.search(value)
+                out.append((pair.group(1), number, _requested(version.group(1)) if version else None))
+            else:
+                string = _TOML_STRING.match(value)
+                out.append((pair.group(1), number,
+                            _requested((string.group(1) or string.group(2) or "")) if string else None))
+    return out
+
+
 # A version pinned to one release, which is the only version a manifest states as a
 # fact: `cryptography==44.0.0` in requirements.txt, `github.com/x/y v1.2.3` in go.mod.
 # A range (`>=42`) is a request, not a version, and yields nothing. pyproject.toml,
@@ -372,13 +444,18 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
         return []
     table = DEPENDENCY_FAMILIES.get(ecosystem, {})
     findings: list[dict[str, Any]] = []
-    for package, number in _names_from_manifest(ecosystem, path.name, lines):
+    if path.name in {"pyproject.toml", "Pipfile"}:
+        named = _pep_requests(path.name, lines)
+    else:
+        named = [(package, number, None) for package, number
+                 in _names_from_manifest(ecosystem, path.name, lines)]
+    for package, number, requested in named:
         families = table.get(package)
         if families is None and ecosystem == "pypi":
             families = table.get(package.lower())
         if not families:
             continue
-        findings.append({
+        item = {
             "path": rel_path,
             "line": number,
             "package": package,
@@ -389,7 +466,11 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
             "description": (f"{package} is declared in {path.name}; it implements "
                             f"{', '.join(families)}. Declared, not observed: nothing "
                             f"here says a line of code calls it."),
-        })
+        }
+        # What the manifest asks for, as written: `>=47.0.0` is a request, not a version.
+        if requested:
+            item["requested"] = requested
+        findings.append(item)
     return findings
 
 
