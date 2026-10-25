@@ -54,6 +54,8 @@ def test_key_type_values_in_configuration(line, name):
     "logo = 'rsa'",
     "choices=['rsa', 'ecdsa']",          # no key type named on the line
     "key_type = 'rsassa_proxy'",
+    'p.add_argument("--kt", help="the key_type: rsa or ecdsa")',   # prose in a string
+    "x = 1  # key_type = rsa was the default",
 ])
 def test_no_key_type_context_or_no_family(line):
     assert "RSA" not in _families(line)

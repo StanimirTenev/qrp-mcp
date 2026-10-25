@@ -2780,7 +2780,8 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": f"{family} named as a key-type value",
                 "excerpt": line.strip()[:200],
                 "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code) else
-                                  "comment" if _in_spans(pos, spans) else kind),
+                                  "comment" if _in_spans(pos, spans) or _in_spans(pos, prose)
+                                  else kind),
                 "in_test_code": in_test_code(rel_path),
             })
         for family, pos, key in (_property_settings(line) if ext == ".properties" else []):
@@ -2827,7 +2828,9 @@ def scan_source_file(path: Path, rel_path: str,
                 "algorithm": family,
                 "description": f"{family} named in a cipher suite",
                 "excerpt": line.strip()[:200],
-                "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
+                "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial) else
+                                  "comment" if _in_spans(pos, spans) or _in_spans(pos, prose)
+                                  else kind),
             })
         # A suite whose OpenSSL name carries no key-exchange word is RSA key exchange
         # (AES256-SHA is TLS_RSA_WITH_AES_256_CBC_SHA); see assets.STATIC_RSA_SUITES.

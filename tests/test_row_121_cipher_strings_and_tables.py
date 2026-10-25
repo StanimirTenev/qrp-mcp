@@ -35,6 +35,10 @@ def test_struck_out_selectors_are_not_uses():
     assert "ECDH" in found and "DH" not in found and "RSA" not in found
 
 
+def test_a_selector_in_a_trailing_comment_is_a_comment():
+    assert "RSA" not in _families("ssl_ciphers HIGH:!aNULL:!MD5;  # dropped RC4+RSA in 2019")
+
+
 def test_dash_suites_are_left_to_the_suite_reader():
     # DES-CBC3-SHA is triple DES; reading its parts again must not add a single DES.
     assert "DES" not in _families("ssl_ciphers DES-CBC3-SHA:RC4+RSA;")
