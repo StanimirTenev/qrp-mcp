@@ -52,6 +52,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .assets import TLS_SETTING_NOTE
+from .detectors import in_test_code
 from .classifier import known_algorithms
 
 SPEC_VERSION = "1.6"
@@ -797,6 +798,56 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["scope"] = "excluded"
         components.append(component)
 
+    # A hybrid is one asset made of two (release A, M4h): its own component, and a
+    # `dependencies` entry from it to each half the inventory holds. Kept only where a
+    # half is in use on the same line, so a hybrid named in a comment is not an asset.
+    # A half the inventory does not hold is named, not pointed at: a ref to a component
+    # that is not in the document would be a link to nothing.
+    in_use_at = {(item.get("path"), item.get("line"),
+                  family_of.get(item.get("algorithm"), item.get("algorithm")))
+                 for item in located if item.get("evidence_kind") not in {"comment", "ban"}}
+    family_refs = {_ref("crypto", family) for family in by_family}
+    by_hybrid: dict[str, list[dict[str, Any]]] = {}
+    for item in scan_result.get("hybrid_names", []):
+        if any((item["path"], item["line"], family) in in_use_at
+               for family, _ in item["halves"]):
+            by_hybrid.setdefault(item["name"], []).append(item)
+    hybrid_dependencies: list[dict[str, Any]] = []
+    for name, group in sorted(by_hybrid.items()):
+        halves = group[0]["halves"]
+        ref = _ref("hybrid", name)
+        held = [_ref("crypto", family) for family, _ in halves
+                if _ref("crypto", family) in family_refs]
+        missing = [family for family, _ in halves if _ref("crypto", family) not in family_refs]
+        properties = [
+            {"name": f"{NS}basis", "value": "named_hybrid"},
+            {"name": f"{NS}halves", "value": " + ".join(
+                f"{family}-{pset}" if pset and family in {"ML-KEM", "Kyber"} else
+                f"{family} ({pset})" if pset else family for family, pset in halves)},
+        ]
+        if missing:
+            properties.append({"name": f"{NS}half_not_in_inventory",
+                               "value": ", ".join(missing)})
+        component = {
+            "type": "cryptographic-asset",
+            "bom-ref": ref,
+            "name": name,
+            "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": {
+                "primitive": "combiner",
+                "cryptoFunctions": ["keygen", "encapsulate", "decapsulate"]}},
+            "properties": properties,
+            "evidence": {"occurrences": [
+                {"location": g["path"], "line": g["line"],
+                 "additionalContext": f"{name}: hybrid of "
+                                      + " and ".join(f for f, _ in halves)}
+                for g in group]},
+        }
+        if all(in_test_code(g["path"]) for g in group):
+            component["scope"] = "excluded"
+        components.append(component)
+        if held:
+            hybrid_dependencies.append({"ref": ref, "dependsOn": sorted(held)})
+
     # Dependencies are libraries, not cryptographic assets: what is installed is
     # not what is called. They travel as `library` components carrying the
     # families they implement, and the basis says the difference out loud.
@@ -868,6 +919,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             },
         },
         "components": components,
+        **({"dependencies": hybrid_dependencies} if hybrid_dependencies else {}),
         "compositions": [{
             "aggregate": aggregate,
             "assemblies": [c["bom-ref"] for c in components],

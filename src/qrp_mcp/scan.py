@@ -261,6 +261,10 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # configuration, never "validated".
             "fips_provider": scan_result.get("fips_provider_findings", []),
         },
+        # Hybrids named on a line with their two halves, for the CBOM's hybrid components
+        # and their `dependencies`. Outside `evidence`: the halves are already there, and
+        # counting the hybrid again would count one line twice.
+        "hybrid_names": scan_result.get("hybrid_names", []),
     }
 
 

@@ -2831,6 +2831,45 @@ _PARAMETER_SETS: dict[str, tuple[re.Pattern[str], Any]] = {
 }
 
 
+# Hybrid key exchanges by name, with their two halves (release A, M4h): the CBOM makes the
+# hybrid one asset depending on both. Halves as (family, parameter set or None).
+# TLS: the IANA TLS Supported Groups registry, draft-ietf-tls-ecdhe-mlkem (X25519MLKEM768,
+# SecP256r1MLKEM768, SecP384r1MLKEM1024), draft-tls-westerbaan-xyber768d00 (the Kyber
+# drafts); curveSM2MLKEM768 as the registry names it. SSH: draft-ietf-sshm-mlkem-hybrid-kex
+# (mlkem768x25519-sha256, mlkem768nistp256-sha256, mlkem1024nistp384-sha384) and the
+# Streamlined NTRU Prime draft (sntrup761x25519-sha512, OpenSSH 9.0's default; sntrup761
+# is in the NTRU family here, classifier.py). X-Wing: draft-connolly-cfrg-xwing-kem.
+HYBRIDS: dict[str, tuple[str, tuple[tuple[str, str | None], ...]]] = {
+    name.lower(): (name, halves) for name, halves in (
+        ("X25519MLKEM768", (("X25519", None), ("ML-KEM", "768"))),
+        ("SecP256r1MLKEM768", (("ECDH", "P-256"), ("ML-KEM", "768"))),
+        ("SecP384r1MLKEM1024", (("ECDH", "P-384"), ("ML-KEM", "1024"))),
+        ("X25519Kyber768Draft00", (("X25519", None), ("Kyber", "768"))),
+        ("SecP256r1Kyber768Draft00", (("ECDH", "P-256"), ("Kyber", "768"))),
+        ("curveSM2MLKEM768", (("SM2", None), ("ML-KEM", "768"))),
+        ("mlkem768x25519-sha256", (("ML-KEM", "768"), ("X25519", None))),
+        ("mlkem768nistp256-sha256", (("ML-KEM", "768"), ("ECDH", "P-256"))),
+        ("mlkem1024nistp384-sha384", (("ML-KEM", "1024"), ("ECDH", "P-384"))),
+        ("sntrup761x25519-sha512", (("NTRU", "sntrup761"), ("X25519", None))),
+        ("X-Wing", (("ML-KEM", "768"), ("X25519", None))),
+    )}
+_HYBRID_NAME = re.compile(
+    r"(?<![A-Za-z0-9])(" + "|".join(re.escape(n) for n in sorted(HYBRIDS, key=len, reverse=True))
+    + r")(?:@openssh\.com)?(?![A-Za-z0-9])", re.IGNORECASE)
+
+
+def scan_hybrid_names(line: str) -> list[str]:
+    """The hybrids this line names, by their registered spelling."""
+    if "kem" not in line.lower() and "sntrup" not in line.lower() and "wing" not in line.lower():
+        return []
+    out: list[str] = []
+    for match in _HYBRID_NAME.finditer(line):
+        name = HYBRIDS[match.group(1).lower()][0]
+        if name not in out:
+            out.append(name)
+    return out
+
+
 def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
     for item in items:
         rule = _PARAMETER_SETS.get(item.get("algorithm"))
@@ -2909,6 +2948,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # Hybrid groups in a TLS group setting, and the TLS server images the tree pins, so
     # the two can be put side by side; see assets.library_support.
     hybrid_places: list[tuple[str, int, str]] = []
+    # Any hybrid named on a line, wherever (release A): the CBOM's hybrid components.
+    hybrid_names: list[tuple[str, int, str]] = []
     pinned_images: list[dict[str, Any]] = []
     # The same for SSH: classical KexAlgorithms offered beside a hybrid; see assets.scan_ssh_kex.
     ssh_kex_findings: list[dict[str, Any]] = []
@@ -3034,6 +3075,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 group["in_test_code"] = in_test_code(rel_path)
                 tls_group_findings.append(group)
             hybrid_places.extend((rel_path, number, g) for g in scan_hybrid_groups(text_line))
+            hybrid_names.extend((rel_path, number, n) for n in scan_hybrid_names(text_line))
             for item in scan_static_rsa_kex(text_line):
                 item["path"] = rel_path
                 item["line"] = number
@@ -3235,6 +3277,11 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         "claimed_but_not_decoded": undecoded,
         # Read, recognised as a report about cryptography, and not matched (row 144).
         "report_documents": reports,
+        # Hybrids named on a line, with their halves; the CBOM keeps those a half of
+        # which is in the inventory at that line.
+        "hybrid_names": [{"path": p, "line": n, "name": name,
+                          "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}
+                         for p, n, name in hybrid_names],
         "protocol_findings": protocol_findings,
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,

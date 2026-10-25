@@ -38,12 +38,14 @@ _LOCATION_FIELDS = ("line",)
 # line must not turn every call below it into closed + new.
 # The TLS-termination pointer is a note about the line, the same on every TLS line, and
 # absent from results written before 0.31.0.
+# The parameter set is read off the excerpt, which is already identity, and is absent
+# from results written before release A.
 # The signing key joined to a signing step is read from another file, like the provider.
 # So are the version pinned for the provider and the FIPS activation beside it.
 # A pinned image's group places and the files it serves are read from other files too.
 _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signing_key",
                    "provider_pin", "fips_provider_configured_in", "group_places", "serves",
-                   "serves_group_places")
+                   "serves_group_places", "parameter_set")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "
