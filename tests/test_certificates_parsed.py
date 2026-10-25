@@ -420,16 +420,19 @@ def test_the_cbom_carries_each_certificate(tmp_path, three, monkeypatch):
     assert rsa_c["notValidBefore"] == "2026-10-25T02:29:20Z"
     assert rsa_c["notValidAfter"] == "2027-10-25T02:29:20Z"
     assert rsa_c["certificateFormat"] == "X.509"
-    assert refs[rsa_c["signatureAlgorithmRef"]]["name"] == "RSA"
+    # Self-signed: the signing key is the subject key, RSA-2048 (release 3d).
+    assert refs[rsa_c["signatureAlgorithmRef"]]["name"] == "RSA-2048"
     key = refs[rsa_c["subjectPublicKeyRef"]]
     assert key["cryptoProperties"]["assetType"] == "related-crypto-material"
     material = key["cryptoProperties"]["relatedCryptoMaterialProperties"]
     assert material["type"] == "public-key" and material["size"] == 2048
-    assert refs[material["algorithmRef"]]["name"] == "RSA"
+    assert refs[material["algorithmRef"]]["name"] == "RSA-2048"
     ec_c = by_name["CN=probe-ecdsa"]["cryptoProperties"]["certificateProperties"]
-    assert refs[ec_c["signatureAlgorithmRef"]]["name"] == "ECDSA"
+    # Release 3d: self-signed, so the ECDSA signature was made with the P-256 subject key.
+    assert refs[ec_c["signatureAlgorithmRef"]]["name"] == "ECDSA-P-256"
     assert refs[refs[ec_c["subjectPublicKeyRef"]]["cryptoProperties"][
-        "relatedCryptoMaterialProperties"]["algorithmRef"]]["name"] == "EC"
+        "relatedCryptoMaterialProperties"]["algorithmRef"]]["name"] == "EC-P-256"
+    assert not {"RSA", "ECDSA", "EC"} & set(refs[r]["name"] for r in refs)
     # Validity is data; nothing about the clock is in the document.
     assert "expired" not in json.dumps(certs)
     schema_dir = Path(__file__).parent / "schema"

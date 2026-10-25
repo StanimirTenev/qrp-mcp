@@ -518,7 +518,8 @@ def test_a_family_used_in_both_places_is_not_excluded(tmp_path):
         encoding="utf-8")
     from qrp_mcp.server import export_cbom
     cbom = export_cbom(str(tmp_path), level="full")
-    rsa_scope = {c.get("scope") for c in cbom["components"] if c.get("name") == "RSA"}
+    # Release 3d: one component per size and none sizeless; the production size is RSA-4096.
+    rsa_scope = {c.get("scope") for c in cbom["components"] if c.get("name") == "RSA-4096"}
     assert rsa_scope, "RSA must be a component in this fixture"
     assert rsa_scope <= {None, "required"}, (
         f"RSA runs in production here and is only ALSO in a fixture; marking it "

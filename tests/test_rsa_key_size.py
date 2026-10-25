@@ -52,7 +52,8 @@ def test_rsa_certificates_carry_their_size(tmp_path):
     assert result["algorithm_key_sizes"]["RSA"] == 2048
     assert result["algorithm_key_sizes_observed"]["RSA"] == [2048, 3072]
     names = {c["name"] for c in build(result)["components"]}
-    assert {"RSA", "RSA-2048", "RSA-3072"} <= names      # release 3b: one per size (M4c)
+    assert {"RSA-2048", "RSA-3072"} <= names      # release 3b: one per size (M4c)
+    assert "RSA" not in names                     # release 3d: no sizeless sighting
 
 
 def test_an_ec_key_signed_by_rsa_gets_no_rsa_size(tmp_path):

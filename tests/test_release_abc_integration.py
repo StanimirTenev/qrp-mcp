@@ -96,7 +96,8 @@ def test_certificate_hybrid_and_evidence_hashes_in_one_cbom(tmp_path, pem, monke
         {"alg": "SHA-256", "content": hashlib.sha256((tmp_path / "ca.pem").read_bytes()).hexdigest()}]
     hybrid = next(c for c in first["components"] if c["name"] == "X25519MLKEM768")
     deps = {d["ref"]: d.get("dependsOn", []) for d in first.get("dependencies", [])}
-    assert deps[hybrid["bom-ref"]] == ["crypto:ml-kem", "crypto:x25519"]
+    # Release 3d: every ML-KEM sighting names 768, so the half is ML-KEM-768's component.
+    assert deps[hybrid["bom-ref"]] == ["crypto:ml-kem-768", "crypto:x25519"]
     schema_dir = Path(__file__).parent / "schema"
     schema = json.loads((schema_dir / "bom-1.6.schema.json").read_text())
     store = {

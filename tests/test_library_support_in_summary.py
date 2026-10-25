@@ -34,7 +34,7 @@ def test_unnegotiable_hybrid_is_named_and_not_counted(tmp_path):
     assert finding["not_negotiable_by"] == ["nginx:1.24.0 (docker-compose.yml:3)"]
     assert result["summary"]["pqc_ready_count"] == 0
     assert result["summary"]["pqc_readiness"] == "classical_only"
-    mlkem = next(c for c in build(result)["components"] if c["name"] == "ML-KEM")
+    mlkem = next(c for c in build(result)["components"] if c["name"].startswith("ML-KEM"))
     props = {p["name"]: p["value"] for p in mlkem["properties"]}
     assert props["qrp:not_negotiable_by"] == '["nginx:1.24.0 (docker-compose.yml:3)"]'
 

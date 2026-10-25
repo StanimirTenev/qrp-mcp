@@ -621,7 +621,10 @@ def _certificate_rows(rel_path: str, line: int, excerpt: str, cert: dict[str, An
             "certificate_role": role,
             "certificate": cert,
         }
-        if role == "subject_public_key" and not key.get("composite"):
+        # A self-signature checked against the subject key was made with that key, so the
+        # signature's family has its size too (release 3d); an issuer's key is not in the file.
+        if not key.get("composite") and (role == "subject_public_key"
+                                         or cert.get("self_signature_verified")):
             if key.get("size"):
                 row["key_size"] = key["size"]
             if key.get("curve"):

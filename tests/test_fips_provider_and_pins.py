@@ -61,7 +61,7 @@ def test_it_is_named_beside_the_openssl_finding(tmp_path):
     assert _identity("source_code", item) == _identity(
         "source_code", {k: v for k, v in item.items() if k != "fips_provider_configured_in"})
     cbom = build(result)
-    comp = next(c for c in cbom["components"] if c["name"] == "ML-KEM")
+    comp = next(c for c in cbom["components"] if c["name"].startswith("ML-KEM"))
     props = {p["name"]: p["value"] for p in comp["properties"]}
     assert "openssl.cnf:8" in props["qrp:provider_configuration"]
     assert props["qrp:provider_validation"] == PROVIDER_VALIDATION

@@ -54,17 +54,18 @@ def _refs_resolve(doc: dict) -> bool:
                for d in doc.get("dependencies", []))
 
 
+# Release 3d: a half every sighting of which names its set is that set's component.
 @pytest.mark.parametrize("name,text,file,halves", [
     ("X25519MLKEM768", "ssl_ecdh_curve X25519MLKEM768:X25519;\n", "nginx.conf",
-     ["crypto:ml-kem", "crypto:x25519"]),
+     ["crypto:ml-kem-768", "crypto:x25519"]),
     ("mlkem768x25519-sha256", "KexAlgorithms mlkem768x25519-sha256\n", "sshd_config",
-     ["crypto:ml-kem", "crypto:x25519"]),
+     ["crypto:ml-kem-768", "crypto:x25519"]),
     ("sntrup761x25519-sha512", "KexAlgorithms sntrup761x25519-sha512\n", "sshd_config",
-     ["crypto:ntru", "crypto:x25519"]),
+     ["crypto:ntru-sntrup761", "crypto:x25519"]),
     ("X25519MLKEM768",
      "package main\nimport \"crypto/tls\"\n"
      "var c = &tls.Config{CurvePreferences: []tls.CurveID{tls.X25519MLKEM768}}\n",
-     "main.go", ["crypto:ml-kem", "crypto:x25519"]),
+     "main.go", ["crypto:ml-kem-768", "crypto:x25519"]),
 ])
 def test_the_hybrid_depends_on_both_halves(tmp_path, validator, name, text, file, halves):
     doc = _cbom(tmp_path, {file: text})

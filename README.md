@@ -173,17 +173,27 @@ since TLS 1.3 is vulnerable over X25519 and is not over X25519MLKEM768. `-SSLv3`
 library named in a comment is not a dependency.
 
 **Key sizes** — a size named on the line (`key_size=1024`, `rsa:1024`, `genrsa 1024`,
-`GenerateKey(..., 1024)`) travels with the family, so a weak RSA key is reported as weak rather
+`GenerateKey(..., 1024)`, `-newkey rsa:3072`, `ssh-keygen -b 4096`, `rsa-key-size = 4096`,
+`KeyPairGenerator.initialize(2048)`; for DSA and DH `key_size=`/`bits=`) travels with the family,
+and only a size a modulus can have — `CKM_RSA_9796` is ISO/IEC 9796 padding, not a 9796-bit key —
+so a weak RSA key is reported as weak rather
 than as one more RSA. `algorithm_key_sizes` holds the **smallest** size seen per family — the
 figure that answers *is anything weak here* — and `algorithm_key_sizes_observed` holds **every**
 size seen, which is a different question and became the operational one when RSA-896 was factored
 on a data-centre fleet: *where is RSA-1024 still in use?*
 
-From 0.17.0 the size reaches the CBOM component. Where one size was observed it is stated as
-`cryptoProperties.algorithmProperties.parameterSetIdentifier` — the field whose own example in the
-schema is a key length. Where several were, that field is **left out** and all of them are named
-in `qrp:observedKeySizes` instead: choosing one would put a number in the document that looks
-measured and is not, and a reader could not tell the difference.
+The size reaches the CBOM as one algorithm component **per observed size, curve or parameter
+set** — `RSA-2048` apart from `RSA-4096`, `ECDSA-P-256` apart from `ECDSA-P-384`, `ML-KEM-768`
+apart from `ML-KEM-1024` — each with its own occurrences and the number in
+`cryptoProperties.algorithmProperties.parameterSetIdentifier`, the field whose own examples in the
+schema are a key length and a digest length. The family's own component (`RSA`) holds only the
+sightings that name no size, and is **not emitted** when there are none; a certificate's key, a
+hybrid's half and a self-signed certificate's signature then point at the sized component. A
+family whose name fixes the number carries it (MD5 128, SHA-1 160, SHA-224 224, DES 56,
+X25519/Ed25519 256, X448 448, Ed448 456 — the key sizes a parsed key gets), and so does a TLS group
+or SSH key exchange offered alone (`prime256v1` 256, `diffie-hellman-group14-sha256` 2048). Nothing
+else gets a number: `rsa-sha2-256` names a hash, not a modulus, and a sizeless sighting stays
+sizeless rather than inheriting a size seen elsewhere in the tree.
 
 **Hybrids and composites** — the RFC 10024 TLS groups `X25519MLKEM768`,
 `SecP256r1MLKEM768` and `SecP384r1MLKEM1024`, OpenSSH 10's default `mlkem768x25519-sha256`,

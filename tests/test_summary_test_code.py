@@ -34,7 +34,7 @@ def test_test_only_pq_is_named_and_not_counted(tmp_path):
     assert "in_test_code" not in _finding(result, "EC")
     assert result["summary"]["pqc_ready_count"] == 0
     assert result["summary"]["pqc_readiness"] == "classical_only"
-    mlkem = next(c for c in build(result)["components"] if c["name"] == "ML-KEM")
+    mlkem = next(c for c in build(result)["components"] if c["name"].startswith("ML-KEM"))
     assert mlkem["scope"] == "excluded"
 
 

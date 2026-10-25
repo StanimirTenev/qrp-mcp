@@ -1672,19 +1672,25 @@ _KEY_SIZE = re.compile(
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
     r"EVP_PKEY_Q_keygen\([^)]*?(\d{3,5})\s*\)|"
     # DNSSEC: BIND's `algorithm rsasha256 2048` and `dnssec-keygen -a RSASHA256 -b 2048`.
-    r"\balgorithm\s+rsa\w*\s+(\d{3,5})\b|\bdnssec-keygen\b[^\n]*?\s-b\s+(\d{3,5})\b",
+    r"\balgorithm\s+rsa\w*\s+(\d{3,5})\b|\bdnssec-keygen\b[^\n]*?\s-b\s+(\d{3,5})\b|"
+    # Release 3d: certbot's `rsa-key-size = 4096` / `--rsa-key-size 4096` / `rsa_key_size`,
+    # Java's `KeyPairGenerator.initialize(2048)`.
+    r"\brsa[-_]key[-_]size[\"'\]]*\s*[=:,]?\s*[\"']?(\d{3,5})|\.initialize\(\s*(\d{3,5})\b",
+    re.IGNORECASE)
+# The same for DSA and DH (release 3d): only the forms that name no algorithm themselves.
+_KEY_SIZE_GENERIC = re.compile(
+    r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|\.initialize\(\s*(\d{3,5})\b",
     re.IGNORECASE)
 
 
-def key_size_on_line(line: str) -> int | None:
-    """The key size named on this line, if any. Only used for RSA, where a size below
-    the minimum is itself the finding."""
-    m = _KEY_SIZE.search(line)
-    if not m:
-        return None
-    for group in m.groups():
-        if group:
-            return int(group)
+def key_size_on_line(line: str, family: str = "RSA") -> int | None:
+    """The key size named on this line, if any: RSA (where a size below the minimum is itself
+    the finding), DSA and DH. Only a modulus size a key can have (registry._SIZES):
+    `CKM_RSA_9796` is ISO/IEC 9796 padding, not a 9796-bit key (release 3d)."""
+    for m in (_KEY_SIZE if family == "RSA" else _KEY_SIZE_GENERIC).finditer(line):
+        for group in m.groups():
+            if group and int(group) in registry._SIZES:
+                return int(group)
     return None
 
 
@@ -2250,6 +2256,48 @@ _PROSE_WORDS = {"a", "an", "the", "and", "or", "is", "are", "was", "were", "be",
                 "supports", "support", "uses", "use", "using", "vs"}
 
 
+def _go_raw_spans(line: str, inside: bool,
+                  in_block: bool) -> tuple[list[tuple[int, int]], bool]:
+    """The parts of a Go line inside a raw string (`...`, which may span lines and has no
+    escapes), and whether one is still open at the end. Backticks in a "..." or '...'
+    literal or in a comment open nothing. `in_block`: the line starts in a /* comment."""
+    spans: list[tuple[int, int]] = []
+    i, n = 0, len(line)
+    if inside:
+        j = line.find("`")
+        if j < 0:
+            return [(0, n)], True
+        spans.append((0, j + 1))
+        i = j + 1
+    elif in_block:
+        j = line.find("*/")
+        if j < 0:
+            return [], False
+        i = j + 2
+    while i < n:
+        c = line[i]
+        if c == "`":
+            j = line.find("`", i + 1)
+            if j < 0:
+                spans.append((i, n))
+                return spans, True
+            spans.append((i, j + 1))
+            i = j + 1
+        elif c in "\"'":
+            m = _STRING_LITERAL.match(line, i)
+            i = m.end() if m else i + 1
+        elif line.startswith("//", i):
+            break
+        elif line.startswith("/*", i):
+            j = line.find("*/", i + 2)
+            if j < 0:
+                break
+            i = j + 2
+        else:
+            i += 1
+    return spans, False
+
+
 def _prose_spans(code: str) -> list[tuple[int, int]]:
     "String literals on this line whose text is a sentence."
     spans: list[tuple[int, int]] = []
@@ -2655,6 +2703,7 @@ def scan_source_file(path: Path, rel_path: str,
     read, patterns, allowed = (None, None, None) if hot is None else hot
     inside_block = False
     inside_doc = ""
+    inside_raw = False  # a Go raw string (`...`) still open (release 3d)
     denial_block_indent: int | None = None
     denial_block_calls = False
     signature_lines: set[int] = set()
@@ -2665,7 +2714,10 @@ def scan_source_file(path: Path, rel_path: str,
                 line_no - 1 in patterns
                 and _a_pattern_matches(line, allowed.get(line_no - 1) if allowed else None)):
             # No rule can match this line (linegate). Only what a later line reads moves:
-            # a block comment or docstring opening or closing, a denial block ending.
+            # a block comment, docstring or Go raw string opening or closing, a denial
+            # block ending.
+            if ext == ".go" and (inside_raw or "`" in line):
+                inside_raw = _go_raw_spans(line, inside_raw, inside_block)[1]
             if "/*" in line or "*/" in line:
                 inside_block = _comment_spans(line, ext, inside_block)[1]
             if ext in _DOCSTRING_EXT and ('"""' in line or "'''" in line):
@@ -2675,6 +2727,9 @@ def scan_source_file(path: Path, rel_path: str,
                 denial_block_indent = None
             continue
         was_inside = inside_block or bool(inside_doc)
+        raw: list[tuple[int, int]] = []
+        if ext == ".go" and (inside_raw or "`" in line):
+            raw, inside_raw = _go_raw_spans(line, inside_raw, inside_block)
         spans, inside_block = _comment_spans(line, ext, inside_block)
         if ext in _DOCSTRING_EXT:
             doc_spans, inside_doc = _docstring_spans(line, inside_doc)
@@ -2759,7 +2814,7 @@ def scan_source_file(path: Path, rel_path: str,
                 # Named, not judged -- see TEST_PATH_RULE. A fixture's RSA is real RSA.
                 "in_test_code": in_test_code(rel_path),
             }
-            size = key_size_on_line(line) if algorithm == "RSA" else None
+            size = key_size_on_line(line, algorithm) if algorithm in ("RSA", "DSA", "DH") else None
             if size:
                 item["key_size"] = size
             if description in DNSSEC_CURVES:
@@ -2991,8 +3046,10 @@ def scan_source_file(path: Path, rel_path: str,
             }
             findings.append(item)
             on_line[family] = item
-        # Identifiers carrying a family (registry.identifiers): code only, strings blanked.
-        bare = (_STRING_LITERAL.sub(lambda m: " " * len(m.group(0)), _masked(code, blobs))
+        # Identifiers carrying a family (registry.identifiers): code only, strings blanked --
+        # Go raw strings too, which span lines (help text, release 3d).
+        bare = (_STRING_LITERAL.sub(lambda m: " " * len(m.group(0)),
+                                    _code_only(_masked(code, blobs), raw))
                 if registry.might_carry_a_family(code) else "")
         for family, pos, said in registry.identifiers(bare):
             if family in seen_on_line:
@@ -3227,6 +3284,10 @@ _PARAMETER_SETS: dict[str, tuple[re.Pattern[str], Any]] = {
     "SLH-DSA": (re.compile(r"(?<![a-z])slh[-_]?dsa[-_]?(sha2|shake)[-_]?(128|192|256)([sf])"
                            r"(?![a-z0-9])", re.I),
                 lambda m: f"{m.group(1).upper()}-{m.group(2)}{m.group(3).lower()}"),
+    # Streamlined NTRU Prime's parameter sets (NTRU Prime round 3 specification, sntrup653
+    # ... sntrup1277; OpenSSH's sntrup761x25519-sha512), release 3d.
+    "NTRU": (re.compile(r"(?<![a-z])sntrup[-_]?(653|761|857|953|1013|1277)(?!\d)", re.I),
+             lambda m: f"sntrup{m.group(1)}"),
 }
 
 

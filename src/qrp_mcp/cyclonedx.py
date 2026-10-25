@@ -164,6 +164,39 @@ _FIXED_STRENGTH = {"X25519": 128, "Ed25519": 128, "X448": 224, "Ed448": 224,
 # (neuromancer.sk/std, "other" category); otherwise only a curve read from the file.
 _FIXED_CURVE = {"X25519": "Curve25519", "X448": "Curve448",
                 "Ed25519": "Ed25519", "Ed448": "Ed448"}
+# `parameterSetIdentifier` where the family's name fixes the number (release 3d, M4c): the
+# schema's own examples, "in AES128, '128' identifies the key length in bits, in SHA256, '256'
+# identifies the digest length". Digest lengths: RFC 1319 (MD2), RFC 1320 (MD4), RFC 1321
+# (MD5), FIPS 180-4 (SHA-1, SHA-224), FIPS 202 (SHA3-224). Key lengths: FIPS 46-3 (DES, 56 of
+# its 64 key bits), RFC 7748 §5 (X25519 32-byte, X448 56-byte keys), RFC 8032 §5.1.5/§5.2.5
+# (Ed25519 32-octet, Ed448 57-octet keys) -- the sizes certificates._key_info gives a parsed
+# key. A fixed-size family is one component: there is no other size to keep apart.
+_FIXED_SIZE = {"MD2": 128, "MD4": 128, "MD5": 128, "SHA1": 160, "SHA-224": 224,
+               "SHA3-224": 224, "DES": 56, "X25519": 256, "X448": 448,
+               "Ed25519": 256, "Ed448": 456}
+# The same for a TLS group or an SSH key exchange offered alone, by its registered name: the
+# curve's size (SEC 2, RFC 5639, RFC 7748), the FFDHE group's (RFC 7919), the MODP group's of
+# an SSH diffie-hellman-groupN (RFC 4253 §8.1 group1 = Oakley Group 2, 1024 bits; RFC 3526
+# groups 14-18, named for SSH by RFC 8268). A hash in the name (`-sha256`) is not a size.
+_GROUP_SIZE = re.compile(
+    r"(?i)^(?:(?:secp|prime|nistp|p-?)(192|224|256|384|521)(?:r1|v1)?|brainpoolp(256|384|512)r1"
+    r"(?:tls13)?|ffdhe(2048|3072|4096|6144|8192)|ecdh-sha2-nistp(256|384|521)|"
+    r"(x25519|curve25519(?:-sha256(?:@libssh\.org)?)?)|(x448|curve448(?:-sha512)?)|"
+    r"diffie-hellman-group(1|14|15|16|17|18)-sha(?:1|256|512))$")
+_SSH_MODP = {"1": 1024, "14": 2048, "15": 3072, "16": 4096, "17": 6144, "18": 8192}
+
+
+def _group_size(name: str) -> str | None:
+    m = _GROUP_SIZE.match(name.strip())
+    if not m:
+        return None
+    if m.group(5):
+        return "256"
+    if m.group(6):
+        return "448"
+    if m.group(7):
+        return str(_SSH_MODP[m.group(7)])
+    return next(g for g in m.groups()[:4] if g)
 # `cryptoFunctions`: what the algorithm implements, by primitive (schema enum). Key
 # agreement derives the shared key (NIST SP 800-56A Rev. 3 §5.8: key derivation is part of
 # every key-agreement scheme). `pke` is said per family: an "EC" key is not an algorithm.
@@ -543,9 +576,13 @@ def _certificate_components(located: list[dict[str, Any]],
         if item.get("certificate") and item.get("evidence_kind") not in {"comment", "ban"}:
             certs.setdefault(item["certificate"]["sha256"], []).append(item)
 
-    def algorithm_ref(family: str | None) -> str | None:
-        ref = _ref("crypto", family) if family else None
-        return ref if ref in algorithm_refs else None
+    def algorithm_ref(family: str | None, detail: Any = None) -> str | None:
+        """The family's component, or where it has none (release 3d) the component of the
+        parameter set, curve or size the key has."""
+        for name in (family, f"{family}-{detail}" if family and detail else None):
+            if name and _ref("crypto", name) in algorithm_refs:
+                return _ref("crypto", name)
+        return None
 
     keys: dict[str, dict[str, Any]] = {}
     out: list[dict[str, Any]] = []
@@ -557,17 +594,21 @@ def _certificate_components(located: list[dict[str, Any]],
                                       "notValidBefore": cert["not_before"],
                                       "notValidAfter": cert["not_after"]}
         signature_families = cert["signature_algorithm"]["families"]
-        signature_ref = algorithm_ref(signature_families[0] if signature_families else None)
+        detail = key.get("curve") or key.get("parameter_set") or key.get("size")
+        # A checked self-signature: the signing key is the subject key, so its size is known.
+        signature_ref = algorithm_ref(
+            signature_families[0] if signature_families else None,
+            detail if cert.get("self_signature_verified") and not key.get("composite")
+            else None)
         if signature_ref:
             properties["signatureAlgorithmRef"] = signature_ref
         if key.get("algorithm") and not key.get("composite"):
-            detail = key.get("curve") or key.get("parameter_set") or key.get("size")
             key_ref = _ref("public-key", f"{key['algorithm']}-{detail}" if detail
                            else key["algorithm"])
             if key_ref not in keys:
                 material: dict[str, Any] = {"type": "public-key"}
-                if algorithm_ref(key["algorithm"]):
-                    material["algorithmRef"] = algorithm_ref(key["algorithm"])
+                if algorithm_ref(key["algorithm"], detail):
+                    material["algorithmRef"] = algorithm_ref(key["algorithm"], detail)
                 if key.get("size"):
                     material["size"] = key["size"]
                 keys[key_ref] = {
@@ -617,6 +658,11 @@ def _certificate_components(located: list[dict[str, Any]],
             component["scope"] = "excluded"
         out.append(component)
     return out + [keys[ref] for ref in sorted(keys)]
+
+
+# What a family's own component says that its parameter-set components do not (release 3d).
+_CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_pins",
+                                 "provider_configuration", "not_negotiable_by")}
 
 
 def _parameter_components(family: str, finding: dict[str, Any],
@@ -686,6 +732,17 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     family_of = {f["raw_value"]: f["algorithm_family"] for f in scan_result["findings"]
                  if f.get("raw_value") and f.get("algorithm_family")}
 
+    # The family a certificate is signed with, where no file states the signing key's size
+    # (an issuer's key): its own component stays, for signatureAlgorithmRef (release 3d).
+    signed_unsized: set[str] = set()
+    for item in located:
+        cert = item.get("certificate")
+        if cert and item.get("evidence_kind") not in {"comment", "ban"}:
+            signers = cert["signature_algorithm"]["families"]
+            if signers and not (cert.get("self_signature_verified")
+                                and not cert["public_key"].get("composite")):
+                signed_unsized.add(signers[0])
+
     components: list[dict[str, Any]] = []
     family_by_ref: dict[str, str] = {}
     for family in sorted(by_family):
@@ -698,13 +755,15 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         # names, each with its own occurrences; the family's own component keeps the rest.
         by_parameter: dict[str, tuple[dict[str, Any], list[dict[str, Any]]]] = {}
         for item in in_use:
-            said = _parameter(item)
+            # A fixed-size family (Ed25519, MD5) has no second size to keep apart.
+            said = None if family in _FIXED_SIZE else _parameter(item)
             if said:
                 by_parameter.setdefault(said[0], (said[1], []))[1].append(item)
         routed = {id(item) for _, items in by_parameter.values() for item in items}
         if by_parameter:
             in_use = [item for item in in_use if id(item) not in routed]
-        family_sizes = [] if by_parameter else observed_sizes.get(family, [])
+        family_sizes = ([_FIXED_SIZE[family]] if family in _FIXED_SIZE else
+                        [] if by_parameter else observed_sizes.get(family, []))
         m4, oid, several_sets = _m4_fields(family, _primitive(family), family_sizes, in_use)
         component: dict[str, Any] = {
             "type": "cryptographic-asset",
@@ -780,6 +839,16 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 "value": json.dumps(finding["not_negotiable_by"], ensure_ascii=False)})
         occurrences = _occurrences([item for item in located if id(item) not in routed],
                                    family, family_of)
+        children = _parameter_components(family, finding, by_parameter, family_by_ref)
+        if children and not occurrences and family not in signed_unsized:
+            # Every sighting names its parameter set, curve or size (release 3d, M4c): the
+            # family's own component would be a sizeless asset with nothing in it. What it
+            # says beyond the children (the providers, their pins) goes on each child.
+            carried = [p for p in component["properties"] if p["name"] in _CARRIED]
+            for child in children:
+                child["properties"].extend(carried)
+            components.extend(children)
+            continue
         if occurrences:
             component["evidence"] = {"occurrences": occurrences}
         # ⚠️ NOT `scope` -- this function already binds that name to the coverage
@@ -789,7 +858,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["scope"] = component_scope
         components.append(component)
         family_by_ref[component["bom-ref"]] = family
-        components.extend(_parameter_components(family, finding, by_parameter, family_by_ref))
+        components.extend(children)
 
     keys = scan_result["evidence"]["embedded_keys"]
     if keys:
@@ -876,8 +945,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "type": "cryptographic-asset",
             "bom-ref": ref,
             "name": f"{group[0]['group']} (TLS group offered alone)",
-            "cryptoProperties": {"assetType": "algorithm",
-                                 "algorithmProperties": {"primitive": "key-agree"}},
+            "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": {
+                "primitive": "key-agree",
+                **({"parameterSetIdentifier": _group_size(group[0]["group"])}
+                   if _group_size(group[0]["group"]) else {})}},
             "properties": [
                 {"name": f"{NS}basis", "value": "configured_group"},
                 {"name": f"{NS}offered", "value": "alone"},
@@ -962,8 +1033,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "type": "cryptographic-asset",
             "bom-ref": ref,
             "name": f"{group[0]['group']} (SSH key exchange offered alone)",
-            "cryptoProperties": {"assetType": "algorithm",
-                                 "algorithmProperties": {"primitive": "key-agree"}},
+            "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": {
+                "primitive": "key-agree",
+                **({"parameterSetIdentifier": _group_size(group[0]["group"])}
+                   if _group_size(group[0]["group"]) else {})}},
             "properties": [
                 {"name": f"{NS}basis", "value": "configured_kex"},
                 {"name": f"{NS}offered", "value": "alone"},
@@ -1017,7 +1090,15 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     in_use_at = {(item.get("path"), item.get("line"),
                   family_of.get(item.get("algorithm"), item.get("algorithm")))
                  for item in located if item.get("evidence_kind") not in {"comment", "ban"}}
-    family_refs = {_ref("crypto", family) for family in by_family}
+    # A half's own family component, or -- where the family has none (release 3d) -- the
+    # component of the parameter set the hybrid names.
+    family_refs = {c["bom-ref"] for c in components}
+
+    def half_ref(family: str, pset: str | None) -> str | None:
+        for name in (family, f"{family}-{pset}" if pset else None):
+            if name and _ref("crypto", name) in family_refs:
+                return _ref("crypto", name)
+        return None
     by_hybrid: dict[str, list[dict[str, Any]]] = {}
     for item in scan_result.get("hybrid_names", []):
         if any((item["path"], item["line"], family) in in_use_at
@@ -1027,9 +1108,8 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     for name, group in sorted(by_hybrid.items()):
         halves = group[0]["halves"]
         ref = _ref("hybrid", name)
-        held = [_ref("crypto", family) for family, _ in halves
-                if _ref("crypto", family) in family_refs]
-        missing = [family for family, _ in halves if _ref("crypto", family) not in family_refs]
+        held = [half_ref(family, pset) for family, pset in halves if half_ref(family, pset)]
+        missing = [family for family, pset in halves if not half_ref(family, pset)]
         properties = [
             {"name": f"{NS}basis", "value": "named_hybrid"},
             {"name": f"{NS}halves", "value": " + ".join(

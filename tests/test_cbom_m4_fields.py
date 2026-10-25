@@ -59,9 +59,10 @@ RSA_2048 = ("from cryptography.hazmat.primitives.asymmetric import rsa\n"
 
 
 def test_rsa_2048_carries_oid_levels_and_functions(tmp_path, validator):
-    # Release 3b (M4c): the size is its own component, RSA-2048, beside the family's.
+    # Release 3b (M4c): the size is its own component, RSA-2048; release 3d: with no sizeless
+    # sighting left, no sizeless RSA component beside it.
     doc = _cbom(tmp_path, {"a.py": RSA_2048})
-    assert _crypto(doc, "RSA")["oid"] == "1.2.840.113549.1.1.1"
+    assert not any(c["name"] == "RSA" for c in doc["components"])
     assert _crypto(doc, "RSA-2048")["oid"] == "1.2.840.113549.1.1.1"
     algo = _algo(doc, "RSA-2048")
     assert algo["parameterSetIdentifier"] == "2048"
@@ -79,7 +80,7 @@ def test_a_size_outside_the_table_gives_no_classical_level(tmp_path):
 def test_two_sizes_give_no_classical_level(tmp_path):
     doc = _cbom(tmp_path, {"a.py": RSA_2048,
                            "b.py": RSA_2048.replace("2048", "3072")})
-    assert "classicalSecurityLevel" not in _algo(doc, "RSA")
+    assert not any(c["name"] == "RSA" for c in doc["components"])   # release 3d
     # Each size its own component, each with its own level (release 3b, M4c).
     assert _algo(doc, "RSA-2048")["classicalSecurityLevel"] == 112
     assert _algo(doc, "RSA-3072")["classicalSecurityLevel"] == 128
@@ -128,9 +129,8 @@ def test_a_set_named_only_in_a_comment_does_not_count(tmp_path):
 def test_two_sets_are_both_named_and_neither_chosen(tmp_path):
     doc = _cbom(tmp_path, {"a.py": "a = KeyEncapsulation('ML-KEM-768')\n"
                                    "b = KeyEncapsulation('ML-KEM-1024')\n"})
-    component = next(c for c in doc["components"] if c["name"] == "ML-KEM")
-    algo = component["cryptoProperties"]["algorithmProperties"]
-    assert "parameterSetIdentifier" not in algo and "nistQuantumSecurityLevel" not in algo
+    # Release 3d: no sizeless ML-KEM component, so none to choose a set for.
+    assert not any(c["name"] == "ML-KEM" for c in doc["components"])
     # Release 3b (M4c): each set its own component, with its own occurrence and level.
     assert _algo(doc, "ML-KEM-768")["nistQuantumSecurityLevel"] == 3
     assert _algo(doc, "ML-KEM-1024")["nistQuantumSecurityLevel"] == 5

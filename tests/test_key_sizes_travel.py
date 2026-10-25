@@ -69,8 +69,8 @@ def test_a_single_size_reaches_the_cbom_component(tmp_path):
 def test_several_sizes_are_all_named_and_none_is_chosen(tmp_path):
     """Picking one would publish a number that looks measured and is not."""
     document = cyclonedx.build(_tree(tmp_path, a_py=ONE, b_py=OTHER))
-    rsa = _crypto_component(document, "RSA")
-    assert "parameterSetIdentifier" not in rsa["cryptoProperties"]["algorithmProperties"]
+    # Release 3d: no sizeless RSA component at all -- every sighting names its size.
+    assert _crypto_component(document, "RSA") is None
     # Release 3b (M4c): not one component with both sizes but one per size, each its own.
     for size in ("1024", "4096"):
         sized = _crypto_component(document, f"RSA-{size}")
@@ -82,11 +82,14 @@ def test_several_sizes_are_all_named_and_none_is_chosen(tmp_path):
 def test_a_family_with_no_size_read_says_nothing_about_size(tmp_path):
     """Absent is absent. An algorithm whose size was never on the line does not
     acquire one."""
-    document = cyclonedx.build(_tree(tmp_path, a_py="import hashlib\nhashlib.md5(b'x')\n"))
-    md5 = _crypto_component(document, "MD5")
-    assert md5 is not None
-    assert "parameterSetIdentifier" not in md5["cryptoProperties"]["algorithmProperties"]
-    assert "qrp:observedKeySizes" not in _properties(md5)
+    # RSA, not MD5: MD5's digest length is its name's (release 3d, test_key_length_in_cbom.py).
+    document = cyclonedx.build(_tree(tmp_path, a_py=(
+        "from cryptography.hazmat.primitives.asymmetric import rsa\n"
+        "k = rsa.generate_private_key(public_exponent=65537, key_size=n)\n")))
+    rsa = _crypto_component(document, "RSA")
+    assert rsa is not None
+    assert "parameterSetIdentifier" not in rsa["cryptoProperties"]["algorithmProperties"]
+    assert "qrp:observedKeySizes" not in _properties(rsa)
 
 
 def test_a_size_only_in_a_comment_does_not_reach_the_document(tmp_path):

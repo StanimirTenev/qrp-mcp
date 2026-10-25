@@ -140,7 +140,8 @@ def test_a_registry_size_reaches_its_own_cbom_component(tmp_path):
     dh = next(c for c in doc["components"] if c["name"] == "DH-2048")
     assert dh["cryptoProperties"]["algorithmProperties"]["parameterSetIdentifier"] == "2048"
     assert dh["evidence"]["occurrences"][0]["location"] == "sshd_config"
-    assert any(c["bom-ref"] == "crypto:dh" for c in doc["components"])
+    # Release 3d: the one sighting names its size, so there is no sizeless DH component.
+    assert not any(c["bom-ref"] == "crypto:dh" for c in doc["components"])
 
 
 def test_the_identifier_hint_never_hides_a_family():

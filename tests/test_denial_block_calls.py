@@ -58,7 +58,7 @@ def test_js_fallback_call_is_a_use(tmp_path):
     assert ec and all(e["evidence_kind"] != "ban" for e in ec)
     assert "EC" not in result["named_but_not_used"]
     assert result["summary"]["pqc_readiness"] == "hybrid_partial"
-    assert "EC" in {c["name"] for c in build(result)["components"]}
+    assert "EC-P-256" in {c["name"] for c in build(result)["components"]}  # release 3d
 
 
 def test_python_except_unsupported_fallback_is_a_use(tmp_path):
