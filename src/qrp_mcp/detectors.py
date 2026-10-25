@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bisect
 import fnmatch
 import functools
 import hashlib
@@ -10,6 +11,7 @@ import os
 import posixpath
 import re
 import stat
+from itertools import accumulate
 from pathlib import Path
 from typing import Any
 
@@ -2821,6 +2823,25 @@ _NAMES_A_PIECE = frozenset(f[2] for f in ALGORITHM_PATTERNS[
     max(i for i, f in enumerate(ALGORITHM_PATTERNS) if components.MAC_OR_KDF_NOTE in f[1]) + 1:])
 
 
+def _lines_to_visit(lines: list[str], ext: str, *marked_sets: set[int]) -> list[int]:
+    """The lines scan_source_file must visit: the gate's, and every line holding `/*` or
+    `*/` (or, in a file with docstrings, a triple quote), ascending."""
+    marked: set[int] = set().union(*marked_sets)
+    text = "\n".join(lines)
+    starts: list[int] | None = None
+    for needle in ("/*", "*/", *(_TRIPLE if ext in _DOCSTRING_EXT else ())):
+        at = text.find(needle)
+        if at == -1:
+            continue
+        if starts is None:
+            starts = list(accumulate((len(line) + 1 for line in lines), initial=0))
+        while at != -1:
+            i = bisect.bisect_right(starts, at) - 1
+            marked.add(i)
+            at = text.find(needle, starts[i + 1])
+    return sorted(marked)
+
+
 def scan_source_file(path: Path, rel_path: str,
                      lines: list[str] | None = None,
                      cipher_exclusions: bool = False,
@@ -2838,7 +2859,22 @@ def scan_source_file(path: Path, rel_path: str,
     denial_block_indent: int | None = None
     denial_block_calls = False
     signature_lines: set[int] = set()
-    for line_no, line in enumerate(lines, start=1):
+    # The lines visited: with a gate, those it marked and those a comment or docstring
+    # opens or closes on; the others change nothing below but the end of a denial block,
+    # which is looked for among them where one is open (release 3c: the walk over every
+    # line was 8% of a curl scan).
+    visited = (range(len(lines)) if read is None else
+               _lines_to_visit(lines, ext, read, patterns, state_only))
+    previous = -1
+    for index in visited:
+        line_no, line = index + 1, lines[index]
+        if denial_block_indent is not None and index > previous + 1:
+            for passed in range(previous + 1, index):
+                text = lines[passed]
+                if text.strip() and len(text) - len(text.lstrip()) <= denial_block_indent:
+                    denial_block_indent = None
+                    break
+        previous = index
         if read is not None and line_no - 1 not in read and not (
                 line_no - 1 in patterns
                 and _a_pattern_matches(line, allowed.get(line_no - 1) if allowed else None)):

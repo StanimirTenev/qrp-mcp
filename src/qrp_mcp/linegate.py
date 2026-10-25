@@ -322,6 +322,10 @@ class Gate:
         core = self._core or None   # built by compiled(), for a tree big enough to repay it
         if core is not None:
             text = "\n".join(lines)
+            if self._core_state is True:
+                read, patterns, allowed, state = core.hot_lines_and_state(text)
+                return Hot(set(read), set(patterns), {i: frozenset(k) for i, k in allowed},
+                           set(state))
             read, patterns, allowed = core.hot_lines(text)
             read = set(read)
             return Hot(read, set(patterns), {i: frozenset(k) for i, k in allowed},
@@ -392,11 +396,7 @@ class Gate:
                                               lambda p=p: rust_regex(p))
                                 for p in self._algorithm_patterns or []]
                     _warm.save()
-                    # The denial words on their own (Hot.state), with no pattern to check.
-                    self._core_state = qrp_mcp_core.Gate(
-                        self.denial_words, [r or p for p, r in DENIAL_PARTS], [], None,
-                        self._blob or "x^")
-                    self._core = qrp_mcp_core.Gate(
+                    arguments = (
                         self.words, self.rust_parts,
                         [[_piece(s) for s in found or ()] for found in self._algorithm_literals],
                         # Without every pattern, a line with a pattern's literal is a pattern
@@ -404,6 +404,16 @@ class Gate:
                         patterns if patterns and None not in patterns
                         and len(patterns) == len(self._algorithm_literals) else None,
                         self._blob or "(?!)")
+                    state = (self.denial_words, [r or p for p, r in DENIAL_PARTS])
+                    try:
+                        # The denial words (Hot.state) in the same pass (core 3c).
+                        self._core = qrp_mcp_core.Gate(*arguments, *state)
+                        self._core_state = True
+                    except TypeError:
+                        # A core built before release 3c: the words in a gate of their own.
+                        self._core = qrp_mcp_core.Gate(*arguments)
+                        self._core_state = qrp_mcp_core.Gate(*state, [], None,
+                                                             self._blob or "x^")
                 except (ImportError, ValueError):
                     self._core = False
         return self._core or None

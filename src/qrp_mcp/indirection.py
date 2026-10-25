@@ -85,8 +85,11 @@ def _read(path: Path, root: Path) -> list[str] | None:
 
 
 def _assigned_once(lines: list[str], name: str, pattern: str = _ASSIGN) -> str | None:
-    values = {m.group(2) for text in lines
-              for m in re.finditer(pattern.format(name=re.escape(name)), text)}
+    # Compiled once, and asked only of the lines holding the name, which every match spells
+    # out (release 3c: per line it was formatted and looked up again, 4% of a curl scan).
+    assignment = re.compile(pattern.format(name=re.escape(name)))
+    values = {m.group(2) for text in lines if name in text
+              for m in assignment.finditer(text)}
     if len(values) == 1:
         value = values.pop()
         return value if _is_algorithm_name(value) else None
@@ -223,7 +226,12 @@ def resolve(path: Path, rel_path: str, lines: list[str], found: list[dict[str, A
     aliases = _aliases(lines, ext, named)
     constants = _constants(path, lines, ext, root)
     changed: dict[int, tuple[str, list[str], set[str] | None]] = {}
-    for number, text in enumerate(lines, 1):
+    # Without an alias or a constant, only folding can change a line, and it needs a plus
+    # and a quote: the other lines are not walked (release 3c).
+    numbered = (enumerate(lines, 1) if aliases or constants else
+                ((n, t) for n, t in enumerate(lines, 1)
+                 if "+" in t and ('"' in t or "'" in t)))
+    for number, text in numbered:
         new, how = text, []
         # The families a row found through a Python or Go alias may have: the alias line's.
         # None while nothing restricts the line (a JS alias, a constant, folded literals).

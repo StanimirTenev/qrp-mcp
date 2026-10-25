@@ -22,6 +22,7 @@ use regex::bytes::{Regex, RegexBuilder};
 const SIZE_LIMIT: usize = 256 * (1 << 20);
 
 type Lines = (Vec<usize>, Vec<usize>, Vec<(usize, Vec<usize>)>);
+type LinesAndState = (Vec<usize>, Vec<usize>, Vec<(usize, Vec<usize>)>, Vec<usize>);
 
 fn error(e: impl ToString) -> PyErr {
     PyValueError::new_err(e.to_string())
@@ -83,6 +84,9 @@ struct Gate {
     /// One per algorithm pattern; None when the patterns were not given.
     patterns: Option<Vec<Regex>>,
     blob: Regex,
+    /// Words and parts that make a line worth reading for state only (linegate.Hot.state).
+    state_words: Option<AhoCorasick>,
+    state_parts: Option<Regex>,
 }
 
 #[pymethods]
@@ -92,15 +96,20 @@ impl Gate {
     /// holds, and `patterns[k]` that pattern in this crate's dialect. A pattern line is one
     /// where a pattern whose literal it holds matches it with its long hex and base64 runs
     /// (`blob`) blanked as detectors._masked blanks them; with `patterns` None, one that
-    /// holds any of the literals.
+    /// holds any of the literals. `state_words` and `state_parts`, like `words` and `parts`,
+    /// mark the lines hot_lines_and_state returns apart.
     #[new]
-    #[pyo3(signature = (words, parts, pattern_literals, patterns, blob))]
+    #[pyo3(signature = (words, parts, pattern_literals, patterns, blob, state_words=None,
+                        state_parts=None))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         words: Vec<String>,
         parts: Vec<String>,
         pattern_literals: Vec<Vec<String>>,
         patterns: Option<Vec<String>>,
         blob: String,
+        state_words: Option<Vec<String>>,
+        state_parts: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let joined = parts.iter().map(|p| format!("(?:{p})")).collect::<Vec<_>>().join("|");
         let parts = regex(&format!("(?im-u){joined}"))?;
@@ -139,18 +148,54 @@ impl Gate {
             word_patterns,
             patterns,
             blob: regex(&format!("(?-u){blob}"))?,
+            state_words: match state_words {
+                Some(list) => Some(words_ac(&list, MatchKind::LeftmostFirst)?),
+                None => None,
+            },
+            state_parts: match state_parts {
+                Some(list) if !list.is_empty() => {
+                    let joined =
+                        list.iter().map(|p| format!("(?:{p})")).collect::<Vec<_>>().join("|");
+                    Some(regex(&format!("(?im-u){joined}"))?)
+                }
+                _ => None,
+            },
         })
     }
 
     /// (lines to read, lines only an algorithm pattern could match, and for the lines of
     /// both that are ASCII the algorithm patterns that can match them), 0-based, ascending.
     fn hot_lines(&self, py: Python<'_>, text: &str) -> Lines {
-        py.allow_threads(|| self.search(text))
+        py.allow_threads(|| self.search(text, false).0)
+    }
+
+    /// hot_lines, and the lines not to be read that a state word or part marks (pattern
+    /// lines among them: a pattern may not match there after all).
+    fn hot_lines_and_state(&self, py: Python<'_>, text: &str) -> LinesAndState {
+        py.allow_threads(|| {
+            let ((read, only_patterns, allowed), state) = self.search(text, true);
+            (read, only_patterns, allowed, state)
+        })
+    }
+}
+
+/// Mark every line a match of `regex` touches; once a line is marked the rest of it is not
+/// searched.
+fn mark_regex(regex: &Regex, bytes: &[u8], starts: &[usize], hot: &mut [bool]) {
+    let mut pos = 0;
+    while pos <= bytes.len() {
+        let Some(m) = regex.find_at(bytes, pos) else { break };
+        let first = line_of(starts, m.start());
+        let last = line_of(starts, m.end().saturating_sub(1).max(m.start()));
+        for h in &mut hot[first..=last] {
+            *h = true;
+        }
+        pos = starts[last + 1];
     }
 }
 
 impl Gate {
-    fn search(&self, text: &str) -> Lines {
+    fn search(&self, text: &str, with_state: bool) -> (Lines, Vec<usize>) {
         let bytes = text.as_bytes();
         let starts = line_starts(bytes);
         let n = starts.len() - 1;
@@ -164,16 +209,7 @@ impl Gate {
         for m in self.words.find_iter(bytes) {
             hot[line_of(&starts, m.start())] = true;
         }
-        let mut pos = 0;
-        while pos <= bytes.len() {
-            let Some(m) = self.parts.find_at(bytes, pos) else { break };
-            let first = line_of(&starts, m.start());
-            let last = line_of(&starts, m.end().saturating_sub(1).max(m.start()));
-            for h in &mut hot[first..=last] {
-                *h = true;
-            }
-            pos = starts[last + 1];
-        }
+        mark_regex(&self.parts, bytes, &starts, &mut hot);
         // For each line holding an algorithm pattern's literal: the patterns that match it,
         // with its long hex and base64 runs blanked as detectors._masked blanks them.
         let mut matching: Vec<Option<Vec<usize>>> = vec![None; n];
@@ -226,7 +262,20 @@ impl Gate {
                 }
             }
         }
-        (read, only_patterns, allowed)
+        let mut state: Vec<usize> = Vec::new();
+        if with_state {
+            let mut marked = vec![false; n];
+            if let Some(words) = &self.state_words {
+                for m in words.find_iter(bytes) {
+                    marked[line_of(&starts, m.start())] = true;
+                }
+            }
+            if let Some(parts) = &self.state_parts {
+                mark_regex(parts, bytes, &starts, &mut marked);
+            }
+            state = (0..n).filter(|&i| marked[i] && !hot[i]).collect();
+        }
+        ((read, only_patterns, allowed), state)
     }
 }
 

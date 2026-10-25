@@ -73,6 +73,12 @@ EDGES = {
     "edge3c.tf": 'tls_min_version = "1.0"\nTLS_MIN_VERSION = "1.1"\n',
     "edge3c.yaml": ("rejected:\n  - sha1\n  # removed:\nallowed:\n  - rsa\n"
                     "no longer supported:\n  - DES\n"),
+    # A denial block ended on a line no rule reads, a comment opened and closed on lines no
+    # rule reads, between two that are read (the lines scan_source_file visits, 3c).
+    "edge3c-close.yaml": ("disabled_algorithms:\n  - rsa\n  plain words here\n\n"
+                          "other: value\n  - md5\nprohibited:\n  - sha1\nnext: x\n- dsa\n"),
+    "edge3c-close.c": ("int a; /* opens\n plain\n closes */ int b = RSA_new();\n"
+                       "/* one */ x(); /* two\n still\n*/ EC_KEY_new();\n"),
     "edge3c.cfg": ("global\n  ssl-default-bind-ciphers AES128-SHA:ECDHE-RSA-AES128-GCM-SHA256\n"
                    "  ssl-default-bind-curves X25519:P-256\nfrontend f\n"
                    "  bind :443 ssl crt /x.pem curves X25519MLKEM768:X25519 ciphers AES256-SHA\n"
