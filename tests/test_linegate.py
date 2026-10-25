@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from qrp_mcp import (assets, aws_tls, components, detectors as d, dnssec, ike, indirection,
-                     linegate, oids, opcua)
+                     linegate, oids, opcua, registry)
 from qrp_mcp.scan import scan_directory
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,6 +61,12 @@ EDGES = {
     "edge.js": ("const blob = 'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVphYmNkZWZnaGlqa2xtbm9wcXJzdHV2"
                 "d3h5ejAxMjM0NTY3ODk=RSA'; createHash('md5')\n"),
     "edge.conf": "ssl_ciphers 'AES128-SHA:!MD5';\nKexAlgorithms -diffie-hellman-group1-sha1\n",
+    # Release 3b: registry names, a glob over them, command lines, PEM labels, identifiers.
+    "edge.sh": ("case $t in\n\trsa-sha2-*) x=1 ;;\nesac\n$OPENSSL_BIN rsa -noout -in k\n"
+                "grep \"BEGIN DSA PRIVATE KEY\" f\nssh-keygen -t ecdsa -b 384 -f k\n"
+                "x=gss-group14-sha256-toWM5Slw5Ew8Mqkay+al2g==\n"),
+    "edge2.c": "#include <openssl/evp.h>\nint n = KEY_RSA_CERT;\nr = rsa_hash_id_from_ident(a);\n",
+    "edge.json": '{"alg": "ECDH-ES+A128KW", "crv": "P-384", "kty": "x"}\n',
 }
 
 
@@ -85,7 +91,42 @@ RULES = [assets.scan_protocols, assets.scan_tls_groups, assets.scan_hybrid_group
          dnssec.unnamed_records, d.scan_openssl3_names, d.scan_cose_algorithms, d.scan_jca_names,
          opcua.scan, aws_tls.scan, ike.fortios_addke, dnssec.scan_records, d.scan_cipher_suites,
          assets.static_rsa_positions, d.PPK_CONFIG_ASSIGN.search, d._DENIAL_WORDS.search]
-ON_MASKED = [d._key_type_values, components.scan, oids.scan]
+# Release 3b: registry names and command lines; identifiers are read with strings blanked as
+# well, so reading them on the whole line is the stricter check.
+ON_MASKED = [d._key_type_values, components.scan, oids.scan, registry.scan, registry.identifiers]
+
+
+@pytest.mark.parametrize("core", ENGINES)
+def test_every_registry_name_is_in_the_gate(core):
+    """Each name of registry_names.json with a family, alone on a line, quoted, as a prefix
+    entry's instance, as a glob over its stem, and each command and PEM label: the gate reads
+    the line, and registry.scan names the family there."""
+    gate = _gate(core)
+    t = registry.table()
+    lines: list[tuple[str, str]] = []
+    for name, family, *_ in t["names"]:
+        if family:
+            lines += [(f"x {name} y", family), (f"x({name.upper()})", family),
+                      (f"case $k in {name[:6]}*) ;;", "")]
+    for name, family, *_ in t["prefixes"]:
+        if family:
+            lines.append((f"k = {name}toWM5Slw5Ew8Mqkay", family))
+    for name, family, *_ in t["quoted"]:
+        if family:
+            lines.append((f'{{"alg": "{name}"}}', family))
+    for command, family in {**t["openssl_commands"], **t["openssl_digests"]}.items():
+        lines.append((f"  $OPENSSL {command} -in a", family))
+    for label, family in t["pem_labels"].items():
+        lines.append((f'grep "BEGIN {label}" f', family))
+    for kind, family in t["ssh_keygen_types"].items():
+        lines.append((f"ssh-keygen -t {kind} -f k", family))
+    hot = gate.hot_lines([text for text, _ in lines])
+    assert hot is not None
+    for i, (text, family) in enumerate(lines):
+        if registry.scan(text) or registry.identifiers(text):
+            assert i in hot.lines, f"not in the gate: {text!r}"
+        if family:
+            assert family in {f for f, *_ in registry.scan(text)}, text
 
 
 @pytest.mark.parametrize("core", ENGINES)

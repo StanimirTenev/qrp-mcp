@@ -397,8 +397,25 @@ def _occurrences(located: list[dict[str, Any]], family: str,
     ]
 
 
+def _parameter(item: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """The one parameter set, curve or key size an occurrence names (release 3b, M4c), as
+    (label, fields); None where it names none or more than one. A parameter set first (the
+    post-quantum sets), then a curve, then a key size."""
+    if item.get("parameter_set"):
+        return str(item["parameter_set"]), {"parameter_set": str(item["parameter_set"])}
+    curve = item.get("curve")
+    if curve and "," not in str(curve):
+        size = item.get("key_size")
+        return str(curve), {"curve": str(curve),
+                            **({"key_size": size} if isinstance(size, int) else {})}
+    if isinstance(item.get("key_size"), int):
+        return str(item["key_size"]), {"key_size": item["key_size"]}
+    return None
+
+
 def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[str, Any],
-                           family_of: dict[str, str]) -> None:
+                           family_of: dict[str, str],
+                           family_by_ref: dict[str, str] | None = None) -> None:
     """`qrp:confidence` on every component with occurrences (release E): a JSON array with
     one level per occurrence, in the order of `evidence.occurrences`. CycloneDX 1.6 gives an
     occurrence no properties (`additionalProperties: false`), so the component carries them.
@@ -419,7 +436,8 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
         levels = []
         for o in occurrences:
             rows = at.get((o["location"], o.get("line")), [])
-            mine = [lv for name, lv in rows if name == component["name"]] or [lv for _, lv in rows]
+            own = (family_by_ref or {}).get(component["bom-ref"], component["name"])
+            mine = [lv for name, lv in rows if name == own] or [lv for _, lv in rows]
             levels.append(min(mine, key=confidence.LEVELS.index) if mine else "unknown")
         component.setdefault("properties", []).append(
             {"name": f"{NS}confidence", "value": json.dumps(levels)})
@@ -601,6 +619,58 @@ def _certificate_components(located: list[dict[str, Any]],
     return out + [keys[ref] for ref in sorted(keys)]
 
 
+def _parameter_components(family: str, finding: dict[str, Any],
+                          by_parameter: dict[str, tuple[dict[str, Any], list[dict[str, Any]]]],
+                          family_by_ref: dict[str, str]) -> list[dict[str, Any]]:
+    """One algorithm component per (family, parameter set / curve / key size) the occurrences
+    name: RSA-2048 apart from RSA-3072, ECDSA-P-256 apart from ECDSA-P-384 (release 3b, M4c;
+    CISA M-23-02 item 4 asks for the key length of each asset). `parameterSetIdentifier` is the
+    parameter set, or the key size in bits (the schema's own example: "in AES128, '128'
+    identifies the key length in bits"); the curve has its own field."""
+    def order(label: str) -> tuple:
+        fields = by_parameter[label][0]
+        return (fields.get("key_size") or 0, label)
+
+    out: list[dict[str, Any]] = []
+    for label in sorted(by_parameter, key=order):
+        fields, items = by_parameter[label]
+        sizes = [fields["key_size"]] if "key_size" in fields else []
+        m4, oid, _ = _m4_fields(family, _primitive(family), sizes, items)
+        identifier = fields.get("parameter_set") or (str(fields["key_size"]) if sizes else None)
+        name = f"{family}-{label}"
+        component: dict[str, Any] = {
+            "type": "cryptographic-asset",
+            "bom-ref": _ref("crypto", name),
+            "name": name,
+            "cryptoProperties": {
+                "assetType": "algorithm",
+                "algorithmProperties": {
+                    "primitive": _primitive(family),
+                    **({"parameterSetIdentifier": identifier} if identifier else {}),
+                    **m4,
+                },
+                **({"oid": oid} if oid else {}),
+            },
+            "properties": [
+                {"name": f"{NS}classification", "value": finding["classification"]},
+                {"name": f"{NS}quantum_vulnerable",
+                 "value": "true" if finding["quantum_vulnerable"] else "false"},
+                {"name": f"{NS}family", "value": family},
+            ],
+            "evidence": {"occurrences": [
+                {"location": item["path"], "line": item["line"],
+                 "additionalContext": _context(item)} for item in items]},
+        }
+        for key in ("pqc_family", "pqc_status"):
+            if finding.get(key):
+                component["properties"].append({"name": f"{NS}{key}", "value": finding[key]})
+        if all(item.get("in_test_code") for item in items):
+            component["scope"] = "excluded"
+        family_by_ref[component["bom-ref"]] = family
+        out.append(component)
+    return out
+
+
 def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     """A CycloneDX 1.6 document from one scan, with the coverage block inside it."""
     coverage = scan_result["coverage"]
@@ -617,14 +687,25 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                  if f.get("raw_value") and f.get("algorithm_family")}
 
     components: list[dict[str, Any]] = []
+    family_by_ref: dict[str, str] = {}
     for family in sorted(by_family):
         finding = by_family[family]
         # The sightings the inventory itself uses: a comment or a ban cannot set a field.
         in_use = [item for item in located
                   if family_of.get(item.get("algorithm"), item.get("algorithm")) == family
                   and item.get("evidence_kind") not in {"comment", "ban"}]
-        m4, oid, several_sets = _m4_fields(family, _primitive(family),
-                                           observed_sizes.get(family, []), in_use)
+        # M4c (release 3b): one component per parameter set, curve or key size an occurrence
+        # names, each with its own occurrences; the family's own component keeps the rest.
+        by_parameter: dict[str, tuple[dict[str, Any], list[dict[str, Any]]]] = {}
+        for item in in_use:
+            said = _parameter(item)
+            if said:
+                by_parameter.setdefault(said[0], (said[1], []))[1].append(item)
+        routed = {id(item) for _, items in by_parameter.values() for item in items}
+        if by_parameter:
+            in_use = [item for item in in_use if id(item) not in routed]
+        family_sizes = [] if by_parameter else observed_sizes.get(family, [])
+        m4, oid, several_sets = _m4_fields(family, _primitive(family), family_sizes, in_use)
         component: dict[str, Any] = {
             "type": "cryptographic-asset",
             "bom-ref": _ref("crypto", family),
@@ -641,8 +722,8 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                     # instead: choosing one of them would publish a number that
                     # looks measured and is not, and a reader cannot tell the
                     # difference. A string, because the schema says string.
-                    **({"parameterSetIdentifier": str(observed_sizes[family][0])}
-                       if len(observed_sizes.get(family, [])) == 1 else {}),
+                    **({"parameterSetIdentifier": str(family_sizes[0])}
+                       if len(family_sizes) == 1 else {}),
                     **m4,
                 },
                 **({"oid": oid} if oid else {}),
@@ -657,10 +738,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             ],
         }
         # More than one size for the same family: all of them, none chosen.
-        if len(observed_sizes.get(family, [])) > 1:
+        if len(family_sizes) > 1:
             component["properties"].append({
                 "name": f"{NS}observedKeySizes",
-                "value": ", ".join(str(s) for s in observed_sizes[family]),
+                "value": ", ".join(str(s) for s in family_sizes),
             })
         # More than one parameter set read: all of them, none chosen (as for sizes).
         if several_sets:
@@ -697,7 +778,8 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["properties"].append({
                 "name": f"{NS}not_negotiable_by",
                 "value": json.dumps(finding["not_negotiable_by"], ensure_ascii=False)})
-        occurrences = _occurrences(located, family, family_of)
+        occurrences = _occurrences([item for item in located if id(item) not in routed],
+                                   family, family_of)
         if occurrences:
             component["evidence"] = {"occurrences": occurrences}
         # ⚠️ NOT `scope` -- this function already binds that name to the coverage
@@ -706,6 +788,8 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         if component_scope:
             component["scope"] = component_scope
         components.append(component)
+        family_by_ref[component["bom-ref"]] = family
+        components.extend(_parameter_components(family, finding, by_parameter, family_by_ref))
 
     keys = scan_result["evidence"]["embedded_keys"]
     if keys:
@@ -1027,7 +1111,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         "hashes": [{"alg": "SHA-256", "content": digests[path]}],
         "properties": [{"name": f"{NS}basis", "value": "evidence_file"}],
     } for path in cited]
-    _confidence_properties(components, scan_result, family_of)
+    _confidence_properties(components, scan_result, family_of, family_by_ref)
 
     # `complete` is a claim about the component list, so it is tied to the file
     # count rather than to the run finishing without error. Anything short of

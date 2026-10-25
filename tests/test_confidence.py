@@ -99,10 +99,12 @@ def test_scan_json_sarif_and_cbom_carry_it(tmp_path):
     assert all("confidence" in r["properties"] for r in doc["runs"][0]["results"])
 
     bom = cyclonedx.build(result)
-    rsa = next(c for c in bom["components"] if c.get("name") == "RSA")
-    levels = json.loads(next(p["value"] for p in rsa["properties"]
-                             if p["name"] == "qrp:confidence"))
-    assert len(levels) == len(rsa["evidence"]["occurrences"])
+    levels = []
+    for rsa in (c for c in bom["components"] if c.get("name", "").startswith("RSA")):
+        mine = json.loads(next(p["value"] for p in rsa["properties"]
+                               if p["name"] == "qrp:confidence"))
+        assert len(mine) == len(rsa["evidence"]["occurrences"])
+        levels += mine
     assert "high" in levels
     assert any(p["name"].startswith("qrp:coverage:confidence:") for p in bom["properties"])
 

@@ -44,7 +44,7 @@ import re
 from itertools import accumulate
 from typing import NamedTuple
 
-from . import components
+from . import components, registry
 
 # --- literals ----------------------------------------------------------------------------
 # Lower-case; searched case-insensitively. Each line says which rule needs it.
@@ -89,6 +89,9 @@ LITERALS: set[str] = {
     "disabled", "disallow", "banned", "blocked", "blocklist", "blacklist", "forbidden",
     "prohibited", "denied", "deny", "reject", "excluded", "unsupported", "removed",
 }
+# registry.scan (release 3b): every registry name with a family, the first six characters of
+# each (a glob's stem), the quoted names, the command words, the PEM labels.
+LITERALS |= registry.literals()
 
 _SUITE_CIPHERS = "aes|camellia|chacha|seed|idea|rc4|3des|des|null|aria|rc2"
 

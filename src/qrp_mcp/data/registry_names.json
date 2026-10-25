@@ -1,0 +1,3267 @@
+{
+ "about": "Algorithm names from their registries, each with the family it names; built by scripts/gen_registries.py. Family null: in the registry, out of the scan's scope (or read by another rule: post-quantum and hybrid names).",
+ "names": [
+  [
+   "3des-cbc",
+   "3DES",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "3des-ctr",
+   "3DES",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "AEAD_AES_128_GCM",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "AEAD_AES_256_GCM",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "aes128-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "aes128-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "aes128-gcm@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "aes192-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "aes192-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "aes256-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "aes256-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "aes256-gcm@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "arcfour",
+   "RC4",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "arcfour128",
+   "RC4",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "arcfour256",
+   "RC4",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "blowfish-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "blowfish-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "brainpoolP160r1",
+   "EC",
+   {
+    "curve": "brainpoolP160r1",
+    "key_size": 160
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP160t1",
+   "EC",
+   {
+    "curve": "brainpoolP160t1",
+    "key_size": 160
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP192r1",
+   "EC",
+   {
+    "curve": "brainpoolP192r1",
+    "key_size": 192
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP192t1",
+   "EC",
+   {
+    "curve": "brainpoolP192t1",
+    "key_size": 192
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP224r1",
+   "EC",
+   {
+    "curve": "brainpoolP224r1",
+    "key_size": 224
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP224t1",
+   "EC",
+   {
+    "curve": "brainpoolP224t1",
+    "key_size": 224
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP256r1",
+   "EC",
+   {
+    "curve": "brainpoolP256r1",
+    "key_size": 256
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "brainpoolP256r1tls13",
+   "EC",
+   {
+    "curve": "brainpoolP256r1",
+    "key_size": 256
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "brainpoolP256t1",
+   "EC",
+   {
+    "curve": "brainpoolP256t1",
+    "key_size": 256
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP320r1",
+   "EC",
+   {
+    "curve": "brainpoolP320r1",
+    "key_size": 320
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP320t1",
+   "EC",
+   {
+    "curve": "brainpoolP320t1",
+    "key_size": 320
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP384r1",
+   "EC",
+   {
+    "curve": "brainpoolP384r1",
+    "key_size": 384
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "brainpoolP384r1tls13",
+   "EC",
+   {
+    "curve": "brainpoolP384r1",
+    "key_size": 384
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "brainpoolP384t1",
+   "EC",
+   {
+    "curve": "brainpoolP384t1",
+    "key_size": 384
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "brainpoolP512r1",
+   "EC",
+   {
+    "curve": "brainpoolP512r1",
+    "key_size": 512
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "brainpoolP512r1tls13",
+   "EC",
+   {
+    "curve": "brainpoolP512r1",
+    "key_size": 512
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "brainpoolP512t1",
+   "EC",
+   {
+    "curve": "brainpoolP512t1",
+    "key_size": 512
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2pnb163v1",
+   "EC",
+   {
+    "curve": "c2pnb163v1",
+    "key_size": 163
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2pnb163v2",
+   "EC",
+   {
+    "curve": "c2pnb163v2",
+    "key_size": 163
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2pnb163v3",
+   "EC",
+   {
+    "curve": "c2pnb163v3",
+    "key_size": 163
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2pnb176v1",
+   "EC",
+   {
+    "curve": "c2pnb176v1",
+    "key_size": 176
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2pnb208w1",
+   "EC",
+   {
+    "curve": "c2pnb208w1",
+    "key_size": 208
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2pnb272w1",
+   "EC",
+   {
+    "curve": "c2pnb272w1",
+    "key_size": 272
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2pnb304w1",
+   "EC",
+   {
+    "curve": "c2pnb304w1",
+    "key_size": 304
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2pnb368w1",
+   "EC",
+   {
+    "curve": "c2pnb368w1",
+    "key_size": 368
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2tnb191v1",
+   "EC",
+   {
+    "curve": "c2tnb191v1",
+    "key_size": 191
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2tnb191v2",
+   "EC",
+   {
+    "curve": "c2tnb191v2",
+    "key_size": 191
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2tnb191v3",
+   "EC",
+   {
+    "curve": "c2tnb191v3",
+    "key_size": 191
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2tnb239v1",
+   "EC",
+   {
+    "curve": "c2tnb239v1",
+    "key_size": 239
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2tnb239v2",
+   "EC",
+   {
+    "curve": "c2tnb239v2",
+    "key_size": 239
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2tnb239v3",
+   "EC",
+   {
+    "curve": "c2tnb239v3",
+    "key_size": 239
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2tnb359v1",
+   "EC",
+   {
+    "curve": "c2tnb359v1",
+    "key_size": 359
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "c2tnb431r1",
+   "EC",
+   {
+    "curve": "c2tnb431r1",
+    "key_size": 431
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "cast128-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "cast128-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "chacha20-poly1305",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "chacha20-poly1305@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "curve25519-sha256",
+   "X25519",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "curve25519-sha256@libssh.org",
+   "X25519",
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "curve448-sha512",
+   "X448",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "curveSM2",
+   "SM2",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "curveSM2MLKEM768",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "des-cbc",
+   "DES",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group-exchange-sha1",
+   "DH",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group-exchange-sha256",
+   "DH",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group1-sha1",
+   "DH",
+   {
+    "key_size": 1024
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group14-sha1",
+   "DH",
+   {
+    "key_size": 2048
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group14-sha256",
+   "DH",
+   {
+    "key_size": 2048
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group15-sha512",
+   "DH",
+   {
+    "key_size": 3072
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group16-sha512",
+   "DH",
+   {
+    "key_size": 4096
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group17-sha512",
+   "DH",
+   {
+    "key_size": 6144
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "diffie-hellman-group18-sha512",
+   "DH",
+   {
+    "key_size": 8192
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "eccsi_sha256",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "ecdh-sha2-nistp256",
+   "ECDH",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ecdh-sha2-nistp384",
+   "ECDH",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ecdh-sha2-nistp521",
+   "ECDH",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ecdsa-sha2-nistp256",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "ecdsa-sha2-nistp256-cert-v01@openssh.com",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "ecdsa-sha2-nistp384",
+   "ECDSA",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "ecdsa-sha2-nistp384-cert-v01@openssh.com",
+   "ECDSA",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "ecdsa-sha2-nistp521",
+   "ECDSA",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "ecdsa-sha2-nistp521-cert-v01@openssh.com",
+   "ECDSA",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "ecdsa_brainpoolP256r1tls13_sha256",
+   "ECDSA",
+   {
+    "curve": "brainpoolP256r1",
+    "key_size": 256
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ecdsa_brainpoolP384r1tls13_sha384",
+   "ECDSA",
+   {
+    "curve": "brainpoolP384r1",
+    "key_size": 384
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ecdsa_brainpoolP512r1tls13_sha512",
+   "ECDSA",
+   {
+    "curve": "brainpoolP512r1",
+    "key_size": 512
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ecdsa_secp256r1_sha256",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ecdsa_secp384r1_sha384",
+   "ECDSA",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ecdsa_secp521r1_sha512",
+   "ECDSA",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ecdsa_sha1",
+   "ECDSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "ecmqv-sha2",
+   "ECDH",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ed25519",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "ext-info-c",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ext-info-s",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ffdhe2048",
+   "DH",
+   {
+    "key_size": 2048
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ffdhe3072",
+   "DH",
+   {
+    "key_size": 3072
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ffdhe4096",
+   "DH",
+   {
+    "key_size": 4096
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ffdhe6144",
+   "DH",
+   {
+    "key_size": 6144
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "ffdhe8192",
+   "DH",
+   {
+    "key_size": 8192
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "gostr34102012_256a",
+   "GOST R 34.10",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "gostr34102012_256b",
+   "GOST R 34.10",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "gostr34102012_256c",
+   "GOST R 34.10",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "gostr34102012_256d",
+   "GOST R 34.10",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "gostr34102012_512a",
+   "GOST R 34.10",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "gostr34102012_512b",
+   "GOST R 34.10",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "gostr34102012_512c",
+   "GOST R 34.10",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "hmac-md5",
+   "MD5",
+   null,
+   "MAC",
+   "iana-ssh"
+  ],
+  [
+   "hmac-md5-96",
+   "MD5",
+   null,
+   "MAC",
+   "iana-ssh"
+  ],
+  [
+   "hmac-md5-96-etm@openssh.com",
+   "MD5",
+   null,
+   "MAC",
+   "openssh"
+  ],
+  [
+   "hmac-md5-etm@openssh.com",
+   "MD5",
+   null,
+   "MAC",
+   "openssh"
+  ],
+  [
+   "hmac-sha1",
+   "SHA1",
+   null,
+   "MAC",
+   "iana-ssh"
+  ],
+  [
+   "hmac-sha1-96",
+   "SHA1",
+   null,
+   "MAC",
+   "iana-ssh"
+  ],
+  [
+   "hmac-sha1-96-etm@openssh.com",
+   "SHA1",
+   null,
+   "MAC",
+   "openssh"
+  ],
+  [
+   "hmac-sha1-etm@openssh.com",
+   "SHA1",
+   null,
+   "MAC",
+   "openssh"
+  ],
+  [
+   "hmac-sha2-256",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "hmac-sha2-256-etm@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "hmac-sha2-512",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "hmac-sha2-512-etm@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "idea-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "idea-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "iso_chinese_ibs",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "iso_ibs1",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "iso_ibs2",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "mldsa44",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "mldsa65",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "mldsa87",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "MLKEM1024",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "mlkem1024-sha384",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "mlkem1024nistp384-sha384",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "MLKEM512",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "mlkem512-sha256",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "MLKEM512X25519",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "MLKEM768",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "mlkem768-sha256",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "mlkem768nistp256-sha256",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "mlkem768x25519-sha256",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "Oakley-EC2N-3",
+   "EC",
+   null,
+   null,
+   "openssl"
+  ],
+  [
+   "Oakley-EC2N-4",
+   "EC",
+   null,
+   null,
+   "openssl"
+  ],
+  [
+   "pgp-sign-dss",
+   "DSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "pgp-sign-rsa",
+   "RSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "prime192v1",
+   "EC",
+   {
+    "curve": "P-192",
+    "key_size": 192
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "prime192v2",
+   "EC",
+   {
+    "curve": "prime192v2",
+    "key_size": 192
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "prime192v3",
+   "EC",
+   {
+    "curve": "prime192v3",
+    "key_size": 192
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "prime239v1",
+   "EC",
+   {
+    "curve": "prime239v1",
+    "key_size": 239
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "prime239v2",
+   "EC",
+   {
+    "curve": "prime239v2",
+    "key_size": 239
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "prime239v3",
+   "EC",
+   {
+    "curve": "prime239v3",
+    "key_size": 239
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "prime256v1",
+   "EC",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "rsa-sha2-256",
+   "RSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "rsa-sha2-256-cert-v01@openssh.com",
+   "RSA",
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "rsa-sha2-512",
+   "RSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "rsa-sha2-512-cert-v01@openssh.com",
+   "RSA",
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "rsa1024-sha1",
+   "RSA",
+   {
+    "key_size": 1024
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "rsa2048-sha256",
+   "RSA",
+   {
+    "key_size": 2048
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "rsa_pkcs1_sha1",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pkcs1_sha256",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pkcs1_sha256_legacy",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pkcs1_sha384",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pkcs1_sha384_legacy",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pkcs1_sha512",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pkcs1_sha512_legacy",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pss_pss_sha256",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pss_pss_sha384",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pss_pss_sha512",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pss_rsae_sha256",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pss_rsae_sha384",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "rsa_pss_rsae_sha512",
+   "RSA",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp112r1",
+   "EC",
+   {
+    "curve": "secp112r1",
+    "key_size": 112
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "secp112r2",
+   "EC",
+   {
+    "curve": "secp112r2",
+    "key_size": 112
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "secp128r1",
+   "EC",
+   {
+    "curve": "secp128r1",
+    "key_size": 128
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "secp128r2",
+   "EC",
+   {
+    "curve": "secp128r2",
+    "key_size": 128
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "secp160k1",
+   "EC",
+   {
+    "curve": "secp160k1",
+    "key_size": 160
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp160r1",
+   "EC",
+   {
+    "curve": "secp160r1",
+    "key_size": 160
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp160r2",
+   "EC",
+   {
+    "curve": "secp160r2",
+    "key_size": 160
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp192k1",
+   "EC",
+   {
+    "curve": "secp192k1",
+    "key_size": 192
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp192r1",
+   "EC",
+   {
+    "curve": "P-192",
+    "key_size": 192
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp224k1",
+   "EC",
+   {
+    "curve": "secp224k1",
+    "key_size": 224
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp224r1",
+   "EC",
+   {
+    "curve": "P-224",
+    "key_size": 224
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp256k1",
+   "ECDSA",
+   {
+    "curve": "secp256k1",
+    "key_size": 256
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp256r1",
+   "EC",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "SecP256r1Kyber768Draft00",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "SecP256r1MLKEM512",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "SecP256r1MLKEM768",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp384r1",
+   "EC",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "SecP384r1MLKEM1024",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "secp521r1",
+   "EC",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect113r1",
+   "EC",
+   {
+    "curve": "sect113r1",
+    "key_size": 113
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "sect113r2",
+   "EC",
+   {
+    "curve": "sect113r2",
+    "key_size": 113
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "sect131r1",
+   "EC",
+   {
+    "curve": "sect131r1",
+    "key_size": 131
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "sect131r2",
+   "EC",
+   {
+    "curve": "sect131r2",
+    "key_size": 131
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "sect163k1",
+   "EC",
+   {
+    "curve": "sect163k1",
+    "key_size": 163
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect163r1",
+   "EC",
+   {
+    "curve": "sect163r1",
+    "key_size": 163
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect163r2",
+   "EC",
+   {
+    "curve": "sect163r2",
+    "key_size": 163
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect193r1",
+   "EC",
+   {
+    "curve": "sect193r1",
+    "key_size": 193
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect193r2",
+   "EC",
+   {
+    "curve": "sect193r2",
+    "key_size": 193
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect233k1",
+   "EC",
+   {
+    "curve": "sect233k1",
+    "key_size": 233
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect233r1",
+   "EC",
+   {
+    "curve": "sect233r1",
+    "key_size": 233
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect239k1",
+   "EC",
+   {
+    "curve": "sect239k1",
+    "key_size": 239
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect283k1",
+   "EC",
+   {
+    "curve": "sect283k1",
+    "key_size": 283
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect283r1",
+   "EC",
+   {
+    "curve": "sect283r1",
+    "key_size": 283
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect409k1",
+   "EC",
+   {
+    "curve": "sect409k1",
+    "key_size": 409
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect409r1",
+   "EC",
+   {
+    "curve": "sect409r1",
+    "key_size": 409
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect571k1",
+   "EC",
+   {
+    "curve": "sect571k1",
+    "key_size": 571
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "sect571r1",
+   "EC",
+   {
+    "curve": "sect571r1",
+    "key_size": 571
+   },
+   null,
+   "iana-tls"
+  ],
+  [
+   "serpent128-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "serpent128-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "serpent192-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "serpent192-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "serpent256-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "serpent256-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "sk-ecdsa-sha2-nistp256@openssh.com",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "sk-ssh-ed25519-cert-v01@openssh.com",
+   "Ed25519",
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "sk-ssh-ed25519@openssh.com",
+   "Ed25519",
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "slhdsa_sha2_128f",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_sha2_128s",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_sha2_192f",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_sha2_192s",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_sha2_256f",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_sha2_256s",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_shake_128f",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_shake_128s",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_shake_192f",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_shake_192s",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_shake_256f",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "slhdsa_shake_256s",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "sm2sig_sm3",
+   "SM2",
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "sntrup761x25519-sha512",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "sntrup761x25519-sha512@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "spki-sign-dss",
+   "DSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "spki-sign-rsa",
+   "RSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-dss",
+   "DSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-dss-cert-v01@openssh.com",
+   "DSA",
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "ssh-ed25519",
+   "Ed25519",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-ed25519-cert-v01@openssh.com",
+   "Ed25519",
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "ssh-ed448",
+   "Ed448",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-mldsa-44",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-mldsa-65",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-mldsa-87",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-mldsa44-ed25519",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-mldsa87-p384",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-rsa",
+   "RSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ssh-rsa-cert-v01@openssh.com",
+   "RSA",
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "twofish-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "twofish128-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "twofish128-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "twofish192-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "twofish192-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "twofish256-cbc",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "twofish256-ctr",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "umac-128-etm@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "umac-128@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "umac-64-etm@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "umac-64@openssh.com",
+   null,
+   null,
+   null,
+   "openssh"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls1",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls1"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls10",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls10"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls11",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls11"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls12",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls12"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls3",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls3"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls4",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls4"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls5",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls5"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls6",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls6"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls7",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls7"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls8",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls8"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "wap-wsg-idm-ecid-wtls9",
+   "EC",
+   {
+    "curve": "wap-wsg-idm-ecid-wtls9"
+   },
+   null,
+   "openssl"
+  ],
+  [
+   "webauthn-sk-ecdsa-sha2-nistp256@openssh.com",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "openssh"
+  ],
+  [
+   "X25519Kyber768Draft00",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "X25519MLKEM768",
+   null,
+   null,
+   null,
+   "iana-tls"
+  ],
+  [
+   "x509v3-ecdsa-sha2-nistp256",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "x509v3-ecdsa-sha2-nistp384",
+   "ECDSA",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "x509v3-ecdsa-sha2-nistp521",
+   "ECDSA",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "x509v3-rsa2048-sha256",
+   "RSA",
+   {
+    "key_size": 2048
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "x509v3-ssh-dss",
+   "DSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "x509v3-ssh-rsa",
+   "RSA",
+   null,
+   null,
+   "iana-ssh"
+  ]
+ ],
+ "openssl_commands": {
+  "dhparam": "DH",
+  "dsa": "DSA",
+  "dsaparam": "DSA",
+  "ec": "EC",
+  "ecparam": "EC",
+  "gendsa": "DSA",
+  "genrsa": "RSA",
+  "rsa": "RSA",
+  "rsautl": "RSA"
+ },
+ "openssl_digests": {
+  "md2": "MD2",
+  "md4": "MD4",
+  "md5": "MD5",
+  "sha1": "SHA1",
+  "sha224": "SHA224",
+  "sha3-224": "SHA3-224"
+ },
+ "openssl_genpkey": {
+  "DH": "DH",
+  "DHX": "DH",
+  "DSA": "DSA",
+  "EC": "EC",
+  "ED25519": "Ed25519",
+  "ED448": "Ed448",
+  "RSA": "RSA",
+  "RSA-PSS": "RSA",
+  "SM2": "SM2",
+  "X25519": "X25519",
+  "X448": "X448"
+ },
+ "pem_labels": {
+  "DH PARAMETERS": "DH",
+  "DSA PARAMETERS": "DSA",
+  "DSA PRIVATE KEY": "DSA",
+  "DSA PUBLIC KEY": "DSA",
+  "EC PARAMETERS": "EC",
+  "EC PRIVATE KEY": "EC",
+  "ECDSA PUBLIC KEY": "ECDSA",
+  "RSA PRIVATE KEY": "RSA",
+  "RSA PUBLIC KEY": "RSA",
+  "X9.42 DH PARAMETERS": "DH"
+ },
+ "prefixes": [
+  [
+   "ecdh-sha2-",
+   "ECDH",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "ecdsa-sha2-",
+   "ECDSA",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-",
+   null,
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-curve25519-sha256-",
+   "X25519",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-curve448-sha512-",
+   "X448",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-gex-sha1-",
+   "DH",
+   null,
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-group1-sha1-",
+   "DH",
+   {
+    "key_size": 1024
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-group14-sha1-",
+   "DH",
+   {
+    "key_size": 2048
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-group14-sha256-",
+   "DH",
+   {
+    "key_size": 2048
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-group15-sha512-",
+   "DH",
+   {
+    "key_size": 3072
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-group16-sha512-",
+   "DH",
+   {
+    "key_size": 4096
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-group17-sha512-",
+   "DH",
+   {
+    "key_size": 6144
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-group18-sha512-",
+   "DH",
+   {
+    "key_size": 8192
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-nistp256-sha256-",
+   "ECDH",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-nistp384-sha384-",
+   "ECDH",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "gss-nistp521-sha512-",
+   "ECDH",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-ssh"
+  ],
+  [
+   "x509v3-ecdsa-sha2-",
+   "ECDSA",
+   null,
+   null,
+   "iana-ssh"
+  ]
+ ],
+ "quoted": [
+  [
+   "A128CBC",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A128CBC-HS256",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A128CTR",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A128GCM",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A128GCMKW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A128KW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A192CBC",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A192CBC-HS384",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A192CTR",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A192GCM",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A192GCMKW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A192KW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A256CBC",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A256CBC-HS512",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A256CTR",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A256GCM",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A256GCMKW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "A256KW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "AES-CCM-16-128-128",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "AES-CCM-16-128-256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "AES-CCM-16-64-128",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "AES-CCM-16-64-256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "AES-CCM-64-128-128",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "AES-CCM-64-128-256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "AES-CCM-64-64-128",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "AES-CCM-64-64-256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "ChaCha20/Poly1305",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "ECDH-ES",
+   "ECDH",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "ECDH-ES+A128KW",
+   "ECDH",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "ECDH-ES+A192KW",
+   "ECDH",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "ECDH-ES+A256KW",
+   "ECDH",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "ES256",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "ES256K",
+   "ECDSA",
+   {
+    "curve": "secp256k1",
+    "key_size": 256
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "ES384",
+   "ECDSA",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "ES512",
+   "ECDSA",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "ESB256",
+   "ECDSA",
+   {
+    "curve": "brainpoolP256r1",
+    "key_size": 256
+   },
+   null,
+   "iana-cose"
+  ],
+  [
+   "ESB320",
+   "ECDSA",
+   {
+    "curve": "brainpoolP320r1",
+    "key_size": 320
+   },
+   null,
+   "iana-cose"
+  ],
+  [
+   "ESB384",
+   "ECDSA",
+   {
+    "curve": "brainpoolP384r1",
+    "key_size": 384
+   },
+   null,
+   "iana-cose"
+  ],
+  [
+   "ESB512",
+   "ECDSA",
+   {
+    "curve": "brainpoolP512r1",
+    "key_size": 512
+   },
+   null,
+   "iana-cose"
+  ],
+  [
+   "ESP256",
+   "ECDSA",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-cose"
+  ],
+  [
+   "ESP384",
+   "ECDSA",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-cose"
+  ],
+  [
+   "ESP512",
+   "ECDSA",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-cose"
+  ],
+  [
+   "Ed25519",
+   "Ed25519",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "Ed448",
+   "Ed448",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "EdDSA",
+   "EdDSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-0",
+   "ECDH",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-0-KE",
+   "ECDH",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-1",
+   "ECDH",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-1-KE",
+   "ECDH",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-2",
+   "ECDH",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-2-KE",
+   "ECDH",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-3",
+   "X25519",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-3-KE",
+   "X25519",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-4",
+   "X25519",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-5",
+   "X448",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-5-KE",
+   "X448",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-6",
+   "X448",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-7",
+   "ECDH",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "HPKE-7-KE",
+   "ECDH",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "HS1",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HS256",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HS384",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HS512",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "HSS-LMS",
+   "HSS/LMS",
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "IV-GENERATION",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "KT128",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "KT256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "ML-DSA-44",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "ML-DSA-65",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "ML-DSA-87",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "P-256",
+   "EC",
+   {
+    "curve": "P-256",
+    "key_size": 256
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "P-384",
+   "EC",
+   {
+    "curve": "P-384",
+    "key_size": 384
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "P-521",
+   "EC",
+   {
+    "curve": "P-521",
+    "key_size": 521
+   },
+   null,
+   "iana-jose"
+  ],
+  [
+   "PBES2-HS256+A128KW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "PBES2-HS384+A192KW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "PBES2-HS512+A256KW",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "PS256",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "PS384",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "PS512",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RS1",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RS256",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RS384",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RS512",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RSA-OAEP",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RSA-OAEP-256",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RSA-OAEP-384",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RSA-OAEP-512",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "RSA1_5",
+   "RSA",
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "SHA-1",
+   "SHA1",
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "SHA-256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "SHA-256/64",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "SHA-384",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "SHA-512",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "SHA-512/256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "SHAKE128",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "SHAKE256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "TurboSHAKE128",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "TurboSHAKE256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "WalnutDSA",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "dir",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ],
+  [
+   "direct",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "direct+HKDF-AES-128",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "direct+HKDF-AES-256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "direct+HKDF-SHA-256",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "direct+HKDF-SHA-512",
+   null,
+   null,
+   null,
+   "iana-cose"
+  ],
+  [
+   "none",
+   null,
+   null,
+   null,
+   "iana-jose"
+  ]
+ ],
+ "sources": {
+  "iana-cose": {
+   "registries": "COSE Algorithms (names; the numbers are detectors.COSE_ALGORITHMS)",
+   "registry_updated": "2026-08-25",
+   "retrieved": "2026-10-25",
+   "url": "https://www.iana.org/assignments/cose/"
+  },
+  "iana-jose": {
+   "registries": "JSON Web Signature and Encryption Algorithms, JSON Web Key Elliptic Curve",
+   "registry_updated": "2026-09-29",
+   "retrieved": "2026-10-25",
+   "url": "https://www.iana.org/assignments/jose/"
+  },
+  "iana-ssh": {
+   "registries": "16 Key Exchange Method Names, 17 Encryption Algorithm Names, 18 MAC Algorithm Names, 19 Public Key Algorithm Names",
+   "registry_updated": "2026-09-08",
+   "retrieved": "2026-10-25",
+   "url": "https://www.iana.org/assignments/ssh-parameters/"
+  },
+  "iana-tls": {
+   "registries": "TLS Supported Groups, TLS SignatureScheme (the cipher suites are read by detectors.scan_cipher_suites, whose grammar is the registry's TLS_*_WITH_* form)",
+   "registry_updated": "2026-10-21",
+   "retrieved": "2026-10-25",
+   "url": "https://www.iana.org/assignments/tls-parameters/"
+  },
+  "openssh": {
+   "retrieved": "2026-10-25",
+   "url": "OpenSSH 9.6p1 `ssh -Q` (PROTOCOL.certkeys, PROTOCOL.u2f)"
+  },
+  "openssl": {
+   "retrieved": "2026-10-25",
+   "url": "OpenSSL 3.0.13 `openssl list -commands`, `-digest-commands`, `ecparam -list_curves`, include/openssl/pem.h"
+  },
+  "ssh-keygen": {
+   "retrieved": "2026-10-25",
+   "url": "OpenSSH 9.6p1 ssh-keygen(1), -t"
+  }
+ },
+ "ssh_keygen_types": {
+  "dsa": "DSA",
+  "ecdsa": "ECDSA",
+  "ecdsa-sk": "ECDSA",
+  "ed25519": "Ed25519",
+  "ed25519-sk": "Ed25519",
+  "rsa": "RSA",
+  "rsa1": "RSA"
+ }
+}

@@ -51,8 +51,8 @@ def test_rsa_certificates_carry_their_size(tmp_path):
     assert sizes == {"a.crt": 2048, "b.der": 3072, "c.pub": 3072}
     assert result["algorithm_key_sizes"]["RSA"] == 2048
     assert result["algorithm_key_sizes_observed"]["RSA"] == [2048, 3072]
-    rsa_component = next(c for c in build(result)["components"] if c["name"] == "RSA")
-    assert "2048" in str(rsa_component) and "3072" in str(rsa_component)
+    names = {c["name"] for c in build(result)["components"]}
+    assert {"RSA", "RSA-2048", "RSA-3072"} <= names      # release 3b: one per size (M4c)
 
 
 def test_an_ec_key_signed_by_rsa_gets_no_rsa_size(tmp_path):

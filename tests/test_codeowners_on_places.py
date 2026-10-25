@@ -60,8 +60,9 @@ def test_a_line_without_owners_leaves_the_place_unowned(tmp_path):
 
 def test_the_cbom_names_owners_per_occurrence(tmp_path):
     bom = build(_tree(tmp_path))
-    rsa = next(c for c in bom["components"] if c["name"].startswith("RSA"))
-    contexts = {o["location"]: o["additionalContext"] for o in rsa["evidence"]["occurrences"]}
+    # Every RSA component: the family's and one per key size read (release 3b, M4c).
+    contexts = {o["location"]: o["additionalContext"] for c in bom["components"]
+                if c["name"].startswith("RSA") for o in c.get("evidence", {}).get("occurrences", [])}
     assert "@device-team" in contexts["firmware/verify.c"]
     assert "@payments-team" in contexts["payments/tls.py"]
 

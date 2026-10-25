@@ -60,7 +60,7 @@ def test_every_observed_size_is_kept_not_only_the_smallest(tmp_path):
 def test_a_single_size_reaches_the_cbom_component(tmp_path):
     """The schema's own example: in AES128, '128' identifies the key length."""
     document = cyclonedx.build(_tree(tmp_path, a_py=ONE))
-    rsa = _crypto_component(document, "RSA")
+    rsa = _crypto_component(document, "RSA-1024")       # release 3b: one per size (M4c)
     assert rsa is not None
     identifier = rsa["cryptoProperties"]["algorithmProperties"].get("parameterSetIdentifier")
     assert identifier == "1024"
@@ -71,7 +71,12 @@ def test_several_sizes_are_all_named_and_none_is_chosen(tmp_path):
     document = cyclonedx.build(_tree(tmp_path, a_py=ONE, b_py=OTHER))
     rsa = _crypto_component(document, "RSA")
     assert "parameterSetIdentifier" not in rsa["cryptoProperties"]["algorithmProperties"]
-    assert _properties(rsa)["qrp:observedKeySizes"] == "1024, 4096"
+    # Release 3b (M4c): not one component with both sizes but one per size, each its own.
+    for size in ("1024", "4096"):
+        sized = _crypto_component(document, f"RSA-{size}")
+        assert sized["cryptoProperties"]["algorithmProperties"]["parameterSetIdentifier"] == size
+        assert [o["location"] for o in sized["evidence"]["occurrences"]] == [
+            "a.py" if size == "1024" else "b.py"]
 
 
 def test_a_family_with_no_size_read_says_nothing_about_size(tmp_path):
@@ -95,7 +100,7 @@ def test_a_size_only_in_a_comment_does_not_reach_the_document(tmp_path):
 def test_the_document_still_validates(tmp_path):
     """parameterSetIdentifier is a string in CycloneDX 1.6, not an integer."""
     document = cyclonedx.build(_tree(tmp_path, a_py=ONE))
-    rsa = _crypto_component(document, "RSA")
+    rsa = _crypto_component(document, "RSA-1024")
     value = rsa["cryptoProperties"]["algorithmProperties"]["parameterSetIdentifier"]
     assert isinstance(value, str)
     json.dumps(document)

@@ -59,9 +59,11 @@ RSA_2048 = ("from cryptography.hazmat.primitives.asymmetric import rsa\n"
 
 
 def test_rsa_2048_carries_oid_levels_and_functions(tmp_path, validator):
+    # Release 3b (M4c): the size is its own component, RSA-2048, beside the family's.
     doc = _cbom(tmp_path, {"a.py": RSA_2048})
     assert _crypto(doc, "RSA")["oid"] == "1.2.840.113549.1.1.1"
-    algo = _algo(doc, "RSA")
+    assert _crypto(doc, "RSA-2048")["oid"] == "1.2.840.113549.1.1.1"
+    algo = _algo(doc, "RSA-2048")
     assert algo["parameterSetIdentifier"] == "2048"
     assert algo["classicalSecurityLevel"] == 112          # SP 800-57 Pt 1 r5, Table 2
     assert algo["nistQuantumSecurityLevel"] == 0          # Shor: no category is met
@@ -71,13 +73,16 @@ def test_rsa_2048_carries_oid_levels_and_functions(tmp_path, validator):
 
 def test_a_size_outside_the_table_gives_no_classical_level(tmp_path):
     doc = _cbom(tmp_path, {"a.py": RSA_2048.replace("2048", "4096")})
-    assert "classicalSecurityLevel" not in _algo(doc, "RSA")
+    assert "classicalSecurityLevel" not in _algo(doc, "RSA-4096")
 
 
 def test_two_sizes_give_no_classical_level(tmp_path):
     doc = _cbom(tmp_path, {"a.py": RSA_2048,
                            "b.py": RSA_2048.replace("2048", "3072")})
     assert "classicalSecurityLevel" not in _algo(doc, "RSA")
+    # Each size its own component, each with its own level (release 3b, M4c).
+    assert _algo(doc, "RSA-2048")["classicalSecurityLevel"] == 112
+    assert _algo(doc, "RSA-3072")["classicalSecurityLevel"] == 128
 
 
 @pytest.mark.parametrize("line,family,pset,oid,level,functions", [
@@ -97,10 +102,10 @@ def test_two_sizes_give_no_classical_level(tmp_path):
 def test_a_pqc_parameter_set_read_on_the_line(tmp_path, validator, line, family, pset,
                                               oid, level, functions):
     doc = _cbom(tmp_path, {"a.py": line + "\n"})
-    algo = _algo(doc, family)
+    algo = _algo(doc, f"{family}-{pset}")
     assert algo["parameterSetIdentifier"] == pset
     assert algo["nistQuantumSecurityLevel"] == level      # FIPS 203 / 204 / 205
-    assert _crypto(doc, family)["oid"] == oid
+    assert _crypto(doc, f"{family}-{pset}")["oid"] == oid
     assert functions <= set(algo["cryptoFunctions"])
     assert list(validator.iter_errors(doc)) == []
 
@@ -116,7 +121,8 @@ def test_a_pqc_family_without_a_set_gets_no_level_and_no_oid(tmp_path):
 def test_a_set_named_only_in_a_comment_does_not_count(tmp_path):
     doc = _cbom(tmp_path, {"a.py": "# TODO move to ML-KEM-1024\n"
                                    "kem = KeyEncapsulation('ML-KEM-768')\n"})
-    assert _algo(doc, "ML-KEM")["parameterSetIdentifier"] == "768"
+    assert _algo(doc, "ML-KEM-768")["parameterSetIdentifier"] == "768"
+    assert not any(c["name"] == "ML-KEM-1024" for c in doc["components"])
 
 
 def test_two_sets_are_both_named_and_neither_chosen(tmp_path):
@@ -125,8 +131,9 @@ def test_two_sets_are_both_named_and_neither_chosen(tmp_path):
     component = next(c for c in doc["components"] if c["name"] == "ML-KEM")
     algo = component["cryptoProperties"]["algorithmProperties"]
     assert "parameterSetIdentifier" not in algo and "nistQuantumSecurityLevel" not in algo
-    props = {p["name"]: p["value"] for p in component["properties"]}
-    assert props["qrp:observedParameterSets"] == "1024, 768"
+    # Release 3b (M4c): each set its own component, with its own occurrence and level.
+    assert _algo(doc, "ML-KEM-768")["nistQuantumSecurityLevel"] == 3
+    assert _algo(doc, "ML-KEM-1024")["nistQuantumSecurityLevel"] == 5
 
 
 def test_x25519_names_its_curve(tmp_path, validator):
@@ -143,10 +150,11 @@ def test_x25519_names_its_curve(tmp_path, validator):
 def test_a_curve_read_from_the_file_becomes_the_field(tmp_path, validator):
     shutil.copytree(DNSSEC, tmp_path / "t")
     doc = cyclonedx.build(scan_directory(tmp_path / "t"))
-    algo = _algo(doc, "ECDSA")
+    algo = _algo(doc, "ECDSA-P-256")
     assert algo["curve"] == "P-256"
+    assert algo["parameterSetIdentifier"] == "256"
     assert algo["classicalSecurityLevel"] == 128          # SP 800-57 Table 2, f=256-383
-    assert "oid" not in _crypto(doc, "ECDSA")             # ECDSA's OIDs name a hash too
+    assert "oid" not in _crypto(doc, "ECDSA-P-256")       # ECDSA's OIDs name a hash too
     assert list(validator.iter_errors(doc)) == []
 
 

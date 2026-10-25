@@ -87,6 +87,15 @@ def assess(category: str, item: dict[str, Any]) -> tuple[str, str]:
     path = str(item.get("path", ""))
     if kind == "call":
         level, basis = "high", "call"
+    elif kind == "identifier":
+        # Release 3b: a family read from a component of an identifier in a file that holds
+        # other crypto (registry.identifiers). No row of the calibration corpora is one, so
+        # the level is set below every measured one, not measured.
+        return "low", "identifier carrying the family, in a file with other crypto"
+    elif kind == "registry_name":
+        # A registry's algorithm name, an OpenSSL / ssh-keygen command line or a PEM label
+        # (registry.scan): the name is the algorithm, the line need not use it.
+        level, basis = "medium", "registry name"
     elif kind == "import":
         return "low", "import: the module is named, not used"
     elif kind == "reference" and path.endswith(".go") and _GO_SIGNATURE.match(

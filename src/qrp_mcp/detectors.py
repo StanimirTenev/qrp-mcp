@@ -11,7 +11,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, suppression
+from . import (aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, registry,
+               suppression)
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
@@ -2657,6 +2658,8 @@ def scan_source_file(path: Path, rel_path: str,
     denial_block_indent: int | None = None
     denial_block_calls = False
     signature_lines: set[int] = set()
+    # Release 3b: rows from identifiers alone, kept only if the file turns out to hold crypto.
+    by_identifier: list[dict[str, Any]] = []
     for line_no, line in enumerate(lines, start=1):
         if read is not None and line_no - 1 not in read and not (
                 line_no - 1 in patterns
@@ -2698,6 +2701,7 @@ def scan_source_file(path: Path, rel_path: str,
         # inflates the headline number by however many ways the line could be
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
+        first_on_line = len(findings)
         prose = _prose_spans(code) if ('"' in code or "'" in code) else []
         # The finding a row 136-143 pattern made, with where it matched (see components below).
         by_pattern: dict[str, tuple[dict[str, Any], list[tuple[int, int]]]] = {}
@@ -2959,6 +2963,51 @@ def scan_source_file(path: Path, rel_path: str,
                                   else kind),
                 "in_test_code": in_test_code(rel_path),
             })
+        # Registry names, command lines and PEM labels (release 3b, registry.py). Where an
+        # earlier rule already named the family, the size or curve the name implies is added
+        # to that row instead.
+        on_line = {f["algorithm"]: f for f in findings[first_on_line:]}
+        for family, pos, said, params in registry.scan(searched):
+            if _in_blob(pos, blobs):
+                continue
+            if family in seen_on_line:
+                held = on_line.get(family)
+                if (held is not None and params and "key_size" not in held
+                        and "curve" not in held):
+                    held.update(params)
+                continue
+            seen_on_line.add(family)
+            item = {
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": said,
+                "excerpt": line.strip()[:200],
+                "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code) else
+                                  "comment" if _in_spans(pos, spans) or _in_spans(pos, prose)
+                                  else "registry_name"),
+                "in_test_code": in_test_code(rel_path),
+                **params,
+            }
+            findings.append(item)
+            on_line[family] = item
+        # Identifiers carrying a family (registry.identifiers): code only, strings blanked.
+        bare = (_STRING_LITERAL.sub(lambda m: " " * len(m.group(0)), _masked(code, blobs))
+                if registry.might_carry_a_family(code) else "")
+        for family, pos, said in registry.identifiers(bare):
+            if family in seen_on_line:
+                continue
+            seen_on_line.add(family)
+            by_identifier.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": said,
+                "excerpt": line.strip()[:200],
+                "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code)
+                                  else "identifier"),
+                "in_test_code": in_test_code(rel_path),
+            })
         if cipher_exclusions and "PPK" not in seen_on_line and PPK_CONFIG_ASSIGN.search(line):
             findings.append({
                 "path": rel_path,
@@ -2967,6 +3016,9 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": "RFC 8784 postquantum preshared key",
                 "excerpt": line.strip()[:200],
             })
+    if by_identifier and (any(f.get("evidence_kind") not in ("comment", "ban") for f in findings)
+                          or registry.CRYPTO_IMPORT.search("\n".join(lines))):
+        findings = sorted(findings + by_identifier, key=lambda f: f["line"])
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
     return _drop_signatures_covered_by_a_call(_drop_imports_covered_by_a_call(findings),
