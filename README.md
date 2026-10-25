@@ -654,6 +654,51 @@ cryben corpus of Näther & Hirsch — are 100% synthetic fixtures with no test/p
 distinction. The rule here is a path convention, not a fact, so it is printed with the
 numbers it produced; a reader who disagrees with the rule can see exactly what it caught.
 
+## How sure the scan is of each occurrence
+
+Every occurrence carries `confidence` — `high`, `medium` or `low` — and `confidence_basis`, the
+reason in words. It is derived from what the scan read, not from a score it makes up:
+
+- **What the line is.** A call, a parsed certificate or key, the value of a setting the scan
+  parsed (a cipher list, a TLS group, a protocol version): `high`. A declaration or reference in
+  source code, a protocol version named by a constant: `medium`. An import, a type in a Go
+  function signature, a declared package: `low` — the line names the algorithm and does not use it.
+- **Whether the family was read whole or inferred.** A family read from a piece of an identifier
+  (`EC_KEY_free`), from an object identifier in a file that was not decoded, from the fallback of
+  a `getProperty` lookup, through a properties file, or through an alias, a constant in another
+  file or literals concatenated on the line is one step lower.
+- Comments and bans are `low` and are not uses anywhere. Whether the role (signature, key
+  establishment) is known is **not** an input: on Cryben rows with a role were 27/31 on a truth
+  line and rows without one 39/43, so it separated nothing.
+
+It travels in the scan JSON, in SARIF (`rank` 90 / 60 / 30 and `properties.confidence`; `level`
+stays the severity) and in the CBOM: CycloneDX 1.6 gives an occurrence no properties, so each
+component carries `qrp:confidence`, a JSON array with one level per occurrence in the order of
+`evidence.occurrences`. The coverage block counts the occurrences per level and carries the
+measured precision of each level, so the figure travels with the document it describes.
+
+**Precision by confidence level, measured on Cryben and the OWASP Benchmark 1.2, 25.10.2026**
+(release E; comments and bans left out):
+
+| level | Cryben (authors' truth, a row on a truth file:line) | OWASP Benchmark crypto + hash, with `benchmark.properties` | pooled |
+|---|---:|---:|---:|
+| high | 60/60 | 348/348 | **1.000** (408 rows) |
+| medium | 2/3 | 73/73 | **0.987** (76) |
+| low | 4/11 | — | **0.364** (11) |
+
+On OWASP a row is graded when its family is one of the Benchmark's weak families for the case's
+category: right when the case is true. On the OWASP subset **without** `benchmark.properties`
+(the 2026-10-25 06-propusnato layout) the 27 `getProperty` fallbacks to `AES/ECB` are `medium`
+and all 27 wrong — the property file sets AES/CCM — which is the reason a fallback is not `high`.
+
+⚠️ What the table is not. Both corpora were used to choose the mapping, so it is a regression
+figure, not a blind one. The medium and low buckets on Cryben are small (3 and 11 rows), OWASP is
+Java only and separates nothing (every graded row there is right), and Cryben's truth does not
+label Go signature lines, which decides part of `low`. Three other tools in this class print a
+confidence, and none publishes its precision. Scored the same way on Cryben (05-novi-merki,
+25.10.2026): CryptoScan 1.5.0 `HIGH` 0/10, `MEDIUM` 69/122, `LOW` 2/27; qScan 0.12.0 `high`
+30/33, `medium` 11/11 (inverted); PostShor 0.1.0 one bucket, 27/40.
+
 ## What a TLS line does not establish
 
 A line that configures TLS — `ssl_ecdh_curve`, `SSLOpenSSLConfCmd Curves`, `ssl_protocols`,
