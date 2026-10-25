@@ -905,7 +905,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # denominator is whole, not that the list of components is. So a held control is
     # what makes `complete` sayable; without one the honest word is `unknown`.
     control_held = bool((coverage.get("claims", {}).get("control") or {}).get("held"))
-    if scope["files_not_examined"] == 0:
+    # A recognised report (row 144) holds no asset this list could be missing.
+    unread = scope["files_not_examined"] - sum(
+        r["count"] for r in coverage["not_examined"] if r["reason"] == "report_document")
+    if unread == 0:
         aggregate = "complete" if control_held else "unknown"
     else:
         aggregate = "incomplete"

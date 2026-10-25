@@ -96,3 +96,9 @@ def test_a_committed_report_does_not_withhold_a_ready_headline(tmp_path):
     # headline for it would make every tree that commits its own CBOM "not established".
     result = scan_directory(_with_own_reports(tmp_path, PQC))
     assert result["summary"]["pqc_readiness"] == "pqc_ready"
+
+
+def test_a_committed_report_does_not_make_the_composition_incomplete(tmp_path):
+    # Same reason as the headline: the report holds no assets this list could miss.
+    doc = cyclonedx.build(scan_directory(_with_own_reports(tmp_path, RSA)))
+    assert doc["compositions"][0]["aggregate"] == "unknown"
