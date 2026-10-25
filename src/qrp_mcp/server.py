@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -14,7 +15,8 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import __version__, closure, coverage, cyclonedx, profiles
+from . import __version__, closure, config, coverage, cyclonedx, mandates, profiles, sarif
+from . import baseline as baseline_mod
 from .classifier import known_algorithms
 from .scan import scan_directory
 
@@ -92,6 +94,12 @@ def scan_repo(
     as a file that is clean. Files skipped because this tool does not claim their type
     are counted by extension, so the reader can judge the boundary rather than assume
     past it.
+
+    The owner's own settings apply and are reported, never silent: a `.qrp.toml` at the
+    root (its excludes are listed under `coverage.not_examined` as `excluded_by_config`;
+    its baseline marks rows new or baselined), and `qrp:ignore <family> <reason>` comments,
+    whose rows move to `suppressed` with the reason and are counted in
+    `coverage.suppressed`.
 
     Cost scales with the size of the tree, so a large monorepo takes proportionally
     longer; there is no cache and no partial mode.
@@ -248,10 +256,17 @@ def _load_result(path: str) -> dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def _evidence_lists(result: dict[str, Any]):
+    """Every list of occurrences the result quotes: `evidence`, and the rows the owner
+    suppressed, which are quoted the same way and so masked the same way."""
+    yield from result.get("evidence", {}).values()
+    yield from ((result.get("suppressed") or {}).get("evidence") or {}).values()
+
+
 def _strip_excerpts(result: dict[str, Any]) -> dict[str, Any]:
     """The 'trimmed' level: every occurrence keeps its file and line, but not the
     line of code itself."""
-    for items in result.get("evidence", {}).values():
+    for items in _evidence_lists(result):
         if isinstance(items, list):
             for item in items:
                 if isinstance(item, dict):
@@ -293,7 +308,7 @@ def _mask_excerpt(excerpt: str, algorithm: str) -> str:
 
 def _mask_excerpts(result: dict[str, Any]) -> dict[str, Any]:
     """The 'masked' level: the line is kept in shape, emptied of its content."""
-    for items in result.get("evidence", {}).values():
+    for items in _evidence_lists(result):
         if isinstance(items, list):
             for item in items:
                 if isinstance(item, dict) and item.get("excerpt"):
@@ -340,16 +355,37 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
     p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
     # The CBOM is the document built to be sent, so it quotes masked by default, as
     # export_cbom does.
-    p.add_argument("--level", choices=("full", "masked", "trimmed"),
-                   default="masked" if cbom else "full",
+    p.add_argument("--level", choices=config.LEVELS, default=None,
                    help="what the quoted line of evidence carries: 'full' the line "
                         "itself, 'masked' its shape with everything but the algorithm "
                         "name starred out, 'trimmed' nothing. Files and line numbers "
-                        "stay in all three. Default: " + ("masked" if cbom else "full"))
+                        "stay in all three. Default: the config file's, else "
+                        + ("masked" if cbom else "full"))
     # The CBOM carries no replacement, so a profile would change nothing in it.
     if not cbom:
-        p.add_argument("--profile", choices=profiles.names(), default="nist",
-                       help="whose rules each replacement follows (default: nist)")
+        p.add_argument("--profile", choices=profiles.names(), default=None,
+                       help="whose rules each replacement follows (default: the config "
+                            "file's, else nist)")
+        p.add_argument("--format", choices=("json", "sarif"), default="json",
+                       help="json (default) or SARIF 2.1.0 for code scanning")
+        p.add_argument("--mandate", action="append", choices=sorted(mandates.MANDATES),
+                       help="give each quantum-vulnerable occurrence the dated clause of "
+                            "this mandate (repeatable)")
+        p.add_argument("--lead-months", type=int, metavar="N", default=None,
+                       help="with --mandate: exit 1 when a deadline falls within N months "
+                            "(a deadline already passed exits 1 without it)")
+        p.add_argument("--as-of", type=date.fromisoformat, metavar="YYYY-MM-DD", default=None,
+                       help="with --mandate: the date the deadlines are counted from "
+                            "(default: today)")
+    p.add_argument("--config", metavar="FILE",
+                   help=f"read settings from FILE instead of PATH/{config.FILENAME}")
+    p.add_argument("--no-config", action="store_true",
+                   help=f"ignore PATH/{config.FILENAME}")
+    p.add_argument("--baseline", metavar="FILE",
+                   help="mark each occurrence new or baselined against FILE (both stay "
+                        "in the result, counted)")
+    p.add_argument("--write-baseline", metavar="FILE",
+                   help="also write every occurrence of this run to FILE as a baseline")
     a = p.parse_args(argv)
     # A path or file name the console cannot encode must not fail the run after the
     # scan has finished.
@@ -362,16 +398,63 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
     out_path = Path(a.out).expanduser() if a.out else None
     if out_path is not None and not out_path.resolve().parent.is_dir():
         p.error(f"the folder for --out does not exist: {out_path.parent}")
+    write_baseline = Path(a.write_baseline).expanduser() if a.write_baseline else None
+    if write_baseline is not None and not write_baseline.resolve().parent.is_dir():
+        p.error(f"the folder for --write-baseline does not exist: {write_baseline.parent}")
+    if a.baseline and not Path(a.baseline).expanduser().is_file():
+        p.error(f"no baseline file at {a.baseline}")
+    try:
+        settings = config.load(Path(a.path), a.config, a.no_config)
+    except config.ConfigError as err:
+        p.error(f"config: {err}")
+    values = (settings or {}).get("values", {})
+    # The command line wins over the file.
+    level = a.level or values.get("level") or ("masked" if cbom else "full")
+    profile = getattr(a, "profile", None) or values.get("profile") or "nist"
+    wanted = (getattr(a, "mandate", None) or values.get("mandate") or []) if not cbom else []
+    lead = getattr(a, "lead_months", None)
+    lead = values.get("lead_months") if lead is None else lead
 
     # The result must not become part of the next run's input. Writing it inside
     # the scanned tree made a second run see one more file, quote the findings out
     # of its own output and produce a different corpus digest for an unchanged
-    # tree. Excluding the same path every run keeps two runs comparable.
-    result = scan_directory(a.path, out_path, getattr(a, "profile", "nist"))
-    result = _at_level(result, a.level)
+    # tree. Excluding the same path every run keeps two runs comparable. The same
+    # for a baseline this run writes.
+    left_out = [x for x in (out_path, write_baseline) if x is not None]
+    try:
+        result = scan_directory(a.path, left_out or None, profile, settings=settings,
+                                baseline=Path(a.baseline).expanduser() if a.baseline else None,
+                                use_baseline=write_baseline is None)
+    except ValueError as err:
+        p.error(str(err))
+    if write_baseline is not None:
+        data = (json.dumps(baseline_mod.document(result), indent=2, ensure_ascii=False)
+                + "\n").encode()
+        try:
+            write_baseline.write_bytes(data)
+        except OSError as err:
+            print(f"qrp-mcp: could not write {write_baseline}: {err.strerror}", file=sys.stderr)
+            return 1
+        print(f"wrote baseline {write_baseline}", file=sys.stderr)
+    # Keyed on the full line, before any level masks it.
+    keys = {id(item): baseline_mod.key(category, item)
+            for lists in (result["evidence"],
+                          (result.get("suppressed") or {}).get("evidence") or {})
+            for category, items in lists.items() for item in items}
+    failed = False
+    if wanted:
+        failed = mandates.apply(result, wanted, a.as_of or date.today(), lead)
+    result = _at_level(result, level)
     if cbom:
         result = cyclonedx.build(result)
-    return _write(result, out_path, a.level)
+    elif a.format == "sarif":
+        result = sarif.build(result, keys)
+    code = _write(result, out_path, level)
+    if failed:
+        print("qrp-mcp: a mandate deadline has passed or falls within --lead-months; "
+              "see mandates.*.gate", file=sys.stderr)
+        return code or 1
+    return code
 
 
 def _write(result: dict[str, Any], out_path: Path | None, label: str) -> int:
@@ -425,9 +508,19 @@ def closure_to_file(argv: list[str]) -> int:
 
 USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MCP clients run)
        qrp-mcp scan PATH [--out FILE] [--level full|masked|trimmed] [--profile NAME]
-                               scan a directory and write the result as JSON
+                    [--format json|sarif] [--mandate cnsa-2.0|nist-ir-8547]
+                    [--lead-months N] [--as-of YYYY-MM-DD]
+                    [--config FILE | --no-config] [--baseline FILE] [--write-baseline FILE]
+                               scan a directory and write the result as JSON or SARIF;
+                               exit 1 when a --mandate deadline has passed or falls
+                               within --lead-months
        qrp-mcp cbom PATH [--out FILE] [--level full|masked|trimmed]
+                    [--config FILE | --no-config] [--baseline FILE] [--write-baseline FILE]
                                scan a directory and write a CycloneDX 1.6 CBOM
+       PATH/.qrp.toml (profile, level, exclude, baseline, mandate, lead_months) is read
+       unless --no-config; the command line wins over it. Inline:
+       `qrp:ignore <family> <reason>` or `qrp:ignore-next-line <family> <reason>`
+       in a comment; without a reason it does not apply. Suppressed rows are listed.
        qrp-mcp closure BEFORE AFTER [--out FILE]
                                compare two saved scans and write what a change closed
        qrp-mcp --version

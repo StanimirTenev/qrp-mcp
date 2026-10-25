@@ -9,8 +9,8 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import (__version__, assets, aws_tls, certificates, coverage, detectors, dnssec, ike,
-               opcua, profiles, remediation)
+from . import (__version__, assets, aws_tls, baseline as baseline_mod, certificates, config,
+               coverage, detectors, dnssec, ike, opcua, profiles, remediation, suppression)
 from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint, known_algorithms, summarize
 
 
@@ -48,23 +48,50 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def scan_directory(path: str | Path, exclude: Path | None = None,
-                   profile: str = "nist") -> dict[str, Any]:
+# `settings` not given: read `<root>/.qrp.toml` if there is one.
+DISCOVER = object()
+
+
+def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
+                   profile: str = "nist", *, settings: Any = DISCOVER,
+                   baseline: str | Path | None = None,
+                   use_baseline: bool = True) -> dict[str, Any]:
     """Scan a directory for classical crypto usage and classify what was found.
 
     Everything runs locally: no network calls, no data leaves the machine.
+
+    `settings` is a loaded `config.load(...)` (or None for none); left out, the tree's own
+    `.qrp.toml` is read, so the MCP tools and the command line apply the same file. Its
+    excludes and baseline apply here; profile and level are the caller's to read.
+    `baseline` names a baseline file (the config's when not given); `use_baseline=False`
+    applies none, for the run that writes a fresh one.
     """
     if profile not in profiles.names():
         raise ValueError(f"unknown profile {profile!r}; known: {', '.join(profiles.names())}")
     repo_path = Path(path).expanduser().resolve()
     if not repo_path.is_dir():
         raise NotADirectoryError(f"not a directory: {repo_path}")
+    if settings is DISCOVER:
+        settings = config.load(repo_path)
+    values = (settings or {}).get("values", {})
+    baseline_file = (baseline or values.get("baseline")) if use_baseline else None
+    baseline_doc = baseline_mod.read(baseline_file) if baseline_file else None
+    # Files this run reads for itself are not part of what it reads: the result, the config
+    # and the baseline. Each is left out and named in files_left_out.
+    left_out = [] if exclude is None else exclude if isinstance(exclude, list) else [exclude]
+    left_out = [*left_out, *([settings["file"]] if settings else []),
+                *([Path(values["baseline"])] if values.get("baseline") else []),
+                *([Path(baseline)] if baseline else [])]
 
     started_at, clock = _now(), time.monotonic()
     # Passed only when there is one, so every existing caller -- and every test
     # that substitutes this function -- keeps the one-argument shape it had.
-    scan_result = (detectors.scan_repo(repo_path, exclude) if exclude is not None
-                   else detectors.scan_repo(repo_path))
+    if values.get("exclude"):
+        scan_result = detectors.scan_repo(repo_path, left_out or None, values["exclude"])
+    elif left_out:
+        scan_result = detectors.scan_repo(repo_path, left_out)
+    else:
+        scan_result = detectors.scan_repo(repo_path)
     seconds, finished_at = time.monotonic() - clock, _now()
     roles = _read_roles(scan_result)
 
@@ -173,7 +200,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         p["version"] for p in scan_result["protocol_findings"]
         if p.get("deprecated") and not p.get("banned") and p.get("version")})
 
-    return {
+    result = {
         "target": detectors.display_path(str(repo_path)),
         # One sentence for whoever signs the report rather than runs the tool.
         # The block below is the evidence for it.
@@ -269,6 +296,29 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         # lets a third party re-locate a finding and tell a moved line from another file.
         "evidence_file_sha256": _cited_digests(scan_result),
     }
+
+    # Applied last, on the finished evidence, so the inventory above is the code as it is:
+    # a suppressed RSA is still RSA in the code.
+    family_of = {detected_by_name[f.raw_value]: f.algorithm_family for f in response.findings
+                 if f.raw_value in detected_by_name}
+    held = suppression.apply(result["evidence"], scan_result.get("suppression_markers") or [],
+                             family_of)
+    result["suppressed"] = held
+    coverage_block["suppressed"] = suppression.coverage_block(held)
+    if held["count"]:
+        per_family: dict[str, int] = {}
+        for items in held["evidence"].values():
+            for item in items:
+                name = family_of.get(item.get("algorithm"), item.get("algorithm"))
+                per_family[name] = per_family.get(name, 0) + 1
+        for finding in result["findings"]:
+            if per_family.get(finding["algorithm_family"]):
+                finding["suppressed_occurrences"] = per_family[finding["algorithm_family"]]
+    if settings:
+        coverage_block["config"] = config.coverage_block(settings)
+    if baseline_doc is not None:
+        result["baseline"] = baseline_mod.apply(result, baseline_doc, baseline_file)
+    return result
 
 
 def _cited_digests(scan_result: dict[str, Any]) -> dict[str, str]:

@@ -43,6 +43,9 @@ REASONS = {
     "claimed_but_not_decoded": ("a claimed file type that was read and gave up no "
                                 "algorithm: encrypted content, or a structure this "
                                 "tool does not parse"),
+    # The owner's choice, not the tool's: a `.qrp.toml` exclude. Present and not read, so
+    # the coverage figure falls with it, and the file that did it is named in `config`.
+    "excluded_by_config": "excluded by the owner's configuration file; present and not read",
 }
 
 # The same discipline one level up, applied to the pins rather than the files.
@@ -347,6 +350,14 @@ def build(
             "meaning": REASONS["report_document"],
             "count": len(reports),
             "paths": reports,
+        })
+    by_config = scan_result.get("files_excluded_by_config") or []
+    if by_config:
+        not_examined.append({
+            "reason": "excluded_by_config",
+            "meaning": REASONS["excluded_by_config"],
+            "count": len(by_config),
+            "paths": by_config,
         })
     accounted = examined + sum(r["count"] for r in not_examined)
     # Counted as read -- it was read -- and named anyway: a claimed type that

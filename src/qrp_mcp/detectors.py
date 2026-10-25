@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -10,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import aws_tls, components, dnssec, ike, oids, opcua
+from . import aws_tls, components, dnssec, ike, oids, opcua, suppression
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import (_group_setting, image_pins, is_manifest, library_support, pinned_versions,
@@ -2909,15 +2910,28 @@ def report_document(raw: bytes) -> str | None:
     return None
 
 
-def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
-    """`exclude` is a single path left out of the scan and named in the scope.
+def _excluded_by_config(rel_path: str, patterns: list[str]) -> bool:
+    """A `.qrp.toml` exclude: a glob on the path from the root, or a directory prefix
+    (`legacy/`). `*` crosses `/`, as fnmatch's does."""
+    return any(fnmatch.fnmatchcase(rel_path, pattern)
+               or rel_path.startswith(pattern.rstrip("/") + "/") for pattern in patterns)
+
+
+def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
+              config_excludes: list[str] | None = None) -> dict[str, Any]:
+    """`exclude` is a path (or a few) left out of the scan and named in the scope.
 
     The one caller that needs it is the CLI writing its own result inside the
     directory it just scanned: the second run then reads the first run's output,
     reports the findings quoted in it, and produces a different corpus digest for
     an unchanged tree. An independent analysis ran exactly that and saw one file
     become two. Excluding the same path on every run makes the runs comparable
-    again, and the scope says the file was left out rather than not noticed.
+    again, and the scope says the file was left out rather than not noticed. The baseline
+    and the config file a run uses are left out the same way: a baseline is JSON naming
+    families, and reading it would report them.
+
+    `config_excludes` are the owner's patterns from `.qrp.toml`. A file they match is
+    present and not examined, named under `files_excluded_by_config`, never dropped.
     """
     source_findings: list[dict[str, Any]] = []
     ci_findings: list[dict[str, Any]] = []
@@ -2984,16 +2998,19 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     file_digests: dict[str, str] = {}
     # CODEOWNERS files read, by location (see CODEOWNERS_LOCATIONS).
     codeowners: dict[str, list[str]] = {}
-    resolved_exclude = None
-    if exclude is not None:
+    resolved_exclude: set[Path] = set()
+    for one in ([] if exclude is None else exclude if isinstance(exclude, list) else [exclude]):
         try:
-            resolved_exclude = Path(exclude).expanduser().resolve()
+            resolved_exclude.add(Path(one).expanduser().resolve())
         except OSError:
-            resolved_exclude = None
+            pass
+    # `qrp:ignore` markers, read where the lines are; applied once the evidence is complete.
+    markers: list[dict[str, Any]] = []
+    excluded_by_config: list[str] = []
     for path in iter_repo_files(repo_path, excluded_dir_counts, walk_problems):
-        if resolved_exclude is not None:
+        if resolved_exclude:
             try:
-                if path.resolve() == resolved_exclude:
+                if path.resolve() in resolved_exclude:
                     left_out.append(str(path.relative_to(repo_path)))
                     continue
             except (OSError, ValueError):
@@ -3007,6 +3024,10 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         kind = path.suffix.lower() or "(no extension)"
         present_kinds[kind] = present_kinds.get(kind, 0) + 1
         rel_path = display_path(path.relative_to(repo_path).as_posix())
+        if config_excludes and _excluded_by_config(rel_path, config_excludes):
+            excluded_by_config.append(rel_path)
+            content_parts.append(f"{rel_path}\0excluded_by_config")
+            continue
         is_ci = is_ci_config_file(path, repo_path)
         # Every comparison is lowercased, and the reason is a defect this line
         # produced. OpenSSL carries thirteen files with upper-case extensions --
@@ -3066,6 +3087,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             reports.append(rel_path)
             continue
         files_read.append(rel_path)
+        if b"qrp:ignore" in raw:
+            found, lines = suppression.read_markers(rel_path, lines)
+            markers.extend(found)
 
         for number, text_line in enumerate(lines, 1):
             for asset in scan_protocols(text_line):
@@ -3269,6 +3293,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # extension. Not a gap in the scan -- a boundary of it, stated rather than
         # left for the reader to assume away.
         "files_left_out": left_out,
+        # Present, not read, because the owner's `.qrp.toml` excluded them.
+        "files_excluded_by_config": sorted(excluded_by_config),
+        "suppression_markers": markers,
         # The same files by name. A count alone is not an accounting: a reader
         # given only "379 by extension" cannot ask about any one of them.
         "files_skipped": sorted(skipped_files),
