@@ -11,8 +11,6 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from mcp.server.mcpserver import MCPServer
-from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from . import __version__, closure, config, coverage, cyclonedx, mandates, profiles, sarif
@@ -20,12 +18,45 @@ from . import baseline as baseline_mod
 from .classifier import known_algorithms
 from .scan import scan_directory
 
-mcp = MCPServer("qrp-mcp", version=__version__)
+
+class _Server:
+    """The MCP server, built the first time something asks it for anything.
+
+    Importing the MCP SDK took 1.6 s of every `qrp-mcp scan`, which never starts the
+    server (release D). The tools are recorded here as they are defined and registered
+    on the real server when it is built, so the server an agent sees is the same one.
+    """
+
+    def __init__(self) -> None:
+        self._tools: list[tuple[Any, dict[str, Any]]] = []
+        self._real: Any = None
+
+    def tool(self, *, annotations: dict[str, Any]):
+        def record(fn):
+            self._tools.append((fn, annotations))
+            return fn
+        return record
+
+    def _build(self) -> Any:
+        if self._real is None:
+            from mcp.server.mcpserver import MCPServer
+            from mcp.types import ToolAnnotations
+            real = MCPServer("qrp-mcp", version=__version__)
+            for fn, annotations in self._tools:
+                real.tool(annotations=ToolAnnotations(**annotations))(fn)
+            self._real = real
+        return self._real
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._build(), name)
+
+
+mcp = _Server()
 
 # Declared rather than described. Read-only, idempotent and closed-world are the
 # three promises this server is built on, and an annotation is the only form of
 # them an agent can check without reading prose.
-_READ_ONLY = ToolAnnotations(
+_READ_ONLY = dict(
     read_only_hint=True,
     destructive_hint=False,
     idempotent_hint=True,
