@@ -18,8 +18,8 @@ from .assets import (_group_setting, image_pins, is_manifest, library_support, p
                      scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
-from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
-                           scan_certificate_file, small_scalar_keys)
+from .certificates import (is_certificate_file, is_undecoded, key_in_source, looks_like_key_file,
+                           scan_certificate_file, small_scalar_keys, unparsed_material)
 
 SOURCE_EXTENSIONS = {
     ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
@@ -2652,10 +2652,14 @@ def _policy_assets(line: str) -> list[dict[str, Any]]:
 
 def scan_embedded_keys(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     """PEM private-key headers in any text file. A key pasted into source code is
-    as exposed as one in a Terraform variable."""
+    as exposed as one in a Terraform variable.
+
+    The key's family and size where the block, string literals and all, parses as a key
+    (release C); otherwise `key_unread` says why (curl usercertinmem.c:67 is `XXXX...`)."""
     return [
         {"path": rel_path, "line": line_no,
-         "description": "Embedded private key material", "excerpt": line.strip()[:200]}
+         "description": "Embedded private key material", "excerpt": line.strip()[:200],
+         **key_in_source(lines, line_no - 1)}
         for line_no, line in enumerate(lines, start=1)
         if _is_embedded_key(lines, line_no - 1)
     ]
@@ -2973,6 +2977,9 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     declarations: list[str] = []
     # Claimed file types that were opened and gave up nothing nameable.
     undecoded: list[str] = []
+    # Blocks and files read that `cryptography` did not parse, each with its reason
+    # (release C): a bundle with one broken certificate is not undecoded, and is not silent.
+    material_problems: list[dict[str, Any]] = []
     # What this run actually read, and what it deliberately did not. A commit does
     # not identify either: two subdirectories of one commit are different corpora,
     # and a git-ignored file the scan reads leaves the tree reporting clean. So the
@@ -3209,6 +3216,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
                 weak_key_findings.append(weak)
             if is_undecoded(algo_findings, key_findings):
                 undecoded.append(rel_path)
+            material_problems.extend(unparsed_material(path, rel_path, raw))
         elif is_ci:
             files_scanned["ci_config"] += 1
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
@@ -3349,6 +3357,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         # "0 findings" can be checked against a denominator instead of trusted.
         "unreadable_files": unreadable,
         "claimed_but_not_decoded": undecoded,
+        "material_not_parsed": material_problems,
         # Read, recognised as a report about cryptography, and not matched (row 144).
         "report_documents": reports,
         "report_declarations": declarations,

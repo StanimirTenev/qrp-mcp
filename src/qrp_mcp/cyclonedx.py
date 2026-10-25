@@ -476,6 +476,94 @@ def _findings_digest(scan_result: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(material, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def _certificate_components(located: list[dict[str, Any]],
+                            algorithm_refs: set[str]) -> list[dict[str, Any]]:
+    """Each parsed certificate as an asset of type `certificate` (release C), one per DER
+    digest however many files carry it, with the subject key as related material.
+
+    Validity is data: notValidBefore/After are the certificate's own, and nothing here
+    says whether it has expired, which would make the document a function of the clock."""
+    certs: dict[str, list[dict[str, Any]]] = {}
+    for item in located:
+        if item.get("certificate") and item.get("evidence_kind") not in {"comment", "ban"}:
+            certs.setdefault(item["certificate"]["sha256"], []).append(item)
+
+    def algorithm_ref(family: str | None) -> str | None:
+        ref = _ref("crypto", family) if family else None
+        return ref if ref in algorithm_refs else None
+
+    keys: dict[str, dict[str, Any]] = {}
+    out: list[dict[str, Any]] = []
+    for digest, rows in sorted(certs.items()):
+        cert = rows[0]["certificate"]
+        key = cert["public_key"]
+        properties: dict[str, Any] = {"subjectName": cert["subject"],
+                                      "issuerName": cert["issuer"],
+                                      "notValidBefore": cert["not_before"],
+                                      "notValidAfter": cert["not_after"]}
+        signature_families = cert["signature_algorithm"]["families"]
+        signature_ref = algorithm_ref(signature_families[0] if signature_families else None)
+        if signature_ref:
+            properties["signatureAlgorithmRef"] = signature_ref
+        if key.get("algorithm") and not key.get("composite"):
+            detail = key.get("curve") or key.get("parameter_set") or key.get("size")
+            key_ref = _ref("public-key", f"{key['algorithm']}-{detail}" if detail
+                           else key["algorithm"])
+            if key_ref not in keys:
+                material: dict[str, Any] = {"type": "public-key"}
+                if algorithm_ref(key["algorithm"]):
+                    material["algorithmRef"] = algorithm_ref(key["algorithm"])
+                if key.get("size"):
+                    material["size"] = key["size"]
+                keys[key_ref] = {
+                    "type": "cryptographic-asset",
+                    "bom-ref": key_ref,
+                    "name": " ".join(str(p) for p in (key["algorithm"], detail) if p)
+                            + " public key",
+                    "cryptoProperties": {"assetType": "related-crypto-material",
+                                         "relatedCryptoMaterialProperties": material,
+                                         **({"oid": key["oid"]} if key.get("oid") else {})},
+                    "properties": [{"name": f"{NS}basis", "value": "certificate_subject_key"}]
+                                  + ([{"name": f"{NS}curve", "value": key["curve"]}]
+                                     if key.get("curve") else []),
+                }
+            properties["subjectPublicKeyRef"] = key_ref
+        properties["certificateFormat"] = "X.509"
+        seen: set[tuple[str, int]] = set()
+        occurrences = []
+        for row in rows:
+            if (row["path"], row["line"]) not in seen:
+                seen.add((row["path"], row["line"]))
+                occurrences.append({"location": row["path"], "line": row["line"],
+                                    "additionalContext": _context(row)})
+        component: dict[str, Any] = {
+            "type": "cryptographic-asset",
+            "bom-ref": f"certificate:{digest}",
+            "name": cert["subject"] or f"certificate {digest[:16]} (empty subject)",
+            "hashes": [{"alg": "SHA-256", "content": digest}],
+            "cryptoProperties": {"assetType": "certificate",
+                                 "certificateProperties": properties},
+            "properties": [
+                {"name": f"{NS}basis", "value": "parsed_certificate"},
+                {"name": f"{NS}serial", "value": cert["serial"]},
+                {"name": f"{NS}signatureAlgorithm",
+                 "value": f"{cert['signature_algorithm']['name']} "
+                          f"({cert['signature_algorithm']['oid']})"},
+                {"name": f"{NS}subjectPublicKey",
+                 "value": " ".join(str(key[k]) for k in ("algorithm", "size", "curve",
+                                                         "parameter_set") if key.get(k))},
+                {"name": f"{NS}selfSigned", "value": "true" if cert["self_signed"] else "false"},
+                {"name": f"{NS}encoding",
+                 "value": ", ".join(sorted({r["certificate"]["format"] for r in rows}))},
+            ],
+            "evidence": {"occurrences": occurrences},
+        }
+        if all(r.get("in_test_code") for r in rows):
+            component["scope"] = "excluded"
+        out.append(component)
+    return out + [keys[ref] for ref in sorted(keys)]
+
+
 def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     """A CycloneDX 1.6 document from one scan, with the coverage block inside it."""
     coverage = scan_result["coverage"]
@@ -595,6 +683,8 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 for k in keys
             ]},
         })
+
+    components.extend(_certificate_components(located, {c["bom-ref"] for c in components}))
 
     # Protocols. CycloneDX has assetType "protocol" for exactly this, and a
     # version pin is the one thing it can honestly carry: which algorithms get

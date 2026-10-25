@@ -21,7 +21,10 @@ classifiers = [
     "Topic :: Security :: Cryptography",
 ]
 # mcp 2.0 moved the server class to mcp.server.mcpserver; 1.x resolves to a missing module.
-dependencies = ["mcp>=2.0.0", "pydantic>=2.0", 'tomli; python_version < "3.11"']
+# cryptography parses certificates and keys (release C, ZA-OPRAVYANE row 127): declared,
+# not borrowed from mcp's tree. 43.0 for Certificate.public_key_algorithm_oid.
+dependencies = ["mcp>=2.0.0", "pydantic>=2.0", 'tomli; python_version < "3.11"',
+                "cryptography>=43.0"]
 
 [project.urls]
 Homepage = "https://quantumreadiness.eu"
