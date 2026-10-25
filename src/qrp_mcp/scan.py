@@ -15,20 +15,33 @@ from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint, known_al
 
 
 def _version() -> str:
-    """The version that did the reading.
+    """The version that did the reading: the running code's own `__version__`.
 
-    The package's own `__version__` is the answer, not the installed
-    distribution's: a run from a source checkout is still a run by a known
-    version, and reporting "unknown" there put a placeholder into an artefact
-    whose whole purpose is to say what produced it. Installed metadata is
-    consulted only to catch the two disagreeing.
+    Until 0.36.0 this read "0.36.0 (installed: 0.33.0)" whenever the distribution
+    metadata disagreed (ZA-OPRAVYANE row 148). The 0.33.0 was written once by an
+    editable install and never refreshed, so it described no code that ran; the
+    disagreement is now said beside the version, in `_installed_distribution`.
     """
-    declared = __version__
+    return __version__
+
+
+def _installed_distribution() -> dict[str, Any] | None:
+    """What the installed distribution's metadata says, only where it disagrees with
+    the code that is running. None when they agree or when nothing is installed."""
     try:
         installed = _pkg_version("qrp-mcp")
     except PackageNotFoundError:
-        return declared
-    return declared if installed == declared else f"{declared} (installed: {installed})"
+        return None
+    if installed == __version__:
+        return None
+    return {
+        "version": installed,
+        "matches_running_code": False,
+        "meaning": (f"the code that ran is {__version__} (see source_commit); the "
+                    f"installed distribution's metadata says {installed}. An editable "
+                    f"install writes that metadata once, at install time, so it lags the "
+                    f"source; a different package on the path would also show here"),
+    }
 
 
 def _now() -> str:
@@ -103,6 +116,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         finished_at=finished_at,
         seconds=seconds,
         tool_version=_version(),
+        installed_distribution=_installed_distribution(),
         ruleset={
             "algorithm_patterns": len(detectors.ALGORITHM_PATTERNS),
             "iac_algorithm_patterns": len(detectors.IAC_ALGORITHM_PATTERNS),
