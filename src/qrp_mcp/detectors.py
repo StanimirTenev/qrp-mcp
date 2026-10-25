@@ -2815,6 +2815,32 @@ def _sizes_by_algorithm(findings: list[dict[str, Any]]) -> dict[str, list[int]]:
     return out
 
 
+# A post-quantum parameter set written on the line (release A, M4): what the CBOM's
+# parameterSetIdentifier, OID and NIST category need, and what a family name alone does not
+# say. The FIPS 203/204/205 names, with or without separators, never preceded by a letter
+# (`HashML-DSA`, `HashSLH-DSA` are the pre-hash variants, which have other OIDs). A line
+# naming two sets of one family gives none.
+_PARAMETER_SETS: dict[str, tuple[re.Pattern[str], Any]] = {
+    "ML-KEM": (re.compile(r"(?<![a-z])ml[-_]?kem[-_]?(512|768|1024)(?!\d)", re.I),
+               lambda m: m.group(1)),
+    "ML-DSA": (re.compile(r"(?<![a-z])ml[-_]?dsa[-_]?(44|65|87)(?!\d)", re.I),
+               lambda m: m.group(1)),
+    "SLH-DSA": (re.compile(r"(?<![a-z])slh[-_]?dsa[-_]?(sha2|shake)[-_]?(128|192|256)([sf])"
+                           r"(?![a-z0-9])", re.I),
+                lambda m: f"{m.group(1).upper()}-{m.group(2)}{m.group(3).lower()}"),
+}
+
+
+def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
+    for item in items:
+        rule = _PARAMETER_SETS.get(item.get("algorithm"))
+        if rule is None:
+            continue
+        found = {rule[1](m) for m in rule[0].finditer(item.get("excerpt") or "")}
+        if len(found) == 1:
+            item["parameter_set"] = found.pop()
+
+
 def report_document(raw: bytes) -> str | None:
     """What kind of report this file is, or None when it is not one.
 
@@ -3167,6 +3193,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             + static_rsa_findings + ssh_kex_findings + weak_key_findings,
             _read_codeowners(owners_file, codeowners[owners_file]))
     _join_pins(source_findings + iac_findings, pins)
+    _tag_parameter_sets(source_findings + iac_findings)
     _join_fips(source_findings + iac_findings, fips_findings)
     return {
         "files_scanned": files_scanned,

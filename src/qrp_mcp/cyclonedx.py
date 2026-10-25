@@ -93,6 +93,133 @@ _PRIMITIVE_BY_FAMILY = {
 }
 
 
+# -- M4: the standard fields, each from a table with a source (release A) -----------------
+#
+# Filled only where the scan read what the table needs; otherwise absent, never guessed.
+#
+# `oid`: the algorithm's own identifier, only where the family is one algorithm and not a
+# combination with a hash (ECDSA's OIDs all name one, so ECDSA gets none). The same
+# entries, from the same RFCs, as oids.OIDS: RFC 8017 App. C (rsaEncryption), RFC 3279
+# (id-dsa, dhpublicnumber, md5, sha1), RFC 5480 (id-ecPublicKey), RFC 8410 (X25519, X448,
+# Ed25519, Ed448). A test holds the two tables together.
+_OID_BY_FAMILY = {
+    "RSA": "1.2.840.113549.1.1.1",
+    "DSA": "1.2.840.10040.4.1",
+    "DH": "1.2.840.10046.2.1",
+    "EC": "1.2.840.10045.2.1",
+    "X25519": "1.3.101.110",
+    "X448": "1.3.101.111",
+    "Ed25519": "1.3.101.112",
+    "Ed448": "1.3.101.113",
+    "MD5": "1.2.840.113549.2.5",
+    "SHA1": "1.3.14.3.2.26",
+}
+# A post-quantum OID names a parameter set, so it is stated only where one set was read.
+# NIST CSOR (Computer Security Objects Register), as classifier._OID_FAMILIES:
+# kems 2.16.840.1.101.3.4.4.{1,2,3} = ML-KEM-512/768/1024 (FIPS 203); sigAlgs
+# 2.16.840.1.101.3.4.3.{17,18,19} = ML-DSA-44/65/87 (FIPS 204, RFC 9881) and .20-.31 = the
+# twelve pure SLH-DSA sets in FIPS 205 order (RFC 9909).
+_PQC_OID = {
+    ("ML-KEM", "512"): "2.16.840.1.101.3.4.4.1",
+    ("ML-KEM", "768"): "2.16.840.1.101.3.4.4.2",
+    ("ML-KEM", "1024"): "2.16.840.1.101.3.4.4.3",
+    ("ML-DSA", "44"): "2.16.840.1.101.3.4.3.17",
+    ("ML-DSA", "65"): "2.16.840.1.101.3.4.3.18",
+    ("ML-DSA", "87"): "2.16.840.1.101.3.4.3.19",
+    **{("SLH-DSA", f"{h}-{n}{v}"): f"2.16.840.1.101.3.4.3.{20 + i}"
+       for i, (h, n, v) in enumerate((h, n, v) for h in ("SHA2", "SHAKE")
+                                     for n in (128, 192, 256) for v in "sf")},
+}
+# `nistQuantumSecurityLevel`: the category the standard assigns to the parameter set.
+# FIPS 203 §8 (ML-KEM-512/768/1024: 1/3/5), FIPS 204 §4 Table 1 (ML-DSA-44/65/87: 2/3/5),
+# FIPS 205 §11 Table 2 (SLH-DSA-*-128/192/256: 1/3/5).
+_PQC_CATEGORY = {
+    ("ML-KEM", "512"): 1, ("ML-KEM", "768"): 3, ("ML-KEM", "1024"): 5,
+    ("ML-DSA", "44"): 2, ("ML-DSA", "65"): 3, ("ML-DSA", "87"): 5,
+    **{("SLH-DSA", f"{h}-{n}{v}"): {128: 1, 192: 3, 256: 5}[n]
+       for h in ("SHA2", "SHAKE") for n in (128, 192, 256) for v in "sf"},
+}
+# ...and 0 -- "none of the categories are met", the schema's own words -- for the classical
+# public-key families Shor's algorithm breaks (NIST IR 8547 ipd lists RSA, ECDSA, EdDSA,
+# DH, ECDH and DSA as quantum-vulnerable; the rest are the same integer-factorisation and
+# discrete-log problems).
+_SHOR_BROKEN = {
+    "RSA", "DSA", "DH", "EC", "ECDSA", "ECDH", "EdDSA", "Ed25519", "Ed448", "X25519", "X448",
+    "Schnorr", "BLS", "GOST R 34.10", "SM2", "ElGamal",
+}
+# `classicalSecurityLevel` (bits). NIST SP 800-57 Part 1 Rev. 5, Table 2: IFC/FFC by the
+# modulus size exactly as tabulated (4096 is not in the table, so it gets none); ECC by
+# the size of n in ranges. Table 3 for hash collision resistance (SHA-224: 112; MD5 and
+# SHA-1 are "<80" there, not a number, so they get none). NIST SP 800-186 for the
+# Montgomery and Edwards curves (Curve25519/Edwards25519: 128, Curve448/Edwards448: 224).
+_IFC_FFC_STRENGTH = {1024: 80, 2048: 112, 3072: 128, 7680: 192, 15360: 256}
+_IFC_FFC = {"RSA", "DSA", "DH", "ElGamal"}
+_ECC = {"EC", "ECDSA", "ECDH"}
+_ECC_STRENGTH = ((512, 256), (384, 192), (256, 128), (224, 112), (160, 80))
+_FIXED_STRENGTH = {"X25519": 128, "Ed25519": 128, "X448": 224, "Ed448": 224,
+                   "SHA-224": 112, "SHA3-224": 112}
+# `curve`: where the family fixes it, in the names the schema recommends
+# (neuromancer.sk/std, "other" category); otherwise only a curve read from the file.
+_FIXED_CURVE = {"X25519": "Curve25519", "X448": "Curve448",
+                "Ed25519": "Ed25519", "Ed448": "Ed448"}
+# `cryptoFunctions`: what the algorithm implements, by primitive (schema enum). Key
+# agreement derives the shared key (NIST SP 800-56A Rev. 3 §5.8: key derivation is part of
+# every key-agreement scheme). `pke` is said per family: an "EC" key is not an algorithm.
+_FUNCTIONS_BY_PRIMITIVE = {
+    "signature": ["keygen", "sign", "verify"],
+    "kem": ["keygen", "encapsulate", "decapsulate"],
+    "key-agree": ["keygen", "keyderive"],
+    "hash": ["digest"],
+    "block-cipher": ["encrypt", "decrypt"],
+    "stream-cipher": ["encrypt", "decrypt"],
+}
+_FUNCTIONS_BY_FAMILY = {
+    "RSA": ["keygen", "encrypt", "decrypt", "sign", "verify"],
+    "ElGamal": ["keygen", "encrypt", "decrypt"],
+}
+
+
+def _classical_strength(family: str, sizes: list[int]) -> int | None:
+    if family in _FIXED_STRENGTH:
+        return _FIXED_STRENGTH[family]
+    if len(sizes) != 1:
+        return None
+    if family in _IFC_FFC:
+        return _IFC_FFC_STRENGTH.get(sizes[0])
+    if family in _ECC:
+        return next((bits for floor, bits in _ECC_STRENGTH if sizes[0] >= floor), None)
+    return None
+
+
+def _m4_fields(family: str, primitive: str, sizes: list[int],
+               in_use: list[dict[str, Any]]) -> tuple[dict[str, Any], str | None, list[str]]:
+    """The M4 fields for one family: algorithmProperties additions, the OID, and every
+    parameter set read when there was more than one (named, none chosen)."""
+    sets = sorted({i["parameter_set"] for i in in_use if i.get("parameter_set")})
+    curves = sorted({c.strip() for i in in_use if i.get("curve")
+                     for c in str(i["curve"]).split(",") if c.strip()})
+    one_set = sets[0] if len(sets) == 1 else None
+    fields: dict[str, Any] = {}
+    # A key size wins where one was read (the existing rule); otherwise one parameter set.
+    if len(sizes) != 1 and one_set:
+        fields["parameterSetIdentifier"] = one_set
+    curve = _FIXED_CURVE.get(family) or (curves[0] if len(curves) == 1 else None)
+    if curve:
+        fields["curve"] = curve
+    functions = _FUNCTIONS_BY_FAMILY.get(family) or _FUNCTIONS_BY_PRIMITIVE.get(primitive)
+    if functions:
+        fields["cryptoFunctions"] = list(functions)
+    strength = _classical_strength(family, sizes)
+    if strength is not None:
+        fields["classicalSecurityLevel"] = strength
+    if family in _SHOR_BROKEN:
+        fields["nistQuantumSecurityLevel"] = 0
+    elif (family, one_set) in _PQC_CATEGORY:
+        fields["nistQuantumSecurityLevel"] = _PQC_CATEGORY[(family, one_set)]
+    oid = _OID_BY_FAMILY.get(family) or _PQC_OID.get((family, one_set))
+    return fields, oid, sets if len(sets) > 1 else []
+
+
 # What a protocol asset says beyond its version, carried as properties. The default a
 # listener got because nothing was written, the standing of an OPC UA policy, and the
 # fragmentation of an IKE configuration all have to reach the document that is sent,
@@ -366,6 +493,12 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     components: list[dict[str, Any]] = []
     for family in sorted(by_family):
         finding = by_family[family]
+        # The sightings the inventory itself uses: a comment or a ban cannot set a field.
+        in_use = [item for item in located
+                  if family_of.get(item.get("algorithm"), item.get("algorithm")) == family
+                  and item.get("evidence_kind") not in {"comment", "ban"}]
+        m4, oid, several_sets = _m4_fields(family, _primitive(family),
+                                           observed_sizes.get(family, []), in_use)
         component: dict[str, Any] = {
             "type": "cryptographic-asset",
             "bom-ref": _ref("crypto", family),
@@ -384,7 +517,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                     # difference. A string, because the schema says string.
                     **({"parameterSetIdentifier": str(observed_sizes[family][0])}
                        if len(observed_sizes.get(family, [])) == 1 else {}),
+                    **m4,
                 },
+                **({"oid": oid} if oid else {}),
             },
             # The classification and the post-quantum family have no field in the
             # schema, so they travel as properties for the same reason coverage
@@ -401,6 +536,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 "name": f"{NS}observedKeySizes",
                 "value": ", ".join(str(s) for s in observed_sizes[family]),
             })
+        # More than one parameter set read: all of them, none chosen (as for sizes).
+        if several_sets:
+            component["properties"].append({
+                "name": f"{NS}observedParameterSets", "value": ", ".join(several_sets)})
         for key in ("pqc_family", "pqc_status"):
             if finding.get(key):
                 component["properties"].append({"name": f"{NS}{key}", "value": finding[key]})
