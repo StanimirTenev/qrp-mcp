@@ -36,6 +36,14 @@ def test_an_identifier_after_a_member_access_is_read():
     assert (2, "RSA") in {(f["line"], f["algorithm"]) for f in _rows(lines, "T.java")}
 
 
+def test_the_jdk_edwards_curve_key_is_eddsa_not_ec():
+    # java.security.interfaces.EdECPublicKey is RFC 8032's EdDSA key (JDK 15+); found as EC on
+    # the mini hold-out (webauthn4j) once names after a dot were read.
+    lines = ["import java.security.interfaces.EdECPublicKey;", "import java.security.KeyFactory;"]
+    rows = {(f["line"], f["algorithm"]) for f in _rows(lines, "K.java")}
+    assert (1, "EC") not in rows and (1, "EdDSA") in rows
+
+
 def test_a_dotted_setting_name_in_configuration_is_not_a_member_access():
     # granichni g053: a flag's key in a registry of flags.
     rows = detectors.scan_source_file(Path("flags.yaml"), "flags.yaml", cipher_exclusions=True,

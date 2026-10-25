@@ -357,7 +357,7 @@ CRYPTO_IMPORT = re.compile(
 # EC, DH and DES are short enough to sit inside ordinary words (`sec`, `check`, `codes`): a
 # component of components._PART starts after a non-letter in any case, or as a capital after a
 # lower-case letter or digit, or capitalised (`Ec`) after any letter or digit.
-_HINT = re.compile(r"(?i:rsa|dsa|dss|md5|sha|rc4|arcfour|25519|448|ffdh|tdes)|(?<![A-Za-z])(?i:ec|dh|des)|"
+_HINT = re.compile(r"(?i:rsa|dsa|dss|md5|sha|rc4|arcfour|25519|448|ffdh|tdes|edec)|(?<![A-Za-z])(?i:ec|dh|des)|"
                    r"(?<=[a-z0-9])(?:EC|DH|DES)|(?<=[A-Za-z0-9])(?:Ec|Dh|Des)")
 
 

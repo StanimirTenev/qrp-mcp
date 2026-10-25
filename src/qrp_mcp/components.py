@@ -36,7 +36,7 @@ FAMILY = {
     "DES": "DES", "DES2": "3DES", "DES3": "3DES", "3DES": "3DES", "TDES": "3DES",
     "RC4": "RC4", "ARC4": "RC4", "ARCFOUR": "RC4",
     "X25519": "X25519", "CURVE25519": "X25519", "X448": "X448", "CURVE448": "X448",
-    "ED25519": "Ed25519", "ED448": "Ed448", "EDDSA": "EdDSA",
+    "ED25519": "Ed25519", "ED448": "Ed448", "EDDSA": "EdDSA", "EDEC": "EdDSA",
 }
 _SIZED = re.compile(r"(FFDHE|RSA|DSA|DHE|DH)\d{3,5}")
 
@@ -105,6 +105,9 @@ def components(name: str) -> list[str]:
             out[-1] = "EC" + p
         elif last in {"ML", "SLH", "FN", "ED"} and p == "DSA":
             out[-1] = last + p
+        elif last == "ED" and p == "EC":
+            # The JDK's EdECKey (java.security.interfaces): RFC 8032's EdDSA key, not EC.
+            out[-1] = "EDEC"
         else:
             out.append(p)
     return out
