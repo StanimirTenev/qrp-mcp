@@ -777,15 +777,27 @@ _BARE_TLS_VERSION_SETTING = re.compile(
     r"^\s*tls_(?:min|max)_version\s*=\s*[\"']?1\.([0-3])[\"']?\s*(?:#.*)?$")
 
 
+_LOWERED: list[Any] = [None, ""]
+
+
 def names_none_of(line: str, words: tuple[str, ...]) -> bool:
     """True when the line holds none of the words in any case, so a rule every match of
     which contains one of them cannot match it. Asked before the rule's regex, which costs
     more (release D). A line that is not ASCII is never ruled out here: case-folding beyond
     ASCII is the regex's to decide."""
-    if not line.isascii():
-        return False
-    low = line.lower()
-    return not any(word in low for word in words)
+    # Asked ~70k times a scan, a dozen times of each line (release 3c): the line's
+    # lower-case form is kept for the line it was made from (the object itself, held here).
+    if _LOWERED[0] is line:
+        low = _LOWERED[1]
+    else:
+        if not line.isascii():
+            return False
+        low = line.lower()
+        _LOWERED[0], _LOWERED[1] = line, low
+    for word in words:
+        if word in low:
+            return False
+    return True
 
 
 # Every match of a rule in scan_protocols contains one of these: _BARE_TLS_VERSION_SETTING

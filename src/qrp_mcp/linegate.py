@@ -44,7 +44,7 @@ import re
 from itertools import accumulate
 from typing import NamedTuple
 
-from . import components
+from . import _warm, components
 
 # --- literals ----------------------------------------------------------------------------
 # Lower-case; searched case-insensitively. Each line says which rule needs it.
@@ -213,7 +213,8 @@ def _trie(words: list[str]) -> str:
 
 def _shortest(words: set[str]) -> list[str]:
     """The words without those containing a shorter one, which marks the same lines."""
-    return sorted(w for w in words if not any(v != w and v in w for v in words))
+    return _warm.derived("shortest", tuple(sorted(words)), lambda: sorted(
+        w for w in words if not any(v != w and v in w for v in words)))
 
 
 class Hot(NamedTuple):
@@ -321,7 +322,11 @@ class Gate:
             if os.environ.get("QRP_MCP_CORE", "").strip() not in ("0", "off", "no"):
                 try:
                     import qrp_mcp_core
-                    patterns = [rust_regex(p) for p in self._algorithm_patterns or []]
+                    # Kept between runs by _warm, keyed by the pattern (release 3c).
+                    patterns = [_warm.derived("rust_regex", (p.pattern, p.flags),
+                                              lambda p=p: rust_regex(p))
+                                for p in self._algorithm_patterns or []]
+                    _warm.save()
                     self._core = qrp_mcp_core.Gate(
                         self.words, self.rust_parts,
                         [[_piece(s) for s in found or ()] for found in self._algorithm_literals],

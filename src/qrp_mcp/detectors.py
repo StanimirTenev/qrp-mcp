@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
+import functools
 import hashlib
 import json
 import os
@@ -11,6 +12,11 @@ import re
 import stat
 from pathlib import Path
 from typing import Any
+
+from . import _warm
+
+# The rules' regexes compile through the cache of _warm until the end of this module.
+_warm.start_regex()
 
 from . import aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, suppression
 from .classifier import _PQC_SCHEMES
@@ -141,8 +147,10 @@ _TEST_DIRS = {"test", "tests", "testing", "spec", "specs", "fixtures", "testdata
 _TEST_FILE = re.compile(r"^(?:test_|conftest$)|(?:_test|\.test|Test|Tests|_spec|\.spec)$")
 
 
+@functools.lru_cache(maxsize=4096)
 def in_test_code(rel_path: str) -> bool:
-    """Whether a path is test code by `TEST_PATH_RULE`. Declared, not guessed silently."""
+    """Whether a path is test code by `TEST_PATH_RULE`. Declared, not guessed silently.
+    Asked once per finding of a file, so its answer is kept per path (release 3c)."""
     parts = rel_path.replace("\\", "/").split("/")
     # A directory is judged by the same shape as a file, so .NET's `App.Tests/` and
     # Go's `pkg/testdata/` both land, and `src/latest/` does not.
@@ -1328,7 +1336,9 @@ def _prefilter(pattern: re.Pattern) -> tuple[str, ...] | None:
 
 # ALGORITHM_PATTERNS with each pattern's literals; its shape is a public count, so the
 # literals ride alongside instead of inside it.
-_FILTERED_PATTERNS = [(algorithm, description, pattern, _prefilter(pattern))
+_FILTERED_PATTERNS = [(algorithm, description, pattern,
+                       _warm.derived("prefilter", (pattern.pattern, pattern.flags),
+                                     lambda pattern=pattern: _prefilter(pattern)))
                       for algorithm, description, pattern in ALGORITHM_PATTERNS]
 # Any literal of any pattern: most lines hold none, and then no pattern is tried at all.
 # One pattern without literals and the gate is the empty regex, which every line passes.
@@ -1364,10 +1374,15 @@ def _trie_regex(words: list[str]) -> str:
 
 _ALL_LITERALS = sorted({s for f in _FILTERED_PATTERNS if f[3] for s in f[3]},
                        key=lambda s: (-len(s), s))
-_LITERAL_AT = re.compile("(?=(" + _trie_regex(_ALL_LITERALS) + "))")
-_INSIDE = {s: frozenset(t for t in _ALL_LITERALS if t in s) for s in _ALL_LITERALS}
-_PATTERNS_WITH = {s: frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if f[3] and s in f[3])
-                  for s in _ALL_LITERALS}
+# Derived from the literals alone, so kept between runs by _warm under them (release 3c).
+_LITERALS_KEY = tuple(f[3] for f in _FILTERED_PATTERNS)
+_LITERAL_AT = re.compile(_warm.derived(
+    "literal_at", _LITERALS_KEY, lambda: "(?=(" + _trie_regex(_ALL_LITERALS) + "))"))
+_INSIDE = _warm.derived("inside", _LITERALS_KEY, lambda: {
+    s: frozenset(t for t in _ALL_LITERALS if t in s) for s in _ALL_LITERALS})
+_PATTERNS_WITH = _warm.derived("patterns_with", _LITERALS_KEY, lambda: {
+    s: frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if f[3] and s in f[3])
+    for s in _ALL_LITERALS})
 _ALWAYS_TRIED = frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if not f[3])
 
 
@@ -1377,6 +1392,11 @@ def _candidate_patterns(lowered: str | None, allowed: frozenset[int] | None = No
     line (linegate.Hot)."""
     if lowered is None:
         return _FILTERED_PATTERNS
+    if allowed is not None and not _ALWAYS_TRIED:
+        # The core gives `allowed` only where every pattern has literals, and both callers
+        # skip a pattern none of whose literals the line holds before trying it: so the
+        # patterns tried are the same, without the search for the literals (release 3c).
+        return [_FILTERED_PATTERNS[i] for i in sorted(allowed)]
     present: set[str] = set()
     for m in _LITERAL_AT.finditer(lowered):
         present |= _INSIDE[m.group(1)]
@@ -2467,6 +2487,27 @@ def _opens_a_denial_block(line: str) -> bool:
                 and not _CONDITION_OPENER.match(stripped))
 
 
+def _has_denial_word(text: str) -> bool:
+    return bool(_DENIAL_WORDS.search(text))
+
+
+def _is_a_list_line(line: str) -> bool:
+    return bool(_ALGORITHM_LIST_LINE.search(line) or _group_setting(line))
+
+
+# _is_banned_here is asked once per match, and a line of libcrux_internal.h holds dozens:
+# the two questions it asks of the whole line are answered once per line (release 3c). Keyed
+# by the string object itself, which the memo holds, so a different line is never taken for
+# the one before.
+_LINE_FACTS: list[Any] = [None, False, None, False]
+
+
+def _line_fact(slot: int, text: str, ask) -> bool:
+    if _LINE_FACTS[2 * slot] is not text:
+        _LINE_FACTS[2 * slot], _LINE_FACTS[2 * slot + 1] = text, ask(text)
+    return _LINE_FACTS[2 * slot + 1]
+
+
 def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
                     code: str | None = None) -> bool:
     """Whether the algorithm at this position is being forbidden rather than used.
@@ -2476,7 +2517,7 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     kept for compatibility` is a use, and reading the comment made it a ban.
     """
     searchable = line if code is None else code
-    if in_denial_block or _DENIAL_WORDS.search(searchable):
+    if in_denial_block or _line_fact(0, searchable, _has_denial_word):
         return True
     # Work in entries, not characters. A hyphen inside a name belongs to it --
     # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
@@ -2485,7 +2526,7 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     # A TLS group setting is a list too: `Groups = DEFAULT:-X25519MLKEM768` removes the
     # hybrid. The same test the TLS group rule asks, so the two cannot disagree
     # (ZA-OPRAVYANE row 56).
-    if not (_ALGORITHM_LIST_LINE.search(line) or _group_setting(line)):
+    if not _line_fact(1, line, _is_a_list_line):
         return False
     start = position
     while start > 0 and line[start - 1] not in ",;:=([{ \t\"'":
@@ -2637,9 +2678,16 @@ def _attach_providers(findings: list[dict[str, Any]], lines: list[str]) -> None:
     the family. Two in one file and none on the line: absent, not guessed. Comments
     and bans neither give nor get a provider.
     """
+    named_on: dict[int, list[str]] = {}
+
     def on(line_no: int) -> list[str]:
-        text = lines[line_no - 1] if 0 < line_no <= len(lines) else ""
-        return [name for name, pattern in PROVIDER_PATTERNS if pattern.search(text)]
+        # Asked twice per finding and once per finding on the same line: once per line
+        # (release 3c; a tenth of libcrux_internal.h's time).
+        if line_no not in named_on:
+            text = lines[line_no - 1] if 0 < line_no <= len(lines) else ""
+            named_on[line_no] = [name for name, pattern in PROVIDER_PATTERNS
+                                 if pattern.search(text)]
+        return named_on[line_no]
 
     used = [f for f in findings if f.get("evidence_kind") not in {"comment", "ban"}]
     in_file: dict[str, set[str]] = {}
@@ -4092,3 +4140,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
                  if f.get("evidence_kind") not in {"comment", "ban"}]).items()
         },
     }
+
+
+# The end of the rules (see _warm.start_regex above).
+_warm.stop_regex()
+_warm.save()
