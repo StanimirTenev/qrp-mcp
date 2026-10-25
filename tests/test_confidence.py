@@ -45,7 +45,6 @@ def test_an_inferred_family_is_one_step_lower():
                         "SHA-1 named in a compound name",
                         "RSA object identifier 1.2.840.113549.1.1.1 observed in the file; "
                         "the file was not decoded",
-                        'AES-ECB named as the default of getProperty("x"); no properties file',
                         "MD5 named by the property hashAlg1 (a.properties:4), read here with "
                         "getProperty",
                         "RSA named in a JCA getInstance call (RSA); read through the constant "
@@ -53,6 +52,14 @@ def test_an_inferred_family_is_one_step_lower():
         assert _level("source_code", evidence_kind="call", description=description) == "medium"
         assert _level("source_code", evidence_kind="reference",
                       description=description) == "low"
+
+
+def test_a_getproperty_fallback_is_low():
+    """The default literal, used because no properties file sets the key: 27/27 wrong on the
+    OWASP subset without benchmark.properties, so not medium."""
+    description = 'AES-ECB named as the default of getProperty("x"); no properties file'
+    for kind in ("call", "reference", "declaration"):
+        assert _level("source_code", evidence_kind=kind, description=description) == "low"
 
 
 def test_comments_and_bans_are_low():

@@ -9,8 +9,10 @@ Two things decide it:
    the algorithm and does not use it.
 2. **Whether the family was read whole or inferred.** A family read from a piece of an
    identifier (`EC_KEY_free`), from an object identifier in a file the scan did not decode,
-   from the fallback of a `getProperty` lookup, or through an indirection (a property file, an
-   alias, a constant in another file, a concatenated literal) is one step lower.
+   or through an indirection (a property file, an alias, a constant in another file, a
+   concatenated literal) is one step lower. The fallback of a `getProperty` lookup, read
+   because no properties file in the tree sets the key, is `low` whatever the line: on the
+   OWASP subset without benchmark.properties all 27 such rows were wrong.
 
 A comment or a ban is `low` and is not counted as a use anywhere; the calibration below leaves
 it out, as the CBOM leaves it out of the inventory.
@@ -46,10 +48,11 @@ _INFERRED = (
     ("named in a compound name", "family read from a piece of an identifier"),
     ("observed in the file; the file was not decoded",
      "object identifier in a file the scan did not decode"),
-    ("named as the default of getProperty", "the fallback of a property lookup"),
     ("read here with getProperty", "joined through a properties file"),
     ("; read through ", "resolved through an indirection"),
 )
+# A getProperty default, used because no properties file in the tree sets the key.
+_FALLBACK = "named as the default of getProperty"
 _GO_SIGNATURE = re.compile(r"^\s*func\b")
 _SETTINGS = {"tls_groups", "ssh_kex", "static_rsa_kex"}
 
@@ -98,6 +101,8 @@ def assess(category: str, item: dict[str, Any]) -> tuple[str, str]:
     else:
         level, basis = "medium", str(kind)
     description = str(item.get("description", ""))
+    if _FALLBACK in description:
+        return "low", f"{basis}; the fallback of a property lookup no properties file sets"
     for marker, why in _INFERRED:
         if marker in description:
             return _down(level), f"{basis}; {why}"
