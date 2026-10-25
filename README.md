@@ -664,9 +664,10 @@ reason in words. It is derived from what the scan read, not from a score it make
   source code, a protocol version named by a constant: `medium`. An import, a type in a Go
   function signature, a declared package: `low` — the line names the algorithm and does not use it.
 - **Whether the family was read whole or inferred.** A family read from a piece of an identifier
-  (`EC_KEY_free`), from an object identifier in a file that was not decoded, from the fallback of
-  a `getProperty` lookup, through a properties file, or through an alias, a constant in another
-  file or literals concatenated on the line is one step lower.
+  (`EC_KEY_free`), from an object identifier in a file that was not decoded, through a properties
+  file, or through an alias, a constant in another file or literals concatenated on the line is
+  one step lower. The fallback of a `getProperty` lookup, read because no properties file in the
+  tree sets the key, is `low` whatever the line.
 - Comments and bans are `low` and are not uses anywhere. Whether the role (signature, key
   establishment) is known is **not** an input: on Cryben rows with a role were 27/31 on a truth
   line and rows without one 39/43, so it separated nothing.
@@ -688,8 +689,9 @@ measured precision of each level, so the figure travels with the document it des
 
 On OWASP a row is graded when its family is one of the Benchmark's weak families for the case's
 category: right when the case is true. On the OWASP subset **without** `benchmark.properties`
-(the 2026-10-25 06-propusnato layout) the 27 `getProperty` fallbacks to `AES/ECB` are `medium`
-and all 27 wrong — the property file sets AES/CCM — which is the reason a fallback is not `high`.
+(the 2026-10-25 06-propusnato layout) the 27 `getProperty` fallbacks to `AES/ECB` are all wrong
+— the property file sets AES/CCM — which is why a fallback is `low` (it was `medium` in release
+E as first measured; the table above has no fallback row and did not move when it changed).
 
 ⚠️ What the table is not. Both corpora were used to choose the mapping, so it is a regression
 figure, not a blind one. The medium and low buckets on Cryben are small (3 and 11 rows), OWASP is
