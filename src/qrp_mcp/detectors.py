@@ -2881,6 +2881,11 @@ def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
             item["parameter_set"] = found.pop()
 
 
+# baseline.FORMAT and config.FILENAME, written out here so this module imports neither.
+BASELINE_FORMAT = "qrp-mcp baseline 1"
+CONFIG_FILENAME = ".qrp.toml"
+
+
 def report_document(raw: bytes) -> str | None:
     """What kind of report this file is, or None when it is not one.
 
@@ -2891,9 +2896,14 @@ def report_document(raw: bytes) -> str | None:
     (`bomFormat` is required by every CycloneDX JSON schema) or a qrp-mcp result (its
     coverage block names the instrument). A file that only quotes `bomFormat` -- the
     CycloneDX schema itself -- is not one.
+
+    The same for the files release A writes: a SARIF 2.1.0 log, ours or any scanner's (a
+    `runs` list beside a SARIF `$schema` or `version: 2.1.0`; a `runs` list alone is not
+    one), and our baseline (its `format`), whose entries name a family each.
     """
     body = raw.lstrip(b"\xef\xbb\xbf \t\r\n")
-    if not body.startswith(b"{") or (b'"bomFormat"' not in body and b'"qrp-mcp"' not in body):
+    if not body.startswith(b"{") or (b'"bomFormat"' not in body and b'"qrp-mcp"' not in body
+                                     and b'"runs"' not in body):
         return None
     try:
         document = json.loads(body.decode("utf-8"))
@@ -2903,6 +2913,12 @@ def report_document(raw: bytes) -> str | None:
         return None
     if document.get("bomFormat") == "CycloneDX":
         return "CycloneDX document"
+    if isinstance(document.get("runs"), list) and (
+            "sarif" in str(document.get("$schema") or "").lower()
+            or document.get("version") == "2.1.0"):
+        return "SARIF log"
+    if document.get("format") == BASELINE_FORMAT:
+        return "qrp-mcp baseline"
     block = document.get("coverage")
     instrument = block.get("instrument") if isinstance(block, dict) else None
     if isinstance(instrument, dict) and instrument.get("tool") == "qrp-mcp":
@@ -3015,6 +3031,12 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
                     continue
             except (OSError, ValueError):
                 pass
+        if path.name == CONFIG_FILENAME:
+            # The owner's settings, whether or not this run loaded them (`--no-config`, a
+            # nested service's own): its comments name what it excludes. Left out and named,
+            # as the loaded one is.
+            left_out.append(str(path.relative_to(repo_path)))
+            continue
         files_present += 1
         # The composition of the denominator, not just its size. A coverage figure
         # is a property of the tool crossed with what the corpus is made of: the
@@ -3050,6 +3072,11 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
             sniffed = _read_file(path, repo_path)
             claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
+        # A `.sarif` is opened only to be named as the report it is (row 144); one that is
+        # not a SARIF log stays the declared boundary.
+        if not claimed and path.suffix.lower() == ".sarif":
+            sniffed = _read_file(path, repo_path)
+            claimed = sniffed is not None and report_document(sniffed[0]) is not None
         # Only a file no declared type claims is peeked at for key material; a .py or
         # a .tf that happens to contain a PEM block stays source and infrastructure.
         peeked_key = False if claimed else looks_like_key_file(path)
