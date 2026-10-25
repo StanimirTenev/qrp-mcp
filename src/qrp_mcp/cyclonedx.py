@@ -569,6 +569,11 @@ def _certificate_components(located: list[dict[str, Any]],
     """Each parsed certificate as an asset of type `certificate` (release C), one per DER
     digest however many files carry it, with the subject key as related material.
 
+    The subject key is nested inside the first certificate that names it, and the others
+    point at it by `subjectPublicKeyRef`. It used to stand at the top level with no
+    occurrence of its own -- a claim located nowhere, which Cryben's scorer counts as a
+    false positive (qrp-pokazateli kragg-2). Where it is, is where its certificate is.
+
     Validity is data: notValidBefore/After are the certificate's own, and nothing here
     says whether it has expired, which would make the document a function of the clock."""
     certs: dict[str, list[dict[str, Any]]] = {}
@@ -602,6 +607,7 @@ def _certificate_components(located: list[dict[str, Any]],
             else None)
         if signature_ref:
             properties["signatureAlgorithmRef"] = signature_ref
+        nested = None
         if key.get("algorithm") and not key.get("composite"):
             key_ref = _ref("public-key", f"{key['algorithm']}-{detail}" if detail
                            else key["algorithm"])
@@ -623,6 +629,7 @@ def _certificate_components(located: list[dict[str, Any]],
                                   + ([{"name": f"{NS}curve", "value": key["curve"]}]
                                      if key.get("curve") else []),
                 }
+                nested = keys[key_ref]
             properties["subjectPublicKeyRef"] = key_ref
         properties["certificateFormat"] = "X.509"
         seen: set[tuple[str, int]] = set()
@@ -656,8 +663,10 @@ def _certificate_components(located: list[dict[str, Any]],
         }
         if all(r.get("in_test_code") for r in rows):
             component["scope"] = "excluded"
+        if nested:
+            component["components"] = [nested]
         out.append(component)
-    return out + [keys[ref] for ref in sorted(keys)]
+    return out
 
 
 # What a family's own component says that its parameter-set components do not (release 3d).
@@ -1227,6 +1236,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 "type": "application",
                 "name": instrument["tool"],
                 "version": instrument["version"],
+                # Which code ran (ZA-OPRAVYANE row 148), beside the version it carries.
+                **({"properties": [{"name": f"{NS}revision", "value": instrument["revision"]}]}
+                   if instrument.get("revision") else {}),
             }]},
             "component": {
                 "type": "application",

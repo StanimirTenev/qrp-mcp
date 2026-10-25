@@ -413,7 +413,8 @@ def test_the_cbom_carries_each_certificate(tmp_path, three, monkeypatch):
     certs = [c for c in doc["components"]
              if c.get("cryptoProperties", {}).get("assetType") == "certificate"]
     assert len(certs) == 3
-    refs = {c["bom-ref"]: c for c in doc["components"]}
+    # A subject key is nested inside its certificate (round 3), so refs walk one level down.
+    refs = {c["bom-ref"]: c for top in doc["components"] for c in [top, *top.get("components", [])]}
     by_name = {c["name"]: c for c in certs}
     rsa_c = by_name["CN=probe-rsa"]["cryptoProperties"]["certificateProperties"]
     assert rsa_c["subjectName"] == "CN=probe-rsa" and rsa_c["issuerName"] == "CN=probe-rsa"

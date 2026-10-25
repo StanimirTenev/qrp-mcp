@@ -103,6 +103,23 @@ CONFIG_FILENAME_PATTERN = re.compile(
 # and Apache keep their sites as sites-available/default.
 CONFIG_DIRECTORIES = {"mods-available", "mods-enabled", "sites-available", "sites-enabled"}
 
+# Ansible's and Salt's Jinja templates are the configuration a host will run:
+# `sites-default.conf.j2` becomes nginx's site, `sshd_config.j2` the daemon's. All were "type
+# not claimed" -- 357 of kolla-ansible's files, every nginx and sshd template of the round-3
+# DEV corpus (qrp-pokazateli kragg-3). A template is read as the file it renders; one whose
+# rendered name no type claims is read as configuration, unless it renders documentation.
+TEMPLATE_SUFFIXES = (".j2", ".jinja2", ".jinja")
+TEMPLATE_DOCUMENTS = {".md", ".rst", ".txt", ".html", ".htm", ".adoc"}
+
+
+def rendered_path(path: Path) -> Path:
+    """The file a Jinja template renders (`nginx.conf.j2` -> `nginx.conf`); else `path`."""
+    lower = path.name.lower()
+    for suffix in TEMPLATE_SUFFIXES:
+        if lower.endswith(suffix) and len(lower) > len(suffix):
+            return path.with_name(path.name[:-len(suffix)])
+    return path
+
 # (algorithm, description, compiled regex matched against a single source line)
 # Test code, named rather than judged. Measured 2026-09-26: comparing this scanner
 # against a calibrated classifier on certbot gave 42 disagreements and **33 sat in test
@@ -140,6 +157,16 @@ def in_test_code(rel_path: str) -> bool:
 EXPERIMENTAL_SSH_MLDSA = ("OpenSSH 10.4 experimental ML-DSA-44-Ed25519 key type "
                           "(@openssh.com), not the one 10.6 enabled")
 KYBER_BY_NAME_ONLY = "Kyber named without an identifier (round-3 Kyber, or an old name for ML-KEM)"
+# Read in .rs files only (scan_source_file): elsewhere `rsa_` and `_dsa_` are too often a
+# variable's word for a value it does not hold.
+RUST_RSA_WORD = "RSA named by a Rust name, module or feature (rsa_to_pkcs8, mod rsa)"
+RUST_DSA_WORD = "DSA named by a Rust name, module or feature (decode_dsa, mod dsa)"
+RUST_ONLY = frozenset({RUST_RSA_WORD, RUST_DSA_WORD})
+# Read in configuration only (scan_source_file with cipher_exclusions): a key file named in
+# sshd_config or an Ansible var is the key the host serves; in code, a name in a list.
+SSH_RSA_KEY_FILE = "RSA named by an SSH key file name (ssh_host_rsa_key, id_rsa)"
+SSH_DSA_KEY_FILE = "DSA named by an SSH key file name (ssh_host_dsa_key, id_dsa)"
+CONFIG_ONLY = frozenset({SSH_RSA_KEY_FILE, SSH_DSA_KEY_FILE})
 
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
@@ -995,6 +1022,55 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("HSS/LMS", "HSS/LMS named by the wolfSSL, liboqs or Mbed TLS API", re.compile(
         r"\bWC_LMS_PARM_\w+|\bOQS_LMS_ID_\w+|\bmbedtls_lms_\w+|\bMBEDTLS_LMS_\w+|"
         r"\b(?:MBEDTLS_)?LMOTS_(?:SHA256|SHAKE)_N\d+_W\d+\b|\bMBEDTLS_LMOTS_\w+")),
+    # ---- Round 3 (qrp-pokazateli kragg-3 DEV corpus, 25.10.2026): the Config and Rust misses
+    # that were real inventory. An SSH host or identity key named by its file: OpenSSH's
+    # ssh_host_<type>_key and id_<type> (ssh-keygen(1) FILES), in Ansible vars, sshd_config,
+    # container manifests and test fixtures. Lower case, as the files are named. In
+    # configuration only (CONFIG_ONLY): in code `['id_rsa', 'id_dsa']` is a list of names.
+    ("RSA", SSH_RSA_KEY_FILE, re.compile(
+        r"(?<![A-Za-z0-9])(?:ssh_host_|id_)rsa(?:_key)?(?![A-Za-z0-9])")),
+    ("DSA", SSH_DSA_KEY_FILE, re.compile(
+        r"(?<![A-Za-z0-9])(?:ssh_host_|id_)dsa(?:_key)?(?![A-Za-z0-9])")),
+    # The key type of a generation task: community.crypto's openssl_privatekey `type: RSA`
+    # (RSA, DSA, ECC, ...) and openssh_keypair `type: rsa`, a whole YAML value; and
+    # ssh-keygen's -t. Ed25519 and ECDSA are named by their own rules already.
+    ("RSA", "RSA named as the key type of a generation task (type: RSA, ssh-keygen -t rsa)",
+     re.compile(r"^\s*(?:-\s+)?type:\s*[\"']?(?i:rsa)[\"']?\s*(?:#.*)?$|"
+                r"\bssh-keygen\b[^\n]*?\s-t\s*[\"']?(?i:rsa)(?![A-Za-z0-9-])")),
+    ("DSA", "DSA named as the key type of a generation task (type: DSA, ssh-keygen -t dsa)",
+     re.compile(r"^\s*(?:-\s+)?type:\s*[\"']?(?i:dsa)[\"']?\s*(?:#.*)?$|"
+                r"\bssh-keygen\b[^\n]*?\s-t\s*[\"']?(?i:dsa)(?![A-Za-z0-9-])")),
+    ("EC", "EC named as the key type of a generation task (type: ECC)", re.compile(
+        r"^\s*(?:-\s+)?type:\s*[\"']?ECC[\"']?\s*(?:#.*)?$")),
+    # DH parameters configured: nginx ssl_dhparam, Dovecot ssl_dh = <file, HAProxy
+    # tune.ssl.default-dh-param, Postfix smtpd_tls_dh1024_param_file, Apache
+    # SSLOpenSSLConfCmd DHParameters. Each enables finite-field DHE. Settings only: a
+    # variable called ssl_dhparams is a name without an operation.
+    ("DH", "DH parameters configured (ssl_dhparam, ssl_dh, default-dh-param, DHParameters)",
+     re.compile(r"^\s*ssl_dhparam\s+[\"']?[^\s;\"']+|^\s*ssl_dh\s*=\s*<|"
+                r"\btune\.ssl\.default-dh-param\s+\d+|\bsmtpd?_tls_dh(?:512|1024)_param_file\s*=|"
+                r"\bSSLOpenSSLConfCmd\s+DHParameters\b")),
+    # sshd options that name RSA (sshd_config(5); RSAAuthentication is protocol 1's).
+    ("RSA", "RSA named by an sshd option (RSAAuthentication, RequiredRSASize)", re.compile(
+        r"\b(?:Rhosts)?RSAAuthentication\b|\bRequiredRSASize\b")),
+    # Types and variants named after the family, as RustCrypto writes them (ssh-key's
+    # RsaKeypair, DsaKeypair, KeypairData::Dsa, Algorithm::Rsa; jwt-simple's
+    # RsaOaepDecryptionKey; sigstore's RSAKeys). Case-sensitive: `MlDsa65` and `SlhDsa`
+    # have no boundary before the D. DSA by its key and signature types only: libcrux's
+    # ML-DSA calls its XOF `DsaXof` (OpenSSH libcrux_internal.h, the relALL gate).
+    ("RSA", "RSA named by a type or enum variant (RsaKeypair, RSAKeys, Algorithm::Rsa)",
+     re.compile(r"\bRsa[A-Z0-9]\w*|\bRSA[A-Z][a-z]\w*|::Rsa\b")),
+    ("DSA", "DSA named by a type or enum variant (DsaKeypair, KeypairData::Dsa)",
+     re.compile(r"\b(?:Dsa|DSA)(?:Key[Pp]air|PrivateKey|PublicKey|Signature|SigningKey|VerifyingKey|"
+                r"Params|Parameters|Components|Authentication)\w*|::Dsa\b")),
+    # Rust only (RUST_ONLY below): the family as a word of a snake_case name, a module or a
+    # cargo feature -- `fn decode_dsa_openssh`, `mod dsa;`, `#[cfg(feature = "dsa")]`,
+    # `rsa_to_pkcs8`. Not the post-quantum ml_dsa / slh_dsa / fn_dsa.
+    ("RSA", RUST_RSA_WORD,
+     re.compile(r"(?<![A-Za-z0-9])rsa(?![A-Za-z0-9])")),
+    ("DSA", RUST_DSA_WORD,
+     re.compile(r"(?<![A-Za-z0-9])(?<!ml_)(?<!slh_)(?<!fn_)(?<!ml-)(?<!slh-)(?<!fn-)dsa"
+                r"(?![A-Za-z0-9])")),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
     # "not started" rather than "migrating".
@@ -2832,7 +2908,8 @@ def scan_source_file(path: Path, rel_path: str,
         lowered = searched.lower() if searched.isascii() else None
         candidates = _candidate_patterns(lowered, allowed.get(line_no - 1) if allowed else None)
         for algorithm, description, pattern, literals in candidates:
-            if algorithm in seen_on_line:
+            if (algorithm in seen_on_line or (description in RUST_ONLY and ext != ".rs")
+                    or (description in CONFIG_ONLY and not cipher_exclusions)):
                 continue
             # "ML-KEM (Kyber)": the line names the standard and gives its old name.
             if description == KYBER_BY_NAME_ONLY and "ML-KEM" in seen_on_line:
@@ -3536,6 +3613,11 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         excluded_by_config.append(rel_path)
         content_parts.append(f"{rel_path}\0excluded_by_config")
         return
+    # A Jinja template is read as the file it renders (see rendered_path); `real` is the
+    # file on disk, `path` from here on the name its type is judged by.
+    real = path
+    path = rendered_path(path)
+    template = path is not real
     is_ci = is_ci_config_file(path, repo_path)
     # Every comparison is lowercased, and the reason is a defect this line
     # produced. OpenSSL carries thirteen files with upper-case extensions --
@@ -3550,30 +3632,34 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                or path.suffix.lower() in SOURCE_EXTENSIONS
                or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
                or is_certificate_file(path) or is_manifest(path))
+    if template and not claimed and path.suffix.lower() not in TEMPLATE_DOCUMENTS:
+        # Rendered to a name no type claims (`realm.provider.j2`): configuration, as
+        # what Ansible and Salt render almost always is. Documentation stays unclaimed.
+        claimed = True
     # `.xml` and `.json5` are read only when they name an OPC UA SecurityPolicy: a
     # .NET `*.Config.xml` and an open62541 `*.json5` are where those stacks declare
     # theirs, and every other XML stays the declared boundary it was. Read once,
     # here, and the same bytes are used below.
     sniffed = None
     if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
-        sniffed = _read_file(path, repo_path)
+        sniffed = _read_file(real, repo_path)
         claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
     # A `.sarif` is opened only to be named as the report it is (row 144); one that is
     # not a SARIF log stays the declared boundary.
     if not claimed and path.suffix.lower() == ".sarif":
-        sniffed = _read_file(path, repo_path)
+        sniffed = _read_file(real, repo_path)
         claimed = sniffed is not None and report_document(sniffed[0]) is not None
     # Only a file no declared type claims is peeked at for key material; a .py or
     # a .tf that happens to contain a PEM block stays source and infrastructure.
-    peeked_key = False if claimed else looks_like_key_file(path)
+    peeked_key = False if claimed else looks_like_key_file(real)
     if not (claimed or peeked_key):
-        kind = path.suffix.lower() or "(no extension)"
+        kind = real.suffix.lower() or "(no extension)"
         skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
         skipped_files.append(rel_path)
         # Not read, so not hashed: its size is what is known about it without
         # opening a file this tool has declared it does not claim.
         try:
-            size = path.stat().st_size
+            size = real.stat().st_size
         except OSError:
             size = -1
         content_parts.append(f"{rel_path}\0skipped:{size}")
@@ -3581,7 +3667,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
 
     # Read once, here: classification and scanning must see the same content, and a
     # file that cannot be read has to leave a mark rather than pass as scanned-clean.
-    read = sniffed if sniffed is not None else _read_file(path, repo_path)
+    read = sniffed if sniffed is not None else _read_file(real, repo_path)
     if read is None:
         unreadable.append(rel_path)
         content_parts.append(f"{rel_path}\0unread")

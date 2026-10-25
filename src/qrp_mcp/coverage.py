@@ -81,6 +81,45 @@ def _absent(reason: str) -> dict[str, Any]:
     return {"pinned": False, "reason": reason, "meaning": PIN_ABSENT[reason]}
 
 
+def _installed_vcs_commit() -> str | None:
+    """The commit an installed qrp-mcp was built from, where pip recorded one: a
+    `direct_url.json` (PEP 610) with `vcs_info`, as `pip install` from a VCS URL writes.
+    A wheel from an index carries none, and _revision says so in words."""
+    import json
+    from importlib.metadata import PackageNotFoundError, distribution
+
+    from . import __version__
+    try:
+        dist = distribution("qrp-mcp")
+        recorded = dist.read_text("direct_url.json")
+    except (PackageNotFoundError, OSError):
+        return None
+    if not recorded or dist.version != __version__:
+        return None
+    try:
+        commit = (json.loads(recorded).get("vcs_info") or {}).get("commit_id")
+    except (ValueError, AttributeError):
+        return None
+    return commit if isinstance(commit, str) and commit else None
+
+
+def _revision(pin: dict[str, Any]) -> str:
+    """Which code ran, in one field (ZA-OPRAVYANE row 148): the commit, or the absence
+    of one said in words. An MCP server three versions behind its plugin printed nothing
+    a reader could check; `source_commit` explains the absence, this names what ran."""
+    if pin.get("pinned"):
+        return pin["commit"] + (" (with uncommitted changes)" if pin.get("dirty") else "")
+    reason = pin.get("reason")
+    if reason == "no_checkout":
+        commit = _installed_vcs_commit()
+        return f"{commit} (installed from VCS)" if commit else "installed wheel, no VCS"
+    if reason == "not_a_repository":
+        return "source tree, no VCS"
+    if reason == "not_tracked":
+        return "untracked directory in a repository, no commit"
+    return "unknown: the VCS could not be run"
+
+
 # Which of two different kinds of claim a figure is. Dong Nguyen's distinction,
 # and it retires the search for a third state on the second axis: there is no
 # third state, because the second axis is not the instrument's to report.
@@ -401,14 +440,16 @@ def build(
     linked_dirs = [e for e in links if e.get("kind") == "directory"]
 
     excluded = scan_result.get("files_excluded_by_dir", {})
+    pin = _tool_pin()
 
     return {
         "instrument": {
             "tool": tool_name,
             "version": tool_version,
+            "revision": _revision(pin),
             # The version alone does not pin the emitter; the code can change
             # without it. Null when running from an installed wheel.
-            "source_commit": _tool_pin(),
+            "source_commit": pin,
             "ruleset": ruleset,
             "claimed_types": claimed_types,
             # Declared because it filters the denominator before anything is counted.
