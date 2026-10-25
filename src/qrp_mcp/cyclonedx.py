@@ -880,6 +880,22 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             ]},
         })
 
+    # Each file an occurrence cites, with the SHA-256 of the bytes that were read
+    # (release A, 05-novi-merki T2). Occurrences have no hash field in 1.6, so a `file`
+    # component named exactly as the occurrence's location carries the schema's own
+    # `hashes`. Not inventory: left out of the composition below.
+    digests: dict[str, str] = scan_result.get("evidence_file_sha256") or {}
+    cited = sorted({o["location"] for c in components
+                    for o in c.get("evidence", {}).get("occurrences", [])
+                    if o.get("location") in digests})
+    evidence_files = [{
+        "type": "file",
+        "bom-ref": f"file:{path}",
+        "name": path,
+        "hashes": [{"alg": "SHA-256", "content": digests[path]}],
+        "properties": [{"name": f"{NS}basis", "value": "evidence_file"}],
+    } for path in cited]
+
     # `complete` is a claim about the component list, so it is tied to the file
     # count rather than to the run finishing without error. Anything short of
     # every present file examined is `incomplete` -- a word the schema has had
@@ -918,7 +934,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 "name": coverage["corpus"]["target"],
             },
         },
-        "components": components,
+        "components": components + evidence_files,
         **({"dependencies": hybrid_dependencies} if hybrid_dependencies else {}),
         "compositions": [{
             "aggregate": aggregate,

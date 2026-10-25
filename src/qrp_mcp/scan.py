@@ -265,7 +265,19 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         # and their `dependencies`. Outside `evidence`: the halves are already there, and
         # counting the hybrid again would count one line twice.
         "hybrid_names": scan_result.get("hybrid_names", []),
+        # The SHA-256 of every file the evidence cites, as it was read (release A): what
+        # lets a third party re-locate a finding and tell a moved line from another file.
+        "evidence_file_sha256": _cited_digests(scan_result),
     }
+
+
+def _cited_digests(scan_result: dict[str, Any]) -> dict[str, str]:
+    digests = scan_result.get("file_digests") or {}
+    cited = {item["path"] for key, items in scan_result.items()
+             if key.endswith("_findings") and isinstance(items, list)
+             for item in items if isinstance(item, dict) and isinstance(item.get("path"), str)}
+    cited.update(item["path"] for item in scan_result.get("hybrid_names", []))
+    return {path: digests[path] for path in sorted(cited) if path in digests}
 
 
 # strongSwan's `ppk_required = no` (its default) and a PPK switched off outright: the value,

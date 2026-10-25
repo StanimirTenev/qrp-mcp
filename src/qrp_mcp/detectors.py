@@ -2979,6 +2979,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # Every file actually read, by path. A count says how much was read; only the
     # names let a later run tell a file that was fixed from a file that is gone.
     files_read: list[str] = []
+    # The SHA-256 of each file read, by path: the per-file part of content_parts, kept so
+    # the CBOM can bind each cited file to the bytes that were read (release A).
+    file_digests: dict[str, str] = {}
     # CODEOWNERS files read, by location (see CODEOWNERS_LOCATIONS).
     codeowners: dict[str, list[str]] = {}
     resolved_exclude = None
@@ -3055,8 +3058,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # read, so two files differing exactly where the scanner looks -- an object
         # identifier inside a DER blob -- produced the same digest while producing
         # different findings. No extra I/O; these are the bytes already in hand.
-        content_parts.append(
-            rel_path + "\0" + hashlib.sha256(raw).hexdigest())
+        digest = hashlib.sha256(raw).hexdigest()
+        content_parts.append(rel_path + "\0" + digest)
+        file_digests[rel_path] = digest
         if report_document(raw):
             # Named under its own reason in the coverage block (row 144), never matched.
             reports.append(rel_path)
@@ -3279,6 +3283,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         "report_documents": reports,
         # Hybrids named on a line, with their halves; the CBOM keeps those a half of
         # which is in the inventory at that line.
+        "file_digests": file_digests,
         "hybrid_names": [{"path": p, "line": n, "name": name,
                           "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}
                          for p, n, name in hybrid_names],
