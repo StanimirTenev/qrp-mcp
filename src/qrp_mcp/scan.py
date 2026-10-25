@@ -15,20 +15,33 @@ from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint, known_al
 
 
 def _version() -> str:
-    """The version that did the reading.
+    """The version that did the reading: the running code's own `__version__`.
 
-    The package's own `__version__` is the answer, not the installed
-    distribution's: a run from a source checkout is still a run by a known
-    version, and reporting "unknown" there put a placeholder into an artefact
-    whose whole purpose is to say what produced it. Installed metadata is
-    consulted only to catch the two disagreeing.
+    Until 0.36.0 this read "0.36.0 (installed: 0.33.0)" whenever the distribution
+    metadata disagreed (ZA-OPRAVYANE row 148). The 0.33.0 was written once by an
+    editable install and never refreshed, so it described no code that ran; the
+    disagreement is now said beside the version, in `_installed_distribution`.
     """
-    declared = __version__
+    return __version__
+
+
+def _installed_distribution() -> dict[str, Any] | None:
+    """What the installed distribution's metadata says, only where it disagrees with
+    the code that is running. None when they agree or when nothing is installed."""
     try:
         installed = _pkg_version("qrp-mcp")
     except PackageNotFoundError:
-        return declared
-    return declared if installed == declared else f"{declared} (installed: {installed})"
+        return None
+    if installed == __version__:
+        return None
+    return {
+        "version": installed,
+        "matches_running_code": False,
+        "meaning": (f"the code that ran is {__version__} (see source_commit); the "
+                    f"installed distribution's metadata says {installed}. An editable "
+                    f"install writes that metadata once, at install time, so it lags the "
+                    f"source; a different package on the path would also show here"),
+    }
 
 
 def _now() -> str:
@@ -103,6 +116,7 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
         finished_at=finished_at,
         seconds=seconds,
         tool_version=_version(),
+        installed_distribution=_installed_distribution(),
         ruleset={
             "algorithm_patterns": len(detectors.ALGORITHM_PATTERNS),
             "iac_algorithm_patterns": len(detectors.IAC_ALGORITHM_PATTERNS),
@@ -247,7 +261,23 @@ def scan_directory(path: str | Path, exclude: Path | None = None,
             # configuration, never "validated".
             "fips_provider": scan_result.get("fips_provider_findings", []),
         },
+        # Hybrids named on a line with their two halves, for the CBOM's hybrid components
+        # and their `dependencies`. Outside `evidence`: the halves are already there, and
+        # counting the hybrid again would count one line twice.
+        "hybrid_names": scan_result.get("hybrid_names", []),
+        # The SHA-256 of every file the evidence cites, as it was read (release A): what
+        # lets a third party re-locate a finding and tell a moved line from another file.
+        "evidence_file_sha256": _cited_digests(scan_result),
     }
+
+
+def _cited_digests(scan_result: dict[str, Any]) -> dict[str, str]:
+    digests = scan_result.get("file_digests") or {}
+    cited = {item["path"] for key, items in scan_result.items()
+             if key.endswith("_findings") and isinstance(items, list)
+             for item in items if isinstance(item, dict) and isinstance(item.get("path"), str)}
+    cited.update(item["path"] for item in scan_result.get("hybrid_names", []))
+    return {path: digests[path] for path in sorted(cited) if path in digests}
 
 
 # strongSwan's `ppk_required = no` (its default) and a PPK switched off outright: the value,
@@ -284,8 +314,12 @@ def _withhold_reassurance(summary: Any, block: dict[str, Any], scan_result: dict
     if not block["accounts_for_every_file"]:
         because.append("the reasons given for files not read do not add up to the files "
                        "present")
-    if scope["files_not_examined"]:
-        because.append(f"{scope['files_not_examined']} of {scope['files_present']} files were "
+    # A report found in the tree was read and recognised (row 144): nothing in it is
+    # unread code, so it does not withhold the headline on its own.
+    unread = scope["files_not_examined"] - sum(
+        r["count"] for r in block["not_examined"] if r["reason"] == "report_document")
+    if unread:
+        because.append(f"{unread} of {scope['files_present']} files were "
                        f"not read ({scope['coverage_pct']}% read); see coverage.not_examined")
     # A zone signed with an algorithm number this scan gives no family (row 102). 0 is
     # DELETE, a signal and not an algorithm.

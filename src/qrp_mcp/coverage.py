@@ -37,6 +37,9 @@ REASONS = {
     "unreadable": "opened and could not be read; attempted and failed",
     "symlink_not_followed": ("a symbolic link, not followed: its target is chosen by "
                              "the scanned tree rather than by the caller"),
+    "report_document": ("a report about cryptography -- a CycloneDX document or a qrp-mcp "
+                        "result -- recognised by its content and not matched: what a tool "
+                        "wrote about some code is not that code (ZA-OPRAVYANE row 144)"),
     "claimed_but_not_decoded": ("a claimed file type that was read and gave up no "
                                 "algorithm: encrypted content, or a structure this "
                                 "tool does not parse"),
@@ -265,7 +268,10 @@ def _tool_pin() -> dict[str, Any]:
         # second case the commit would belong to someone else's tree.
         return _absent("not_a_repository")
     commit = out.stdout.strip()
-    dirty = _run_git(root, "status", "--porcelain")
+    # The package directory only (ZA-OPRAVYANE row 148): untracked work elsewhere in
+    # the checkout -- an agent's `.claude/` folder -- is not the code that ran, and
+    # counting it made every run from a working checkout report `dirty: true`.
+    dirty = _run_git(root, "status", "--porcelain", "--", ".")
     return {"pinned": True, "commit": commit, "dirty": bool(dirty.stdout.strip())}
 
 
@@ -281,6 +287,7 @@ def build(
     ruleset: dict[str, int],
     claimed_types: dict[str, list[str]],
     excluded_dirs: list[str],
+    installed_distribution: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the block. Every number here is derived, none is asserted."""
     present = scan_result["files_present"]
@@ -333,6 +340,14 @@ def build(
             "count": len(file_links),
             "paths": [e.get("path") for e in file_links],
         })
+    reports = scan_result.get("report_documents") or []
+    if reports:
+        not_examined.append({
+            "reason": "report_document",
+            "meaning": REASONS["report_document"],
+            "count": len(reports),
+            "paths": reports,
+        })
     accounted = examined + sum(r["count"] for r in not_examined)
     # Counted as read -- it was read -- and named anyway: a claimed type that
     # yields nothing is exactly the silent skip this block exists to refuse, and
@@ -364,6 +379,10 @@ def build(
             # A filter that shapes the number and is not stated is the defect this
             # block exists to refuse.
             "excluded_dirs": sorted(excluded_dirs),
+            # Only where the installed metadata disagrees with the running code
+            # (ZA-OPRAVYANE row 148); `version` above is always the running code's.
+            **({"installed_distribution": installed_distribution}
+               if installed_distribution else {}),
         },
         "corpus": {
             "target": str(repo_path),

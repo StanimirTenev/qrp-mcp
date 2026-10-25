@@ -34,20 +34,25 @@ Determinism is a requirement rather than a nicety, because the comparison tool i
 `coverage.compare` reads these documents. Two runs of the same instrument over the
 same corpus that find the same things get the same serial number: it is derived from
 the target, the two pins and a digest of the findings and counts rather than drawn at
-random. The timestamp and the coverage window record when each run happened, so those
-fields differ between runs; everything else is identical. Two runs whose instrument differs get
-different serial numbers, which is the pin argument stated in one field.
+random. Since release A the whole document is byte-identical across such runs: the
+timestamp is the tree's commit time (or SOURCE_DATE_EPOCH, or absent), and the read
+window stays in the scan result, named in the CBOM rather than carried. Two runs whose
+instrument differs get different serial numbers, which is the pin argument stated in one
+field.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from .assets import TLS_SETTING_NOTE
+from .detectors import in_test_code
 from .classifier import known_algorithms
 
 SPEC_VERSION = "1.6"
@@ -87,6 +92,133 @@ _PRIMITIVE_BY_FAMILY = {
     # Not an algorithm: a certificate format whose strength is the CA's and cosigners'.
     "MTC": "other",
 }
+
+
+# -- M4: the standard fields, each from a table with a source (release A) -----------------
+#
+# Filled only where the scan read what the table needs; otherwise absent, never guessed.
+#
+# `oid`: the algorithm's own identifier, only where the family is one algorithm and not a
+# combination with a hash (ECDSA's OIDs all name one, so ECDSA gets none). The same
+# entries, from the same RFCs, as oids.OIDS: RFC 8017 App. C (rsaEncryption), RFC 3279
+# (id-dsa, dhpublicnumber, md5, sha1), RFC 5480 (id-ecPublicKey), RFC 8410 (X25519, X448,
+# Ed25519, Ed448). A test holds the two tables together.
+_OID_BY_FAMILY = {
+    "RSA": "1.2.840.113549.1.1.1",
+    "DSA": "1.2.840.10040.4.1",
+    "DH": "1.2.840.10046.2.1",
+    "EC": "1.2.840.10045.2.1",
+    "X25519": "1.3.101.110",
+    "X448": "1.3.101.111",
+    "Ed25519": "1.3.101.112",
+    "Ed448": "1.3.101.113",
+    "MD5": "1.2.840.113549.2.5",
+    "SHA1": "1.3.14.3.2.26",
+}
+# A post-quantum OID names a parameter set, so it is stated only where one set was read.
+# NIST CSOR (Computer Security Objects Register), as classifier._OID_FAMILIES:
+# kems 2.16.840.1.101.3.4.4.{1,2,3} = ML-KEM-512/768/1024 (FIPS 203); sigAlgs
+# 2.16.840.1.101.3.4.3.{17,18,19} = ML-DSA-44/65/87 (FIPS 204, RFC 9881) and .20-.31 = the
+# twelve pure SLH-DSA sets in FIPS 205 order (RFC 9909).
+_PQC_OID = {
+    ("ML-KEM", "512"): "2.16.840.1.101.3.4.4.1",
+    ("ML-KEM", "768"): "2.16.840.1.101.3.4.4.2",
+    ("ML-KEM", "1024"): "2.16.840.1.101.3.4.4.3",
+    ("ML-DSA", "44"): "2.16.840.1.101.3.4.3.17",
+    ("ML-DSA", "65"): "2.16.840.1.101.3.4.3.18",
+    ("ML-DSA", "87"): "2.16.840.1.101.3.4.3.19",
+    **{("SLH-DSA", f"{h}-{n}{v}"): f"2.16.840.1.101.3.4.3.{20 + i}"
+       for i, (h, n, v) in enumerate((h, n, v) for h in ("SHA2", "SHAKE")
+                                     for n in (128, 192, 256) for v in "sf")},
+}
+# `nistQuantumSecurityLevel`: the category the standard assigns to the parameter set.
+# FIPS 203 §8 (ML-KEM-512/768/1024: 1/3/5), FIPS 204 §4 Table 1 (ML-DSA-44/65/87: 2/3/5),
+# FIPS 205 §11 Table 2 (SLH-DSA-*-128/192/256: 1/3/5).
+_PQC_CATEGORY = {
+    ("ML-KEM", "512"): 1, ("ML-KEM", "768"): 3, ("ML-KEM", "1024"): 5,
+    ("ML-DSA", "44"): 2, ("ML-DSA", "65"): 3, ("ML-DSA", "87"): 5,
+    **{("SLH-DSA", f"{h}-{n}{v}"): {128: 1, 192: 3, 256: 5}[n]
+       for h in ("SHA2", "SHAKE") for n in (128, 192, 256) for v in "sf"},
+}
+# ...and 0 -- "none of the categories are met", the schema's own words -- for the classical
+# public-key families Shor's algorithm breaks (NIST IR 8547 ipd lists RSA, ECDSA, EdDSA,
+# DH, ECDH and DSA as quantum-vulnerable; the rest are the same integer-factorisation and
+# discrete-log problems).
+_SHOR_BROKEN = {
+    "RSA", "DSA", "DH", "EC", "ECDSA", "ECDH", "EdDSA", "Ed25519", "Ed448", "X25519", "X448",
+    "Schnorr", "BLS", "GOST R 34.10", "SM2", "ElGamal",
+}
+# `classicalSecurityLevel` (bits). NIST SP 800-57 Part 1 Rev. 5, Table 2: IFC/FFC by the
+# modulus size exactly as tabulated (4096 is not in the table, so it gets none); ECC by
+# the size of n in ranges. Table 3 for hash collision resistance (SHA-224: 112; MD5 and
+# SHA-1 are "<80" there, not a number, so they get none). NIST SP 800-186 for the
+# Montgomery and Edwards curves (Curve25519/Edwards25519: 128, Curve448/Edwards448: 224).
+_IFC_FFC_STRENGTH = {1024: 80, 2048: 112, 3072: 128, 7680: 192, 15360: 256}
+_IFC_FFC = {"RSA", "DSA", "DH", "ElGamal"}
+_ECC = {"EC", "ECDSA", "ECDH"}
+_ECC_STRENGTH = ((512, 256), (384, 192), (256, 128), (224, 112), (160, 80))
+_FIXED_STRENGTH = {"X25519": 128, "Ed25519": 128, "X448": 224, "Ed448": 224,
+                   "SHA-224": 112, "SHA3-224": 112}
+# `curve`: where the family fixes it, in the names the schema recommends
+# (neuromancer.sk/std, "other" category); otherwise only a curve read from the file.
+_FIXED_CURVE = {"X25519": "Curve25519", "X448": "Curve448",
+                "Ed25519": "Ed25519", "Ed448": "Ed448"}
+# `cryptoFunctions`: what the algorithm implements, by primitive (schema enum). Key
+# agreement derives the shared key (NIST SP 800-56A Rev. 3 §5.8: key derivation is part of
+# every key-agreement scheme). `pke` is said per family: an "EC" key is not an algorithm.
+_FUNCTIONS_BY_PRIMITIVE = {
+    "signature": ["keygen", "sign", "verify"],
+    "kem": ["keygen", "encapsulate", "decapsulate"],
+    "key-agree": ["keygen", "keyderive"],
+    "hash": ["digest"],
+    "block-cipher": ["encrypt", "decrypt"],
+    "stream-cipher": ["encrypt", "decrypt"],
+}
+_FUNCTIONS_BY_FAMILY = {
+    "RSA": ["keygen", "encrypt", "decrypt", "sign", "verify"],
+    "ElGamal": ["keygen", "encrypt", "decrypt"],
+}
+
+
+def _classical_strength(family: str, sizes: list[int]) -> int | None:
+    if family in _FIXED_STRENGTH:
+        return _FIXED_STRENGTH[family]
+    if len(sizes) != 1:
+        return None
+    if family in _IFC_FFC:
+        return _IFC_FFC_STRENGTH.get(sizes[0])
+    if family in _ECC:
+        return next((bits for floor, bits in _ECC_STRENGTH if sizes[0] >= floor), None)
+    return None
+
+
+def _m4_fields(family: str, primitive: str, sizes: list[int],
+               in_use: list[dict[str, Any]]) -> tuple[dict[str, Any], str | None, list[str]]:
+    """The M4 fields for one family: algorithmProperties additions, the OID, and every
+    parameter set read when there was more than one (named, none chosen)."""
+    sets = sorted({i["parameter_set"] for i in in_use if i.get("parameter_set")})
+    curves = sorted({c.strip() for i in in_use if i.get("curve")
+                     for c in str(i["curve"]).split(",") if c.strip()})
+    one_set = sets[0] if len(sets) == 1 else None
+    fields: dict[str, Any] = {}
+    # A key size wins where one was read (the existing rule); otherwise one parameter set.
+    if len(sizes) != 1 and one_set:
+        fields["parameterSetIdentifier"] = one_set
+    curve = _FIXED_CURVE.get(family) or (curves[0] if len(curves) == 1 else None)
+    if curve:
+        fields["curve"] = curve
+    functions = _FUNCTIONS_BY_FAMILY.get(family) or _FUNCTIONS_BY_PRIMITIVE.get(primitive)
+    if functions:
+        fields["cryptoFunctions"] = list(functions)
+    strength = _classical_strength(family, sizes)
+    if strength is not None:
+        fields["classicalSecurityLevel"] = strength
+    if family in _SHOR_BROKEN:
+        fields["nistQuantumSecurityLevel"] = 0
+    elif (family, one_set) in _PQC_CATEGORY:
+        fields["nistQuantumSecurityLevel"] = _PQC_CATEGORY[(family, one_set)]
+    oid = _OID_BY_FAMILY.get(family) or _PQC_OID.get((family, one_set))
+    return fields, oid, sets if len(sets) > 1 else []
 
 
 # What a protocol asset says beyond its version, carried as properties. The default a
@@ -215,6 +347,31 @@ def _serial(coverage: dict[str, Any], findings_digest: str = "") -> str:
     return f"urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, seed)}"
 
 
+# Where the read time lives, said in the CBOM in place of the times themselves.
+WINDOW_NOT_CARRIED = (
+    "not carried in the CBOM: the read time differs on every run and would make two "
+    "documents of one unchanged tree differ; it is in the scan result's coverage.window")
+
+
+def _timestamp(coverage: dict[str, Any]) -> tuple[str | None, str]:
+    """A timestamp that is a function of the tree, and what it is.
+
+    SOURCE_DATE_EPOCH first (the reproducible-builds convention), then the commit time
+    of a clean checkout. Otherwise none: the schema makes the field optional, and a
+    clock reading would be the one thing in the document the tree did not decide.
+    """
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if epoch.isdigit():
+        stamp = datetime.fromtimestamp(int(epoch), timezone.utc).isoformat(timespec="seconds")
+        return stamp, "SOURCE_DATE_EPOCH, set by whoever ran the scan"
+    pin = coverage["corpus"].get("pinned_at") or {}
+    if pin.get("pinned") and pin.get("dirty") is False and pin.get("committed_at"):
+        return pin["committed_at"], ("the commit time of the scanned tree's commit "
+                                     "(a clean checkout), not the time of the run")
+    return None, ("not stated: the tree is not a clean checkout and SOURCE_DATE_EPOCH is "
+                  "not set, so nothing but the clock could give one")
+
+
 def _occurrences(located: list[dict[str, Any]], family: str,
                  family_of: dict[str, str]) -> list[dict[str, Any]]:
     """Where a family was found. The detector names what it matched ("PPK"); the
@@ -337,6 +494,12 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     components: list[dict[str, Any]] = []
     for family in sorted(by_family):
         finding = by_family[family]
+        # The sightings the inventory itself uses: a comment or a ban cannot set a field.
+        in_use = [item for item in located
+                  if family_of.get(item.get("algorithm"), item.get("algorithm")) == family
+                  and item.get("evidence_kind") not in {"comment", "ban"}]
+        m4, oid, several_sets = _m4_fields(family, _primitive(family),
+                                           observed_sizes.get(family, []), in_use)
         component: dict[str, Any] = {
             "type": "cryptographic-asset",
             "bom-ref": _ref("crypto", family),
@@ -355,7 +518,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                     # difference. A string, because the schema says string.
                     **({"parameterSetIdentifier": str(observed_sizes[family][0])}
                        if len(observed_sizes.get(family, [])) == 1 else {}),
+                    **m4,
                 },
+                **({"oid": oid} if oid else {}),
             },
             # The classification and the post-quantum family have no field in the
             # schema, so they travel as properties for the same reason coverage
@@ -372,6 +537,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 "name": f"{NS}observedKeySizes",
                 "value": ", ".join(str(s) for s in observed_sizes[family]),
             })
+        # More than one parameter set read: all of them, none chosen (as for sizes).
+        if several_sets:
+            component["properties"].append({
+                "name": f"{NS}observedParameterSets", "value": ", ".join(several_sets)})
         for key in ("pqc_family", "pqc_status"):
             if finding.get(key):
                 component["properties"].append({"name": f"{NS}{key}", "value": finding[key]})
@@ -629,6 +798,56 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["scope"] = "excluded"
         components.append(component)
 
+    # A hybrid is one asset made of two (release A, M4h): its own component, and a
+    # `dependencies` entry from it to each half the inventory holds. Kept only where a
+    # half is in use on the same line, so a hybrid named in a comment is not an asset.
+    # A half the inventory does not hold is named, not pointed at: a ref to a component
+    # that is not in the document would be a link to nothing.
+    in_use_at = {(item.get("path"), item.get("line"),
+                  family_of.get(item.get("algorithm"), item.get("algorithm")))
+                 for item in located if item.get("evidence_kind") not in {"comment", "ban"}}
+    family_refs = {_ref("crypto", family) for family in by_family}
+    by_hybrid: dict[str, list[dict[str, Any]]] = {}
+    for item in scan_result.get("hybrid_names", []):
+        if any((item["path"], item["line"], family) in in_use_at
+               for family, _ in item["halves"]):
+            by_hybrid.setdefault(item["name"], []).append(item)
+    hybrid_dependencies: list[dict[str, Any]] = []
+    for name, group in sorted(by_hybrid.items()):
+        halves = group[0]["halves"]
+        ref = _ref("hybrid", name)
+        held = [_ref("crypto", family) for family, _ in halves
+                if _ref("crypto", family) in family_refs]
+        missing = [family for family, _ in halves if _ref("crypto", family) not in family_refs]
+        properties = [
+            {"name": f"{NS}basis", "value": "named_hybrid"},
+            {"name": f"{NS}halves", "value": " + ".join(
+                f"{family}-{pset}" if pset and family in {"ML-KEM", "Kyber"} else
+                f"{family} ({pset})" if pset else family for family, pset in halves)},
+        ]
+        if missing:
+            properties.append({"name": f"{NS}half_not_in_inventory",
+                               "value": ", ".join(missing)})
+        component = {
+            "type": "cryptographic-asset",
+            "bom-ref": ref,
+            "name": name,
+            "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": {
+                "primitive": "combiner",
+                "cryptoFunctions": ["keygen", "encapsulate", "decapsulate"]}},
+            "properties": properties,
+            "evidence": {"occurrences": [
+                {"location": g["path"], "line": g["line"],
+                 "additionalContext": f"{name}: hybrid of "
+                                      + " and ".join(f for f, _ in halves)}
+                for g in group]},
+        }
+        if all(in_test_code(g["path"]) for g in group):
+            component["scope"] = "excluded"
+        components.append(component)
+        if held:
+            hybrid_dependencies.append({"ref": ref, "dependsOn": sorted(held)})
+
     # Dependencies are libraries, not cryptographic assets: what is installed is
     # not what is called. They travel as `library` components carrying the
     # families they implement, and the basis says the difference out loud.
@@ -661,6 +880,22 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             ]},
         })
 
+    # Each file an occurrence cites, with the SHA-256 of the bytes that were read
+    # (release A, 05-novi-merki T2). Occurrences have no hash field in 1.6, so a `file`
+    # component named exactly as the occurrence's location carries the schema's own
+    # `hashes`. Not inventory: left out of the composition below.
+    digests: dict[str, str] = scan_result.get("evidence_file_sha256") or {}
+    cited = sorted({o["location"] for c in components
+                    for o in c.get("evidence", {}).get("occurrences", [])
+                    if o.get("location") in digests})
+    evidence_files = [{
+        "type": "file",
+        "bom-ref": f"file:{path}",
+        "name": path,
+        "hashes": [{"alg": "SHA-256", "content": digests[path]}],
+        "properties": [{"name": f"{NS}basis", "value": "evidence_file"}],
+    } for path in cited]
+
     # `complete` is a claim about the component list, so it is tied to the file
     # count rather than to the run finishing without error. Anything short of
     # every present file examined is `incomplete` -- a word the schema has had
@@ -670,7 +905,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # denominator is whole, not that the list of components is. So a held control is
     # what makes `complete` sayable; without one the honest word is `unknown`.
     control_held = bool((coverage.get("claims", {}).get("control") or {}).get("held"))
-    if scope["files_not_examined"] == 0:
+    # A recognised report (row 144) holds no asset this list could be missing.
+    unread = scope["files_not_examined"] - sum(
+        r["count"] for r in coverage["not_examined"] if r["reason"] == "report_document")
+    if unread == 0:
         aggregate = "complete" if control_held else "unknown"
     else:
         aggregate = "incomplete"
@@ -680,13 +918,14 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         # it is different from `incomplete`, which asserts a known shortfall.
         aggregate = "unknown"
 
+    timestamp, timestamp_basis = _timestamp(coverage)
     document: dict[str, Any] = {
         "bomFormat": "CycloneDX",
         "specVersion": SPEC_VERSION,
         "serialNumber": _serial(coverage, _findings_digest(scan_result)),
         "version": 1,
         "metadata": {
-            "timestamp": coverage["window"]["started_at"],
+            **({"timestamp": timestamp} if timestamp else {}),
             "tools": {"components": [{
                 "type": "application",
                 "name": instrument["tool"],
@@ -698,15 +937,18 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 "name": coverage["corpus"]["target"],
             },
         },
-        "components": components,
+        "components": components + evidence_files,
+        **({"dependencies": hybrid_dependencies} if hybrid_dependencies else {}),
         "compositions": [{
             "aggregate": aggregate,
             "assemblies": [c["bom-ref"] for c in components],
         }],
+        # The read window is the one part of the block that changes when the tree does
+        # not; it is named in its place rather than dropped.
         "properties": [
             {"name": f"{NS}coverage:{name}", "value": value}
-            for name, value in _flatten(coverage)
-        ],
+            for name, value in _flatten({**coverage, "window": WINDOW_NOT_CARRIED})
+        ] + [{"name": f"{NS}timestamp_basis", "value": timestamp_basis}],
     }
 
     # Signing commands found in CI are evidence of cryptography being used without

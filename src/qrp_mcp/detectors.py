@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import posixpath
 import re
@@ -2814,6 +2815,100 @@ def _sizes_by_algorithm(findings: list[dict[str, Any]]) -> dict[str, list[int]]:
     return out
 
 
+# A post-quantum parameter set written on the line (release A, M4): what the CBOM's
+# parameterSetIdentifier, OID and NIST category need, and what a family name alone does not
+# say. The FIPS 203/204/205 names, with or without separators, never preceded by a letter
+# (`HashML-DSA`, `HashSLH-DSA` are the pre-hash variants, which have other OIDs). A line
+# naming two sets of one family gives none.
+_PARAMETER_SETS: dict[str, tuple[re.Pattern[str], Any]] = {
+    "ML-KEM": (re.compile(r"(?<![a-z])ml[-_]?kem[-_]?(512|768|1024)(?!\d)", re.I),
+               lambda m: m.group(1)),
+    "ML-DSA": (re.compile(r"(?<![a-z])ml[-_]?dsa[-_]?(44|65|87)(?!\d)", re.I),
+               lambda m: m.group(1)),
+    "SLH-DSA": (re.compile(r"(?<![a-z])slh[-_]?dsa[-_]?(sha2|shake)[-_]?(128|192|256)([sf])"
+                           r"(?![a-z0-9])", re.I),
+                lambda m: f"{m.group(1).upper()}-{m.group(2)}{m.group(3).lower()}"),
+}
+
+
+# Hybrid key exchanges by name, with their two halves (release A, M4h): the CBOM makes the
+# hybrid one asset depending on both. Halves as (family, parameter set or None).
+# TLS: the IANA TLS Supported Groups registry, draft-ietf-tls-ecdhe-mlkem (X25519MLKEM768,
+# SecP256r1MLKEM768, SecP384r1MLKEM1024), draft-tls-westerbaan-xyber768d00 (the Kyber
+# drafts); curveSM2MLKEM768 as the registry names it. SSH: draft-ietf-sshm-mlkem-hybrid-kex
+# (mlkem768x25519-sha256, mlkem768nistp256-sha256, mlkem1024nistp384-sha384) and the
+# Streamlined NTRU Prime draft (sntrup761x25519-sha512, OpenSSH 9.0's default; sntrup761
+# is in the NTRU family here, classifier.py). X-Wing: draft-connolly-cfrg-xwing-kem.
+HYBRIDS: dict[str, tuple[str, tuple[tuple[str, str | None], ...]]] = {
+    name.lower(): (name, halves) for name, halves in (
+        ("X25519MLKEM768", (("X25519", None), ("ML-KEM", "768"))),
+        ("SecP256r1MLKEM768", (("ECDH", "P-256"), ("ML-KEM", "768"))),
+        ("SecP384r1MLKEM1024", (("ECDH", "P-384"), ("ML-KEM", "1024"))),
+        ("X25519Kyber768Draft00", (("X25519", None), ("Kyber", "768"))),
+        ("SecP256r1Kyber768Draft00", (("ECDH", "P-256"), ("Kyber", "768"))),
+        ("curveSM2MLKEM768", (("SM2", None), ("ML-KEM", "768"))),
+        ("mlkem768x25519-sha256", (("ML-KEM", "768"), ("X25519", None))),
+        ("mlkem768nistp256-sha256", (("ML-KEM", "768"), ("ECDH", "P-256"))),
+        ("mlkem1024nistp384-sha384", (("ML-KEM", "1024"), ("ECDH", "P-384"))),
+        ("sntrup761x25519-sha512", (("NTRU", "sntrup761"), ("X25519", None))),
+        ("X-Wing", (("ML-KEM", "768"), ("X25519", None))),
+    )}
+_HYBRID_NAME = re.compile(
+    r"(?<![A-Za-z0-9])(" + "|".join(re.escape(n) for n in sorted(HYBRIDS, key=len, reverse=True))
+    + r")(?:@openssh\.com)?(?![A-Za-z0-9])", re.IGNORECASE)
+
+
+def scan_hybrid_names(line: str) -> list[str]:
+    """The hybrids this line names, by their registered spelling."""
+    if "kem" not in line.lower() and "sntrup" not in line.lower() and "wing" not in line.lower():
+        return []
+    out: list[str] = []
+    for match in _HYBRID_NAME.finditer(line):
+        name = HYBRIDS[match.group(1).lower()][0]
+        if name not in out:
+            out.append(name)
+    return out
+
+
+def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
+    for item in items:
+        rule = _PARAMETER_SETS.get(item.get("algorithm"))
+        if rule is None:
+            continue
+        found = {rule[1](m) for m in rule[0].finditer(item.get("excerpt") or "")}
+        if len(found) == 1:
+            item["parameter_set"] = found.pop()
+
+
+def report_document(raw: bytes) -> str | None:
+    """What kind of report this file is, or None when it is not one.
+
+    ZA-OPRAVYANE row 144: our own scan result and CBOM saved in the tree, or any vendor's
+    CycloneDX `bom.json`, were matched as code and turned an RSA-only tree `hybrid_partial`.
+    A report is a statement about cryptography written by a tool, not cryptography in use.
+    Recognised by content: a top-level JSON object that is a CycloneDX document
+    (`bomFormat` is required by every CycloneDX JSON schema) or a qrp-mcp result (its
+    coverage block names the instrument). A file that only quotes `bomFormat` -- the
+    CycloneDX schema itself -- is not one.
+    """
+    body = raw.lstrip(b"\xef\xbb\xbf \t\r\n")
+    if not body.startswith(b"{") or (b'"bomFormat"' not in body and b'"qrp-mcp"' not in body):
+        return None
+    try:
+        document = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    if document.get("bomFormat") == "CycloneDX":
+        return "CycloneDX document"
+    block = document.get("coverage")
+    instrument = block.get("instrument") if isinstance(block, dict) else None
+    if isinstance(instrument, dict) and instrument.get("tool") == "qrp-mcp":
+        return "qrp-mcp scan result"
+    return None
+
+
 def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     """`exclude` is a single path left out of the scan and named in the scope.
 
@@ -2831,6 +2926,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     files_scanned = {"source": 0, "ci_config": 0, "iac": 0, "config": 0, "certificate": 0}
 
     unreadable: list[str] = []
+    # Reports (CycloneDX documents, qrp-mcp results) read and recognised, not matched.
+    reports: list[str] = []
     # Claimed file types that were opened and gave up nothing nameable.
     undecoded: list[str] = []
     # What this run actually read, and what it deliberately did not. A commit does
@@ -2851,6 +2948,8 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # Hybrid groups in a TLS group setting, and the TLS server images the tree pins, so
     # the two can be put side by side; see assets.library_support.
     hybrid_places: list[tuple[str, int, str]] = []
+    # Any hybrid named on a line, wherever (release A): the CBOM's hybrid components.
+    hybrid_names: list[tuple[str, int, str]] = []
     pinned_images: list[dict[str, Any]] = []
     # The same for SSH: classical KexAlgorithms offered beside a hybrid; see assets.scan_ssh_kex.
     ssh_kex_findings: list[dict[str, Any]] = []
@@ -2880,6 +2979,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     # Every file actually read, by path. A count says how much was read; only the
     # names let a later run tell a file that was fixed from a file that is gone.
     files_read: list[str] = []
+    # The SHA-256 of each file read, by path: the per-file part of content_parts, kept so
+    # the CBOM can bind each cited file to the bytes that were read (release A).
+    file_digests: dict[str, str] = {}
     # CODEOWNERS files read, by location (see CODEOWNERS_LOCATIONS).
     codeowners: dict[str, list[str]] = {}
     resolved_exclude = None
@@ -2956,8 +3058,13 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # read, so two files differing exactly where the scanner looks -- an object
         # identifier inside a DER blob -- produced the same digest while producing
         # different findings. No extra I/O; these are the bytes already in hand.
-        content_parts.append(
-            rel_path + "\0" + hashlib.sha256(raw).hexdigest())
+        digest = hashlib.sha256(raw).hexdigest()
+        content_parts.append(rel_path + "\0" + digest)
+        file_digests[rel_path] = digest
+        if report_document(raw):
+            # Named under its own reason in the coverage block (row 144), never matched.
+            reports.append(rel_path)
+            continue
         files_read.append(rel_path)
 
         for number, text_line in enumerate(lines, 1):
@@ -2972,6 +3079,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                 group["in_test_code"] = in_test_code(rel_path)
                 tls_group_findings.append(group)
             hybrid_places.extend((rel_path, number, g) for g in scan_hybrid_groups(text_line))
+            hybrid_names.extend((rel_path, number, n) for n in scan_hybrid_names(text_line))
             for item in scan_static_rsa_kex(text_line):
                 item["path"] = rel_path
                 item["line"] = number
@@ -3131,6 +3239,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             + static_rsa_findings + ssh_kex_findings + weak_key_findings,
             _read_codeowners(owners_file, codeowners[owners_file]))
     _join_pins(source_findings + iac_findings, pins)
+    _tag_parameter_sets(source_findings + iac_findings)
     _join_fips(source_findings + iac_findings, fips_findings)
     return {
         "files_scanned": files_scanned,
@@ -3170,6 +3279,14 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
         # "0 findings" can be checked against a denominator instead of trusted.
         "unreadable_files": unreadable,
         "claimed_but_not_decoded": undecoded,
+        # Read, recognised as a report about cryptography, and not matched (row 144).
+        "report_documents": reports,
+        # Hybrids named on a line, with their halves; the CBOM keeps those a half of
+        # which is in the inventory at that line.
+        "file_digests": file_digests,
+        "hybrid_names": [{"path": p, "line": n, "name": name,
+                          "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}
+                         for p, n, name in hybrid_names],
         "protocol_findings": protocol_findings,
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,
