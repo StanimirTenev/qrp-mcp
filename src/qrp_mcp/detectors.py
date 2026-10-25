@@ -2468,6 +2468,96 @@ def _attach_providers(findings: list[dict[str, Any]], lines: list[str]) -> None:
             f["provider"] = names[0]
 
 
+# Java .properties and getProperty (ZA-OPRAVYANE rows 145, 149). OWASP Benchmark's 40 hash
+# misses were all `getProperty("hashAlg1", "SHA512")` in the code and `hashAlg1=MD5` in
+# benchmark.properties. A property is an algorithm setting when its key says so and its
+# value is an algorithm; the line of code that reads it names the same algorithm.
+_PROPERTY_LINE = re.compile(r"^\s*([A-Za-z0-9_.\-]+)\s*[=:]\s*(\S+?)\s*$")
+_ALGORITHM_SETTING_KEY = re.compile(
+    r"(?i:alg|cipher|hash|digest|crypto|transformation|signature|key[._-]?type)")
+_VALUE_FAMILY = {"MD5": "MD5", "MD2": "MD2", "MD4": "MD4", "SHA1": "SHA1", "SHA-1": "SHA1",
+                 "SHA": "SHA1", "DES": "DES", "DESEDE": "3DES", "TRIPLEDES": "3DES",
+                 "3DES": "3DES", "RC4": "RC4", "ARCFOUR": "RC4", "RC2": "RC2", "RSA": "RSA",
+                 "DSA": "DSA", "DH": "DH", "DIFFIEHELLMAN": "DH", "EC": "EC", "ECDSA": "ECDSA",
+                 "ECDH": "ECDH"}
+_GET_PROPERTY = re.compile(r"\bgetProperty\s*\(\s*\"([^\"]+)\"\s*(?:,\s*\"([^\"]*)\"\s*)?\)")
+
+
+def _algorithm_value(value: str) -> str | None:
+    """The family a JCA-style value names: `MD5`, `DESede/ECB/PKCS5Padding`, `AES/ECB/...`."""
+    head, _, rest = value.strip().strip("\"'").partition("/")
+    if head.upper() == "AES" and rest.upper().startswith("ECB"):
+        return "AES-ECB"
+    return _VALUE_FAMILY.get(head.upper())
+
+
+def property_assignments(lines: list[str]) -> list[tuple[str, str, int, int]]:
+    """(key, value, line, position of the value) for every `key=value` of a .properties file."""
+    out = []
+    for number, text in enumerate(lines, 1):
+        if text.lstrip().startswith(("#", "!")):
+            continue
+        match = _PROPERTY_LINE.match(text)
+        if match:
+            out.append((match.group(1), match.group(2), number, match.start(2)))
+    return out
+
+
+def _property_settings(line: str) -> list[tuple[str, int, str]]:
+    """(family, position, key) where this .properties line sets an algorithm."""
+    out = []
+    for key, value, _, pos in property_assignments([line]):
+        family = _algorithm_value(value)
+        if family and _ALGORITHM_SETTING_KEY.search(key):
+            out.append((family, pos, key))
+    return out
+
+
+def getproperty_reads(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """Each `getProperty("key"[, "default"])` in code, for the tree-wide join below."""
+    out = []
+    for number, text in enumerate(lines, 1):
+        if "getProperty" not in text or _COMMENT_LINE.match(text):
+            continue
+        for match in _GET_PROPERTY.finditer(text):
+            out.append({"path": rel_path, "line": number, "key": match.group(1),
+                        "default": match.group(2), "excerpt": text.strip()[:200],
+                        "evidence_kind": _evidence_kind(text, False)})
+    return out
+
+
+def _join_properties(reads: list[dict[str, Any]],
+                     settings: dict[str, list[tuple[str, str, int]]],
+                     findings: list[dict[str, Any]]) -> None:
+    """A read whose key a .properties file in the tree sets gets that file's algorithm. The
+    join is by key across the tree (src/main/resources is no ancestor of src/main/java), and
+    a key set to different values is not guessed between. Only a key no file sets runs on
+    its default, so only then is the default literal read."""
+    have = {(f["path"], f["line"], f["algorithm"]) for f in findings}
+    for read in reads:
+        entries = settings.get(read["key"])
+        if entries:
+            if len({value for value, _, _ in entries}) != 1:
+                continue
+            value, where, line = entries[0]
+            family = _algorithm_value(value)
+            said = (f"{family} named by the property {read['key']} ({where}:{line}), "
+                    f"read here with getProperty")
+        else:
+            family = _algorithm_value(read["default"] or "")
+            said = (f"{family} named as the default of getProperty(\"{read['key']}\"); no "
+                    f"properties file in the tree sets {read['key']}")
+        if not family or (read["path"], read["line"], family) in have:
+            continue
+        have.add((read["path"], read["line"], family))
+        findings.append({
+            "path": read["path"], "line": read["line"], "algorithm": family,
+            "description": said, "excerpt": read["excerpt"],
+            "evidence_kind": read["evidence_kind"],
+            "in_test_code": in_test_code(read["path"]),
+        })
+
+
 # Python 3.9+ `hashlib.md5(data, usedforsecurity=False)`: the code declares the digest is
 # not a security use (ZA-OPRAVYANE row 147). The row keeps its family and severity -- the
 # flag is the developer's statement, and dropping the row would let it silence the scan --
@@ -2691,6 +2781,19 @@ def scan_source_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
                 "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code) else
                                   "comment" if _in_spans(pos, spans) else kind),
+                "in_test_code": in_test_code(rel_path),
+            })
+        for family, pos, key in (_property_settings(line) if ext == ".properties" else []):
+            if family in seen_on_line:
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} set as the value of the property {key}",
+                "excerpt": line.strip()[:200],
+                "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial, code) else kind,
                 "in_test_code": in_test_code(rel_path),
             })
         # DNSSEC algorithm numbers, in the shape of a DNSKEY, DS or RRSIG record.
@@ -3022,6 +3125,9 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
     fips_findings: list[dict[str, Any]] = []
     # Packages pinned to one version: (ecosystem, package, version, manifest, line).
     pins: list[tuple[str, str, str, str, int]] = []
+    # .properties assignments by key, and the getProperty reads that look them up (row 145).
+    property_values: dict[str, list[tuple[str, str, int]]] = {}
+    property_reads: list[dict[str, Any]] = []
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -3163,6 +3269,11 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                                       "path": rel_path, "line": number, "excerpt": excerpt})
         if path.suffix.lower() in {".yaml", ".yml"}:
             pinned_images.extend(image_pins(rel_path, lines))
+        if path.suffix.lower() == ".properties":
+            for key, value, number, _ in property_assignments(lines):
+                property_values.setdefault(key, []).append((value, rel_path, number))
+        elif path.suffix.lower() in SOURCE_EXTENSIONS and b"getProperty" in raw:
+            property_reads.extend(getproperty_reads(rel_path, lines))
         if is_manifest(path):
             dependency_findings.extend(scan_manifest(path, rel_path, lines))
             pins.extend((eco, pkg, ver, rel_path, n)
@@ -3280,6 +3391,7 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
             unreadable_dirs.append(rel + "/")
         content_parts.append(f"{rel}\0{kind}")
 
+    _join_properties(property_reads, property_values, source_findings)
     _link_signing_keys(ci_findings, key_files)
     owners_file = next((p for p in CODEOWNERS_LOCATIONS if p in codeowners), None)
     if owners_file:
