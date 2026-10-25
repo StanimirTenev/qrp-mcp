@@ -1537,6 +1537,34 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
     return out + _cipher_string_parts(line) + _suite_table_entry(line)
 
 
+# A key type given as a value (ZA-OPRAVYANE row 126, decision 25.10): `key_type = 'rsa'`,
+# `private_key_type = "rsa"`, `'--key-type', 'rsa'`, `choices=['rsa', 'ecdsa']` beside a key
+# type (certbot). A bare 'rsa' is refused everywhere else -- it names logos, files and
+# variables -- so the line has to say it is a key type. RSA and ECDSA alike. The name of a
+# setting (`rsa_enabled`) is not a value and stays silent.
+_KEY_TYPE_FAMILY = {"rsa": "RSA", "ecdsa": "ECDSA", "dsa": "DSA", "ec": "EC",
+                    "ed25519": "Ed25519", "ed448": "Ed448"}
+_KEY_TYPE_VALUE = re.compile(
+    r"(?i:key[_-]?type)\w*[\"']?\s*(?:[:=]=?|,|\s)\s*[\"']?"
+    r"(?i:(rsa|ecdsa|dsa|ec|ed25519|ed448))(?![A-Za-z0-9_-])")
+_KEY_TYPE_NAMED = re.compile(r"(?i:key[_-]?type)")
+_CHOICES = re.compile(r"\bchoices\s*=\s*[\[(]([^\])]*)[\])]")
+_QUOTED_WORD = re.compile(r"[\"']([A-Za-z0-9]+)[\"']")
+
+
+def _key_type_values(line: str) -> list[tuple[str, int]]:
+    if not _KEY_TYPE_NAMED.search(line):
+        return []
+    out = [(_KEY_TYPE_FAMILY[m.group(1).lower()], m.start(1))
+           for m in _KEY_TYPE_VALUE.finditer(line)]
+    for choices in _CHOICES.finditer(line):
+        for word in _QUOTED_WORD.finditer(choices.group(1)):
+            family = _KEY_TYPE_FAMILY.get(word.group(1).lower())
+            if family:
+                out.append((family, choices.start(1) + word.start(1)))
+    return out
+
+
 def _suite_families(parts: list[str]) -> list[str]:
     families = [f for f in (_SUITE_COMPONENT.get(p.upper()) for p in parts) if f]
     return [f for f in families if f != "DES"] if "3DES" in families else families
@@ -2634,6 +2662,20 @@ def scan_source_file(path: Path, rel_path: str,
                 "description": f"{family} offered as the TLS group {group['group']}",
                 "excerpt": line.strip()[:200],
                 "evidence_kind": kind,
+                "in_test_code": in_test_code(rel_path),
+            })
+        for family, pos in _key_type_values(searched):
+            if family in seen_on_line or _in_blob(pos, blobs):
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} named as a key-type value",
+                "excerpt": line.strip()[:200],
+                "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code) else
+                                  "comment" if _in_spans(pos, spans) else kind),
                 "in_test_code": in_test_code(rel_path),
             })
         # DNSSEC algorithm numbers, in the shape of a DNSKEY, DS or RRSIG record.
