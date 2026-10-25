@@ -160,8 +160,9 @@ def export_cbom(
 
     The serial number is derived from the target, the two pins and a digest of the
     findings, so two runs of the same code over the same corpus that find the same things
-    share it and a different result does not. The timestamp and coverage window record
-    when each run happened.
+    share it and a different result does not. The timestamp is the tree's commit time
+    (or SOURCE_DATE_EPOCH), so two runs over one unchanged tree give the same bytes; the
+    read window stays in the scan result.
 
     The matched text in `evidence.occurrences` is masked by default, for the reason
     given on `scan_repo` and one more: this document is the one built to be sent.

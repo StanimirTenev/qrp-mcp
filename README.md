@@ -593,8 +593,10 @@ EC key is a `related-crypto-material` component with `qrp:curve`, `qrp:scalar` a
 
 Output is deterministic where it matters. The serial number is derived from the target, the two
 pins and a digest of what was found, so the same code over the same corpus that finds the same
-things gets the same serial, and a different result gets a different one. The timestamp and the
-coverage window record when the run happened, so those fields differ between runs.
+things gets the same serial, and a different result gets a different one. The whole CBOM is
+byte-identical across two runs over one unchanged tree: the timestamp is the tree's commit time
+(or `SOURCE_DATE_EPOCH`, or absent when neither exists), and the read window stays in the scan
+result's `coverage.window`, named in the CBOM rather than carried.
 
 ## What kind of place a finding sits in
 

@@ -34,17 +34,21 @@ Determinism is a requirement rather than a nicety, because the comparison tool i
 `coverage.compare` reads these documents. Two runs of the same instrument over the
 same corpus that find the same things get the same serial number: it is derived from
 the target, the two pins and a digest of the findings and counts rather than drawn at
-random. The timestamp and the coverage window record when each run happened, so those
-fields differ between runs; everything else is identical. Two runs whose instrument differs get
-different serial numbers, which is the pin argument stated in one field.
+random. Since release A the whole document is byte-identical across such runs: the
+timestamp is the tree's commit time (or SOURCE_DATE_EPOCH, or absent), and the read
+window stays in the scan result, named in the CBOM rather than carried. Two runs whose
+instrument differs get different serial numbers, which is the pin argument stated in one
+field.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
 from .assets import TLS_SETTING_NOTE
@@ -213,6 +217,31 @@ def _serial(coverage: dict[str, Any], findings_digest: str = "") -> str:
         findings_digest,
     ])
     return f"urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, seed)}"
+
+
+# Where the read time lives, said in the CBOM in place of the times themselves.
+WINDOW_NOT_CARRIED = (
+    "not carried in the CBOM: the read time differs on every run and would make two "
+    "documents of one unchanged tree differ; it is in the scan result's coverage.window")
+
+
+def _timestamp(coverage: dict[str, Any]) -> tuple[str | None, str]:
+    """A timestamp that is a function of the tree, and what it is.
+
+    SOURCE_DATE_EPOCH first (the reproducible-builds convention), then the commit time
+    of a clean checkout. Otherwise none: the schema makes the field optional, and a
+    clock reading would be the one thing in the document the tree did not decide.
+    """
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if epoch.isdigit():
+        stamp = datetime.fromtimestamp(int(epoch), timezone.utc).isoformat(timespec="seconds")
+        return stamp, "SOURCE_DATE_EPOCH, set by whoever ran the scan"
+    pin = coverage["corpus"].get("pinned_at") or {}
+    if pin.get("pinned") and pin.get("dirty") is False and pin.get("committed_at"):
+        return pin["committed_at"], ("the commit time of the scanned tree's commit "
+                                     "(a clean checkout), not the time of the run")
+    return None, ("not stated: the tree is not a clean checkout and SOURCE_DATE_EPOCH is "
+                  "not set, so nothing but the clock could give one")
 
 
 def _occurrences(located: list[dict[str, Any]], family: str,
@@ -680,13 +709,14 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         # it is different from `incomplete`, which asserts a known shortfall.
         aggregate = "unknown"
 
+    timestamp, timestamp_basis = _timestamp(coverage)
     document: dict[str, Any] = {
         "bomFormat": "CycloneDX",
         "specVersion": SPEC_VERSION,
         "serialNumber": _serial(coverage, _findings_digest(scan_result)),
         "version": 1,
         "metadata": {
-            "timestamp": coverage["window"]["started_at"],
+            **({"timestamp": timestamp} if timestamp else {}),
             "tools": {"components": [{
                 "type": "application",
                 "name": instrument["tool"],
@@ -703,10 +733,12 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "aggregate": aggregate,
             "assemblies": [c["bom-ref"] for c in components],
         }],
+        # The read window is the one part of the block that changes when the tree does
+        # not; it is named in its place rather than dropped.
         "properties": [
             {"name": f"{NS}coverage:{name}", "value": value}
-            for name, value in _flatten(coverage)
-        ],
+            for name, value in _flatten({**coverage, "window": WINDOW_NOT_CARRIED})
+        ] + [{"name": f"{NS}timestamp_basis", "value": timestamp_basis}],
     }
 
     # Signing commands found in CI are evidence of cryptography being used without

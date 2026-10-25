@@ -143,11 +143,10 @@ def test_rsa_is_a_public_key_primitive_and_md5_is_a_hash(document):
 def test_two_runs_of_the_same_code_over_the_same_corpus_share_a_serial(corpus):
     """The serial is a function of the run's conditions, not of the moment.
 
-    Byte identity is deliberately not asserted: the window genuinely differs
-    between two runs and a document claiming otherwise would be lying about when
-    it read. What has to hold is that the identifier follows the instrument and
-    the corpus, so a reader can tell two runs apart by their conditions rather
-    than by their clocks.
+    What has to hold is that the identifier follows the instrument and the corpus,
+    so a reader can tell two runs apart by their conditions rather than by their
+    clocks. Byte identity of the whole document is asserted since release A, in
+    test_cbom_byte_identical.py: the read window is named there, not carried.
     """
     first = cyclonedx.build(scan_directory(corpus))
     second = cyclonedx.build(scan_directory(corpus))
@@ -156,8 +155,10 @@ def test_two_runs_of_the_same_code_over_the_same_corpus_share_a_serial(corpus):
     assert first["compositions"] == second["compositions"]
 
 
-def test_the_timestamp_comes_from_the_scan_window_not_from_the_clock(scan, document):
-    assert document["metadata"]["timestamp"] == scan["coverage"]["window"]["started_at"]
+def test_the_timestamp_comes_from_the_tree_not_from_the_clock(scan, document):
+    # Release A: the corpus commit time, so two runs give one document
+    # (test_cbom_byte_identical.py); the read window stays in the scan result.
+    assert document["metadata"]["timestamp"] == scan["coverage"]["corpus"]["pinned_at"]["committed_at"]
 
 
 def test_a_different_emitter_commit_changes_the_serial_number(scan):
