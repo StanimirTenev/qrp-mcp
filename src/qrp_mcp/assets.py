@@ -69,6 +69,8 @@ DEPENDENCY_FAMILIES: dict[str, dict[str, tuple[str, ...]]] = {
         "http-signature": ("RSA", "ECDSA"),
         "libsodium-wrappers": ("EdDSA", "X25519"),
         "ecdsa-sig-formatter": ("ECDSA",),
+        # No public-key algorithm; its weak hashes and ciphers (ZA-OPRAVYANE row 149).
+        "crypto-js": ("MD5", "SHA1", "DES", "3DES", "RC4"),
     },
     "pypi": {
         "pycryptodome": ("RSA", "ECDSA", "DSA"),
