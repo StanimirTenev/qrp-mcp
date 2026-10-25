@@ -476,6 +476,63 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
     return findings
 
 
+# --- secrets encrypted at rest (ZA-OPRAVYANE row 146) -----------------------
+#
+# A sops/age/OpenPGP file in the tree is ciphertext whose key was agreed with a recipient's
+# public key; whoever copies it today opens it once that key falls (harvest now, decrypt
+# later). An age recipient (`age1` + 58 bech32 characters, age-encryption.org/v1) is an
+# X25519 key. An OpenPGP recipient's family is not in a fingerprint, so none is named. The
+# fingerprint lines are read only in a file that is sops's own (`.sops.yaml`, or one with
+# its `sops:` metadata), where `pgp:` and `fp:` mean exactly that.
+_AGE_RECIPIENT = re.compile(r"(?<![A-Za-z0-9])age1[02-9ac-hj-np-z]{58}(?![A-Za-z0-9])")
+_AT_REST_ARMOUR = re.compile(r"-----BEGIN (AGE ENCRYPTED FILE|PGP MESSAGE)-----")
+_SOPS_PGP = re.compile(r"^\s*-?\s*(?:fp|pgp)\s*:\s*[\"']?[0-9A-Fa-f]{40}(?![0-9A-Fa-f])")
+_SOPS_METADATA = re.compile(r"^sops:\s*$")
+_HNDL_NOTE = ("encrypted at rest: a copy taken today opens once the recipient's key is broken "
+              "(harvest now, decrypt later)")
+
+
+def scan_encrypted_at_rest(rel_path: str, lines: list[str]) -> tuple[list[dict[str, Any]],
+                                                                      list[dict[str, Any]]]:
+    """(X25519 findings for age recipients, protocol assets for what is encrypted at rest)."""
+    findings: list[dict[str, Any]] = []
+    assets: list[dict[str, Any]] = []
+    sops = (posixpath.basename(rel_path) == ".sops.yaml"
+            or any(_SOPS_METADATA.match(text) for text in lines))
+    for number, text in enumerate(lines, 1):
+        excerpt = text.strip()[:200]
+        if "age1" in text and _AGE_RECIPIENT.search(text):
+            findings.append({
+                "path": rel_path, "line": number, "algorithm": "X25519",
+                "description": f"X25519 named by an age recipient; {_HNDL_NOTE}",
+                "excerpt": excerpt, "evidence_kind": "declaration", "hndl": True,
+            })
+            assets.append(_at_rest("age", rel_path, number, excerpt, "X25519"))
+        armour = _AT_REST_ARMOUR.search(text) if "-----BEGIN" in text else None
+        if armour:
+            assets.append(_at_rest("age" if armour.group(1).startswith("AGE") else "openpgp",
+                                   rel_path, number, excerpt, None))
+        elif sops and _SOPS_PGP.match(text):
+            assets.append(_at_rest("openpgp", rel_path, number, excerpt, None))
+    return findings, assets
+
+
+def _at_rest(protocol: str, path: str, line: int, excerpt: str,
+             family: str | None) -> dict[str, Any]:
+    asset = {
+        "protocol": protocol, "banned": False, "basis": "encrypted_at_rest",
+        "deprecated": False, "hndl": True, "path": path, "line": line, "excerpt": excerpt,
+        "description": (f"A secret {_HNDL_NOTE}. " + (
+            f"The recipient key is {family}." if family else
+            "The recipient's key family is not in the tree: an OpenPGP fingerprint does "
+            "not state it." if protocol == "openpgp" else
+            "The armour does not state the recipient's key family.")),
+    }
+    if family:
+        asset["recipient_family"] = family
+    return asset
+
+
 # --- protocols --------------------------------------------------------------
 
 # The spellings a version pin actually takes, across the languages that pin one.

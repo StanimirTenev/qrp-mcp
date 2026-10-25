@@ -14,7 +14,7 @@ from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
                      library_support, pinned_versions,
-                     scan_hybrid_groups, scan_manifest, scan_openssl_fips,
+                     scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
@@ -3269,6 +3269,12 @@ def scan_repo(repo_path: Path, exclude: Path | None = None) -> dict[str, Any]:
                                       "path": rel_path, "line": number, "excerpt": excerpt})
         if path.suffix.lower() in {".yaml", ".yml"}:
             pinned_images.extend(image_pins(rel_path, lines))
+        if b"age1" in raw or b"-----BEGIN" in raw:
+            at_rest_findings, at_rest_assets = scan_encrypted_at_rest(rel_path, lines)
+            for item in at_rest_findings:
+                item["in_test_code"] = in_test_code(rel_path)
+            source_findings.extend(at_rest_findings)
+            protocol_findings.extend(at_rest_assets)
         if path.suffix.lower() == ".properties":
             for key, value, number, _ in property_assignments(lines):
                 property_values.setdefault(key, []).append((value, rel_path, number))
