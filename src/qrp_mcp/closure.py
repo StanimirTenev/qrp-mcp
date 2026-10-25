@@ -43,7 +43,10 @@ _LOCATION_FIELDS = ("line",)
 # A pinned image's group places and the files it serves are read from other files too.
 _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signing_key",
                    "provider_pin", "fips_provider_configured_in", "group_places", "serves",
-                   "serves_group_places")
+                   "serves_group_places",
+                   # What a run says about the line -- against a baseline, a mandate, an
+                   # owner's suppression -- is not the line.
+                   "baseline_state", "mandates", "hndl_exposed", "suppression")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "
@@ -268,10 +271,19 @@ def prove_closure(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
 
     unread_files, unread_dirs = _unread_paths(after)
     read_after = set(after["files_read"])
-    closed, removed, unverifiable = [], [], []
+    # An occurrence the owner suppressed in the second tree is still in the code. It left
+    # `evidence` for `suppressed`, and it is not closed (ZA-OPRAVYANE row 128).
+    held: dict[str, list] = defaultdict(list)
+    for category, items in sorted((((after.get("suppressed") or {}).get("evidence")) or {}).items()):
+        for item in items:
+            held[_identity(category, item)].append(item)
+    closed, removed, unverifiable, suppressed = [], [], [], []
     for cat, item in gone:
         path = str(item.get("path") or "")
-        if path in unread_files or any(path.startswith(d) for d in unread_dirs):
+        if held.get(_identity(cat, item)):
+            owner = held[_identity(cat, item)].pop(0)
+            suppressed.append({**_brief(cat, owner), "suppression": owner.get("suppression")})
+        elif path in unread_files or any(path.startswith(d) for d in unread_dirs):
             unverifiable.append({**_brief(cat, item),
                                  "why": "the second run did not read this file"})
         elif path not in read_after:
@@ -301,12 +313,15 @@ def prove_closure(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
             "moved_out_of_test_code": out_of_test,
             "new": new,
             "unverifiable": unverifiable,
+            "suppressed": suppressed,
             "per_family_before_after": per_family,
         },
         "statement": (f"{len(closed)} occurrence(s) closed, {len(removed)} removed with "
                       f"their file, {len(still_open)} still open "
                       f"({moved_lines} of them only moved lines), {len(relocated)} relocated to "
-                      f"another path, {len(new)} new, {len(unverifiable)} unverifiable. "
+                      f"another path, {len(new)} new, {len(unverifiable)} unverifiable"
+                      + (f", {len(suppressed)} suppressed by the owner and not closed"
+                         if suppressed else "") + ". "
                       f"Closed means present in the first tree and absent from every file "
                       f"the second run read, under the same instrument. Removed means the "
                       f"whole file is gone; whether its cryptography is still needed "

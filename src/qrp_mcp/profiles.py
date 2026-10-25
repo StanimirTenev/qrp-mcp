@@ -41,6 +41,53 @@ PROFILES: dict[str, dict[str, Any]] = {
         # classification levels', so NIST's SHA-256 would not be CNSA 2.0 at all.
         "weak_hash": "SHA-384 or SHA-512 (CNSA 2.0, all classification levels)",
         "weak_cipher": "AES-256 (CNSA 2.0, all classification levels)",
+        # `--mandate cnsa-2.0` (mandates.py): the dated clauses, by class of system. Text of
+        # NSA's advisory "Announcing the Commercial National Security Algorithm Suite 2.0",
+        # PP-22-1338, SEP 2022 Ver. 1.0, section "Other requirements for NSS" (p. 6):
+        #   "Software and firmware signing: begin transitioning immediately, support and
+        #    prefer CNSA 2.0 by 2025, and exclusively use CNSA 2.0 by 2030."
+        #   "Web browsers/servers and cloud services: support and prefer CNSA 2.0 by 2025,
+        #    and exclusively use CNSA 2.0 by 2033."
+        #   "Traditional networking equipment (e.g., virtual private networks, routers):
+        #    support and prefer CNSA 2.0 by 2026, and exclusively use CNSA 2.0 by 2030."
+        #   "Operating systems: support and prefer CNSA 2.0 by 2027, and exclusively use
+        #    CNSA 2.0 by 2033."
+        #   "Custom applications and legacy equipment: update or replace by 2033."
+        # and "Timing" (p. 4): "NSA expects the transition to QR algorithms for NSS to be
+        # complete by 2035 in line with NSM-10."
+        # Read 25.10.2026 from the copy fetched for this module on 27.09 (the advisory at
+        # media.defense.gov/2025/May/30/2003728741/-1/-1/0/CSA_CNSA_2.0_ALGORITHMS.PDF, the
+        # same Sep 2022 v1.0 text; qrp-mcp/razuznavane/profili, US-1). A live fetch on
+        # 25.10.2026 was refused (HTTP 403); secondary summaries found the same day give
+        # the same years. "By 2030" is read as the end of 2030: the advisory gives years.
+        "mandate": {
+            "name": "cnsa-2.0",
+            "document": "NSA, Announcing the Commercial National Security Algorithm Suite 2.0 "
+                        "(Cybersecurity Advisory PP-22-1338, Sep 2022 Ver. 1.0)",
+            "url": "https://media.defense.gov/2025/May/30/2003728741/-1/-1/0/"
+                   "CSA_CNSA_2.0_ALGORITHMS.PDF",
+            "read_on": "2026-10-25",
+            "classes": {
+                "signing": ("Software and firmware signing: exclusively use CNSA 2.0 by 2030",
+                            "2030-12-31"),
+                "networking": ("Traditional networking equipment (e.g., virtual private "
+                               "networks, routers): exclusively use CNSA 2.0 by 2030",
+                               "2030-12-31"),
+                "web": ("Web browsers/servers and cloud services: exclusively use CNSA 2.0 "
+                        "by 2033", "2033-12-31"),
+                "custom": ("Custom applications and legacy equipment: update or replace by "
+                           "2033", "2033-12-31"),
+            },
+            "section": "section 'Other requirements for NSS'",
+            "complete_by": ("2035-12-31", "NSA expects the transition to QR algorithms for "
+                                          "NSS to be complete by 2035 in line with NSM-10 "
+                                          "(section 'Timing')"),
+            # The profile's own date above, from CNSS Policy 15 (March 2025).
+            "new_products": {"from": "2027-01-01",
+                             "clause": "CNSA 2.0 algorithms 'will be required in all new "
+                                       "products and services that provide cryptographic "
+                                       "protection', unless excepted (CNSS Policy 15)"},
+        },
     },
     "uk-ncsc": {
         "authority": "NCSC (United Kingdom)",
@@ -209,6 +256,41 @@ PROFILES: dict[str, dict[str, Any]] = {
                   "A national plan for quantum communication infrastructure exists; that is "
                   "quantum key distribution, not post-quantum cryptography.",
     },
+}
+
+
+# `--mandate nist-ir-8547` (mandates.py). The `nist` profile has no entry above -- it is the
+# default in remediation -- so its dated document is here. NIST IR 8547 ipd, "Transition to
+# Post-Quantum Cryptography Standards", Initial Public Draft, November 2024: section 4.1.1
+# Table 2 (quantum-vulnerable digital signatures) and section 4.1.2 Table 4 (quantum-vulnerable
+# key establishment). Every row reads the same: at 112 bits of security strength "Deprecated
+# after 2030 / Disallowed after 2035"; at "≥ 128 bits of security strength" "Disallowed after
+# 2035". EdDSA has only the >= 128-bit row. Lines 508-511 (section 4.1.2): "in order to
+# mitigate the risk of 'harvest now, decrypt later' attacks on network communications,
+# application-specific guidance ... may require or recommend migration to quantum-resistant
+# key establishment schemes before the classical schemes are generally disallowed."
+# Fetched live 25.10.2026 from nvlpubs.nist.gov/nistpubs/ir/2024/NIST.IR.8547.ipd.pdf (sha256
+# 6b551b4f...0ed6, identical to the copy of 27.09); csrc.nist.gov/pubs/ir/8547/ipd lists no
+# later draft or final on 25.10.2026. Security strength of a key size from SP 800-57 Part 1
+# Rev. 5, Table 2 (fetched 25.10.2026): IFC (RSA) k = 2048 and FFC L = 2048 give 112 bits,
+# k = 3072 / L = 3072 give 128; ECC f = 224-255 gives 112, f = 256-383 gives 128; k = 1024
+# and f = 160-223 give at most 80.
+NIST_IR_8547: dict[str, Any] = {
+    "name": "nist-ir-8547",
+    "document": "NIST IR 8547 ipd, Transition to Post-Quantum Cryptography Standards "
+                "(Initial Public Draft, November 2024)",
+    "url": "https://nvlpubs.nist.gov/nistpubs/ir/2024/NIST.IR.8547.ipd.pdf",
+    "read_on": "2026-10-25",
+    "deprecated_after": "2030-12-31",
+    "disallowed_after": "2035-12-31",
+    "tables": {
+        "signature": "section 4.1.1, Table 2: Quantum-vulnerable digital signature algorithms",
+        "key_establishment": "section 4.1.2, Table 4: Quantum-vulnerable key-establishment "
+                             "schemes",
+    },
+    "hndl": "section 4.1.2, lines 508-511: 'harvest now, decrypt later' attacks on network "
+            "communications may require migration of key establishment before the classical "
+            "schemes are generally disallowed",
 }
 
 
