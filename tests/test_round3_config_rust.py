@@ -131,6 +131,7 @@ def test_rust_names(tmp_path, text, family):
 @pytest.mark.parametrize("text", [
     "use ml_dsa::{MlDsa65, KeyGen};\n", "let s = slh_dsa::SigningKey::new();\n",
     "let k = MlDsa65::key_gen(&mut rng);\n", "let versa = vice;\n", "fn dsap() {}\n",
+    "impl libcrux_ml_dsa::hash_functions::shake256::DsaXof for Shake256 {}\n",
 ])
 def test_rust_lookalikes(tmp_path, text):
     assert "DSA" not in _families(tmp_path, "src/key.rs", text)[0]

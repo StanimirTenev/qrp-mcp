@@ -1055,11 +1055,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # Types and variants named after the family, as RustCrypto writes them (ssh-key's
     # RsaKeypair, DsaKeypair, KeypairData::Dsa, Algorithm::Rsa; jwt-simple's
     # RsaOaepDecryptionKey; sigstore's RSAKeys). Case-sensitive: `MlDsa65` and `SlhDsa`
-    # have no boundary before the D.
+    # have no boundary before the D. DSA by its key and signature types only: libcrux's
+    # ML-DSA calls its XOF `DsaXof` (OpenSSH libcrux_internal.h, the relALL gate).
     ("RSA", "RSA named by a type or enum variant (RsaKeypair, RSAKeys, Algorithm::Rsa)",
      re.compile(r"\bRsa[A-Z0-9]\w*|\bRSA[A-Z][a-z]\w*|::Rsa\b")),
     ("DSA", "DSA named by a type or enum variant (DsaKeypair, KeypairData::Dsa)",
-     re.compile(r"\bDsa[A-Z0-9]\w*|\bDSA[A-Z][a-z]\w*|::Dsa\b")),
+     re.compile(r"\b(?:Dsa|DSA)(?:Key[Pp]air|PrivateKey|PublicKey|Signature|SigningKey|VerifyingKey|"
+                r"Params|Parameters|Components|Authentication)\w*|::Dsa\b")),
     # Rust only (RUST_ONLY below): the family as a word of a snake_case name, a module or a
     # cargo feature -- `fn decode_dsa_openssh`, `mod dsa;`, `#[cfg(feature = "dsa")]`,
     # `rsa_to_pkcs8`. Not the post-quantum ml_dsa / slh_dsa / fn_dsa.
