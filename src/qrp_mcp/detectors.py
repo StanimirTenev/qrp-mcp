@@ -12,7 +12,8 @@ from typing import Any
 from . import aws_tls, components, dnssec, ike, oids, opcua
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
-from .assets import (_group_setting, image_pins, is_manifest, library_support, pinned_versions,
+from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
+                     library_support, pinned_versions,
                      scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
@@ -1524,7 +1525,60 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
         if text.upper() in _ARIA_RSA_SUITES:
             families.append("RSA")
         out.extend((family, pos) for family in families)
+    return out + _cipher_string_parts(line) + _suite_table_entry(line)
+
+
+def _suite_families(parts: list[str]) -> list[str]:
+    families = [f for f in (_SUITE_COMPONENT.get(p.upper()) for p in parts) if f]
+    return [f for f in families if f != "DES"] if "3DES" in families else families
+
+
+# OpenSSL cipher strings join selectors with `+` and separate entries with `:`, `,` or a
+# space: `RC4+RSA`, `EECDH+aRSA`, `EDH+aRSA` (ZA-OPRAVYANE row 121; certbot's nginx test
+# data). An entry struck out with `!` or `-` is not a use. A dash-joined entry is a suite
+# name and stays with the suite reader above, which knows DES-CBC3-SHA is one cipher.
+_CIPHER_ENTRY = re.compile(r"[^:,;\s'\"]+")
+# GnuTLS priority strings: `NORMAL:-SIGN-ALL:+SIGN-RSA-SHA512` (mbedtls tests/ssl-opt.sh).
+# Only an entry added with `+`; its keyword parts are split as a name is, so that
+# `+SIGN-ML-DSA-65` stays ML-DSA and never becomes DSA.
+_GNUTLS_PRIORITY = re.compile(r"--priority[= ]|\bgnutls_priority_\w+\s*\(|\bPRIORITY\s*=",
+                              re.IGNORECASE)
+_GNUTLS_KEYWORD = ("SIGN-", "KX-", "GROUP-", "CURVE-")
+
+
+def _cipher_string_parts(line: str) -> list[tuple[str, int]]:
+    out: list[tuple[str, int]] = []
+    gnutls = _GNUTLS_PRIORITY.search(line)
+    if gnutls:
+        for entry in _CIPHER_ENTRY.finditer(line, gnutls.end()):
+            text = entry.group(0)
+            if text.startswith("+") and text[1:].upper().startswith(_GNUTLS_KEYWORD):
+                out += [(f, entry.start()) for f in _suite_families(components.components(text[1:]))]
+        return out
+    if line.lstrip().startswith(_COMMENT_START) or not _cipher_setting(line):
+        return out
+    for entry in _CIPHER_ENTRY.finditer(line):
+        text = entry.group(0).lstrip("+")
+        if entry.group(0)[:1] in "!-" or "-" in text or not text:
+            continue
+        out += [(f, entry.start()) for f in _suite_families(text.split("+"))
+                if f not in {"SHA1"}]   # a bare SHA selector picks MACs, not a cipher use
     return out
+
+
+# A table of TLS suites in C, one macro per suite with the IANA code first and the name's
+# parts as bare words: curl's `CS_ENTRY(0x009E, DHE,RSA,AES128,GCM,SHA256,,,)`.
+_SUITE_TABLE_ENTRY = re.compile(r"\b\w+\(\s*0x[0-9A-Fa-f]{4}\s*,((?:\s*[A-Z0-9]*\s*,)+\s*[A-Z0-9]*)\s*\)")
+
+
+def _suite_table_entry(line: str) -> list[tuple[str, int]]:
+    match = _SUITE_TABLE_ENTRY.search(line)
+    if not match:
+        return []
+    parts = [p.strip() for p in match.group(1).split(",") if p.strip()]
+    if not any(p.startswith(_SUITE_CIPHER) for p in parts):
+        return []
+    return [(f, match.start(1)) for f in _suite_families(parts)]
 
 
 # --- key sizes named on the same line as the algorithm ---
