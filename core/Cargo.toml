@@ -1,0 +1,22 @@
+[package]
+name = "qrp-mcp-core"
+version = "0.1.0"
+edition = "2021"
+description = "Optional compiled line gate for qrp-mcp: which lines of a file any rule could match"
+license = "Apache-2.0"
+repository = "https://github.com/StanimirTenev/qrp-mcp"
+publish = false
+
+[lib]
+name = "qrp_mcp_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+# abi3: one wheel per platform serves every CPython from 3.10 on.
+pyo3 = { version = "0.25", features = ["extension-module", "abi3-py310"] }
+regex = "1.11"
+aho-corasick = "1.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
