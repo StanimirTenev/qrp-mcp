@@ -639,6 +639,18 @@ def _first_tlv(blob: bytes) -> bytes:
 _JKS_MAGIC = (b"\xfe\xed\xfe\xed", b"\xce\xce\xce\xce")
 
 
+def _other_x509(raw: bytes) -> bool:
+    """A DER request or revocation list: parsed, and not a certificate (certbot csr.der)."""
+    from cryptography import x509
+    for load in (x509.load_der_x509_csr, x509.load_der_x509_crl):
+        try:
+            load(raw)
+            return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
 def _key_fields(info: dict[str, Any]) -> dict[str, Any]:
     if not info:
         return {"key_unread": "family_not_named"}
@@ -731,10 +743,8 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
                         found = ([bundle.cert.certificate] if bundle.cert else []) + [
                             c.certificate for c in bundle.additional_certs]
                         add(1, "PKCS#12 file", "PKCS#12", found)
-                elif suffix in _CERTIFICATE_SUFFIXES:
+                elif suffix in _CERTIFICATE_SUFFIXES and not _other_x509(raw):
                     problem(1, "DER", "not_parsed_as_certificate")
-        elif suffix in _CERTIFICATE_SUFFIXES and raw:
-            problem(1, "DER", "not_parsed_as_certificate")
     return {"certificates": certs, "keys": keys, "problems": problems,
             "parsed_blocks": parsed_blocks}
 

@@ -300,6 +300,22 @@ def test_a_jks_keystore_is_named_unread(tmp_path):
                          "reason": "format_not_parsed"}]
 
 
+def test_an_ssh_certificate_and_a_der_request_are_not_named_unparsed(tmp_path, three):
+    """openssh's authopt/testdata/*.cert are OpenSSH certificates, read by their lines;
+    certbot's csr.der is a request. Neither is an X.509 certificate that failed."""
+    from cryptography.x509.oid import NameOID as _N
+    _, (rsa_key, _, _) = three
+    ssh = b"ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20= u\n"
+    assert certificates.unparsed_material(tmp_path / "a.cert", "a.cert", ssh) == []
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(_N.COMMON_NAME, "r")]))
+           .sign(rsa_key, hashes.SHA256()).public_bytes(serialization.Encoding.DER))
+    assert certificates.unparsed_material(tmp_path / "csr.der", "csr.der", csr) == []
+    junk = b"\x30\x03\x02\x01\x01"
+    assert certificates.unparsed_material(tmp_path / "x.der", "x.der", junk) == [
+        {"path": "x.der", "line": 1, "label": "DER", "reason": "not_parsed_as_certificate"}]
+
+
 def test_a_truncated_block_is_named_and_the_good_one_still_read(tmp_path, three):
     good = _pem(three[0][0])
     bad = _pem(three[0][1]).splitlines()
