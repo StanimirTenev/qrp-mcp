@@ -318,6 +318,10 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         coverage_block["config"] = config.coverage_block(settings)
     if baseline_doc is not None:
         result["baseline"] = baseline_mod.apply(result, baseline_doc, baseline_file)
+        # Counted where the CBOM reads, as `suppressed` is; the rows and the file's path
+        # stay in `baseline`, the path being this machine's.
+        coverage_block["baseline"] = {k: result["baseline"][k] for k in
+                                      ("meaning", "entries", "new", "baselined", "absent")}
     return result
 
 
