@@ -184,6 +184,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             "yaml": [".yaml", ".yml"],
             "manifest": sorted(assets._NUGET_SUFFIXES),
             "manifest_filenames": sorted(set(assets.MANIFEST_FILENAMES) | assets._NUGET_FILENAMES),
+            # Read as the file they render (kragg-3); a template rendering documentation
+            # (detectors.TEMPLATE_DOCUMENTS: .md, .rst, ...) is not claimed.
+            "jinja_template": list(detectors.TEMPLATE_SUFFIXES),
             # A file no type claims is still read when its first bytes are a key.
             "any_type_beginning_with_key_material": ["*"],
         },

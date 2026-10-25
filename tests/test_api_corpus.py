@@ -17,7 +17,7 @@ import pytest
 
 from pathlib import Path
 
-from qrp_mcp.detectors import ALGORITHM_PATTERNS, _is_excluded
+from qrp_mcp.detectors import ALGORITHM_PATTERNS, RUST_ONLY, _is_excluded
 
 # (source line, the algorithm it must be reported as)
 C_OPENSSL = [
@@ -55,7 +55,9 @@ DOTNET_POWERSHELL = [
 
 def _algorithms(line: str) -> set[str]:
     found = set()
-    for name, _, pattern in ALGORITHM_PATTERNS:
+    for name, description, pattern in ALGORITHM_PATTERNS:
+        if description in RUST_ONLY:          # read in .rs files only, as the scan does
+            continue
         match = pattern.search(line)
         if match and not _is_excluded(line, match.start()):
             found.add(name)
