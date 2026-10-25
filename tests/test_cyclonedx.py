@@ -134,7 +134,8 @@ def test_rsa_is_a_public_key_primitive_and_md5_is_a_hash(document):
     primitive = {
         c["name"]: c["cryptoProperties"]["algorithmProperties"]["primitive"]
         for c in document["components"]
-        if "algorithmProperties" in c["cryptoProperties"]
+        # Evidence `file` components (release A) carry no cryptoProperties.
+        if "algorithmProperties" in c.get("cryptoProperties", {})
     }
     assert primitive["RSA"] == "pke"
     assert primitive["MD5"] == "hash"
