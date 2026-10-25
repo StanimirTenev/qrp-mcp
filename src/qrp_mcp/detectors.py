@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import aws_tls, components, dnssec, ike, oids, opcua, suppression
+from . import aws_tls, components, dnssec, ike, indirection, oids, opcua, suppression
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
@@ -3512,7 +3512,11 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             embedded_key_findings.extend(key_findings)
         elif path.suffix.lower() in SOURCE_EXTENSIONS:
             files_scanned["source"] += 1
-            source_findings.extend(scan_source_file(path, rel_path, lines))
+            found = scan_source_file(path, rel_path, lines)
+            source_findings.extend(found)
+            # Uses reached through an alias, folded literals or another file's constant.
+            source_findings.extend(indirection.resolve(path, rel_path, lines, found,
+                                                       repo_path, scan_source_file))
             embedded_key_findings.extend(scan_embedded_keys(rel_path, lines))
             # A release script signs the same way a pipeline does, and the pipeline
             # often only calls it (ZA-OPRAVYANE row 34).
