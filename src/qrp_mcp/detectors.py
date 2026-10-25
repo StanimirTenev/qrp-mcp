@@ -1921,6 +1921,8 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
             problems.append(("dir", rel(err.filename)))
 
     found: list[Path] = []
+    found_posix: list[str] = []
+    posix = os.name == "posix"
     for dirpath, dirnames, filenames in os.walk(repo_path, onerror=onerror):
         dirnames.sort()
         dir_parts = Path(dirpath).relative_to(repo_path).parts
@@ -1935,37 +1937,42 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
                         problems.append(("symlink_dir", rel(str(candidate))))
                     dirnames.remove(name)
         for name in filenames:
-            path = Path(dirpath) / name
             if hit is not None:
                 if excluded_counter is not None:
                     excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
                 continue
-            if os.name == "posix":
-                # One lstat answers both questions below where there are no junctions
-                # (release 3c: the walk was two stats and three Paths per file). A file
-                # that is not a link is its own stat; one lstat cannot read is broken.
+            if posix:
+                # One lstat of the path as a string answers both questions below where
+                # there are no junctions (release 3c: the walk was two stats and three
+                # Paths per file, 0.15 s of curl). A file that is not a link is its own
+                # stat; one lstat cannot read is broken. Sockets, FIFOs and devices are
+                # not files the tool reads.
+                full = os.path.join(dirpath, name)
                 try:
-                    mode = os.lstat(path).st_mode
+                    mode = os.lstat(full).st_mode
                 except OSError:
-                    mode = None
-                if mode is not None and stat.S_ISLNK(mode):
                     if problems is not None:
-                        problems.append(("symlink", rel(str(path))))
+                        problems.append(("file", rel(full)))
                     continue
-                regular, broken = (False, True) if mode is None else (stat.S_ISREG(mode), False)
-            else:
-                if _is_link(path):
-                    # Not read, and named. A broken link is reported the same way: it
-                    # is still a link, and its target is still outside this tool's say.
+                if stat.S_ISLNK(mode):
                     if problems is not None:
-                        problems.append(("symlink", rel(str(path))))
-                    continue
-                try:
-                    regular = path.is_file()
-                    broken = not regular and (path.is_symlink() or not path.exists())
-                except OSError:
-                    # Listed but not stat-able: a directory that can be read but not entered.
-                    regular, broken = False, True
+                        problems.append(("symlink", rel(full)))
+                elif stat.S_ISREG(mode):
+                    found_posix.append(full)
+                continue
+            path = Path(dirpath) / name
+            if _is_link(path):
+                # Not read, and named. A broken link is reported the same way: it
+                # is still a link, and its target is still outside this tool's say.
+                if problems is not None:
+                    problems.append(("symlink", rel(str(path))))
+                continue
+            try:
+                regular = path.is_file()
+                broken = not regular and (path.is_symlink() or not path.exists())
+            except OSError:
+                # Listed but not stat-able: a directory that can be read but not entered.
+                regular, broken = False, True
             if not regular:
                 # Sockets, FIFOs and devices are not files the tool reads; a broken or
                 # unreachable entry is a file it could not read, and says so.
@@ -1973,6 +1980,10 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
                     problems.append(("file", rel(str(path))))
                 continue
             found.append(path)
+    if posix:
+        # In the order sorted(Paths) gives: a POSIX Path compares its string's parts.
+        yield from [Path(p) for p in sorted(found_posix, key=lambda p: p.split("/"))]
+        return
     yield from sorted(found)
 
 

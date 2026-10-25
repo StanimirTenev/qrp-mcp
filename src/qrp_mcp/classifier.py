@@ -6,9 +6,8 @@ No network, no LLM, no external services: the same input always produces the sam
 from __future__ import annotations
 
 import re
-from typing import Any, Literal
-
-from pydantic import BaseModel, Field
+from dataclasses import dataclass, field, fields
+from typing import Any, Literal, get_args
 
 CONTRACT_VERSION = "cfp-v1"
 
@@ -489,14 +488,49 @@ def _find_weak_token(squashed: str) -> tuple[str, str] | None:
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
-class FingerprintRequest(BaseModel):
-    asset_name: str = Field(..., min_length=1)
+# Plain dataclasses with pydantic's model_dump(), which is all of pydantic.BaseModel the
+# package used: importing pydantic and building these four models was 0.15 s of every
+# scan's start, before the first file was read (release 3c). model_dump() gives what
+# pydantic's gave -- the fields in order, nested models and containers as new dicts and
+# lists -- and the two checks pydantic made that could fail here are kept.
+def _dumped(value: Any) -> Any:
+    if isinstance(value, _Model):
+        return value.model_dump()
+    if isinstance(value, dict):
+        return {k: _dumped(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_dumped(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_dumped(v) for v in value)
+    if isinstance(value, (set, frozenset)):
+        return type(value)(_dumped(v) for v in value)
+    return value
+
+
+class _Model:
+    def model_dump(self) -> dict[str, Any]:
+        return {f.name: _dumped(getattr(self, f.name)) for f in fields(self)}
+
+
+_CLASSIFICATIONS = frozenset(get_args(Classification))
+
+
+@dataclass(kw_only=True, eq=True)
+class FingerprintRequest(_Model):
+    asset_name: str
     algorithms: list[str] | None = None
     tls_metadata: dict[str, Any] | None = None
     crypto_evidence: dict[str, Any] | None = None
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.asset_name, str) or not self.asset_name:
+            raise ValueError("asset_name: a string of at least 1 character")
+        if self.algorithms is not None:
+            self.algorithms = list(self.algorithms)
 
-class Finding(BaseModel):
+
+@dataclass(kw_only=True, eq=True)
+class Finding(_Model):
     source: str
     location: str
     raw_value: str
@@ -505,7 +539,7 @@ class Finding(BaseModel):
     # algorithm carries two: id-MLDSA44-RSA2048-PSS-SHA256 is ML-DSA *and*
     # RSA-2048, and an inventory that reports only the post-quantum half is
     # describing the half that is fine.
-    also_present: list[str] = Field(default_factory=list)
+    also_present: list[str] = field(default_factory=list)
     pqc_family: str | None = None
     pqc_status: str | None = None
     classification: Classification
@@ -514,8 +548,14 @@ class Finding(BaseModel):
     severity: str
     reason: str
 
+    def __post_init__(self) -> None:
+        if self.classification not in _CLASSIFICATIONS:
+            raise ValueError(f"classification: not one of {sorted(_CLASSIFICATIONS)}")
+        self.also_present = list(self.also_present)
 
-class FingerprintSummary(BaseModel):
+
+@dataclass(kw_only=True, eq=True)
+class FingerprintSummary(_Model):
     total_findings: int
     quantum_vulnerable_count: int
     pqc_ready_count: int
@@ -531,17 +571,21 @@ class FingerprintSummary(BaseModel):
     readiness_not_established: dict[str, Any] | None = None
     # Deprecated protocol versions enabled somewhere in the tree. Not in weak_count, which
     # counts keys and algorithms; until 0.34.0 nothing in the summary carried them.
-    deprecated_protocols: list[str] = Field(default_factory=list)
+    deprecated_protocols: list[str] = field(default_factory=list)
     # The same readiness for key establishment and for signatures apart, with the families in
     # each (ZA-OPRAVYANE row 100). None where the summary was not built from a scan.
     by_role: dict[str, Any] | None = None
 
 
-class FingerprintResponse(BaseModel):
+@dataclass(kw_only=True, eq=True)
+class FingerprintResponse(_Model):
     contract_version: str
     asset_name: str
     findings: list[Finding]
     summary: FingerprintSummary
+
+    def __post_init__(self) -> None:
+        self.findings = list(self.findings)
 
 
 # ---------------------------------------------------------------------------

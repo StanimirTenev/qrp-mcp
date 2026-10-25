@@ -11,12 +11,18 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import Field
-
 from . import __version__, closure, config, coverage, cyclonedx, mandates, profiles, sarif
 from . import baseline as baseline_mod
 from .classifier import known_algorithms
 from .scan import scan_directory
+
+
+def Field(*args: Any, **kwargs: Any) -> Any:  # noqa: N802 -- stands in for pydantic.Field
+    """pydantic.Field, imported only when the tools' annotations are read: by the MCP
+    server, when it is built, or by typing.get_type_hints. `qrp-mcp scan` reads none of
+    them, and importing pydantic was 0.13 s of its start (release 3c)."""
+    from pydantic import Field as field
+    return field(*args, **kwargs)
 
 
 class _Server:
