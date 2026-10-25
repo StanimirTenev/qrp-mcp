@@ -2228,6 +2228,34 @@ def _families_in_use(findings: list[dict[str, Any]]) -> set[str]:
             if f.get("evidence_kind") not in {"comment", "ban"}}
 
 
+# A Go function signature names the types it takes and returns; it calls nothing. `func
+# demo(pub *rsa.PublicKey) {` was a `call`, and 9 of 0.36.0's 32 rows off Cryben's reference
+# were such lines, one above the call they introduce (qrp-pokazateli 02-tochnost). Only a
+# signature whose line opens no body with code in it: `func f() { rsa.Sign(...) }` calls.
+_GO_SIGNATURE = re.compile(r"^\s*func\s*(?:\([^)]*\)\s*)?\w+\s*(?:\[[^\]]*\]\s*)?\(")
+_GO_BODY_CODE = re.compile(r"\{\s*\S")
+# Families one call and one type of the same library name differently: ecdsa.PublicKey in
+# the signature, elliptic.P256() in the body.
+_FAMILY_GROUP = {"ECDSA": "EC", "ECDH": "EC", "3DES": "DES", "EdDSA": "Ed25519",
+                 "Ed448": "Ed25519"}
+_SIGNATURE_REACH = 2
+
+
+def _drop_signatures_covered_by_a_call(findings: list[dict[str, Any]],
+                                       signature_lines: set[int]) -> list[dict[str, Any]]:
+    """A Go signature is not a second row when a call of the same family group follows
+    within two lines (the reach measured on Cryben: -8 rows off the reference, none on it)."""
+    if not signature_lines:
+        return findings
+    calls = [(f["line"], _FAMILY_GROUP.get(f["algorithm"], f["algorithm"]))
+             for f in findings if f.get("evidence_kind") == "call"]
+    return [f for f in findings
+            if not (f["line"] in signature_lines and f.get("evidence_kind") == "reference"
+                    and any(0 < line - f["line"] <= _SIGNATURE_REACH
+                            and group == _FAMILY_GROUP.get(f["algorithm"], f["algorithm"])
+                            for line, group in calls))]
+
+
 def _drop_imports_covered_by_a_call(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """An import is not a second row when the call it enables is in the file.
 
@@ -2362,6 +2390,7 @@ def scan_source_file(path: Path, rel_path: str,
     inside_doc = ""
     denial_block_indent: int | None = None
     denial_block_calls = False
+    signature_lines: set[int] = set()
     for line_no, line in enumerate(lines, start=1):
         was_inside = inside_block or bool(inside_doc)
         spans, inside_block = _comment_spans(line, ext, inside_block)
@@ -2370,6 +2399,10 @@ def scan_source_file(path: Path, rel_path: str,
             spans = spans + doc_spans
         code = _code_only(line, spans)
         kind = _evidence_kind(line, was_inside, code)
+        if (kind == "call" and ext == ".go" and _GO_SIGNATURE.match(code)
+                and not _GO_BODY_CODE.search(code)):
+            kind = "reference"
+            signature_lines.add(line_no)
         indent = len(line) - len(line.lstrip())
         if denial_block_indent is not None and line.strip() and indent <= denial_block_indent:
             denial_block_indent = None
@@ -2626,7 +2659,8 @@ def scan_source_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
             })
     _attach_providers(findings, lines)
-    return _drop_imports_covered_by_a_call(findings)
+    return _drop_signatures_covered_by_a_call(_drop_imports_covered_by_a_call(findings),
+                                              signature_lines)
 
 
 _NOT_A_SETTING = ("#", ";", "//", "--", "/*", "*", "<!--")
