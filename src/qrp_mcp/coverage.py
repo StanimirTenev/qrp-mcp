@@ -51,8 +51,8 @@ REASONS = {
 # Of the report documents, the CycloneDX ones another tool wrote: declared, not observed.
 SUPPLIER_DECLARATION = (
     "a CycloneDX document another tool wrote: a supplier's declaration about its product, "
-    "not a measurement of this code. It belongs in the DORA report, passed with qrp-dora's "
-    "`--ingest`, which names it as declared by the supplier")
+    "not a measurement of this code. It belongs in a report as a declaration (in a DORA "
+    "report, an `--ingest` step), named as declared by the supplier")
 
 # The same discipline one level up, applied to the pins rather than the files.
 # A pin that is simply absent is the defect this block exists to prevent, arriving
