@@ -777,8 +777,30 @@ _BARE_TLS_VERSION_SETTING = re.compile(
     r"^\s*tls_(?:min|max)_version\s*=\s*[\"']?1\.([0-3])[\"']?\s*(?:#.*)?$")
 
 
+def names_none_of(line: str, words: tuple[str, ...]) -> bool:
+    """True when the line holds none of the words in any case, so a rule every match of
+    which contains one of them cannot match it. Asked before the rule's regex, which costs
+    more (release D). A line that is not ASCII is never ruled out here: case-folding beyond
+    ASCII is the regex's to decide."""
+    if not line.isascii():
+        return False
+    low = line.lower()
+    return not any(word in low for word in words)
+
+
+# Every match of a rule in scan_protocols contains one of these: _BARE_TLS_VERSION_SETTING
+# and _VERSION_MACRO `_version`; the _TLS_CONTEXT branch reports only through _TLS_VERSION
+# (each alternative has `tls` or `sslv`) or _SSL_PROTOCOL_ALL (`protocol`); _SSH_KEY_LINE
+# `ssh-`, `ecdsa-sha2-` or `sk-`; _SSH_PROTOCOL `protocol`, `algorithms`, `pubkeyaccepted`,
+# `ciphers` or `macs`.
+_PROTOCOL_WORDS = ("_version", "tls", "sslv", "protocol", "ssh-", "ecdsa-sha2-", "sk-",
+                   "algorithms", "pubkeyaccepted", "ciphers", "macs")
+
+
 def scan_protocols(line: str) -> list[dict[str, Any]]:
     """Protocol versions pinned on this line, as assets with no algorithm claim."""
+    if names_none_of(line, _PROTOCOL_WORDS):
+        return []
     out: list[dict[str, Any]] = []
     seen: set[tuple[str, bool]] = set()
     bare = _BARE_TLS_VERSION_SETTING.match(line)
@@ -916,6 +938,9 @@ _HAPROXY_CURVES = re.compile(r"(?<=\s)curves(?=\s)")
 
 def _group_setting(line: str) -> re.Match | None:
     """The group setting on this line, if it has one."""
+    # Every alternative of the two regexes contains one of these words (release D).
+    if names_none_of(line, ("ecdh_curve", "ecdhcurve", "groups", "curves", "curvepreferences")):
+        return None
     setting = _TLS_GROUP_SETTING.search(line)
     if setting is None and _HAPROXY_LINE.match(line):
         setting = _HAPROXY_CURVES.search(line)
@@ -942,6 +967,9 @@ _HAPROXY_CIPHERS = re.compile(r"(?<=\s)ciphers(?:uites)?(?=\s)")
 
 def _cipher_setting(line: str) -> bool:
     """Whether this line sets TLS cipher suites."""
+    # Every alternative of both regexes contains `cipher` (release D).
+    if names_none_of(line, ("cipher",)):
+        return False
     return bool(_TLS_CIPHER_SETTING.search(line)
                 or (_HAPROXY_LINE.match(line) and _HAPROXY_CIPHERS.search(line)))
 
@@ -1123,7 +1151,7 @@ _SSH_KEX_SETTING = re.compile(r"\bKexAlgorithms\b\s*(?:=\s*|\s+)([^\s\"']+)", re
 
 def scan_ssh_kex(line: str) -> list[dict[str, Any]]:
     """Classical key exchange algorithms this line offers in an SSH KexAlgorithms list."""
-    if line.lstrip().startswith(_COMMENT_START):
+    if line.lstrip().startswith(_COMMENT_START) or names_none_of(line, ("kexalgorithms",)):
         return []
     setting = _SSH_KEX_SETTING.search(line)
     if not setting:

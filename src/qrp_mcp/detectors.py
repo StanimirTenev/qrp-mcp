@@ -11,11 +11,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import aws_tls, components, dnssec, ike, oids, opcua, suppression
+from . import aws_tls, components, dnssec, ike, linegate, oids, opcua, suppression
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
-                     library_support, pinned_versions,
+                     library_support, names_none_of, pinned_versions,
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
@@ -1306,6 +1306,35 @@ def _candidate_patterns(lowered: str | None) -> list:
         indices |= _PATTERNS_WITH[s]
     return [_FILTERED_PATTERNS[i] for i in sorted(indices)]
 
+
+# The lines of a file any rule could match, in one search of the file (release D; see
+# linegate.py). The other lines are passed over by every per-line rule.
+LINE_GATE = linegate.Gate([f[3] for f in _FILTERED_PATTERNS])
+_ALL_LINES_UNKNOWN = object()
+
+
+def hot_lines(lines: list[str], ext: str) -> linegate.Hot | None:
+    """The lines to read rule by rule (linegate.Hot); None for all of them.
+
+    A .properties file is read whole: an algorithm there is a bare value (`hashAlg1=MD5`),
+    which only _property_settings, by the key, can tell from any other word."""
+    return LINE_GATE.hot_lines(lines, read_all=ext == ".properties")
+
+
+def _a_pattern_matches(line: str) -> bool:
+    """Whether an algorithm pattern the line's literals select matches it outside a blob:
+    what the loop in scan_source_file needs before it can report anything. Asked of an
+    ASCII line only."""
+    blobs = _blob_spans(line)
+    searched = _masked(line, blobs)
+    lowered = searched.lower()
+    for _algorithm, _description, pattern, literals in _candidate_patterns(lowered):
+        if literals and not any(s in lowered for s in literals):
+            continue
+        if any(not _in_blob(m.start(), blobs) for m in pattern.finditer(searched)):
+            return True
+    return False
+
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(r"\bgpg\s+(--detach-sign|--sign|-s)\b")),
@@ -1475,7 +1504,8 @@ _COSE_CONTEXT = re.compile(r"public-key|pubKeyCredParams|\bcose", re.IGNORECASE)
 
 def scan_cose_algorithms(line: str) -> list[tuple[str, int, str]]:
     """(family, position, name) for each COSE algorithm identifier on a COSE/WebAuthn line."""
-    if not _COSE_CONTEXT.search(line):
+    if (names_none_of(line, ("public-key", "pubkeycredparams", "cose"))   # release D
+            or not _COSE_CONTEXT.search(line)):
         return []
     out: list[tuple[str, int, str]] = []
     for m in _COSE_ALG.finditer(line):
@@ -1488,6 +1518,8 @@ def scan_cose_algorithms(line: str) -> list[tuple[str, int, str]]:
 def scan_jca_names(line: str) -> list[tuple[str, int, str]]:
     """Families named as the algorithm of a JCA getInstance call, with the name used."""
     out: list[tuple[str, int, str]] = []
+    if ".getInstance(" not in line:     # in every match of _JCA_CALL (release D)
+        return out
     for m in _JCA_CALL.finditer(line):
         family = _JCA_NAME_FAMILY.get(m.group(1).upper())
         if family:
@@ -1498,11 +1530,20 @@ def scan_jca_names(line: str) -> list[tuple[str, int, str]]:
 def scan_openssl3_names(line: str) -> list[tuple[str, int]]:
     """Families named as a string argument to an OpenSSL 3 fetch or keygen call."""
     out: list[tuple[str, int]] = []
+    if "EVP_" not in line:              # in every match of _FETCH_CALL (release D)
+        return out
     for m in _FETCH_CALL.finditer(line):
         family = _FETCH_NAME_FAMILY.get(m.group(1).upper())
         if family:
             out.append((family, m.start()))
     return out
+
+
+def _names_no_suite(line: str) -> bool:
+    """No token here can be read as a suite: a prefixed one (_SUITE_PREFIX) has TLS or SSL
+    in capitals, a dash-joined one a part starting with a bulk cipher (release D)."""
+    return "TLS" not in line and "SSL" not in line and names_none_of(
+        line, tuple(c.lower() for c in _SUITE_CIPHER))
 
 
 _ARIA_RSA_SUITES = {"ECDHE-ARIA128-GCM-SHA256", "ECDHE-ARIA256-GCM-SHA384",
@@ -1516,7 +1557,7 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
     distinction is checked by the caller exactly as it is for ordinary matches.
     """
     out: list[tuple[str, int]] = []
-    for token in _SUITE_TOKEN.finditer(line):
+    for token in (() if _names_no_suite(line) else _SUITE_TOKEN.finditer(line)):
         text = token.group(0)
         pos = token.start()
         parts = re.split(r"[-_+]", text)
@@ -1587,7 +1628,7 @@ _GNUTLS_KEYWORD = ("SIGN-", "KX-", "GROUP-", "CURVE-")
 
 def _cipher_string_parts(line: str) -> list[tuple[str, int]]:
     out: list[tuple[str, int]] = []
-    gnutls = _GNUTLS_PRIORITY.search(line)
+    gnutls = None if names_none_of(line, ("priority",)) else _GNUTLS_PRIORITY.search(line)
     if gnutls:
         for entry in _CIPHER_ENTRY.finditer(line, gnutls.end()):
             text = entry.group(0)
@@ -1611,7 +1652,7 @@ _SUITE_TABLE_ENTRY = re.compile(r"\b\w+\(\s*0x[0-9A-Fa-f]{4}\s*,((?:\s*[A-Z0-9]*
 
 
 def _suite_table_entry(line: str) -> list[tuple[str, int]]:
-    match = _SUITE_TABLE_ENTRY.search(line)
+    match = _SUITE_TABLE_ENTRY.search(line) if "0x" in line else None
     if not match:
         return []
     parts = [p.strip() for p in match.group(1).split(",") if p.strip()]
@@ -2583,16 +2624,32 @@ _NAMES_A_PIECE = frozenset(f[2] for f in ALGORITHM_PATTERNS[
 
 def scan_source_file(path: Path, rel_path: str,
                      lines: list[str] | None = None,
-                     cipher_exclusions: bool = False) -> list[dict[str, Any]]:
+                     cipher_exclusions: bool = False,
+                     hot: Any = _ALL_LINES_UNKNOWN) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     lines = (_read_lines(path) or []) if lines is None else lines
     ext = path.suffix.lower()
+    if hot is _ALL_LINES_UNKNOWN:
+        hot = hot_lines(lines, ext)
+    read, patterns = (None, None) if hot is None else hot
     inside_block = False
     inside_doc = ""
     denial_block_indent: int | None = None
     denial_block_calls = False
     signature_lines: set[int] = set()
     for line_no, line in enumerate(lines, start=1):
+        if read is not None and line_no - 1 not in read and not (
+                line_no - 1 in patterns and _a_pattern_matches(line)):
+            # No rule can match this line (linegate). Only what a later line reads moves:
+            # a block comment or docstring opening or closing, a denial block ending.
+            if "/*" in line or "*/" in line:
+                inside_block = _comment_spans(line, ext, inside_block)[1]
+            if ext in _DOCSTRING_EXT and ('"""' in line or "'''" in line):
+                inside_doc = _docstring_spans(line, inside_doc)[1]
+            if (denial_block_indent is not None and line.strip()
+                    and len(line) - len(line.lstrip()) <= denial_block_indent):
+                denial_block_indent = None
+            continue
         was_inside = inside_block or bool(inside_doc)
         spans, inside_block = _comment_spans(line, ext, inside_block)
         if ext in _DOCSTRING_EXT:
@@ -3208,6 +3265,360 @@ def _excluded_by_config(rel_path: str, patterns: list[str]) -> bool:
                or rel_path.startswith(pattern.rstrip("/") + "/") for pattern in patterns)
 
 
+# What scan_repo gathers file by file (_read_one): lists in the order of the walk, counts,
+# maps by path, and lists by key. Joined in that order, batches read in parallel give the
+# containers one sequential pass gives (release D).
+_READING_LISTS = (
+    "source_findings", "ci_findings", "iac_findings", "embedded_key_findings", "unreadable",
+    "reports", "declarations", "undecoded", "content_parts", "protocol_findings",
+    "dependency_findings", "tls_group_findings", "static_rsa_findings", "hybrid_places",
+    "hybrid_names", "pinned_images", "ssh_kex_findings", "weak_key_findings", "fips_findings",
+    "pins", "property_reads", "skipped_files", "left_out", "files_read", "markers",
+    "excluded_by_config",)
+_READING_COUNTS = ("files_scanned", "skipped_kinds", "present_kinds")
+_READING_MAPS = ("key_files", "file_digests", "codeowners")
+_READING_LIST_MAPS = ("property_values",)
+_READING = _READING_LISTS + _READING_COUNTS + _READING_MAPS + _READING_LIST_MAPS
+
+
+def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: set[Path],
+              config_excludes: list[str] | None) -> None:
+    """One file of scan_repo's walk. Everything it finds goes into `r`, in the order
+    found: the whole run's containers, or a batch's when batches of files are read in
+    parallel and joined in the order of the walk (release D)."""
+    (source_findings, ci_findings, iac_findings, embedded_key_findings, unreadable, reports,
+     declarations, undecoded, content_parts, protocol_findings, dependency_findings,
+     tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
+     ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads, skipped_files,
+     left_out, files_read, markers, excluded_by_config, files_scanned, skipped_kinds,
+     present_kinds, key_files, file_digests, codeowners, property_values) = (
+        r[name] for name in _READING)
+    if resolved_exclude:
+        try:
+            if path.resolve() in resolved_exclude:
+                left_out.append(str(path.relative_to(repo_path)))
+                return
+        except (OSError, ValueError):
+            pass
+    if path.name == CONFIG_FILENAME:
+        # The owner's settings, whether or not this run loaded them (`--no-config`, a
+        # nested service's own): its comments name what it excludes. Left out and named,
+        # as the loaded one is.
+        left_out.append(str(path.relative_to(repo_path)))
+        return
+    r["files_present"] += 1
+    # The composition of the denominator, not just its size. A coverage figure
+    # is a property of the tool crossed with what the corpus is made of: the
+    # same scanner over a tree of Go and over a tree of Ruby reports different
+    # numbers with nothing in the scanner changing. Size makes a figure
+    # reproducible; composition is what makes it interpretable.
+    kind = path.suffix.lower() or "(no extension)"
+    present_kinds[kind] = present_kinds.get(kind, 0) + 1
+    rel_path = display_path(path.relative_to(repo_path).as_posix())
+    if config_excludes and _excluded_by_config(rel_path, config_excludes):
+        excluded_by_config.append(rel_path)
+        content_parts.append(f"{rel_path}\0excluded_by_config")
+        return
+    is_ci = is_ci_config_file(path, repo_path)
+    # Every comparison is lowercased, and the reason is a defect this line
+    # produced. OpenSSL carries thirteen files with upper-case extensions --
+    # twelve .H and one .PL -- which failed a case-sensitive `in` against a
+    # lower-case set, were skipped, and were then reported under
+    # `path.suffix.lower()` as .h and .pl: types this tool does claim. So the
+    # declared boundary and the real one differed, the count said the tool
+    # does not claim these, and the lower-casing in the report concealed the
+    # case-sensitivity in the match.
+    claimed = (is_ci or rel_path in CODEOWNERS_LOCATIONS
+               or path.suffix.lower() in IAC_EXTENSIONS
+               or path.suffix.lower() in SOURCE_EXTENSIONS
+               or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
+               or is_certificate_file(path) or is_manifest(path))
+    # `.xml` and `.json5` are read only when they name an OPC UA SecurityPolicy: a
+    # .NET `*.Config.xml` and an open62541 `*.json5` are where those stacks declare
+    # theirs, and every other XML stays the declared boundary it was. Read once,
+    # here, and the same bytes are used below.
+    sniffed = None
+    if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
+        sniffed = _read_file(path, repo_path)
+        claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
+    # A `.sarif` is opened only to be named as the report it is (row 144); one that is
+    # not a SARIF log stays the declared boundary.
+    if not claimed and path.suffix.lower() == ".sarif":
+        sniffed = _read_file(path, repo_path)
+        claimed = sniffed is not None and report_document(sniffed[0]) is not None
+    # Only a file no declared type claims is peeked at for key material; a .py or
+    # a .tf that happens to contain a PEM block stays source and infrastructure.
+    peeked_key = False if claimed else looks_like_key_file(path)
+    if not (claimed or peeked_key):
+        kind = path.suffix.lower() or "(no extension)"
+        skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
+        skipped_files.append(rel_path)
+        # Not read, so not hashed: its size is what is known about it without
+        # opening a file this tool has declared it does not claim.
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = -1
+        content_parts.append(f"{rel_path}\0skipped:{size}")
+        return
+
+    # Read once, here: classification and scanning must see the same content, and a
+    # file that cannot be read has to leave a mark rather than pass as scanned-clean.
+    read = sniffed if sniffed is not None else _read_file(path, repo_path)
+    if read is None:
+        unreadable.append(rel_path)
+        content_parts.append(f"{rel_path}\0unread")
+        return
+    raw, lines = read
+    # The digest is over the BYTES this read returned. Over the decoded text it
+    # was not identity at all: `decode(errors="ignore")` drops what it cannot
+    # read, so two files differing exactly where the scanner looks -- an object
+    # identifier inside a DER blob -- produced the same digest while producing
+    # different findings. No extra I/O; these are the bytes already in hand.
+    digest = hashlib.sha256(raw).hexdigest()
+    content_parts.append(rel_path + "\0" + digest)
+    file_digests[rel_path] = digest
+    report = report_document(raw)
+    if report:
+        # Named under its own reason in the coverage block (row 144), never matched.
+        reports.append(rel_path)
+        if report == SUPPLIER_DOCUMENT:
+            declarations.append(rel_path)
+        return
+    files_read.append(rel_path)
+    if b"qrp:ignore" in raw:
+        found, lines = suppression.read_markers(rel_path, lines)
+        markers.extend(found)
+
+    hot = hot_lines(lines, path.suffix.lower())
+    # The rules below are gated by linegate's words and parts, never by the algorithm
+    # patterns' literals, so the lines in hot.patterns are not theirs to read.
+    for number, text_line in (enumerate(lines, 1) if hot is None else
+                              ((i + 1, lines[i]) for i in sorted(hot.lines))):
+        for asset in scan_protocols(text_line):
+            asset["path"] = rel_path
+            asset["line"] = number
+            asset["excerpt"] = text_line.strip()[:200]
+            protocol_findings.append(asset)
+        for group in scan_tls_groups(text_line):
+            group["path"] = rel_path
+            group["line"] = number
+            group["in_test_code"] = in_test_code(rel_path)
+            tls_group_findings.append(group)
+        hybrid_places.extend((rel_path, number, g) for g in scan_hybrid_groups(text_line))
+        hybrid_names.extend((rel_path, number, n) for n in scan_hybrid_names(text_line))
+        for item in scan_static_rsa_kex(text_line):
+            item["path"] = rel_path
+            item["line"] = number
+            item["in_test_code"] = in_test_code(rel_path)
+            static_rsa_findings.append(item)
+        for kex in scan_ssh_kex(text_line):
+            kex["path"] = rel_path
+            kex["line"] = number
+            kex["in_test_code"] = in_test_code(rel_path)
+            ssh_kex_findings.append(kex)
+        for asset in _policy_assets(text_line):
+            asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
+            protocol_findings.append(asset)
+        if not text_line.lstrip().startswith(_NOT_A_SETTING):
+            for asset in dnssec.unnamed_records(text_line):
+                asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
+                protocol_findings.append(asset)
+    # A load-balancer listener that serves HTTPS or TLS and names no policy gets
+    # the provider's: said as a default, with the reason, on the resource.
+    for number in aws_tls.listeners_without_policy(path.suffix.lower(), lines):
+        excerpt = lines[number - 1].strip()[:200]
+        for family in aws_tls.families(aws_tls.DEFAULT_POLICY):
+            iac_findings.append({
+                "path": rel_path, "line": number, "algorithm": family,
+                "description": aws_tls.describe(aws_tls.DEFAULT_POLICY, default=True),
+                "excerpt": excerpt, "evidence_kind": "default",
+                "basis": "provider_default",
+                "in_test_code": in_test_code(rel_path),
+            })
+        protocol_findings.append({**aws_tls.asset(aws_tls.DEFAULT_POLICY, default=True),
+                                  "path": rel_path, "line": number, "excerpt": excerpt})
+    if path.suffix.lower() in {".yaml", ".yml"}:
+        pinned_images.extend(image_pins(rel_path, lines))
+    if b"age1" in raw or b"-----BEGIN" in raw:
+        at_rest_findings, at_rest_assets = scan_encrypted_at_rest(rel_path, lines)
+        for item in at_rest_findings:
+            item["in_test_code"] = in_test_code(rel_path)
+        source_findings.extend(at_rest_findings)
+        protocol_findings.extend(at_rest_assets)
+    if path.suffix.lower() == ".properties":
+        for key, value, number, _ in property_assignments(lines):
+            property_values.setdefault(key, []).append((value, rel_path, number))
+    elif path.suffix.lower() in SOURCE_EXTENSIONS and b"getProperty" in raw:
+        property_reads.extend(getproperty_reads(rel_path, lines))
+    if is_manifest(path):
+        dependency_findings.extend(scan_manifest(path, rel_path, lines))
+        pins.extend((eco, pkg, ver, rel_path, n)
+                    for eco, pkg, ver, n in pinned_versions(path, lines))
+
+    if rel_path in CODEOWNERS_LOCATIONS:
+        # Read for who owns what, not matched for algorithms: its paths name
+        # directories (`/crypto/rsa/`), not uses.
+        files_scanned["config"] += 1
+        codeowners[rel_path] = lines
+    elif path.name in LOCKFILES:
+        # A lockfile is read for its packages (dependency_findings, above), by its
+        # structure. Its text is package names, versions and hashes: matching it as
+        # source made `ecdsa-sig-formatter` an "ECDSA usage" beside the dependencies row
+        # that already says "declared, not observed" (ZA-OPRAVYANE row 88).
+        files_scanned["config"] += 1
+    elif is_certificate_file(path) or peeked_key:
+        # Certificates and keys are read as bytes, not lines: a .der carries no
+        # lines at all, and a .pem that fails to decode must still be counted.
+        files_scanned["certificate"] += 1
+        algo_findings, key_findings = scan_certificate_file(path, rel_path, raw)
+        source_findings.extend(algo_findings)
+        key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
+        embedded_key_findings.extend(key_findings)
+        for weak in small_scalar_keys(rel_path, raw):
+            weak["in_test_code"] = in_test_code(rel_path)
+            weak_key_findings.append(weak)
+        if is_undecoded(algo_findings, key_findings):
+            undecoded.append(rel_path)
+    elif is_ci:
+        files_scanned["ci_config"] += 1
+        ci_findings.extend(scan_ci_file(path, rel_path, lines))
+        # A pipeline also names algorithms (`openssl req -newkey rsa:2048`).
+        source_findings.extend(
+            scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot))
+    elif is_iac_file(path, repo_path, lines):
+        files_scanned["iac"] += 1
+        algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
+        # Terraform and manifests also carry Ed25519 keys, ML-DSA key specs and
+        # embedded TLS configuration; the two IaC rules alone missed them.
+        _merge(algo_findings,
+               scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot))
+        iac_findings.extend(algo_findings)
+        embedded_key_findings.extend(key_findings)
+    elif path.suffix.lower() in SOURCE_EXTENSIONS:
+        files_scanned["source"] += 1
+        source_findings.extend(scan_source_file(path, rel_path, lines, hot=hot))
+        embedded_key_findings.extend(scan_embedded_keys(rel_path, lines))
+        # A release script signs the same way a pipeline does, and the pipeline
+        # often only calls it (ZA-OPRAVYANE row 34).
+        if path.suffix.lower() == ".sh":
+            ci_findings.extend(scan_ci_file(path, rel_path, lines))
+    else:
+        # Configuration: the extensions above, and any YAML that is not a
+        # manifest. This branch exists so that nothing can be opened and then
+        # dropped: reaching here used to fall off the end of the loop, leaving
+        # a file that was read, counted nowhere, and listed nowhere -- which is
+        # the one thing this scanner is not allowed to do.
+        #
+        # Both pattern sets run, because a config file carries both shapes: a
+        # cipher list reads like source, a key algorithm declaration reads like
+        # infrastructure.
+        files_scanned["config"] += 1
+        src = scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot)
+        source_findings.extend(src)
+        # An IKE configuration carrying a post-quantum algorithm: name its
+        # fragmentation setting (see ike.py).
+        post_quantum: dict[str, int] = {}
+        for item in src:
+            if (item["algorithm"] in _PQC_SCHEMES
+                    and item.get("evidence_kind") not in {"comment", "ban"}):
+                post_quantum.setdefault(item["algorithm"], item["line"])
+        for asset in ike.scan(path.name, lines, post_quantum):
+            asset["path"] = rel_path
+            protocol_findings.append(asset)
+        if path.suffix.lower() == ".cnf":
+            fips_findings.extend(scan_openssl_fips(rel_path, lines))
+        # HAProxy listeners and unverified backends (HAProxy, nginx): see
+        # assets.scan_tls_listeners.
+        protocol_findings.extend(scan_tls_listeners(rel_path, lines))
+        # The DNS UDP size budget a BIND configuration sets (see dnssec.py).
+        for asset in dnssec.udp_sizes(lines):
+            asset["path"] = rel_path
+            protocol_findings.append(asset)
+        algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
+        _merge(iac_findings, algo_findings, already=src)
+        embedded_key_findings.extend(key_findings)
+
+
+def _new_reading() -> dict[str, Any]:
+    r: dict[str, Any] = {name: [] for name in _READING_LISTS}
+    r.update({name: {} for name in _READING_COUNTS + _READING_MAPS + _READING_LIST_MAPS})
+    r["files_scanned"] = {"source": 0, "ci_config": 0, "iac": 0, "config": 0, "certificate": 0}
+    r["files_present"] = 0
+    return r
+
+
+def _join_reading(into: dict[str, Any], part: dict[str, Any]) -> None:
+    """Add a later batch to what the earlier ones gathered, as if read after them."""
+    for name in _READING_LISTS:
+        into[name].extend(part[name])
+    for name in _READING_COUNTS:
+        for key, count in part[name].items():
+            into[name][key] = into[name].get(key, 0) + count
+    for name in _READING_MAPS:
+        into[name].update(part[name])
+    for name in _READING_LIST_MAPS:
+        for key, items in part[name].items():
+            into[name].setdefault(key, []).extend(items)
+    into["files_present"] += part["files_present"]
+
+
+def _read_batch(paths: list[Path], repo_path: Path, resolved_exclude: set[Path],
+                config_excludes: list[str] | None) -> dict[str, Any]:
+    r = _new_reading()
+    for path in paths:
+        _read_one(r, path, repo_path, resolved_exclude, config_excludes)
+    return r
+
+
+def _jobs(files: int) -> int:
+    """Processes to read with: QRP_MCP_JOBS when set, else one per available core for a
+    tree big enough to repay starting them. The result does not depend on it."""
+    wanted = os.environ.get("QRP_MCP_JOBS", "").strip()
+    if wanted.isdigit() and int(wanted) >= 1:
+        return int(wanted)
+    if files < 200:
+        return 1
+    try:
+        cores = len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        cores = os.cpu_count() or 1
+    return max(1, min(cores, 8))
+
+
+def _read_files(r: dict[str, Any], paths: list[Path], repo_path: Path,
+                resolved_exclude: set[Path], config_excludes: list[str] | None) -> None:
+    """Read every file of the walk into `r`, in the walk's order, in batches across
+    processes where there is more than one core (release D). The batches are joined in
+    order, so the result is the one a single pass gives; where processes cannot be
+    started, the single pass is what runs."""
+    jobs = _jobs(len(paths))
+    if jobs > 1:
+        import multiprocessing
+        import sys
+        import threading
+        from concurrent.futures import ProcessPoolExecutor
+        from concurrent.futures.process import BrokenProcessPool
+        from itertools import repeat
+        size = max(1, min(64, len(paths) // (jobs * 8)))
+        batches = [paths[i:i + size] for i in range(0, len(paths), size)]
+        # fork shares the compiled rules with no import; only where it is safe to.
+        method = ("fork" if sys.platform == "linux" and threading.active_count() == 1
+                  else "spawn")
+        try:
+            with ProcessPoolExecutor(jobs, mp_context=multiprocessing.get_context(method)) as pool:
+                parts = list(pool.map(_read_batch, batches, repeat(repo_path),
+                                      repeat(resolved_exclude), repeat(config_excludes)))
+        except (OSError, BrokenProcessPool):
+            parts = None
+        if parts is not None:
+            for part in parts:
+                _join_reading(r, part)
+            return
+    for path in paths:
+        _read_one(r, path, repo_path, resolved_exclude, config_excludes)
+
+
 def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
               config_excludes: list[str] | None = None) -> dict[str, Any]:
     """`exclude` is a path (or a few) left out of the scan and named in the scope.
@@ -3303,248 +3714,17 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     # `qrp:ignore` markers, read where the lines are; applied once the evidence is complete.
     markers: list[dict[str, Any]] = []
     excluded_by_config: list[str] = []
-    for path in iter_repo_files(repo_path, excluded_dir_counts, walk_problems):
-        if resolved_exclude:
-            try:
-                if path.resolve() in resolved_exclude:
-                    left_out.append(str(path.relative_to(repo_path)))
-                    continue
-            except (OSError, ValueError):
-                pass
-        if path.name == CONFIG_FILENAME:
-            # The owner's settings, whether or not this run loaded them (`--no-config`, a
-            # nested service's own): its comments name what it excludes. Left out and named,
-            # as the loaded one is.
-            left_out.append(str(path.relative_to(repo_path)))
-            continue
-        files_present += 1
-        # The composition of the denominator, not just its size. A coverage figure
-        # is a property of the tool crossed with what the corpus is made of: the
-        # same scanner over a tree of Go and over a tree of Ruby reports different
-        # numbers with nothing in the scanner changing. Size makes a figure
-        # reproducible; composition is what makes it interpretable.
-        kind = path.suffix.lower() or "(no extension)"
-        present_kinds[kind] = present_kinds.get(kind, 0) + 1
-        rel_path = display_path(path.relative_to(repo_path).as_posix())
-        if config_excludes and _excluded_by_config(rel_path, config_excludes):
-            excluded_by_config.append(rel_path)
-            content_parts.append(f"{rel_path}\0excluded_by_config")
-            continue
-        is_ci = is_ci_config_file(path, repo_path)
-        # Every comparison is lowercased, and the reason is a defect this line
-        # produced. OpenSSL carries thirteen files with upper-case extensions --
-        # twelve .H and one .PL -- which failed a case-sensitive `in` against a
-        # lower-case set, were skipped, and were then reported under
-        # `path.suffix.lower()` as .h and .pl: types this tool does claim. So the
-        # declared boundary and the real one differed, the count said the tool
-        # does not claim these, and the lower-casing in the report concealed the
-        # case-sensitivity in the match.
-        claimed = (is_ci or rel_path in CODEOWNERS_LOCATIONS
-                   or path.suffix.lower() in IAC_EXTENSIONS
-                   or path.suffix.lower() in SOURCE_EXTENSIONS
-                   or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
-                   or is_certificate_file(path) or is_manifest(path))
-        # `.xml` and `.json5` are read only when they name an OPC UA SecurityPolicy: a
-        # .NET `*.Config.xml` and an open62541 `*.json5` are where those stacks declare
-        # theirs, and every other XML stays the declared boundary it was. Read once,
-        # here, and the same bytes are used below.
-        sniffed = None
-        if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
-            sniffed = _read_file(path, repo_path)
-            claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
-        # A `.sarif` is opened only to be named as the report it is (row 144); one that is
-        # not a SARIF log stays the declared boundary.
-        if not claimed and path.suffix.lower() == ".sarif":
-            sniffed = _read_file(path, repo_path)
-            claimed = sniffed is not None and report_document(sniffed[0]) is not None
-        # Only a file no declared type claims is peeked at for key material; a .py or
-        # a .tf that happens to contain a PEM block stays source and infrastructure.
-        peeked_key = False if claimed else looks_like_key_file(path)
-        if not (claimed or peeked_key):
-            kind = path.suffix.lower() or "(no extension)"
-            skipped_kinds[kind] = skipped_kinds.get(kind, 0) + 1
-            skipped_files.append(rel_path)
-            # Not read, so not hashed: its size is what is known about it without
-            # opening a file this tool has declared it does not claim.
-            try:
-                size = path.stat().st_size
-            except OSError:
-                size = -1
-            content_parts.append(f"{rel_path}\0skipped:{size}")
-            continue
-
-        # Read once, here: classification and scanning must see the same content, and a
-        # file that cannot be read has to leave a mark rather than pass as scanned-clean.
-        read = sniffed if sniffed is not None else _read_file(path, repo_path)
-        if read is None:
-            unreadable.append(rel_path)
-            content_parts.append(f"{rel_path}\0unread")
-            continue
-        raw, lines = read
-        # The digest is over the BYTES this read returned. Over the decoded text it
-        # was not identity at all: `decode(errors="ignore")` drops what it cannot
-        # read, so two files differing exactly where the scanner looks -- an object
-        # identifier inside a DER blob -- produced the same digest while producing
-        # different findings. No extra I/O; these are the bytes already in hand.
-        digest = hashlib.sha256(raw).hexdigest()
-        content_parts.append(rel_path + "\0" + digest)
-        file_digests[rel_path] = digest
-        report = report_document(raw)
-        if report:
-            # Named under its own reason in the coverage block (row 144), never matched.
-            reports.append(rel_path)
-            if report == SUPPLIER_DOCUMENT:
-                declarations.append(rel_path)
-            continue
-        files_read.append(rel_path)
-        if b"qrp:ignore" in raw:
-            found, lines = suppression.read_markers(rel_path, lines)
-            markers.extend(found)
-
-        for number, text_line in enumerate(lines, 1):
-            for asset in scan_protocols(text_line):
-                asset["path"] = rel_path
-                asset["line"] = number
-                asset["excerpt"] = text_line.strip()[:200]
-                protocol_findings.append(asset)
-            for group in scan_tls_groups(text_line):
-                group["path"] = rel_path
-                group["line"] = number
-                group["in_test_code"] = in_test_code(rel_path)
-                tls_group_findings.append(group)
-            hybrid_places.extend((rel_path, number, g) for g in scan_hybrid_groups(text_line))
-            hybrid_names.extend((rel_path, number, n) for n in scan_hybrid_names(text_line))
-            for item in scan_static_rsa_kex(text_line):
-                item["path"] = rel_path
-                item["line"] = number
-                item["in_test_code"] = in_test_code(rel_path)
-                static_rsa_findings.append(item)
-            for kex in scan_ssh_kex(text_line):
-                kex["path"] = rel_path
-                kex["line"] = number
-                kex["in_test_code"] = in_test_code(rel_path)
-                ssh_kex_findings.append(kex)
-            for asset in _policy_assets(text_line):
-                asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
-                protocol_findings.append(asset)
-            if not text_line.lstrip().startswith(_NOT_A_SETTING):
-                for asset in dnssec.unnamed_records(text_line):
-                    asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
-                    protocol_findings.append(asset)
-        # A load-balancer listener that serves HTTPS or TLS and names no policy gets
-        # the provider's: said as a default, with the reason, on the resource.
-        for number in aws_tls.listeners_without_policy(path.suffix.lower(), lines):
-            excerpt = lines[number - 1].strip()[:200]
-            for family in aws_tls.families(aws_tls.DEFAULT_POLICY):
-                iac_findings.append({
-                    "path": rel_path, "line": number, "algorithm": family,
-                    "description": aws_tls.describe(aws_tls.DEFAULT_POLICY, default=True),
-                    "excerpt": excerpt, "evidence_kind": "default",
-                    "basis": "provider_default",
-                    "in_test_code": in_test_code(rel_path),
-                })
-            protocol_findings.append({**aws_tls.asset(aws_tls.DEFAULT_POLICY, default=True),
-                                      "path": rel_path, "line": number, "excerpt": excerpt})
-        if path.suffix.lower() in {".yaml", ".yml"}:
-            pinned_images.extend(image_pins(rel_path, lines))
-        if b"age1" in raw or b"-----BEGIN" in raw:
-            at_rest_findings, at_rest_assets = scan_encrypted_at_rest(rel_path, lines)
-            for item in at_rest_findings:
-                item["in_test_code"] = in_test_code(rel_path)
-            source_findings.extend(at_rest_findings)
-            protocol_findings.extend(at_rest_assets)
-        if path.suffix.lower() == ".properties":
-            for key, value, number, _ in property_assignments(lines):
-                property_values.setdefault(key, []).append((value, rel_path, number))
-        elif path.suffix.lower() in SOURCE_EXTENSIONS and b"getProperty" in raw:
-            property_reads.extend(getproperty_reads(rel_path, lines))
-        if is_manifest(path):
-            dependency_findings.extend(scan_manifest(path, rel_path, lines))
-            pins.extend((eco, pkg, ver, rel_path, n)
-                        for eco, pkg, ver, n in pinned_versions(path, lines))
-
-        if rel_path in CODEOWNERS_LOCATIONS:
-            # Read for who owns what, not matched for algorithms: its paths name
-            # directories (`/crypto/rsa/`), not uses.
-            files_scanned["config"] += 1
-            codeowners[rel_path] = lines
-        elif path.name in LOCKFILES:
-            # A lockfile is read for its packages (dependency_findings, above), by its
-            # structure. Its text is package names, versions and hashes: matching it as
-            # source made `ecdsa-sig-formatter` an "ECDSA usage" beside the dependencies row
-            # that already says "declared, not observed" (ZA-OPRAVYANE row 88).
-            files_scanned["config"] += 1
-        elif is_certificate_file(path) or peeked_key:
-            # Certificates and keys are read as bytes, not lines: a .der carries no
-            # lines at all, and a .pem that fails to decode must still be counted.
-            files_scanned["certificate"] += 1
-            algo_findings, key_findings = scan_certificate_file(path, rel_path, raw)
-            source_findings.extend(algo_findings)
-            key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
-            embedded_key_findings.extend(key_findings)
-            for weak in small_scalar_keys(rel_path, raw):
-                weak["in_test_code"] = in_test_code(rel_path)
-                weak_key_findings.append(weak)
-            if is_undecoded(algo_findings, key_findings):
-                undecoded.append(rel_path)
-        elif is_ci:
-            files_scanned["ci_config"] += 1
-            ci_findings.extend(scan_ci_file(path, rel_path, lines))
-            # A pipeline also names algorithms (`openssl req -newkey rsa:2048`).
-            source_findings.extend(
-                scan_source_file(path, rel_path, lines, cipher_exclusions=True))
-        elif is_iac_file(path, repo_path, lines):
-            files_scanned["iac"] += 1
-            algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
-            # Terraform and manifests also carry Ed25519 keys, ML-DSA key specs and
-            # embedded TLS configuration; the two IaC rules alone missed them.
-            _merge(algo_findings,
-                   scan_source_file(path, rel_path, lines, cipher_exclusions=True))
-            iac_findings.extend(algo_findings)
-            embedded_key_findings.extend(key_findings)
-        elif path.suffix.lower() in SOURCE_EXTENSIONS:
-            files_scanned["source"] += 1
-            source_findings.extend(scan_source_file(path, rel_path, lines))
-            embedded_key_findings.extend(scan_embedded_keys(rel_path, lines))
-            # A release script signs the same way a pipeline does, and the pipeline
-            # often only calls it (ZA-OPRAVYANE row 34).
-            if path.suffix.lower() == ".sh":
-                ci_findings.extend(scan_ci_file(path, rel_path, lines))
-        else:
-            # Configuration: the extensions above, and any YAML that is not a
-            # manifest. This branch exists so that nothing can be opened and then
-            # dropped: reaching here used to fall off the end of the loop, leaving
-            # a file that was read, counted nowhere, and listed nowhere -- which is
-            # the one thing this scanner is not allowed to do.
-            #
-            # Both pattern sets run, because a config file carries both shapes: a
-            # cipher list reads like source, a key algorithm declaration reads like
-            # infrastructure.
-            files_scanned["config"] += 1
-            src = scan_source_file(path, rel_path, lines, cipher_exclusions=True)
-            source_findings.extend(src)
-            # An IKE configuration carrying a post-quantum algorithm: name its
-            # fragmentation setting (see ike.py).
-            post_quantum: dict[str, int] = {}
-            for item in src:
-                if (item["algorithm"] in _PQC_SCHEMES
-                        and item.get("evidence_kind") not in {"comment", "ban"}):
-                    post_quantum.setdefault(item["algorithm"], item["line"])
-            for asset in ike.scan(path.name, lines, post_quantum):
-                asset["path"] = rel_path
-                protocol_findings.append(asset)
-            if path.suffix.lower() == ".cnf":
-                fips_findings.extend(scan_openssl_fips(rel_path, lines))
-            # HAProxy listeners and unverified backends (HAProxy, nginx): see
-            # assets.scan_tls_listeners.
-            protocol_findings.extend(scan_tls_listeners(rel_path, lines))
-            # The DNS UDP size budget a BIND configuration sets (see dnssec.py).
-            for asset in dnssec.udp_sizes(lines):
-                asset["path"] = rel_path
-                protocol_findings.append(asset)
-            algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
-            _merge(iac_findings, algo_findings, already=src)
-            embedded_key_findings.extend(key_findings)
+    reading = dict(zip(_READING, (
+        source_findings, ci_findings, iac_findings, embedded_key_findings, unreadable, reports,
+        declarations, undecoded, content_parts, protocol_findings, dependency_findings,
+        tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
+        ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads,
+        skipped_files, left_out, files_read, markers, excluded_by_config, files_scanned,
+        skipped_kinds, present_kinds, key_files, file_digests, codeowners, property_values)))
+    reading["files_present"] = files_present
+    _read_files(reading, list(iter_repo_files(repo_path, excluded_dir_counts, walk_problems)),
+                repo_path, resolved_exclude, config_excludes)
+    files_present = reading["files_present"]
 
     # Entries the walk could see but not read count as present and unreadable, so the
     # invariant still holds. Directories it could not enter have an unknown number of

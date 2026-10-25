@@ -24,6 +24,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .assets import names_none_of
+
 # number -> (IANA mnemonic, family, curve or None)
 ALGORITHMS: dict[int, tuple[str, str, str | None]] = {
     1: ("RSAMD5", "RSA", None),
@@ -51,6 +53,8 @@ _RECORDS = re.compile(
     r"(?P<dt>C?DS|(?:static|initial)-ds)\s+\d{1,5}\s+(?P<da>\d{1,3})\s+\d{1,3}\s+[\"']?[0-9A-Fa-f]{20}|"
     r"(?P<rt>RRSIG)\s+[A-Z][A-Z0-9]*\s+(?P<ra>\d{1,3})\s+\d{1,3}\s"
     r")")
+# One of these is in every match of _RECORDS, in some case (release D).
+_RECORD_WORDS = ("dnskey", "-key", "ds", "rrsig")
 
 
 # Numbers this scanner gives no family, with IANA's mnemonic where the registry has one
@@ -68,6 +72,8 @@ def unnamed_records(line: str) -> list[dict[str, Any]]:
     """A DNSKEY, DS or RRSIG record whose algorithm number has no family here, as a
     protocol asset that says so."""
     out: list[dict[str, Any]] = []
+    if names_none_of(line, _RECORD_WORDS):
+        return out
     for m in _RECORDS.finditer(line):
         rtype = m.group("kt") or m.group("dt") or m.group("rt")
         number = int(m.group("ka") or m.group("da") or m.group("ra"))
@@ -90,6 +96,8 @@ def scan_records(line: str) -> list[tuple[str, int, str, str | None]]:
     """(family, position, description, curve) for each DNSSEC algorithm number this line
     gives in a record."""
     out = []
+    if names_none_of(line, _RECORD_WORDS):
+        return out
     for m in _RECORDS.finditer(line):
         rtype = m.group("kt") or m.group("dt") or m.group("rt")
         number = int(m.group("ka") or m.group("da") or m.group("ra"))
