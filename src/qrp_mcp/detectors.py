@@ -2468,6 +2468,21 @@ def _attach_providers(findings: list[dict[str, Any]], lines: list[str]) -> None:
             f["provider"] = names[0]
 
 
+# Python 3.9+ `hashlib.md5(data, usedforsecurity=False)`: the code declares the digest is
+# not a security use (ZA-OPRAVYANE row 147). The row keeps its family and severity -- the
+# flag is the developer's statement, and dropping the row would let it silence the scan --
+# and gets the role that says so. On the call's own line only.
+_NOT_FOR_SECURITY = re.compile(r"\busedforsecurity\s*=\s*False\b")
+_HASH_FAMILIES = {"MD5", "SHA1", "MD4", "MD2", "SHA224", "SHA3-224"}
+
+
+def _mark_non_security_use(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    for f in findings:
+        if (f["algorithm"] in _HASH_FAMILIES and f.get("evidence_kind") not in {"ban", "comment"}
+                and _NOT_FOR_SECURITY.search(lines[f["line"] - 1])):
+            f["role"] = "non_security_use"
+
+
 _IDENTIFIER_END = re.compile(r"\w*")
 # The patterns after row 131's MAC and KDF names: rows 136-143 and the list's tail.
 _NAMES_A_PIECE = frozenset(f[2] for f in ALGORITHM_PATTERNS[
@@ -2767,6 +2782,7 @@ def scan_source_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
             })
     _attach_providers(findings, lines)
+    _mark_non_security_use(findings, lines)
     return _drop_signatures_covered_by_a_call(_drop_imports_covered_by_a_call(findings),
                                               signature_lines)
 
