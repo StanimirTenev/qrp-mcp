@@ -83,9 +83,12 @@ def build(result: dict[str, Any], keys: dict[int, str]) -> dict[str, Any]:
 
     notes: list[dict[str, Any]] = []
     for entry in cov.get("not_examined") or []:
+        declared = (entry.get("declarations") or {}).get("paths") or []
         for path in entry.get("paths") or []:
-            notes.append(_notification(entry["reason"], f"not read: {entry['meaning']}",
-                                       path=path))
+            text = f"not read: {entry['meaning']}"
+            if path in declared:
+                text += f"; {entry['declarations']['meaning']}"
+            notes.append(_notification(entry["reason"], text, path=path))
     for path in result.get("files_left_out") or []:
         notes.append(_notification("left_out", "not read: the run's own output, config or "
                                    "baseline file", level="note", path=path))

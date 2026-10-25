@@ -37,8 +37,8 @@ REASONS = {
     "unreadable": "opened and could not be read; attempted and failed",
     "symlink_not_followed": ("a symbolic link, not followed: its target is chosen by "
                              "the scanned tree rather than by the caller"),
-    "report_document": ("a report about cryptography -- a CycloneDX document or a qrp-mcp "
-                        "result -- recognised by its content and not matched: what a tool "
+    "report_document": ("a report about cryptography -- a CycloneDX document, a SARIF log, "
+                        "a qrp-mcp result or baseline -- recognised by its content and not matched: what a tool "
                         "wrote about some code is not that code (ZA-OPRAVYANE row 144)"),
     "claimed_but_not_decoded": ("a claimed file type that was read and gave up no "
                                 "algorithm: encrypted content, or a structure this "
@@ -47,6 +47,12 @@ REASONS = {
     # the coverage figure falls with it, and the file that did it is named in `config`.
     "excluded_by_config": "excluded by the owner's configuration file; present and not read",
 }
+
+# Of the report documents, the CycloneDX ones another tool wrote: declared, not observed.
+SUPPLIER_DECLARATION = (
+    "a CycloneDX document another tool wrote: a supplier's declaration about its product, "
+    "not a measurement of this code. It belongs in the DORA report, passed with qrp-dora's "
+    "`--ingest`, which names it as declared by the supplier")
 
 # The same discipline one level up, applied to the pins rather than the files.
 # A pin that is simply absent is the defect this block exists to prevent, arriving
@@ -350,6 +356,10 @@ def build(
             "meaning": REASONS["report_document"],
             "count": len(reports),
             "paths": reports,
+            **({"declarations": {"meaning": SUPPLIER_DECLARATION,
+                                 "count": len(scan_result["report_declarations"]),
+                                 "paths": scan_result["report_declarations"]}}
+               if scan_result.get("report_declarations") else {}),
         })
     by_config = scan_result.get("files_excluded_by_config") or []
     if by_config:

@@ -102,3 +102,47 @@ def test_a_committed_report_does_not_make_the_composition_incomplete(tmp_path):
     # Same reason as the headline: the report holds no assets this list could miss.
     doc = cyclonedx.build(scan_directory(_with_own_reports(tmp_path, RSA)))
     assert doc["compositions"][0]["aggregate"] == "unknown"
+
+
+SUPPLIER_CBOM = {
+    "bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
+    "metadata": {"tools": {"components": [{"type": "application", "name": "VendorScan"}]}},
+    "components": [{"type": "cryptographic-asset", "name": "ML-KEM-768",
+                    "cryptoProperties": {"assetType": "algorithm"}}]}
+
+
+def test_a_supplier_cbom_is_named_as_a_declaration_for_the_dora_report(tmp_path):
+    (tmp_path / "app.py").write_text(RSA)
+    (tmp_path / "supplier-cbom.json").write_text(json.dumps(SUPPLIER_CBOM))
+    reports = _reports(scan_directory(tmp_path))
+    assert reports["paths"] == ["supplier-cbom.json"]
+    declarations = reports["declarations"]
+    assert declarations["paths"] == ["supplier-cbom.json"]
+    # What it is and where it goes, in one sentence.
+    assert "declar" in declarations["meaning"] and "not a measurement" in declarations["meaning"]
+    assert "--ingest" in declarations["meaning"] and "DORA" in declarations["meaning"]
+
+
+def test_our_own_cbom_is_not_a_supplier_declaration(tmp_path):
+    # Ours carries `metadata.tools` naming qrp-mcp; the older 1.4 list shape is read too.
+    old_shape = dict(SUPPLIER_CBOM, metadata={"tools": [{"name": "qrp-mcp"}]})
+    tree = _with_own_reports(tmp_path, RSA)
+    (tree / "old.json").write_text(json.dumps(old_shape))
+    reports = _reports(scan_directory(tree))
+    assert sorted(reports["paths"]) == ["cbom.json", "old.json", "scan.json"]
+    assert "declarations" not in reports
+
+
+def test_the_cbom_and_sarif_carry_the_declaration_hint(tmp_path):
+    from qrp_mcp import sarif
+    (tmp_path / "app.py").write_text(RSA)
+    (tmp_path / "supplier-cbom.json").write_text(json.dumps(SUPPLIER_CBOM))
+    result = scan_directory(tmp_path)
+    props = {p["name"]: p["value"] for p in cyclonedx.build(result)["properties"]}
+    assert any(k.endswith(":declarations:paths") and v == '["supplier-cbom.json"]'
+               for k, v in props.items())
+    log = sarif.build(result, {id(i): "k" for items in result["evidence"].values()
+                               for i in items})
+    notes = [n for n in log["runs"][0]["invocations"][0]["toolExecutionNotifications"]
+             if n["descriptor"]["id"] == "report_document"]
+    assert len(notes) == 1 and "--ingest" in notes[0]["message"]["text"]

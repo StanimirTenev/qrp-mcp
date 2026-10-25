@@ -2884,6 +2884,8 @@ def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
 # baseline.FORMAT and config.FILENAME, written out here so this module imports neither.
 BASELINE_FORMAT = "qrp-mcp baseline 1"
 CONFIG_FILENAME = ".qrp.toml"
+# A CycloneDX document another tool wrote; coverage.REASONS names where it belongs.
+SUPPLIER_DOCUMENT = "CycloneDX document"
 
 
 def report_document(raw: bytes) -> str | None:
@@ -2912,7 +2914,16 @@ def report_document(raw: bytes) -> str | None:
     if not isinstance(document, dict):
         return None
     if document.get("bomFormat") == "CycloneDX":
-        return "CycloneDX document"
+        # Ours names itself in `metadata.tools` (1.5+: `components`; 1.4: a list). Any
+        # other is a supplier's declaration about its product: SUPPLIER_DOCUMENT.
+        metadata = document.get("metadata")
+        tools = metadata.get("tools") if isinstance(metadata, dict) else None
+        if isinstance(tools, dict):
+            tools = tools.get("components")
+        if isinstance(tools, list) and any(
+                isinstance(t, dict) and t.get("name") == "qrp-mcp" for t in tools):
+            return "qrp-mcp CBOM"
+        return SUPPLIER_DOCUMENT
     if isinstance(document.get("runs"), list) and (
             "sarif" in str(document.get("$schema") or "").lower()
             or document.get("version") == "2.1.0"):
@@ -2958,6 +2969,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     unreadable: list[str] = []
     # Reports (CycloneDX documents, qrp-mcp results) read and recognised, not matched.
     reports: list[str] = []
+    # Those of them another tool wrote about a product: declarations, not measurements.
+    declarations: list[str] = []
     # Claimed file types that were opened and gave up nothing nameable.
     undecoded: list[str] = []
     # What this run actually read, and what it deliberately did not. A commit does
@@ -3109,9 +3122,12 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         digest = hashlib.sha256(raw).hexdigest()
         content_parts.append(rel_path + "\0" + digest)
         file_digests[rel_path] = digest
-        if report_document(raw):
+        report = report_document(raw)
+        if report:
             # Named under its own reason in the coverage block (row 144), never matched.
             reports.append(rel_path)
+            if report == SUPPLIER_DOCUMENT:
+                declarations.append(rel_path)
             continue
         files_read.append(rel_path)
         if b"qrp:ignore" in raw:
@@ -3335,6 +3351,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         "claimed_but_not_decoded": undecoded,
         # Read, recognised as a report about cryptography, and not matched (row 144).
         "report_documents": reports,
+        "report_declarations": declarations,
         # Hybrids named on a line, with their halves; the CBOM keeps those a half of
         # which is in the inventory at that line.
         "file_digests": file_digests,
