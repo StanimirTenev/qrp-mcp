@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use aho_corasick::{AhoCorasick, AhoCorasickBuilder, MatchKind};
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder, AhoCorasickKind, MatchKind};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 // Bytes and ASCII classes (?-u): every line this crate vouches for is plain, and on plain
@@ -28,7 +28,15 @@ fn error(e: impl ToString) -> PyErr {
 }
 
 fn words_ac(words: &[String], kind: MatchKind) -> PyResult<AhoCorasick> {
-    AhoCorasickBuilder::new().ascii_case_insensitive(true).match_kind(kind).build(words).map_err(error)
+    // A DFA: one table step per byte. The automatic choice took the NFA for this many
+    // words, and the overlapping search of the patterns' literals then ran at ~50 MB/s,
+    // most of the gate's time (release 3c).
+    AhoCorasickBuilder::new()
+        .ascii_case_insensitive(true)
+        .match_kind(kind)
+        .kind(Some(AhoCorasickKind::DFA))
+        .build(words)
+        .map_err(error)
 }
 
 fn regex(pattern: &str) -> PyResult<Regex> {

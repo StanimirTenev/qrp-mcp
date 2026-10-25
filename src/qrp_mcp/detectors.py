@@ -8,6 +8,7 @@ import json
 import os
 import posixpath
 import re
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -1919,18 +1920,32 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
                 if excluded_counter is not None:
                     excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
                 continue
-            if _is_link(path):
-                # Not read, and named. A broken link is reported the same way: it
-                # is still a link, and its target is still outside this tool's say.
-                if problems is not None:
-                    problems.append(("symlink", rel(str(path))))
-                continue
-            try:
-                regular = path.is_file()
-                broken = not regular and (path.is_symlink() or not path.exists())
-            except OSError:
-                # Listed but not stat-able: a directory that can be read but not entered.
-                regular, broken = False, True
+            if os.name == "posix":
+                # One lstat answers both questions below where there are no junctions
+                # (release 3c: the walk was two stats and three Paths per file). A file
+                # that is not a link is its own stat; one lstat cannot read is broken.
+                try:
+                    mode = os.lstat(path).st_mode
+                except OSError:
+                    mode = None
+                if mode is not None and stat.S_ISLNK(mode):
+                    if problems is not None:
+                        problems.append(("symlink", rel(str(path))))
+                    continue
+                regular, broken = (False, True) if mode is None else (stat.S_ISREG(mode), False)
+            else:
+                if _is_link(path):
+                    # Not read, and named. A broken link is reported the same way: it
+                    # is still a link, and its target is still outside this tool's say.
+                    if problems is not None:
+                        problems.append(("symlink", rel(str(path))))
+                    continue
+                try:
+                    regular = path.is_file()
+                    broken = not regular and (path.is_symlink() or not path.exists())
+                except OSError:
+                    # Listed but not stat-able: a directory that can be read but not entered.
+                    regular, broken = False, True
             if not regular:
                 # Sockets, FIFOs and devices are not files the tool reads; a broken or
                 # unreachable entry is a file it could not read, and says so.
@@ -1981,10 +1996,18 @@ def _read_within(root: Path, path: Path) -> bytes | None | object:
     """
     if not (os.open in os.supports_dir_fd and getattr(os, "O_NOFOLLOW", 0)):
         return _NO_DIRFD
-    try:
-        parts = _relative_parts(path.resolve(), root.resolve())
-    except (OSError, ValueError):
-        return None
+    # The walk built `path` from `root`, so its components below the root are the walk's
+    # own, and each is opened below without following a link. Resolving the path first
+    # (two realpath walks per file, a tenth of a curl scan) only changed which file a
+    # link swapped in after the walk led to; now such a link is refused like any other
+    # (release 3c). A path not plainly beneath the root is resolved as before.
+    lexical = path.parts[len(root.parts):]
+    if path.parts[:len(root.parts)] != root.parts or ".." in lexical:
+        try:
+            lexical = _relative_parts(path.resolve(), root.resolve())
+        except (OSError, ValueError):
+            return None
+    parts = lexical
     if not parts:
         return None
     flags = os.O_RDONLY | os.O_NOFOLLOW
@@ -2239,6 +2262,15 @@ def _docstring_spans(line: str, inside: str) -> tuple[list[tuple[int, int]], str
     return spans, ""
 
 
+# The characters _comment_spans stops at: outside a string a quote or one of the markers
+# (by which markers the language uses), inside one its closing quote or a backslash.
+_OUTSIDE_QUOTES = {
+    (slash, hash_, dash): re.compile("[\"'" + "/" * slash + "#" * hash_ + "\\-" * dash + "]")
+    for slash in (False, True) for hash_ in (False, True) for dash in (False, True)}
+_IN_DOUBLE = re.compile(r'[\\"]')
+_IN_SINGLE = re.compile(r"[\\']")
+
+
 def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[int, int]], bool]:
     """Where the comments are on this line, and whether the next line continues one.
 
@@ -2262,16 +2294,29 @@ def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[
             return [(0, n)], True
         spans.append((0, end + 2))
         i = end + 2
+    # Only a marker the file's language uses can open a comment: a line holding none of
+    # them has no other span, whatever its quotes (release 3c; the walk below is the
+    # same, jumping from one character that matters to the next).
+    if not ((slash and "/" in line) or (hash_ and "#" in line) or (dash and "-" in line)):
+        return spans, False
+    outside = _OUTSIDE_QUOTES[(slash, hash_, dash)]
     while i < n:
-        c = line[i]
         if quote:
-            if c == "\\":
+            m = (_IN_DOUBLE if quote == '"' else _IN_SINGLE).search(line, i)
+            if m is None:
+                break
+            i = m.start()
+            if line[i] == "\\":
                 i += 2
                 continue
-            if c == quote:
-                quote = ""
+            quote = ""
             i += 1
             continue
+        m = outside.search(line, i)
+        if m is None:
+            break
+        i = m.start()
+        c = line[i]
         if c in "\"'":
             quote = c
             i += 1
@@ -3075,6 +3120,10 @@ def scan_embedded_keys(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
 
     The key's family and size where the block, string literals and all, parses as a key
     (release C); otherwise `key_unread` says why (curl usercertinmem.c:67 is `XXXX...`)."""
+    # Every match of EMBEDDED_KEY_PATTERN holds this; one search of the file instead of a
+    # regex per line where it is absent (release 3c).
+    if "-----BEGIN" not in "\n".join(lines):
+        return []
     return [
         {"path": rel_path, "line": line_no,
          "description": "Embedded private key material", "excerpt": line.strip()[:200],
@@ -3395,7 +3444,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      left_out, files_read, markers, excluded_by_config, material_problems, files_scanned,
      skipped_kinds, present_kinds, key_files, file_digests, codeowners, property_values) = (
         r[name] for name in _READING)
-    if resolved_exclude:
+    # A walked file is not a link, so it can only resolve to an excluded path of its own
+    # name: the name is asked first, and the path resolved only then (release 3c).
+    if resolved_exclude and path.name in {p.name for p in resolved_exclude}:
         try:
             if path.resolve() in resolved_exclude:
                 left_out.append(str(path.relative_to(repo_path)))

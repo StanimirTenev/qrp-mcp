@@ -83,6 +83,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
                 *([Path(values["baseline"])] if values.get("baseline") else []),
                 *([Path(baseline)] if baseline else [])]
 
+    # The checkout's commit and state, asked now: its `git status` runs beside the reading
+    # instead of after it (release 3c).
+    corpus_pin = coverage.start_git_pin(repo_path)
     started_at, clock = _now(), time.monotonic()
     # Passed only when there is one, so every existing caller -- and every test
     # that substitutes this function -- keeps the one-argument shape it had.
@@ -144,6 +147,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         seconds=seconds,
         tool_version=_version(),
         installed_distribution=_installed_distribution(),
+        corpus_pin=corpus_pin,
         ruleset={
             "algorithm_patterns": len(detectors.ALGORITHM_PATTERNS),
             "iac_algorithm_patterns": len(detectors.IAC_ALGORITHM_PATTERNS),

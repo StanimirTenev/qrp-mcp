@@ -48,6 +48,11 @@ _JS_REL_REQUIRE = re.compile(
 _PY_REL_IMPORT = re.compile(r"^\s*from\s+(\.?)(\w+)\s+import\s+([\w\s,]+)$")
 _ASSIGN = r"(?:^|[\s{{,]|\bexports\.|\bconst\s+|\blet\s+|\bvar\s+){name}\s*[:=]\s*([\"'])([^\"'\\]*)\1"
 _LIMIT = 1 << 20
+_JS_EXT = (".js", ".mjs", ".cjs", ".ts", ".jsx", ".tsx")
+# The extensions _aliases and _constants find anything in. A file of any other is passed
+# over without walking its lines: curl's C files spent 2 s there finding nothing (3c).
+_ALIAS_EXT = {".py", ".go", *_JS_EXT}
+_CONSTANT_EXT = {".java", ".py", *_JS_EXT}
 
 
 def _vocabulary() -> set[str]:
@@ -92,6 +97,8 @@ def _aliases(lines: list[str], ext: str, named: dict[int, set[str]]
              ) -> list[tuple[re.Pattern[str], str, str, set[str] | None]]:
     """(use pattern, replacement, how, families allowed or None) for each alias in the file."""
     out = []
+    if ext not in _ALIAS_EXT:
+        return out
     in_import = False
     for number, text in enumerate(lines, 1):
         if ext == ".go":
@@ -132,6 +139,8 @@ def _constants(path: Path, lines: list[str], ext: str, root: Path
                ) -> list[tuple[re.Pattern[str], str, str]]:
     """(use pattern, quoted value, how) for constants another file assigns."""
     out: list[tuple[re.Pattern[str], str, str]] = []
+    if ext not in _CONSTANT_EXT:
+        return out
     here = path.parent
     if ext == ".java":
         classes: dict[str, list[str] | None] = {}
@@ -226,14 +235,19 @@ def resolve(path: Path, rel_path: str, lines: list[str], found: list[dict[str, A
                 how.append(said)
                 if families is not None:
                     allowed = (allowed or set()) | families
-        defining = _JS_REL_REQUIRE.search(text) or _PY_REL_IMPORT.match(text)
-        for pattern, value, said in constants:
-            if "(" in new and not defining:
+        # Asked only where a constant could be replaced: two regexes on every line of
+        # every file was most of this function's time.
+        if constants and "(" in new and not (_JS_REL_REQUIRE.search(text)
+                                             or _PY_REL_IMPORT.match(text)):
+            for pattern, value, said in constants:
+                if "(" not in new:
+                    break       # and no replacement can bring one back
                 replaced = pattern.sub(value, new)
                 if replaced != new:
                     new = replaced
                     how.append(said)
-        if "+" in new:
+        # _CONCAT needs a quote beside the plus.
+        if "+" in new and ('"' in new or "'" in new):
             folded = _fold(new)
             if folded != new:
                 new = folded
