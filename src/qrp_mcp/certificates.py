@@ -7,12 +7,14 @@ both halves of the ability already -- it recognised "-----BEGIN PRIVATE KEY-----
 and it resolved object identifiers -- and no path that opened such a file, so
 embedded_key_findings was 0 in every one of them.
 
-What this does NOT do is parse X.509. It walks the DER for ASN.1 OBJECT
-IDENTIFIER values and keeps the ones the classifier already knows by name. That
-is a deliberately narrow claim: a test corpus is full of deliberately malformed
-certificates -- OpenSSL's is, by design -- and a real parser would have to decide
-what a broken structure means. Accepting only recognised identifiers means
-malformed input yields nothing rather than yields nonsense.
+Since release C, a certificate is parsed with `cryptography`, a declared dependency
+(ZA-OPRAVYANE row 127): each certificate of a PEM, DER, PKCS#7 or password-less PKCS#12
+file is a row of its own, at its BEGIN line, with key, signature and validity. What the
+library will not parse keeps the narrow path it always had: a walk of the DER for ASN.1
+OBJECT IDENTIFIER values the classifier already knows by name. A test corpus is full of
+deliberately malformed certificates -- OpenSSL's is, by design -- and accepting only
+recognised identifiers means malformed input yields nothing rather than nonsense. The
+block that did not parse is named, with its reason, in the coverage (`unparsed_material`).
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from __future__ import annotations
 import base64
 import re
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +35,8 @@ CERTIFICATE_EXTENSIONS = {
     # (ZA-OPRAVYANE row 84: spring-security-samples' server.jks, 65 SHA1withRSA
     # certificates, unread). A keystore keytool wrote as PKCS#12 reads like a .p12.
     ".jks", ".keystore",
+    # PKCS#7 certificate bundles (release C): a chain as one file, read with `cryptography`.
+    ".p7b", ".p7c",
 }
 
 _PEM_BLOCK = re.compile(
@@ -389,6 +394,409 @@ def _read_bytes_once(path: Path) -> bytes | None:
         return None
 
 
+# -- Certificates and keys parsed with `cryptography` (release C, ZA-OPRAVYANE row 127) ----
+#
+# A bundle was one row at line 1: object identifiers "observed in the file; the file was not
+# decoded as a certificate" (certbot fullchain1.pem:30, li-trust-store ca-bundle.pem:29 were
+# PostShor's rows, not ours). Now each certificate is parsed and is a row at its own BEGIN
+# line, with the subject key, the signature, the validity and the names. What the library
+# will not parse falls back to the identifier walk below, and is named in the coverage.
+
+# Composite ML-DSA signatures, draft-ietf-lamps-pq-composite-sigs-19 section 6 (fetched
+# 25.10.2026). Earlier drafts used other arcs; these are the ones the draft now assigns. The
+# same identifier is the key's and the signature's: a composite key signs only as itself.
+COMPOSITE_SIGNATURES: dict[str, tuple[str, tuple[str, str]]] = {
+    "1.3.6.1.5.5.7.6.37": ("id-MLDSA44-RSA2048-PSS-SHA256", ("ML-DSA", "RSA")),
+    "1.3.6.1.5.5.7.6.38": ("id-MLDSA44-RSA2048-PKCS15-SHA256", ("ML-DSA", "RSA")),
+    "1.3.6.1.5.5.7.6.39": ("id-MLDSA44-Ed25519-SHA512", ("ML-DSA", "Ed25519")),
+    "1.3.6.1.5.5.7.6.40": ("id-MLDSA44-ECDSA-P256-SHA256", ("ML-DSA", "ECDSA")),
+    "1.3.6.1.5.5.7.6.41": ("id-MLDSA65-RSA3072-PSS-SHA512", ("ML-DSA", "RSA")),
+    "1.3.6.1.5.5.7.6.42": ("id-MLDSA65-RSA3072-PKCS15-SHA512", ("ML-DSA", "RSA")),
+    "1.3.6.1.5.5.7.6.43": ("id-MLDSA65-RSA4096-PSS-SHA512", ("ML-DSA", "RSA")),
+    "1.3.6.1.5.5.7.6.44": ("id-MLDSA65-RSA4096-PKCS15-SHA512", ("ML-DSA", "RSA")),
+    "1.3.6.1.5.5.7.6.45": ("id-MLDSA65-ECDSA-P256-SHA512", ("ML-DSA", "ECDSA")),
+    "1.3.6.1.5.5.7.6.46": ("id-MLDSA65-ECDSA-P384-SHA512", ("ML-DSA", "ECDSA")),
+    "1.3.6.1.5.5.7.6.47": ("id-MLDSA65-ECDSA-brainpoolP256r1-SHA512", ("ML-DSA", "ECDSA")),
+    "1.3.6.1.5.5.7.6.48": ("id-MLDSA65-Ed25519-SHA512", ("ML-DSA", "Ed25519")),
+    "1.3.6.1.5.5.7.6.49": ("id-MLDSA87-ECDSA-P384-SHA512", ("ML-DSA", "ECDSA")),
+    "1.3.6.1.5.5.7.6.50": ("id-MLDSA87-ECDSA-brainpoolP384r1-SHA512", ("ML-DSA", "ECDSA")),
+    "1.3.6.1.5.5.7.6.51": ("id-MLDSA87-Ed448-SHAKE256", ("ML-DSA", "Ed448")),
+    "1.3.6.1.5.5.7.6.52": ("id-MLDSA87-RSA3072-PSS-SHA512", ("ML-DSA", "RSA")),
+    "1.3.6.1.5.5.7.6.53": ("id-MLDSA87-RSA4096-PSS-SHA512", ("ML-DSA", "RSA")),
+    "1.3.6.1.5.5.7.6.54": ("id-MLDSA87-ECDSA-P521-SHA512", ("ML-DSA", "ECDSA")),
+}
+
+_ML_DSA_SETS = {"2.16.840.1.101.3.4.3.17": "ML-DSA-44", "2.16.840.1.101.3.4.3.18": "ML-DSA-65",
+                "2.16.840.1.101.3.4.3.19": "ML-DSA-87"}
+
+# `cryptography`'s curve names, in the spelling CURVE_OIDS uses.
+_CURVE_NAMES = {"secp256r1": "P-256", "secp384r1": "P-384", "secp521r1": "P-521"}
+
+_CERTIFICATE_LABELS = {"CERTIFICATE", "X509 CERTIFICATE", "TRUSTED CERTIFICATE"}
+_CERTIFICATE_SUFFIXES = {".der", ".crt", ".cer", ".cert", ".p7b", ".p7c"}
+
+# Why a block or a file that was read gave up less than it holds. Closed, like coverage's
+# REASONS; adding one means adding it here first.
+UNPARSED_REASONS = {
+    "not_parsed_as_certificate": "a certificate block or file that `cryptography` did not "
+                                 "parse: truncated, malformed, or not a certificate",
+    "not_parsed_as_pkcs7": "a PKCS#7 block that did not parse as a certificate bundle",
+    "not_parsed_as_key": "a private-key block whose body did not parse as a key",
+    "password_protected": "encrypted under a password, or damaged: it did not open without one",
+    "format_not_parsed": "a format `cryptography` does not read (a Java keystore)",
+}
+
+
+def _iso(moment: Any) -> str:
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _as_of() -> tuple[Any, str]:
+    """What `expired` is relative to: SOURCE_DATE_EPOCH, else the clock of this scan."""
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if epoch.isdigit():
+        return datetime.fromtimestamp(int(epoch), timezone.utc), "SOURCE_DATE_EPOCH"
+    return datetime.now(timezone.utc), "scan time"
+
+
+def _cn(name: Any) -> str | None:
+    from cryptography.x509.oid import NameOID
+    try:
+        values = name.get_attributes_for_oid(NameOID.COMMON_NAME)
+        return str(values[0].value) if values else None
+    except Exception:  # noqa: BLE001 -- a name the library cannot read is no name
+        return None
+
+
+def _oid_name(oid: Any) -> str:
+    dotted = oid.dotted_string
+    if dotted in COMPOSITE_SIGNATURES:
+        return COMPOSITE_SIGNATURES[dotted][0]
+    name = getattr(oid, "_name", "") or ""
+    if name and name != "Unknown OID":
+        return name
+    from .oids import OIDS
+    return OIDS[dotted][1] if dotted in OIDS else dotted
+
+
+def _key_info(key: Any) -> dict[str, Any]:
+    """Family, size and curve of a key object (public or private)."""
+    from cryptography.hazmat.primitives.asymmetric import (
+        dsa, ec, ed448, ed25519, rsa, x448, x25519)
+    if isinstance(key, (rsa.RSAPublicKey, rsa.RSAPrivateKey)):
+        return {"algorithm": "RSA", "size": key.key_size}
+    if isinstance(key, (ec.EllipticCurvePublicKey, ec.EllipticCurvePrivateKey)):
+        return {"algorithm": "EC", "size": key.key_size,
+                "curve": _CURVE_NAMES.get(key.curve.name, key.curve.name)}
+    if isinstance(key, (dsa.DSAPublicKey, dsa.DSAPrivateKey)):
+        return {"algorithm": "DSA", "size": key.key_size}
+    # By class name: touching the `dh` module raises a deprecation warning in every scan.
+    if type(key).__name__ in ("DHPublicKey", "DHPrivateKey"):
+        return {"algorithm": "DH", "size": key.key_size}
+    for kinds, family, size in (
+            ((ed25519.Ed25519PublicKey, ed25519.Ed25519PrivateKey), "Ed25519", 256),
+            ((ed448.Ed448PublicKey, ed448.Ed448PrivateKey), "Ed448", 456),
+            ((x25519.X25519PublicKey, x25519.X25519PrivateKey), "X25519", 256),
+            ((x448.X448PublicKey, x448.X448PrivateKey), "X448", 448)):
+        if isinstance(key, kinds):
+            return {"algorithm": family, "size": size}
+    # ML-DSA keys by their class (MLDSA65PublicKey), so an older `cryptography` without
+    # the module still imports this file.
+    name = type(key).__name__
+    if name.startswith("MLDSA") and name[5:7].isdigit():
+        return {"algorithm": "ML-DSA", "parameter_set": f"ML-DSA-{name[5:7]}"}
+    return {}
+
+
+def _public_key(cert: Any) -> tuple[dict[str, Any], list[str]]:
+    """The subject key, and the families it puts in the inventory."""
+    from .classifier import _find_oid_family  # local: avoids an import cycle
+    try:
+        oid = cert.public_key_algorithm_oid.dotted_string
+    except Exception:  # noqa: BLE001
+        return {"algorithm": None}, []
+    if oid in COMPOSITE_SIGNATURES:
+        name, halves = COMPOSITE_SIGNATURES[oid]
+        return {"algorithm": name, "oid": oid, "composite": list(halves)}, list(halves)
+    try:
+        info = _key_info(cert.public_key())
+    except Exception:  # noqa: BLE001 -- an algorithm the library does not load
+        info = {}
+    if oid in _ML_DSA_SETS:
+        info = {"algorithm": "ML-DSA", "parameter_set": _ML_DSA_SETS[oid]}
+    if not info:
+        entry = _find_oid_family(oid)
+        info = {"algorithm": entry[1] if entry else None}
+    info["oid"] = oid
+    return info, [info["algorithm"]] if info["algorithm"] else []
+
+
+def _signature(cert: Any) -> tuple[dict[str, Any], list[str]]:
+    from .classifier import _find_oid_family  # local: avoids an import cycle
+    from .oids import OIDS
+    oid = cert.signature_algorithm_oid
+    dotted = oid.dotted_string
+    if dotted in COMPOSITE_SIGNATURES:
+        families = list(COMPOSITE_SIGNATURES[dotted][1])
+    elif dotted in OIDS:
+        # A hash named inside the identifier is a second family (sha1WithRSAEncryption).
+        families = list(OIDS[dotted][0])
+    else:
+        entry = _find_oid_family(dotted)
+        families = [entry[1]] if entry else []
+    return {"name": _oid_name(oid), "oid": dotted, "families": families}, families
+
+
+def _self_signed(cert: Any) -> tuple[bool, bool | None]:
+    """(issuer is the subject and the signature does not refute it, signature checked)."""
+    from cryptography.exceptions import InvalidSignature
+    if cert.issuer != cert.subject:
+        return False, None
+    try:
+        cert.verify_directly_issued_by(cert)
+    except InvalidSignature:
+        return False, False
+    except Exception:  # noqa: BLE001 -- not checkable here (composite, unsupported key)
+        return True, None
+    return True, True
+
+
+def describe_certificate(cert: Any, fmt: str, index: int) -> tuple[dict[str, Any], list[str]]:
+    """What one certificate says, and the families its key and signature name."""
+    import hashlib
+    from cryptography.hazmat.primitives.serialization import Encoding
+    public_key, key_families = _public_key(cert)
+    signature, signature_families = _signature(cert)
+    self_signed, checked = _self_signed(cert)
+    now, basis = _as_of()
+    try:
+        subject, issuer = cert.subject.rfc4514_string(), cert.issuer.rfc4514_string()
+    except Exception:  # noqa: BLE001
+        subject, issuer = "", ""
+    families: list[str] = []
+    for family in key_families + signature_families:
+        if family not in families:
+            families.append(family)
+    return {
+        "format": fmt,
+        "index": index,
+        "sha256": hashlib.sha256(cert.public_bytes(Encoding.DER)).hexdigest(),
+        "subject": subject,
+        "issuer": issuer,
+        "subject_cn": _cn(cert.subject),
+        "issuer_cn": _cn(cert.issuer),
+        "serial": format(cert.serial_number, "x"),
+        "not_before": _iso(cert.not_valid_before_utc),
+        "not_after": _iso(cert.not_valid_after_utc),
+        # Relative to a stated moment. Kept out of the CBOM: there validity is data.
+        "expired": now > cert.not_valid_after_utc,
+        "expired_as_of": _iso(now),
+        "expired_basis": basis,
+        "self_signed": self_signed,
+        "self_signature_verified": checked,
+        "public_key": public_key,
+        "signature_algorithm": signature,
+    }, families
+
+
+def _certificate_rows(rel_path: str, line: int, excerpt: str, cert: dict[str, Any],
+                      families: list[str]) -> list[dict[str, Any]]:
+    key = cert["public_key"]
+    key_families = key.get("composite") or [key.get("algorithm")]
+    shown = cert["subject"] or "an empty subject"
+    rows = []
+    for family in families:
+        role = "subject_public_key" if family in key_families else "signature"
+        row: dict[str, Any] = {
+            "path": rel_path, "line": line, "algorithm": family,
+            # Clock-free: the description reaches the CBOM where an excerpt is trimmed.
+            "description": (f"{family} in certificate {cert['index']} ({shown}): key "
+                            f"{key.get('algorithm')}"
+                            + (f" {key['size']}" if key.get("size") else "")
+                            + (f" {key['curve']}" if key.get("curve") else "")
+                            + f", signed with {cert['signature_algorithm']['name']}, valid "
+                              f"{cert['not_before']} to {cert['not_after']}"),
+            "excerpt": excerpt[:200],
+            "evidence_kind": "declaration",
+            "certificate_role": role,
+            "certificate": cert,
+        }
+        if role == "subject_public_key" and not key.get("composite"):
+            if key.get("size"):
+                row["key_size"] = key["size"]
+            if key.get("curve"):
+                row["curve"] = key["curve"]
+        rows.append(row)
+    return rows
+
+
+def _first_tlv(blob: bytes) -> bytes:
+    """The leading DER element alone: OpenSSL's TRUSTED CERTIFICATE appends its aux data."""
+    head = _der_header(blob, 0, 0x30)
+    return blob[:head[1] + head[0]] if head else blob
+
+
+_JKS_MAGIC = (b"\xfe\xed\xfe\xed", b"\xce\xce\xce\xce")
+
+
+def _other_x509(raw: bytes) -> bool:
+    """A DER request or revocation list: parsed, and not a certificate (certbot csr.der)."""
+    from cryptography import x509
+    for load in (x509.load_der_x509_csr, x509.load_der_x509_crl):
+        try:
+            load(raw)
+            return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
+def _key_fields(info: dict[str, Any]) -> dict[str, Any]:
+    if not info:
+        return {"key_unread": "family_not_named"}
+    return {"key_algorithm": info["algorithm"],
+            **{field: info[name] for field, name in (("key_size", "size"), ("curve", "curve"),
+                                                     ("parameter_set", "parameter_set"))
+               if info.get(name)}}
+
+
+def _load_private_key(pem: bytes) -> dict[str, Any]:
+    from cryptography.hazmat.primitives import serialization
+    try:
+        key = serialization.load_pem_private_key(pem, None)
+    except TypeError:
+        return {"key_unread": "password_protected"}
+    except Exception:  # noqa: BLE001 -- never raises: the corpus is edge cases
+        return {"key_unread": "body_not_a_key"}
+    return _key_fields(_key_info(key))
+
+
+def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
+    """Parse what `cryptography` can: certificates by line, private keys by line, the
+    blocks that did not parse, and which PEM blocks were certificates read in full."""
+    from cryptography import x509
+    from cryptography.hazmat.primitives.serialization import pkcs7, pkcs12
+
+    certs: list[tuple[int, str, dict[str, Any], list[str]]] = []
+    keys: dict[int, dict[str, Any]] = {}
+    problems: list[dict[str, Any]] = []
+    parsed_blocks: set[int] = set()
+
+    def add(line: int, excerpt: str, fmt: str, found: list[Any]) -> None:
+        for index, cert in enumerate(found, start=1):
+            try:
+                described, families = describe_certificate(cert, fmt, index)
+            except Exception:  # noqa: BLE001 -- parsed lazily; a field may still fail
+                continue
+            certs.append((line, excerpt, described, families))
+
+    def problem(line: int, label: str, reason: str) -> None:
+        problems.append({"path": rel_path, "line": line, "label": label, "reason": reason})
+
+    text = raw.decode("utf-8", errors="replace")
+    blocks = list(_PEM_BLOCK.finditer(text))
+    for n, match in enumerate(blocks):
+        label = match.group(1).strip()
+        line = text.count("\n", 0, match.start()) + 1
+        if label in _CERTIFICATE_LABELS or label == "PKCS7":
+            try:
+                body = base64.b64decode(match.group(2), validate=False)
+                if label == "PKCS7":
+                    found = pkcs7.load_der_pkcs7_certificates(body)
+                else:
+                    found = [x509.load_der_x509_certificate(
+                        _first_tlv(body) if label == "TRUSTED CERTIFICATE" else body)]
+            except Exception:  # noqa: BLE001 -- never raises: the corpus is edge cases
+                problem(line, label, "not_parsed_as_pkcs7" if label == "PKCS7"
+                        else "not_parsed_as_certificate")
+                continue
+            parsed_blocks.add(n)
+            add(line, f"-----BEGIN {label}-----", "PKCS#7" if label == "PKCS7" else "PEM",
+                found)
+        elif _PRIVATE_KEY_LABEL.search(label) and label != "OPENSSH PRIVATE KEY":
+            keys[line] = _load_private_key(match.group(0).encode())
+            unread = keys[line].get("key_unread")
+            if unread in ("password_protected", "body_not_a_key"):
+                problem(line, label, "password_protected" if unread == "password_protected"
+                        else "not_parsed_as_key")
+
+    if not blocks and not text.lstrip().startswith("-----BEGIN"):
+        suffix = os.path.splitext(rel_path)[1].lower()
+        if raw[:4] in _JKS_MAGIC:
+            problem(1, "JKS", "format_not_parsed")
+        elif raw[:1] == b"\x30":
+            for fmt, load in (("DER", lambda b: [x509.load_der_x509_certificate(b)]),
+                              ("PKCS#7", pkcs7.load_der_pkcs7_certificates)):
+                try:
+                    found = load(raw)
+                except Exception:  # noqa: BLE001
+                    continue
+                add(1, f"{fmt} certificate file", fmt, found)
+                break
+            else:
+                if _iter_oids(raw) & _PKCS12_MARKERS:
+                    try:
+                        bundle = pkcs12.load_pkcs12(raw, None)
+                    except Exception:  # noqa: BLE001
+                        problem(1, "PKCS#12", "password_protected")
+                    else:
+                        found = ([bundle.cert.certificate] if bundle.cert else []) + [
+                            c.certificate for c in bundle.additional_certs]
+                        add(1, "PKCS#12 file", "PKCS#12", found)
+                elif suffix in _CERTIFICATE_SUFFIXES and not _other_x509(raw):
+                    problem(1, "DER", "not_parsed_as_certificate")
+    return {"certificates": certs, "keys": keys, "problems": problems,
+            "parsed_blocks": parsed_blocks}
+
+
+_LAST_MATERIAL: list[Any] = [None, None, None]
+
+
+def _material_once(rel_path: str, raw: bytes) -> dict[str, Any]:
+    """One parse per file: the findings and the coverage ask about the same bytes."""
+    if _LAST_MATERIAL[0] == rel_path and _LAST_MATERIAL[1] is raw:
+        return _LAST_MATERIAL[2]
+    try:
+        result = _material(rel_path, raw)
+    except Exception:  # noqa: BLE001 -- never raises
+        result = {"certificates": [], "keys": {}, "problems": [], "parsed_blocks": set()}
+    _LAST_MATERIAL[:] = [rel_path, raw, result]
+    return result
+
+
+def unparsed_material(path: Path, rel_path: str, raw: bytes | None = None) -> list[dict[str, Any]]:
+    """The blocks and files that were read and did not parse, each with its reason."""
+    if raw is None:
+        raw = _read_bytes_once(path)
+        if raw is None:
+            return []
+    return list(_material_once(rel_path, raw)["problems"])
+
+
+# A PEM block written as string literals in code: `"-----BEGIN PRIVATE KEY-----\n"` and
+# the body on the lines beneath, each in quotes (curl docs/examples/usercertinmem.c:67).
+_LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"|\'((?:[^\'\\]|\\.)*)\'')
+
+
+def key_in_source(lines: list[str], index: int) -> dict[str, Any]:
+    """Family and size of the private key whose header is on lines[index], or why not.
+    Nothing when no whole block can be put together from the lines."""
+    pieces: list[str] = []
+    for line in lines[index:index + 200]:
+        literals = [a or b for a, b in _LITERAL.findall(line)]
+        piece = "".join(literals) if literals else line.strip()
+        pieces.append(piece.replace("\\r", "").replace("\\n", "\n"))
+        if "-----END" in piece:
+            break
+    match = _PEM_BLOCK.search("\n".join(pieces))
+    if not match or not _PRIVATE_KEY_LABEL.search(match.group(1)) \
+            or match.group(1).strip() == "OPENSSH PRIVATE KEY":
+        return {}
+    label, body = match.group(1), re.sub(r"\s+", "", match.group(2))
+    return _load_private_key(
+        f"-----BEGIN {label}-----\n{body}\n-----END {label}-----\n".encode())
+
+
 def scan_certificate_file(path: Path, rel_path: str,
                           raw: bytes | None = None) -> tuple[list[dict[str, Any]],
                                                              list[dict[str, Any]]]:
@@ -440,10 +848,17 @@ def scan_certificate_file(path: Path, rel_path: str,
     # The blobs that are an `RSA PUBLIC KEY` block, read as a bare RSAPublicKey.
     pkcs1_public: set[int] = set()
     text = raw.decode("utf-8", errors="replace")
+    # What `cryptography` read (release C). A block it parsed as certificates is reported
+    # from the parse, at its own line, and kept out of the identifier walk below.
+    material = _material_once(rel_path, raw)
+    found_blocks = False
 
-    for match in _PEM_BLOCK.finditer(text):
+    for n, match in enumerate(_PEM_BLOCK.finditer(text)):
+        found_blocks = True
         label = match.group(1).strip()
         line_no = text.count("\n", 0, match.start()) + 1
+        if n in material["parsed_blocks"]:
+            continue
 
         named = _LABEL_ALGORITHMS.get(label)
         if named:
@@ -455,6 +870,7 @@ def scan_certificate_file(path: Path, rel_path: str,
                 "line": line_no,
                 "type": label,
                 "description": f"private key material in a {label.lower()} block",
+                **material["keys"].get(line_no, {}),
             })
         try:
             blobs.append(base64.b64decode(match.group(2), validate=False))
@@ -463,8 +879,9 @@ def scan_certificate_file(path: Path, rel_path: str,
         if label == "RSA PUBLIC KEY":
             pkcs1_public.add(len(blobs) - 1)
 
-    # A .der or .p12 is the same content without the armour.
-    if not blobs and not text.lstrip().startswith("-----BEGIN"):
+    # A .der or .p12 is the same content without the armour -- unless it was parsed.
+    if not blobs and not found_blocks and not material["certificates"] \
+            and not text.lstrip().startswith("-----BEGIN"):
         blobs.append(raw)
 
     for line_no, line in enumerate(text.splitlines(), start=1):
@@ -528,6 +945,11 @@ def scan_certificate_file(path: Path, rel_path: str,
             item["key_size"] = sizes[0]
             item["description"] += (f"; modulus of {', '.join(map(str, sizes))} bits "
                                     f"from its public key")
+
+    # Each parsed certificate, at its own line (release C). After the two passes above,
+    # which set one file-wide curve and size: a certificate's are its own.
+    for line_no, excerpt, cert, families in material["certificates"]:
+        algorithms.extend(_certificate_rows(rel_path, line_no, excerpt, cert, families))
 
     # PKCS#12. The wrapper is not encrypted even when everything inside it is, so
     # it still names its bags: a shrouded key bag means a private key is in the

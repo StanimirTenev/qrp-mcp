@@ -30,6 +30,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .certificates import UNPARSED_REASONS
+
 # Closed set. A file that is in files_present but not in files_examined carries
 # exactly one of these, and adding a sixth means adding it here first.
 REASONS = {
@@ -43,6 +45,11 @@ REASONS = {
     "claimed_but_not_decoded": ("a claimed file type that was read and gave up no "
                                 "algorithm: encrypted content, or a structure this "
                                 "tool does not parse"),
+    # Not a reason a file goes unexamined: the file was read, and part of it -- a block,
+    # a bundle, a keystore -- did not parse (release C). Named per block, with its reason.
+    "material_not_parsed": ("read, and a certificate, key or bundle in it did not parse; "
+                            "each such block is named with its line and reason, and what the "
+                            "rest of the file gave is reported"),
     # The owner's choice, not the tool's: a `.qrp.toml` exclude. Present and not read, so
     # the coverage figure falls with it, and the file that did it is named in `config`.
     "excluded_by_config": "excluded by the owner's configuration file; present and not read",
@@ -379,6 +386,14 @@ def build(
         "count": len(undecoded),
         "paths": undecoded,
     }
+    problems = scan_result.get("material_not_parsed", [])
+    read_in_part = {
+        "reason": "material_not_parsed",
+        "meaning": REASONS["material_not_parsed"],
+        "count": len(problems),
+        "items": problems,
+        "reasons": {r: UNPARSED_REASONS[r] for r in sorted({p["reason"] for p in problems})},
+    }
     dirs_not_entered = scan_result.get("unreadable_directories", [])
     links = scan_result.get("symlinks_not_followed", [])
     # A linked directory was not entered, so how many files it holds is
@@ -459,6 +474,7 @@ def build(
         "not_examined": not_examined,
         # Read, counted as read, and empty anyway.
         "examined_without_result": read_but_empty,
+        "examined_partly": read_in_part,
         # Seen and deliberately not followed. A link is a path the scanned tree
         # chose, not one the caller gave, so following it would let the corpus
         # decide what this tool reads.
