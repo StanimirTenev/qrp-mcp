@@ -61,7 +61,7 @@ def _result(category: str, item: dict[str, Any], keys: dict[int, str]) -> dict[s
         "partialFingerprints": {"qrpBaseline/v1": keys[id(item)]},
         "properties": {"evidence": category, "evidence_kind": kind,
                        **{k: item[k] for k in ("in_test_code", "role", "key_size", "mandates",
-                                               "hndl_exposed") if k in item}},
+                                               "hndl_exposed", "hndl") if k in item}},
     }
     if "suppression" in item:
         out["suppressions"] = [{"kind": "inSource", "status": "accepted",

@@ -450,6 +450,10 @@ def _context(item: dict[str, Any]) -> str:
         tags.append(f"[{item['evidence_kind']}]")
     if item.get("in_test_code"):
         tags.append("[test]")
+    # The code's own statement that this digest is not a security use (row 147): kept in
+    # the inventory, and said where the occurrence is, as the scan result says it.
+    if item.get("role") == "non_security_use":
+        tags.append("[non_security_use]")
     # The owner of this place, by CODEOWNERS (ZA-OPRAVYANE row 94). Per occurrence, because
     # a component is an algorithm and one algorithm sits in many teams' code; with the line
     # that said it, because it is the file's assumption and not a fact.
