@@ -32,6 +32,7 @@ dialect has no look-arounds: there each look-around is dropped, which only match
 from __future__ import annotations
 
 import bisect
+import os
 import re
 from itertools import accumulate
 from typing import NamedTuple
@@ -135,7 +136,9 @@ def _component_parts() -> list[tuple[str, str]]:
     `ECDH` (after no capital, before no capital or digit or before a capitalised word).
     Digits closing the token stop the same way. Ed+DSA needs no word of its own: its DSA
     is a component of the same shapes."""
-    lower, capital, caps = [], [], []
+    lower: list[tuple[str, bool]] = []      # (text, whether digits close it)
+    capital: list[tuple[str, bool]] = []
+    caps: list[str] = []
     for key in sorted(_COMPONENT_FIRSTS, key=lambda k: (-len(k), k)):
         letters = re.match(r"[A-Z]*", key).group(0)
         digits = key[len(letters):]
@@ -143,21 +146,27 @@ def _component_parts() -> list[tuple[str, str]]:
             # 3DES: a token of capitals and digits only.
             caps.append(re.escape(key))
             continue
-        after = r"(?![0-9])" if digits else r"(?![a-z0-9])"
         if letters:
-            lower.append(re.escape(key.lower()) + after)
+            lower.append((re.escape(key.lower()), bool(digits)))
         if len(letters) >= 2:
-            capital.append(re.escape(letters[0] + letters[1:].lower() + digits) + after)
+            capital.append((re.escape(letters[0] + letters[1:].lower() + digits), bool(digits)))
         caps.append(re.escape(key))
     sized = "FFDHE|RSA|DSA|DHE|DH"
-    lower.append(r"(?:" + sized.lower() + r")[0-9]{3,5}(?![0-9])")
-    capital.append(r"(?:Ffdhe|Rsa|Dsa|Dhe|Dh)[0-9]{3,5}(?![0-9])")
+    lower.append((r"(?:" + sized.lower() + r")[0-9]{3,5}", True))
+    capital.append((r"(?:Ffdhe|Rsa|Dsa|Dhe|Dh)[0-9]{3,5}", True))
     caps.append(r"(?:" + sized + r")[0-9]{3,5}")
-    python = (r"(?-i:(?<![A-Za-z])(?:" + "|".join(lower) + r")|(?:" + "|".join(capital)
+
+    def shapes(entries: list[tuple[str, bool]], digits_after: str, letters_after: str) -> str:
+        return "|".join(text + (digits_after if digits else letters_after)
+                        for text, digits in entries)
+    python = (r"(?-i:(?<![A-Za-z])(?:" + shapes(lower, r"(?![0-9])", r"(?![a-z0-9])")
+              + r")|(?:" + shapes(capital, r"(?![0-9])", r"(?![a-z0-9])")
               + r")|(?<![A-Z])(?:" + "|".join(caps) + r")(?:(?![A-Z0-9])|(?=[A-Z][a-z])))")
-    # The compiled core has no look-arounds: dropped, the part only matches more.
-    rust = "(?-i:" + "|".join(re.sub(r"\(\?<?[!=][^)]*\)", "", p)
-                              for p in lower + capital + caps) + ")"
+    # The compiled core has no look-arounds: each reads the character it looked at instead
+    # (or the line's edge), which can only mark a neighbouring line as well.
+    rust = (r"(?-i:(?:^|[^A-Za-z])(?:" + shapes(lower, r"(?:[^0-9]|$)", r"(?:[^a-z0-9]|$)")
+            + r")|(?:" + shapes(capital, r"(?:[^0-9]|$)", r"(?:[^a-z0-9]|$)")
+            + r")|(?:^|[^A-Z])(?:" + "|".join(caps) + r")(?:[^A-Z0-9]|$|[A-Z][a-z]))")
     return [(python, rust)]
 
 
@@ -206,17 +215,26 @@ class Hot(NamedTuple):
     `lines`: any rule but the algorithm patterns could match there (or the line is not
     ASCII), so the line is read by every rule. `patterns`: only an algorithm pattern's
     literal is there; the line is read by every rule if one of those patterns matches it,
-    and otherwise it is passed over like the rest."""
+    and otherwise it is passed over like the rest. `allowed`: from the compiled core, for
+    a line of either set, the indices of the algorithm patterns that can match it (a
+    superset of those that do); None where not known, and then every pattern is tried."""
     lines: set[int]
     patterns: set[int]
+    allowed: dict[int, frozenset[int]] | None = None
 
 
 class Gate:
     """The union of every rule's gate, with the algorithm patterns' own literals apart."""
 
-    def __init__(self, algorithm_literals: list[tuple[str, ...] | None]):
+    def __init__(self, algorithm_literals: list[tuple[str, ...] | None],
+                 algorithm_patterns: list[re.Pattern] | None = None, blob: str | None = None,
+                 use_core: bool = True):
         # A pattern with no literal can match any line: then every line is read.
         self.everything = any(found is None for found in algorithm_literals)
+        self._algorithm_literals = algorithm_literals
+        self._algorithm_patterns, self._blob = algorithm_patterns, blob
+        # None: not yet looked for; False: not used.
+        self._core: object = None if use_core else False
         self.words = _shortest(set(LITERALS))
         self.pattern_words = _shortest({_piece(s) for found in algorithm_literals if found
                                         for s in found})
@@ -241,6 +259,10 @@ class Gate:
         """The lines any rule could match (see Hot); None when every line is read."""
         if self.everything or read_all:
             return None
+        core = self._core or None   # built by compiled(), for a tree big enough to repay it
+        if core is not None:
+            read, patterns, allowed = core.hot_lines("\n".join(lines))
+            return Hot(set(read), set(patterns), {i: frozenset(k) for i, k in allowed})
         hot: set[int] = set()
         text = "\n".join(lines)
         if not text.isascii():
@@ -282,3 +304,125 @@ class Gate:
         patterns: set[int] = set()
         mark(self._patterns, low, patterns)
         return Hot(hot, patterns - hot)
+
+    def compiled(self):
+        """The compiled core's gate, built on first use; None when qrp-mcp-core is not
+        installed, QRP_MCP_CORE=0 is set, or it refuses the gate. Then the search below, in
+        Python, is used: it marks other lines, never other findings."""
+        if self._core is None:
+            self._core = False
+            if os.environ.get("QRP_MCP_CORE", "").strip() not in ("0", "off", "no"):
+                try:
+                    import qrp_mcp_core
+                    patterns = [rust_regex(p) for p in self._algorithm_patterns or []]
+                    self._core = qrp_mcp_core.Gate(
+                        self.words, self.rust_parts,
+                        [[_piece(s) for s in found or ()] for found in self._algorithm_literals],
+                        # Without every pattern, a line with a pattern's literal is a pattern
+                        # line whether or not a pattern matches it.
+                        patterns if patterns and None not in patterns
+                        and len(patterns) == len(self._algorithm_literals) else None,
+                        self._blob or "(?!)")
+                except (ImportError, ValueError):
+                    self._core = False
+        return self._core or None
+
+
+# --- the algorithm patterns in the compiled core's dialect ---------------------------------
+try:
+    from re import _constants as _sre, _parser as _sre_parse
+except ImportError:  # Python 3.10
+    import sre_constants as _sre  # type: ignore[no-redef]
+    import sre_parse as _sre_parse  # type: ignore[no-redef]
+
+_CATEGORY = {
+    _sre.CATEGORY_DIGIT: r"\d", _sre.CATEGORY_NOT_DIGIT: r"\D",
+    _sre.CATEGORY_SPACE: r"\s", _sre.CATEGORY_NOT_SPACE: r"\S",
+    _sre.CATEGORY_WORD: r"\w", _sre.CATEGORY_NOT_WORD: r"\W",
+}
+
+
+class _Unported(Exception):
+    pass
+
+
+def _char(code: int) -> str:
+    """One character. The core searches ASCII lines as bytes (`(?-u)`), so a character
+    beyond ASCII, which no such line holds, becomes the byte 0xFF, which none holds either."""
+    if code > 0x7F:
+        return "\\xFF"
+    char = chr(code)
+    return char if char.isalnum() or char == "_" else "\\x%02X" % code
+
+
+def _class(items) -> str:
+    out, negate = [], False
+    for op, av in items:
+        if op is _sre.NEGATE:
+            negate = True
+        elif op is _sre.LITERAL:
+            out.append(_char(av))
+        elif op is _sre.RANGE:
+            out.append(_char(av[0]) + "-" + _char(av[1] if av[1] <= 0x7F or av[0] > 0x7F
+                                                    else 0xFF))
+        elif op is _sre.CATEGORY and av in _CATEGORY:
+            out.append(_CATEGORY[av])
+        else:
+            raise _Unported(op)
+    return "[" + ("^" if negate else "") + "".join(out) + "]"
+
+
+def _flags(add: int, delete: int) -> str:
+    on = "".join(c for f, c in ((_sre.SRE_FLAG_IGNORECASE, "i"), (_sre.SRE_FLAG_DOTALL, "s"))
+                 if add & f)
+    off = "".join(c for f, c in ((_sre.SRE_FLAG_IGNORECASE, "i"), (_sre.SRE_FLAG_DOTALL, "s"))
+                  if delete & f)
+    return on + ("-" + off if off else "")
+
+
+def _ported(items) -> str:
+    out = []
+    for op, av in items:
+        if op is _sre.LITERAL:
+            out.append(_char(av))
+        elif op is _sre.NOT_LITERAL:
+            out.append("[^" + _char(av) + "]")
+        elif op is _sre.ANY:
+            out.append(".")
+        elif op is _sre.IN:
+            out.append(_class(av))
+        elif op is _sre.BRANCH:
+            out.append("(?:" + "|".join(_ported(a) for a in av[1]) + ")")
+        elif op is _sre.SUBPATTERN:
+            _group, add, delete, inner = av
+            flags = _flags(add, delete)
+            out.append("(?" + flags + ":" + _ported(inner) + ")")
+        elif op in _REPEATS:
+            low, high, inner = av
+            count = "{%d,}" % low if high == _sre.MAXREPEAT else "{%d,%d}" % (low, high)
+            out.append("(?:" + _ported(inner) + ")" + count)
+        elif op is getattr(_sre, "ATOMIC_GROUP", None):
+            out.append("(?:" + _ported(av) + ")")
+        elif op in (_sre.AT, _sre.ASSERT, _sre.ASSERT_NOT):
+            pass          # an anchor, a boundary or a look-around: dropped, which matches more
+        elif op is _sre.GROUPREF:
+            out.append(".*")   # whatever the group held, on the same line
+        else:
+            raise _Unported(op)
+    return "".join(out)
+
+
+_REPEATS = {_sre.MAX_REPEAT, _sre.MIN_REPEAT, getattr(_sre, "POSSESSIVE_REPEAT", None)} - {None}
+
+
+def rust_regex(pattern: re.Pattern) -> str | None:
+    """A regex in the compiled core's dialect that matches at least wherever `pattern`
+    matches an ASCII line: anchors, \\b and look-arounds dropped, a back-reference read as
+    any run of characters, laziness and possessiveness ignored. None for a construct not
+    handled here, and then the core does not vouch for any pattern."""
+    try:
+        body = _ported(_sre_parse.parse(pattern.pattern, pattern.flags))
+    except (_Unported, re.error):
+        return None
+    flags = _flags(pattern.flags, 0)
+    return ("(?" + flags + ")" if flags else "") + body

@@ -1294,8 +1294,10 @@ _PATTERNS_WITH = {s: frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if f[
 _ALWAYS_TRIED = frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if not f[3])
 
 
-def _candidate_patterns(lowered: str | None) -> list:
-    """The patterns worth trying on a line; every pattern for a non-ASCII line."""
+def _candidate_patterns(lowered: str | None, allowed: frozenset[int] | None = None) -> list:
+    """The patterns worth trying on a line; every pattern for a non-ASCII line. `allowed`,
+    where the compiled core gave it, leaves out the patterns it found cannot match the
+    line (linegate.Hot)."""
     if lowered is None:
         return _FILTERED_PATTERNS
     present: set[str] = set()
@@ -1304,12 +1306,11 @@ def _candidate_patterns(lowered: str | None) -> list:
     indices = set(_ALWAYS_TRIED)
     for s in present:
         indices |= _PATTERNS_WITH[s]
+    if allowed is not None:
+        indices &= allowed
     return [_FILTERED_PATTERNS[i] for i in sorted(indices)]
 
 
-# The lines of a file any rule could match, in one search of the file (release D; see
-# linegate.py). The other lines are passed over by every per-line rule.
-LINE_GATE = linegate.Gate([f[3] for f in _FILTERED_PATTERNS])
 _ALL_LINES_UNKNOWN = object()
 
 
@@ -1321,14 +1322,14 @@ def hot_lines(lines: list[str], ext: str) -> linegate.Hot | None:
     return LINE_GATE.hot_lines(lines, read_all=ext == ".properties")
 
 
-def _a_pattern_matches(line: str) -> bool:
+def _a_pattern_matches(line: str, allowed: frozenset[int] | None = None) -> bool:
     """Whether an algorithm pattern the line's literals select matches it outside a blob:
     what the loop in scan_source_file needs before it can report anything. Asked of an
     ASCII line only."""
     blobs = _blob_spans(line)
     searched = _masked(line, blobs)
     lowered = searched.lower()
-    for _algorithm, _description, pattern, literals in _candidate_patterns(lowered):
+    for _algorithm, _description, pattern, literals in _candidate_patterns(lowered, allowed):
         if literals and not any(s in lowered for s in literals):
             continue
         if any(not _in_blob(m.start(), blobs) for m in pattern.finditer(searched)):
@@ -1736,6 +1737,21 @@ def _is_embedded_key(lines: list[str], index: int) -> bool:
     return True
 
 
+def _relative_parts(path: Path, root: Path) -> tuple[str, ...]:
+    """`path.relative_to(root).parts`, without building a Path for every parent of `path`
+    the way Python 3.12's relative_to does (a sixth of a curl scan; release D). Raises
+    the same ValueError where `path` is not under `root`."""
+    parts, prefix = path.parts, root.parts
+    if parts[:len(prefix)] == prefix:
+        return parts[len(prefix):]
+    return path.relative_to(root).parts
+
+
+def _relative_posix(path: Path, root: Path) -> str:
+    """`path.relative_to(root).as_posix()`, by _relative_parts."""
+    return "/".join(_relative_parts(path, root)) or "."
+
+
 def display_path(rel: str) -> str:
     """A relative path that can always be printed and serialised.
 
@@ -1850,7 +1866,7 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
 
 
 def is_ci_config_file(path: Path, repo_path: Path) -> bool:
-    rel = path.relative_to(repo_path).as_posix()
+    rel = _relative_posix(path, repo_path)
     if rel.startswith(".github/workflows/") and path.suffix.lower() in {".yml", ".yaml"}:
         return True
     if rel.startswith(".circleci/") and path.suffix.lower() in {".yml", ".yaml"}:
@@ -1890,10 +1906,9 @@ def _read_within(root: Path, path: Path) -> bytes | None | object:
     if not (os.open in os.supports_dir_fd and getattr(os, "O_NOFOLLOW", 0)):
         return _NO_DIRFD
     try:
-        relative = path.resolve().relative_to(root.resolve())
+        parts = _relative_parts(path.resolve(), root.resolve())
     except (OSError, ValueError):
         return None
-    parts = relative.parts
     if not parts:
         return None
     flags = os.O_RDONLY | os.O_NOFOLLOW
@@ -2035,6 +2050,11 @@ def _is_excluded(line: str, start: int) -> bool:
 # test vector in OpenSSH contains "ed448" inside the message bytes. A match that
 # starts inside such a run is an accident of the alphabet, not a use.
 _BLOB = re.compile(r"(?:[0-9a-fA-F]{32,}|[A-Za-z0-9+/]{40,}={0,2})")
+
+# The lines of a file any rule could match, in one search of the file (release D; see
+# linegate.py). The other lines are passed over by every per-line rule.
+LINE_GATE = linegate.Gate([f[3] for f in _FILTERED_PATTERNS], [f[2] for f in _FILTERED_PATTERNS],
+                          _BLOB.pattern)
 
 
 def _blob_spans(line: str) -> list[tuple[int, int]]:
@@ -2631,7 +2651,7 @@ def scan_source_file(path: Path, rel_path: str,
     ext = path.suffix.lower()
     if hot is _ALL_LINES_UNKNOWN:
         hot = hot_lines(lines, ext)
-    read, patterns = (None, None) if hot is None else hot
+    read, patterns, allowed = (None, None, None) if hot is None else hot
     inside_block = False
     inside_doc = ""
     denial_block_indent: int | None = None
@@ -2639,7 +2659,8 @@ def scan_source_file(path: Path, rel_path: str,
     signature_lines: set[int] = set()
     for line_no, line in enumerate(lines, start=1):
         if read is not None and line_no - 1 not in read and not (
-                line_no - 1 in patterns and _a_pattern_matches(line)):
+                line_no - 1 in patterns
+                and _a_pattern_matches(line, allowed.get(line_no - 1) if allowed else None)):
             # No rule can match this line (linegate). Only what a later line reads moves:
             # a block comment or docstring opening or closing, a denial block ending.
             if "/*" in line or "*/" in line:
@@ -2684,7 +2705,7 @@ def scan_source_file(path: Path, rel_path: str,
         blobs = _blob_spans(line)
         searched = _masked(line, blobs)
         lowered = searched.lower() if searched.isascii() else None
-        candidates = _candidate_patterns(lowered)
+        candidates = _candidate_patterns(lowered, allowed.get(line_no - 1) if allowed else None)
         for algorithm, description, pattern, literals in candidates:
             if algorithm in seen_on_line:
                 continue
@@ -3314,7 +3335,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     # reproducible; composition is what makes it interpretable.
     kind = path.suffix.lower() or "(no extension)"
     present_kinds[kind] = present_kinds.get(kind, 0) + 1
-    rel_path = display_path(path.relative_to(repo_path).as_posix())
+    rel_path = display_path(_relative_posix(path, repo_path))
     if config_excludes and _excluded_by_config(rel_path, config_excludes):
         excluded_by_config.append(rel_path)
         content_parts.append(f"{rel_path}\0excluded_by_config")
@@ -3564,7 +3585,9 @@ def _join_reading(into: dict[str, Any], part: dict[str, Any]) -> None:
 
 
 def _read_batch(paths: list[Path], repo_path: Path, resolved_exclude: set[Path],
-                config_excludes: list[str] | None) -> dict[str, Any]:
+                config_excludes: list[str] | None, core: bool = False) -> dict[str, Any]:
+    if core:
+        LINE_GATE.compiled()    # a spawned process has not built it
     r = _new_reading()
     for path in paths:
         _read_one(r, path, repo_path, resolved_exclude, config_excludes)
@@ -3592,6 +3615,10 @@ def _read_files(r: dict[str, Any], paths: list[Path], repo_path: Path,
     processes where there is more than one core (release D). The batches are joined in
     order, so the result is the one a single pass gives; where processes cannot be
     started, the single pass is what runs."""
+    core = len(paths) >= 200
+    if core:
+        # The compiled core's gate takes 0.1 s to build: repaid on a tree this size.
+        LINE_GATE.compiled()
     jobs = _jobs(len(paths))
     if jobs > 1:
         import multiprocessing
@@ -3599,16 +3626,37 @@ def _read_files(r: dict[str, Any], paths: list[Path], repo_path: Path,
         import threading
         from concurrent.futures import ProcessPoolExecutor
         from concurrent.futures.process import BrokenProcessPool
-        from itertools import repeat
-        size = max(1, min(64, len(paths) // (jobs * 8)))
-        batches = [paths[i:i + size] for i in range(0, len(paths), size)]
-        # fork shares the compiled rules with no import; only where it is safe to.
+        # Batches of neighbouring files, closed at a share of the tree's bytes, so one
+        # directory of large files does not become one long batch; the largest batch is
+        # started first. The join below is in walk order whatever the order of reading.
+        sizes = []
+        for path in paths:
+            try:
+                sizes.append(path.stat().st_size)
+            except OSError:
+                sizes.append(0)
+        budget = max(1, sum(sizes) // (jobs * 16))
+        batches, weights, batch, weight = [], [], [], 0
+        for path, size in zip(paths, sizes):
+            batch.append(path)
+            weight += size
+            if weight >= budget or len(batch) >= 64:
+                batches.append(batch)
+                weights.append(weight)
+                batch, weight = [], 0
+        if batch:
+            batches.append(batch)
+            weights.append(weight)
+        # fork shares the compiled rules, the core's gate among them, with no import; only
+        # where it is safe to.
         method = ("fork" if sys.platform == "linux" and threading.active_count() == 1
                   else "spawn")
         try:
             with ProcessPoolExecutor(jobs, mp_context=multiprocessing.get_context(method)) as pool:
-                parts = list(pool.map(_read_batch, batches, repeat(repo_path),
-                                      repeat(resolved_exclude), repeat(config_excludes)))
+                started = {i: pool.submit(_read_batch, batches[i], repo_path, resolved_exclude,
+                                          config_excludes, core)
+                           for i in sorted(range(len(batches)), key=lambda i: -weights[i])}
+                parts = [started[i].result() for i in range(len(batches))]
         except (OSError, BrokenProcessPool):
             parts = None
         if parts is not None:
