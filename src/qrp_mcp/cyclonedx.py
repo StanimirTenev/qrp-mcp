@@ -229,7 +229,8 @@ _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versio
                     "post_quantum", "default_applied", "product", "fragmentation",
                     "fragmentation_default", "udp_setting", "udp_size", "included_by",
                     "listener", "library_defaults", "peer_verification",
-                    "verification_setting", "dnssec_algorithm", "dnssec_mnemonic")
+                    "verification_setting", "dnssec_algorithm", "dnssec_mnemonic",
+                    "recipient_family", "hndl")
 _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 
 
@@ -247,6 +248,9 @@ def _protocol_label(asset: dict[str, Any]) -> str:
         return f"{asset.get('version') or 'IKE'} ({asset['product']})"
     if asset.get("dnssec_algorithm") is not None:
         return f"DNSSEC algorithm {asset['dnssec_algorithm']} (not named by this scan)"
+    if asset.get("basis") == "encrypted_at_rest":
+        return ("age" if asset["protocol"] == "age" else "OpenPGP") + " encryption at rest" + (
+            f" ({asset['recipient_family']} recipient)" if asset.get("recipient_family") else "")
     return asset.get("version") or asset["protocol"].upper()
 
 

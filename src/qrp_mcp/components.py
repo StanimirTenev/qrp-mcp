@@ -49,6 +49,10 @@ _PREFIXES = (
     "OSSL_", "PROV_NAMES_", "ENGINE_", "ERR_R_", "BN_",
     "SEC_OID_", "CKK_", "CKM_", "CKA_", "WC_", "wc_", "WOLFSSL_", "wolfSSL_", "CTC_",
     "PKCS5_", "PKCS12_",
+    # curl's own crypto API (ZA-OPRAVYANE row 120): Curl_MD5_update, curl_md5.h,
+    # Curl_ed25519_sign, curl_des_set_odd_parity. Over curl's lib/ every Curl_/curl_ name
+    # with an algorithm component is one (read 25.10.2026).
+    "Curl_", "curl_",
 )
 # Also OpenSSL's: SSL_ calls, and every library's reason and function codes (X509_R_*,
 # SSL_R_*); RSA_R_* and the like are the module API below.

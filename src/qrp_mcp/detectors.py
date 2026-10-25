@@ -14,8 +14,9 @@ from typing import Any
 from . import aws_tls, components, dnssec, ike, oids, opcua, suppression
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
-from .assets import (_group_setting, image_pins, is_manifest, library_support, pinned_versions,
-                     scan_hybrid_groups, scan_manifest, scan_openssl_fips,
+from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
+                     library_support, pinned_versions,
+                     scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
 from .certificates import (is_certificate_file, is_undecoded, looks_like_key_file,
@@ -1163,6 +1164,15 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\b(?:X509_V_FLAG_USE_MTC_DRAFT_PLANTS_\d+|NID_(?:alg_mtcProof|pe_mtcCertificationAuthority)_draft|"
         r"MTCAnchor|kVerifyMTCs|VerifyMTCs|verify-mtcs)\b",
     )),
+    # ZA-OPRAVYANE row 124. OpenSSL's curves API names its family by itself: curl's
+    # `SSL_CTX_set1_curves_list(octx->ssl_ctx, ...)` is EC key agreement although the list
+    # is a variable. The groups API is not here: a group list can hold FFDHE and ML-KEM
+    # hybrids, so without a literal it names no family (the group reader reads literals).
+    ("ECDH", "EC key agreement: the TLS curve list set by OpenSSL's curves API", re.compile(
+        r"\bSSL(?:_CTX)?_set1_curves(?:_list)?\b")),
+    # The RFC 7919 groups as a word of their own: `groups=ffdhe6144` in an mbedtls test.
+    ("DH", "DH named by an RFC 7919 FFDHE group", re.compile(
+        r"(?<![A-Za-z0-9_])ffdhe(?:2048|3072|4096|6144|8192)(?![A-Za-z0-9])", re.IGNORECASE)),
 ]
 
 # The curve a DNSSEC mnemonic names, by the rule that matched it.
@@ -1526,7 +1536,88 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
         if text.upper() in _ARIA_RSA_SUITES:
             families.append("RSA")
         out.extend((family, pos) for family in families)
+    return out + _cipher_string_parts(line) + _suite_table_entry(line)
+
+
+# A key type given as a value (ZA-OPRAVYANE row 126, decision 25.10): `key_type = 'rsa'`,
+# `private_key_type = "rsa"`, `'--key-type', 'rsa'`, `choices=['rsa', 'ecdsa']` beside a key
+# type (certbot). A bare 'rsa' is refused everywhere else -- it names logos, files and
+# variables -- so the line has to say it is a key type. RSA and ECDSA alike. The name of a
+# setting (`rsa_enabled`) is not a value and stays silent.
+_KEY_TYPE_FAMILY = {"rsa": "RSA", "ecdsa": "ECDSA", "dsa": "DSA", "ec": "EC",
+                    "ed25519": "Ed25519", "ed448": "Ed448"}
+_KEY_TYPE_VALUE = re.compile(
+    r"(?i:key[_-]?type)\w*[\"']?\s*(?:[:=]=?|,|\s)\s*[\"']?"
+    r"(?i:(rsa|ecdsa|dsa|ec|ed25519|ed448))(?![A-Za-z0-9_-])")
+_KEY_TYPE_NAMED = re.compile(r"(?i:key[_-]?type)")
+_CHOICES = re.compile(r"\bchoices\s*=\s*[\[(]([^\])]*)[\])]")
+_QUOTED_WORD = re.compile(r"[\"']([A-Za-z0-9]+)[\"']")
+
+
+def _key_type_values(line: str) -> list[tuple[str, int]]:
+    if not _KEY_TYPE_NAMED.search(line):
+        return []
+    out = [(_KEY_TYPE_FAMILY[m.group(1).lower()], m.start(1))
+           for m in _KEY_TYPE_VALUE.finditer(line)]
+    for choices in _CHOICES.finditer(line):
+        for word in _QUOTED_WORD.finditer(choices.group(1)):
+            family = _KEY_TYPE_FAMILY.get(word.group(1).lower())
+            if family:
+                out.append((family, choices.start(1) + word.start(1)))
     return out
+
+
+def _suite_families(parts: list[str]) -> list[str]:
+    families = [f for f in (_SUITE_COMPONENT.get(p.upper()) for p in parts) if f]
+    return [f for f in families if f != "DES"] if "3DES" in families else families
+
+
+# OpenSSL cipher strings join selectors with `+` and separate entries with `:`, `,` or a
+# space: `RC4+RSA`, `EECDH+aRSA`, `EDH+aRSA` (ZA-OPRAVYANE row 121; certbot's nginx test
+# data). An entry struck out with `!` or `-` is not a use. A dash-joined entry is a suite
+# name and stays with the suite reader above, which knows DES-CBC3-SHA is one cipher.
+_CIPHER_ENTRY = re.compile(r"[^:,;\s'\"]+")
+# GnuTLS priority strings: `NORMAL:-SIGN-ALL:+SIGN-RSA-SHA512` (mbedtls tests/ssl-opt.sh).
+# Only an entry added with `+`; its keyword parts are split as a name is, so that
+# `+SIGN-ML-DSA-65` stays ML-DSA and never becomes DSA.
+_GNUTLS_PRIORITY = re.compile(r"--priority[= ]|\bgnutls_priority_\w+\s*\(|\bPRIORITY\s*=",
+                              re.IGNORECASE)
+_GNUTLS_KEYWORD = ("SIGN-", "KX-", "GROUP-", "CURVE-")
+
+
+def _cipher_string_parts(line: str) -> list[tuple[str, int]]:
+    out: list[tuple[str, int]] = []
+    gnutls = _GNUTLS_PRIORITY.search(line)
+    if gnutls:
+        for entry in _CIPHER_ENTRY.finditer(line, gnutls.end()):
+            text = entry.group(0)
+            if text.startswith("+") and text[1:].upper().startswith(_GNUTLS_KEYWORD):
+                out += [(f, entry.start()) for f in _suite_families(components.components(text[1:]))]
+        return out
+    if line.lstrip().startswith(_COMMENT_START) or not _cipher_setting(line):
+        return out
+    for entry in _CIPHER_ENTRY.finditer(line):
+        text = entry.group(0).lstrip("+")
+        if entry.group(0)[:1] in "!-" or "-" in text or not text:
+            continue
+        out += [(f, entry.start()) for f in _suite_families(text.split("+"))
+                if f not in {"SHA1"}]   # a bare SHA selector picks MACs, not a cipher use
+    return out
+
+
+# A table of TLS suites in C, one macro per suite with the IANA code first and the name's
+# parts as bare words: curl's `CS_ENTRY(0x009E, DHE,RSA,AES128,GCM,SHA256,,,)`.
+_SUITE_TABLE_ENTRY = re.compile(r"\b\w+\(\s*0x[0-9A-Fa-f]{4}\s*,((?:\s*[A-Z0-9]*\s*,)+\s*[A-Z0-9]*)\s*\)")
+
+
+def _suite_table_entry(line: str) -> list[tuple[str, int]]:
+    match = _SUITE_TABLE_ENTRY.search(line)
+    if not match:
+        return []
+    parts = [p.strip() for p in match.group(1).split(",") if p.strip()]
+    if not any(p.startswith(_SUITE_CIPHER) for p in parts):
+        return []
+    return [(f, match.start(1)) for f in _suite_families(parts)]
 
 
 # --- key sizes named on the same line as the algorithm ---
@@ -2217,6 +2308,9 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     start = position
     while start > 0 and line[start - 1] not in ",;:=([{ \t\"'":
         start -= 1
+    # `if(!SSL_CTX_set1_curves_list(...))` negates a call's result; it strikes nothing out.
+    if re.match(r"!\s*\w+\s*\(", line[start:]):
+        return False
     return line[start:start + 1] in {"-", "!"}
 
 
@@ -2228,6 +2322,34 @@ def _families_in_use(findings: list[dict[str, Any]]) -> set[str]:
     """Families with evidence that is neither a comment nor a ban."""
     return {f["algorithm"] for f in findings
             if f.get("evidence_kind") not in {"comment", "ban"}}
+
+
+# A Go function signature names the types it takes and returns; it calls nothing. `func
+# demo(pub *rsa.PublicKey) {` was a `call`, and 9 of 0.36.0's 32 rows off Cryben's reference
+# were such lines, one above the call they introduce (qrp-pokazateli 02-tochnost). Only a
+# signature whose line opens no body with code in it: `func f() { rsa.Sign(...) }` calls.
+_GO_SIGNATURE = re.compile(r"^\s*func\s*(?:\([^)]*\)\s*)?\w+\s*(?:\[[^\]]*\]\s*)?\(")
+_GO_BODY_CODE = re.compile(r"\{\s*\S")
+# Families one call and one type of the same library name differently: ecdsa.PublicKey in
+# the signature, elliptic.P256() in the body.
+_FAMILY_GROUP = {"ECDSA": "EC", "ECDH": "EC", "3DES": "DES", "EdDSA": "Ed25519",
+                 "Ed448": "Ed25519"}
+_SIGNATURE_REACH = 2
+
+
+def _drop_signatures_covered_by_a_call(findings: list[dict[str, Any]],
+                                       signature_lines: set[int]) -> list[dict[str, Any]]:
+    """A Go signature is not a second row when a call of the same family group follows
+    within two lines (the reach measured on Cryben: -8 rows off the reference, none on it)."""
+    if not signature_lines:
+        return findings
+    calls = [(f["line"], _FAMILY_GROUP.get(f["algorithm"], f["algorithm"]))
+             for f in findings if f.get("evidence_kind") == "call"]
+    return [f for f in findings
+            if not (f["line"] in signature_lines and f.get("evidence_kind") == "reference"
+                    and any(0 < line - f["line"] <= _SIGNATURE_REACH
+                            and group == _FAMILY_GROUP.get(f["algorithm"], f["algorithm"])
+                            for line, group in calls))]
 
 
 def _drop_imports_covered_by_a_call(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -2348,6 +2470,111 @@ def _attach_providers(findings: list[dict[str, Any]], lines: list[str]) -> None:
             f["provider"] = names[0]
 
 
+# Java .properties and getProperty (ZA-OPRAVYANE rows 145, 149). OWASP Benchmark's 40 hash
+# misses were all `getProperty("hashAlg1", "SHA512")` in the code and `hashAlg1=MD5` in
+# benchmark.properties. A property is an algorithm setting when its key says so and its
+# value is an algorithm; the line of code that reads it names the same algorithm.
+_PROPERTY_LINE = re.compile(r"^\s*([A-Za-z0-9_.\-]+)\s*[=:]\s*(\S+?)\s*$")
+_ALGORITHM_SETTING_KEY = re.compile(
+    r"(?i:alg|cipher|hash|digest|crypto|transformation|signature|key[._-]?type)")
+_VALUE_FAMILY = {"MD5": "MD5", "MD2": "MD2", "MD4": "MD4", "SHA1": "SHA1", "SHA-1": "SHA1",
+                 "SHA": "SHA1", "DES": "DES", "DESEDE": "3DES", "TRIPLEDES": "3DES",
+                 "3DES": "3DES", "RC4": "RC4", "ARCFOUR": "RC4", "RC2": "RC2", "RSA": "RSA",
+                 "DSA": "DSA", "DH": "DH", "DIFFIEHELLMAN": "DH", "EC": "EC", "ECDSA": "ECDSA",
+                 "ECDH": "ECDH"}
+_GET_PROPERTY = re.compile(r"\bgetProperty\s*\(\s*\"([^\"]+)\"\s*(?:,\s*\"([^\"]*)\"\s*)?\)")
+
+
+def _algorithm_value(value: str) -> str | None:
+    """The family a JCA-style value names: `MD5`, `DESede/ECB/PKCS5Padding`, `AES/ECB/...`."""
+    head, _, rest = value.strip().strip("\"'").partition("/")
+    if head.upper() == "AES" and rest.upper().startswith("ECB"):
+        return "AES-ECB"
+    return _VALUE_FAMILY.get(head.upper())
+
+
+def property_assignments(lines: list[str]) -> list[tuple[str, str, int, int]]:
+    """(key, value, line, position of the value) for every `key=value` of a .properties file."""
+    out = []
+    for number, text in enumerate(lines, 1):
+        if text.lstrip().startswith(("#", "!")):
+            continue
+        match = _PROPERTY_LINE.match(text)
+        if match:
+            out.append((match.group(1), match.group(2), number, match.start(2)))
+    return out
+
+
+def _property_settings(line: str) -> list[tuple[str, int, str]]:
+    """(family, position, key) where this .properties line sets an algorithm."""
+    out = []
+    for key, value, _, pos in property_assignments([line]):
+        family = _algorithm_value(value)
+        if family and _ALGORITHM_SETTING_KEY.search(key):
+            out.append((family, pos, key))
+    return out
+
+
+def getproperty_reads(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """Each `getProperty("key"[, "default"])` in code, for the tree-wide join below."""
+    out = []
+    for number, text in enumerate(lines, 1):
+        if "getProperty" not in text or _COMMENT_LINE.match(text):
+            continue
+        for match in _GET_PROPERTY.finditer(text):
+            out.append({"path": rel_path, "line": number, "key": match.group(1),
+                        "default": match.group(2), "excerpt": text.strip()[:200],
+                        "evidence_kind": _evidence_kind(text, False)})
+    return out
+
+
+def _join_properties(reads: list[dict[str, Any]],
+                     settings: dict[str, list[tuple[str, str, int]]],
+                     findings: list[dict[str, Any]]) -> None:
+    """A read whose key a .properties file in the tree sets gets that file's algorithm. The
+    join is by key across the tree (src/main/resources is no ancestor of src/main/java), and
+    a key set to different values is not guessed between. Only a key no file sets runs on
+    its default, so only then is the default literal read."""
+    have = {(f["path"], f["line"], f["algorithm"]) for f in findings}
+    for read in reads:
+        entries = settings.get(read["key"])
+        if entries:
+            if len({value for value, _, _ in entries}) != 1:
+                continue
+            value, where, line = entries[0]
+            family = _algorithm_value(value)
+            said = (f"{family} named by the property {read['key']} ({where}:{line}), "
+                    f"read here with getProperty")
+        else:
+            family = _algorithm_value(read["default"] or "")
+            said = (f"{family} named as the default of getProperty(\"{read['key']}\"); no "
+                    f"properties file in the tree sets {read['key']}")
+        if not family or (read["path"], read["line"], family) in have:
+            continue
+        have.add((read["path"], read["line"], family))
+        findings.append({
+            "path": read["path"], "line": read["line"], "algorithm": family,
+            "description": said, "excerpt": read["excerpt"],
+            "evidence_kind": read["evidence_kind"],
+            "in_test_code": in_test_code(read["path"]),
+        })
+
+
+# Python 3.9+ `hashlib.md5(data, usedforsecurity=False)`: the code declares the digest is
+# not a security use (ZA-OPRAVYANE row 147). The row keeps its family and severity -- the
+# flag is the developer's statement, and dropping the row would let it silence the scan --
+# and gets the role that says so. On the call's own line only.
+_NOT_FOR_SECURITY = re.compile(r"\busedforsecurity\s*=\s*False\b")
+_HASH_FAMILIES = {"MD5", "SHA1", "MD4", "MD2", "SHA224", "SHA3-224"}
+
+
+def _mark_non_security_use(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    for f in findings:
+        if (f["algorithm"] in _HASH_FAMILIES and f.get("evidence_kind") not in {"ban", "comment"}
+                and _NOT_FOR_SECURITY.search(lines[f["line"] - 1])):
+            f["role"] = "non_security_use"
+
+
 _IDENTIFIER_END = re.compile(r"\w*")
 # The patterns after row 131's MAC and KDF names: rows 136-143 and the list's tail.
 _NAMES_A_PIECE = frozenset(f[2] for f in ALGORITHM_PATTERNS[
@@ -2364,6 +2591,7 @@ def scan_source_file(path: Path, rel_path: str,
     inside_doc = ""
     denial_block_indent: int | None = None
     denial_block_calls = False
+    signature_lines: set[int] = set()
     for line_no, line in enumerate(lines, start=1):
         was_inside = inside_block or bool(inside_doc)
         spans, inside_block = _comment_spans(line, ext, inside_block)
@@ -2372,6 +2600,10 @@ def scan_source_file(path: Path, rel_path: str,
             spans = spans + doc_spans
         code = _code_only(line, spans)
         kind = _evidence_kind(line, was_inside, code)
+        if (kind == "call" and ext == ".go" and _GO_SIGNATURE.match(code)
+                and not _GO_BODY_CODE.search(code)):
+            kind = "reference"
+            signature_lines.add(line_no)
         indent = len(line) - len(line.lstrip())
         if denial_block_indent is not None and line.strip() and indent <= denial_block_indent:
             denial_block_indent = None
@@ -2539,6 +2771,34 @@ def scan_source_file(path: Path, rel_path: str,
                 "evidence_kind": kind,
                 "in_test_code": in_test_code(rel_path),
             })
+        for family, pos in _key_type_values(searched):
+            if family in seen_on_line or _in_blob(pos, blobs):
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} named as a key-type value",
+                "excerpt": line.strip()[:200],
+                "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial, code) else
+                                  "comment" if _in_spans(pos, spans) or _in_spans(pos, prose)
+                                  else kind),
+                "in_test_code": in_test_code(rel_path),
+            })
+        for family, pos, key in (_property_settings(line) if ext == ".properties" else []):
+            if family in seen_on_line:
+                continue
+            seen_on_line.add(family)
+            findings.append({
+                "path": rel_path,
+                "line": line_no,
+                "algorithm": family,
+                "description": f"{family} set as the value of the property {key}",
+                "excerpt": line.strip()[:200],
+                "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial, code) else kind,
+                "in_test_code": in_test_code(rel_path),
+            })
         # DNSSEC algorithm numbers, in the shape of a DNSKEY, DS or RRSIG record.
         for family, pos, said, curve in dnssec.scan_records(line):
             if family in seen_on_line or _in_blob(pos, blobs):
@@ -2570,7 +2830,9 @@ def scan_source_file(path: Path, rel_path: str,
                 "algorithm": family,
                 "description": f"{family} named in a cipher suite",
                 "excerpt": line.strip()[:200],
-                "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
+                "evidence_kind": ("ban" if _is_banned_here(line, pos, in_denial) else
+                                  "comment" if _in_spans(pos, spans) or _in_spans(pos, prose)
+                                  else kind),
             })
         # A suite whose OpenSSL name carries no key-exchange word is RSA key exchange
         # (AES256-SHA is TLS_RSA_WITH_AES_256_CBC_SHA); see assets.STATIC_RSA_SUITES.
@@ -2628,7 +2890,9 @@ def scan_source_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
             })
     _attach_providers(findings, lines)
-    return _drop_imports_covered_by_a_call(findings)
+    _mark_non_security_use(findings, lines)
+    return _drop_signatures_covered_by_a_call(_drop_imports_covered_by_a_call(findings),
+                                              signature_lines)
 
 
 _NOT_A_SETTING = ("#", ";", "//", "--", "/*", "*", "<!--")
@@ -3006,6 +3270,9 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     fips_findings: list[dict[str, Any]] = []
     # Packages pinned to one version: (ecosystem, package, version, manifest, line).
     pins: list[tuple[str, str, str, str, int]] = []
+    # .properties assignments by key, and the getProperty reads that look them up (row 145).
+    property_values: dict[str, list[tuple[str, str, int]]] = {}
+    property_reads: list[dict[str, Any]] = []
     # The denominator. files_scanned says how much was read; on its own it does not
     # say how much there was. A file skipped because the tool does not claim its
     # type is not a failure, but leaving it uncounted turns coverage into a number
@@ -3180,6 +3447,17 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
                                       "path": rel_path, "line": number, "excerpt": excerpt})
         if path.suffix.lower() in {".yaml", ".yml"}:
             pinned_images.extend(image_pins(rel_path, lines))
+        if b"age1" in raw or b"-----BEGIN" in raw:
+            at_rest_findings, at_rest_assets = scan_encrypted_at_rest(rel_path, lines)
+            for item in at_rest_findings:
+                item["in_test_code"] = in_test_code(rel_path)
+            source_findings.extend(at_rest_findings)
+            protocol_findings.extend(at_rest_assets)
+        if path.suffix.lower() == ".properties":
+            for key, value, number, _ in property_assignments(lines):
+                property_values.setdefault(key, []).append((value, rel_path, number))
+        elif path.suffix.lower() in SOURCE_EXTENSIONS and b"getProperty" in raw:
+            property_reads.extend(getproperty_reads(rel_path, lines))
         if is_manifest(path):
             dependency_findings.extend(scan_manifest(path, rel_path, lines))
             pins.extend((eco, pkg, ver, rel_path, n)
@@ -3297,6 +3575,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             unreadable_dirs.append(rel + "/")
         content_parts.append(f"{rel}\0{kind}")
 
+    _join_properties(property_reads, property_values, source_findings)
     _link_signing_keys(ci_findings, key_files)
     owners_file = next((p for p in CODEOWNERS_LOCATIONS if p in codeowners), None)
     if owners_file:
