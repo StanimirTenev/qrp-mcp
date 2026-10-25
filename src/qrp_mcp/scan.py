@@ -9,8 +9,8 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import (__version__, assets, aws_tls, baseline as baseline_mod, certificates, config,
-               coverage, detectors, dnssec, ike, opcua, profiles, remediation, suppression)
+from . import (__version__, assets, aws_tls, baseline as baseline_mod, certificates, confidence,
+               config, coverage, detectors, dnssec, ike, opcua, profiles, remediation, suppression)
 from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint, known_algorithms, summarize
 
 
@@ -297,14 +297,18 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         "evidence_file_sha256": _cited_digests(scan_result),
     }
 
+    # How sure the scan is of each occurrence, from what it read (release E); before the
+    # suppression below, so a suppressed occurrence keeps its level.
+    confidence.annotate(result["evidence"])
     # Applied last, on the finished evidence, so the inventory above is the code as it is:
     # a suppressed RSA is still RSA in the code.
-    family_of = {detected_by_name[f.raw_value]: f.algorithm_family for f in response.findings
+    family_of ={detected_by_name[f.raw_value]: f.algorithm_family for f in response.findings
                  if f.raw_value in detected_by_name}
     held = suppression.apply(result["evidence"], scan_result.get("suppression_markers") or [],
                              family_of)
     result["suppressed"] = held
     coverage_block["suppressed"] = suppression.coverage_block(held)
+    coverage_block["confidence"] = confidence.coverage_block(result["evidence"])
     if held["count"]:
         per_family: dict[str, int] = {}
         for items in held["evidence"].values():

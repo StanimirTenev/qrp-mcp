@@ -15,6 +15,8 @@ What a SARIF viewer would otherwise not show is put where the format has room fo
   not apply
   a baseline            `baselineState` new / unchanged on each result.
   coverage              `run.properties.coverage`: present, examined, the verdict.
+  confidence            `rank` (high 90, medium 60, low 30) and `properties.confidence` with
+                        its basis (release E; see confidence.py). `level` stays the severity.
 
 `partialFingerprints["qrpBaseline/v1"]` is the baseline key (path + family + normalised
 line), computed on the full line before any masking.
@@ -29,6 +31,7 @@ from . import baseline as baseline_mod
 
 SCHEMA = "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json"
 _NOTE = {"comment", "ban", "named_but_not_used"}
+_RANK = {"high": 90.0, "medium": 60.0, "low": 30.0}
 
 
 def _location(path: str, line: int | None = None, excerpt: str | None = None) -> dict[str, Any]:
@@ -61,8 +64,11 @@ def _result(category: str, item: dict[str, Any], keys: dict[int, str]) -> dict[s
         "partialFingerprints": {"qrpBaseline/v1": keys[id(item)]},
         "properties": {"evidence": category, "evidence_kind": kind,
                        **{k: item[k] for k in ("in_test_code", "role", "key_size", "mandates",
-                                               "hndl_exposed", "hndl") if k in item}},
+                                               "hndl_exposed", "hndl", "confidence",
+                                               "confidence_basis") if k in item}},
     }
+    if item.get("confidence") in _RANK:
+        out["rank"] = _RANK[item["confidence"]]
     if "suppression" in item:
         out["suppressions"] = [{"kind": "inSource", "status": "accepted",
                                 "justification": item["suppression"]["reason"]}]

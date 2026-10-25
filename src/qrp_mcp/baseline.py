@@ -27,7 +27,8 @@ MEANING = ("occurrences already recorded in the baseline file, told apart from n
 _NOT_IDENTITY = {"line", "in_test_code", "role", "provider", "tls_termination", "signing_key",
                  "provider_pin", "fips_provider_configured_in", "group_places", "serves",
                  "serves_group_places", "owners", "owners_source", "baseline_state",
-                 "mandates", "hndl_exposed", "suppression", "path"}
+                 "mandates", "hndl_exposed", "suppression", "path", "confidence",
+                 "confidence_basis"}
 
 
 def family(item: dict[str, Any]) -> str:

@@ -51,6 +51,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from . import baseline as baseline_mod, confidence
 from .assets import TLS_SETTING_NOTE
 from .detectors import in_test_code
 from .classifier import known_algorithms
@@ -394,6 +395,34 @@ def _occurrences(located: list[dict[str, Any]], family: str,
         for item in located
         if family_of.get(item.get("algorithm"), item.get("algorithm")) == family
     ]
+
+
+def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[str, Any],
+                           family_of: dict[str, str]) -> None:
+    """`qrp:confidence` on every component with occurrences (release E): a JSON array with
+    one level per occurrence, in the order of `evidence.occurrences`. CycloneDX 1.6 gives an
+    occurrence no properties (`additionalProperties: false`), so the component carries them.
+    An occurrence takes the level of the evidence row of the component's own family on that
+    file:line; where none names it (a protocol, a key block), of the rows there; the highest
+    when several do."""
+    at: dict[tuple[str, int], list[tuple[str, str]]] = {}
+    for items in scan_result["evidence"].values():
+        for item in items:
+            if isinstance(item, dict) and item.get("confidence") and "line" in item:
+                name = baseline_mod.family(item)
+                at.setdefault((item["path"], item["line"]), []).append(
+                    (family_of.get(name, name), item["confidence"]))
+    for component in components:
+        occurrences = component.get("evidence", {}).get("occurrences") or []
+        if not occurrences:
+            continue
+        levels = []
+        for o in occurrences:
+            rows = at.get((o["location"], o.get("line")), [])
+            mine = [lv for name, lv in rows if name == component["name"]] or [lv for _, lv in rows]
+            levels.append(min(mine, key=confidence.LEVELS.index) if mine else "unknown")
+        component.setdefault("properties", []).append(
+            {"name": f"{NS}confidence", "value": json.dumps(levels)})
 
 
 def _scope(located: list[dict[str, Any]], family: str,
@@ -998,6 +1027,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         "hashes": [{"alg": "SHA-256", "content": digests[path]}],
         "properties": [{"name": f"{NS}basis", "value": "evidence_file"}],
     } for path in cited]
+    _confidence_properties(components, scan_result, family_of)
 
     # `complete` is a claim about the component list, so it is tied to the file
     # count rather than to the run finishing without error. Anything short of
