@@ -114,3 +114,21 @@ def test_go_reference_moving_down_is_still_open(tmp_path):
     c = out["closure"]
     assert c["closed"] == [] and c["new"] == []
     assert c["still_open_moved_lines"] >= 1
+
+
+def test_one_library_spelled_three_ways_is_one_component(tmp_path):
+    # certbot: `PyOpenSSL` (acme/pyproject.toml), `pyOpenSSL` (a pinning pyproject),
+    # `pyopenssl` (requirements.txt). Release B reads pyproject; three spellings gave the
+    # same bom-ref three times and compositions.assemblies failed uniqueItems.
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "pyproject.toml").write_text(
+        '[project]\nname = "a"\ndependencies = ["PyOpenSSL>=25.0.0"]\n')
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "b"\ndependencies = ["pyOpenSSL==26.1.0"]\n')
+    (tmp_path / "requirements.txt").write_text("pyopenssl\n")
+    doc = cyclonedx.build(scan_directory(str(tmp_path)))
+    refs = [c["bom-ref"] for c in doc["components"]]
+    assert refs.count("dependency:pypi-pyopenssl") == 1
+    assert len(refs) == len(set(refs))
+    lib = next(c for c in doc["components"] if c["bom-ref"] == "dependency:pypi-pyopenssl")
+    assert len(lib["evidence"]["occurrences"]) == 3

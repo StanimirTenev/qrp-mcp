@@ -862,11 +862,16 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # One component per library, however many manifests declare it: a monorepo
     # names the same dependency in every module, and a repeated bom-ref breaks
     # the uniqueness the schema requires of compositions.assemblies.
+    # Grouped by the bom-ref, not the spelling: certbot's manifests name `PyOpenSSL`,
+    # `pyOpenSSL` and `pyopenssl`, one package (PEP 503) and one ref; the name is the
+    # first spelling in order.
     by_library: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for dependency in scan_result["evidence"].get("dependencies", []):
-        by_library.setdefault((dependency["ecosystem"], dependency["package"]),
+        by_library.setdefault((dependency["ecosystem"],
+                               _ref("dependency", dependency["package"])),
                               []).append(dependency)
-    for (ecosystem, package), group in sorted(by_library.items()):
+    for (ecosystem, _), group in sorted(by_library.items()):
+        package = min(dependency["package"] for dependency in group)
         families: list[str] = []
         for dependency in group:
             for family in dependency["families"]:
