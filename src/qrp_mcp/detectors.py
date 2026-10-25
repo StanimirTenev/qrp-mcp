@@ -1162,6 +1162,15 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\b(?:X509_V_FLAG_USE_MTC_DRAFT_PLANTS_\d+|NID_(?:alg_mtcProof|pe_mtcCertificationAuthority)_draft|"
         r"MTCAnchor|kVerifyMTCs|VerifyMTCs|verify-mtcs)\b",
     )),
+    # ZA-OPRAVYANE row 124. OpenSSL's curves API names its family by itself: curl's
+    # `SSL_CTX_set1_curves_list(octx->ssl_ctx, ...)` is EC key agreement although the list
+    # is a variable. The groups API is not here: a group list can hold FFDHE and ML-KEM
+    # hybrids, so without a literal it names no family (the group reader reads literals).
+    ("ECDH", "EC key agreement: the TLS curve list set by OpenSSL's curves API", re.compile(
+        r"\bSSL(?:_CTX)?_set1_curves(?:_list)?\b")),
+    # The RFC 7919 groups as a word of their own: `groups=ffdhe6144` in an mbedtls test.
+    ("DH", "DH named by an RFC 7919 FFDHE group", re.compile(
+        r"(?<![A-Za-z0-9_])ffdhe(?:2048|3072|4096|6144|8192)(?![A-Za-z0-9])", re.IGNORECASE)),
 ]
 
 # The curve a DNSSEC mnemonic names, by the rule that matched it.
@@ -2269,6 +2278,9 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     start = position
     while start > 0 and line[start - 1] not in ",;:=([{ \t\"'":
         start -= 1
+    # `if(!SSL_CTX_set1_curves_list(...))` negates a call's result; it strikes nothing out.
+    if re.match(r"!\s*\w+\s*\(", line[start:]):
+        return False
     return line[start:start + 1] in {"-", "!"}
 
 
