@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from qrp_mcp import (assets, aws_tls, components, detectors as d, dnssec, ike, linegate, oids,
-                     opcua)
+from qrp_mcp import (assets, aws_tls, components, detectors as d, dnssec, ike, indirection,
+                     linegate, oids, opcua)
 from qrp_mcp.scan import scan_directory
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -143,6 +143,8 @@ def _without_window(result):
 
 def test_parallel_batches_give_the_single_pass(monkeypatch):
     tree = ROOT / "tests"
+    # A certificate's `expired` is relative to the scan's clock unless this is set (release C).
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1792886400")
     monkeypatch.setenv("QRP_MCP_JOBS", "1")
     single = d.scan_repo(tree)
     monkeypatch.setenv("QRP_MCP_JOBS", "3")
@@ -154,8 +156,115 @@ def test_parallel_batches_give_the_single_pass(monkeypatch):
 @pytest.mark.parametrize("core", ENGINES)
 def test_the_scan_is_the_same_whichever_gate(core, monkeypatch):
     tree = ROOT / "tests"
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1792886400")
     monkeypatch.setattr(d, "LINE_GATE", _gate(core))
     gated = _without_window(scan_directory(tree))
     monkeypatch.setattr(d, "hot_lines", lambda lines, ext: None)
     every = _without_window(scan_directory(tree))
     assert gated == every
+
+
+# --- the rules after release AB: certificates and keys (C), indirection and confidence (E) ---
+# Release C reads certificates and keys from the file's bytes, and scan_embedded_keys,
+# key_in_source and getproperty_reads read every line: none of them is behind the gate.
+# Release E's indirection rewrites lines (an alias, folded literals, another file's constant)
+# and reads the rewritten lines with scan_source_file again, whose gate is then computed on
+# the REWRITTEN text: a line that names nothing until it is rewritten is cold in the file
+# and hot after. Passing the file's own `hot` to that second reading would lose exactly
+# those rows; the tree below holds them, and both tests fail if they are lost.
+INDIRECT = {
+    "alias.py": ("from cryptography.hazmat.primitives.asymmetric import rsa as keyalg\n"
+                 "key = keyalg.generate_private_key(public_exponent=65537, key_size=2048)\n"),
+    "consts.py": "from algs import DIGEST\nh = hashlib.new(DIGEST)\n",
+    "algs.py": 'DIGEST = "md5"\n',
+    "main.go": ('package main\n\nimport (\n\t"crypto/rand"\n\tasym "crypto/rsa"\n)\n\n'
+                "func main() {\n\tk, _ := asym.GenerateKey(rand.Reader, 2048)\n\t_ = k\n}\n"),
+    "mk.js": ("const { generateKeyPairSync: mk } = require('crypto');\n"
+              "const kp = mk('rsa', { modulusLength: 2048 });\n"),
+    "req.js": ("const crypto = require('crypto');\nconst { ALG } = require('./algs');\n"
+               "const h = crypto.createHash(ALG);\n"),
+    "algs.js": "module.exports = { ALG: 'md5' };\n",
+    "Sig.java": ('class Sig { void f() throws Exception {\n'
+                 '  java.security.Signature.getInstance("EC" + "DSA");\n'
+                 '  java.security.KeyPairGenerator.getInstance(Algs.ASYM);\n'
+                 '  String a = props.getProperty("cryptoAlg1", "AES/ECB/PKCS5Padding");\n} }\n'),
+    "Algs.java": 'final class Algs {\n  static final String ASYM = "RSA";\n}\n',
+    "fold.js": ("const crypto = require('crypto');\n"
+                "crypto.generateKeyPairSync('r' + 'sa', { modulusLength: 2048 });\n"),
+    "key.c": ('static const char *k =\n  "-----BEGIN EC PRIVATE KEY-----\\n"\n'
+              '  "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\\n"\n'
+              '  "-----END EC PRIVATE KEY-----\\n";\n'),
+}
+
+
+def _indirect_tree(tmp_path):
+    for name, text in INDIRECT.items():
+        (tmp_path / name).write_text(text, encoding="utf-8")
+    return tmp_path
+
+
+def _rewritten(path, rel, lines, root):
+    """The lines indirection.resolve reads a second time (None if it rewrote none)."""
+    seen = []
+
+    def spy(p, r, rewritten):
+        seen.append(rewritten)
+        return d.scan_source_file(p, r, rewritten)
+    indirection.resolve(path, rel, lines, d.scan_source_file(path, rel, lines), root, spy)
+    return seen[0] if seen else None
+
+
+@pytest.mark.parametrize("core", ENGINES)
+def test_rows_found_only_through_indirection_survive_the_gate(core, tmp_path, monkeypatch):
+    tree = _indirect_tree(tmp_path)
+    monkeypatch.setenv("QRP_MCP_JOBS", "1")          # the patch below reaches every file
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1792886400")
+    monkeypatch.setattr(d, "LINE_GATE", _gate(core))
+    gated = _without_window(scan_directory(tree))
+    rows = gated["evidence"]["source_code"]
+    through = {(r["path"], r["line"]) for r in rows if "; read through " in r["description"]}
+    # Each of these lines names nothing until it is rewritten: cold in the file.
+    cold_first = {("consts.py", 2), ("req.js", 3), ("main.go", 9), ("alias.py", 2)}
+    for rel, line in cold_first:
+        hot = d.LINE_GATE.hot_lines(INDIRECT[rel].splitlines())
+        assert hot is not None and line - 1 not in hot.lines, f"{rel}:{line} is not cold"
+    assert cold_first <= through, sorted(cold_first - through)
+    assert {("Sig.java", 2), ("Sig.java", 3), ("fold.js", 2), ("mk.js", 2)} <= through
+    levels = {(r["path"], r["line"]): r["confidence"] for r in rows}
+    assert levels[("Sig.java", 4)] == "low"              # the getProperty fallback
+    assert gated["evidence"]["embedded_keys"]
+    monkeypatch.setattr(d, "hot_lines", lambda lines, ext: None)
+    assert gated == _without_window(scan_directory(tree))
+
+
+@pytest.mark.parametrize("core", ENGINES)
+def test_no_rule_matches_a_rewritten_line_the_gate_passes_over(core, tmp_path):
+    """The cold-line check above, on the lines indirection reads a second time."""
+    gate = _gate(core)
+    tree = _indirect_tree(tmp_path)
+    files = [(p, r, ls, next(t for t in TREES if t in p.parents)) for p, r, ls in _files()]
+    files += [(tree / n, n, t.splitlines(), tree) for n, t in INDIRECT.items()]
+    rewritten_files = 0
+    for path, rel, lines, root in files:
+        if path.suffix.lower() not in d.SOURCE_EXTENSIONS:
+            continue
+        rewritten = _rewritten(path, rel, lines, root)
+        if rewritten is None:
+            continue
+        rewritten_files += 1
+        hot = gate.hot_lines(rewritten)
+        every = d.scan_source_file(path, rel, rewritten, hot=None)
+        assert d.scan_source_file(path, rel, rewritten, hot=hot) == every, rel
+        if hot is None:
+            continue
+        for i, line in enumerate(rewritten):
+            if i in hot.lines:
+                continue
+            masked = d._masked(line, d._blob_spans(line))
+            for rule in RULES:
+                assert not rule(line), f"{rule.__name__} on rewritten {rel}:{i + 1}: {line!r}"
+            for rule in ON_MASKED:
+                assert not rule(masked), f"{rule.__name__} on rewritten {rel}:{i + 1}: {line!r}"
+            if i not in hot.patterns:
+                assert not d._a_pattern_matches(line), f"a pattern on rewritten {rel}:{i + 1}"
+    assert rewritten_files >= 8

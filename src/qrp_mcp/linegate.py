@@ -25,6 +25,13 @@ A rule added to the scan without a gate here makes the gate wrong, so the gate i
 tests/test_linegate.py reads every fixture with and without it and requires the same
 findings, and runs each rule on every line the gate passed over.
 
+The rules after release AB are not behind it. Certificates and keys (release C) are read from
+the file's bytes, and scan_embedded_keys, key_in_source and getproperty_reads read every line.
+Release E's indirection rewrites lines and reads them with scan_source_file again, which
+computes the gate on the REWRITTEN text: a line naming nothing until it is rewritten is cold
+in the file and hot after, so the file's own gate must never be passed to that reading
+(tests/test_linegate.py holds such lines, and the rule check is run on rewritten lines too).
+
 `RUST_PARTS` is the same union for the optional compiled core (qrp-mcp-core), whose regex
 dialect has no look-arounds: there each look-around is dropped, which only matches more.
 """
