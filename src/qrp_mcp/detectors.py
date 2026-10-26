@@ -2998,6 +2998,20 @@ def _lines_to_visit(lines: list[str], ext: str, *marked_sets: set[int]) -> list[
     return sorted(marked)
 
 
+# Release R4: the elliptic-curve side of a key exchange. ECDH code names its own values `dh_*`
+# (OpenSSH kexecdh.c: `EC_POINT *dh_pub`, `sshbuf_get_ec(buf, dh_pub, group)`,
+# `ECDH_compute_key(kbuf, klen, dh_pub, key, NULL)`): a DH read from a `dh` component of an
+# identifier on a line that names the curve side is ECDH's Diffie-Hellman, not finite-field DH.
+_CURVE_SIDE = {"EC", "ECDH", "ECDHE", "X25519", "X448", "CURVE25519"}
+
+
+def _names_the_curve(bare: str) -> bool:
+    """Whether a line (code only, strings blanked) names the elliptic-curve side of a key
+    exchange: an identifier with such a component."""
+    return any(_CURVE_SIDE.intersection(components.components(m.group(0)))
+               for m in registry._MEMBER.finditer(bare))
+
+
 def scan_source_file(path: Path, rel_path: str,
                      lines: list[str] | None = None,
                      cipher_exclusions: bool = False,
@@ -3405,7 +3419,11 @@ def scan_source_file(path: Path, rel_path: str,
                                     _code_only(_masked(code, blobs), raw))
                 if registry.might_carry_a_family(code) else "")
         named_here: dict[str, dict[str, Any]] = {}
-        for family, pos, said in registry.identifiers(bare, members=not cipher_exclusions):
+        carried = registry.identifiers(bare, members=not cipher_exclusions)
+        if any(family == "DH" for family, _, _ in carried) and _names_the_curve(bare):
+            carried = [hit for hit in carried if hit[0] != "DH" or "DH" not in components.components(
+                registry._MEMBER.match(bare, hit[1]).group(0))]
+        for family, pos, said in carried:
             alone = registry.stands_alone(registry._MEMBER.match(bare, pos).group(0))
             if family in seen_on_line:
                 # The line's row for the family stands alone if any identifier for it does.
