@@ -425,8 +425,12 @@ def _carried(name: str) -> tuple[tuple[str, str], ...]:
         # DSS beside a signature is FIPS 186's (r, s) signature encoding, which DSA and ECDSA
         # share: pyca's encode_dss_signature, cryptography-kotlin's DssRawSignatureVerifier
         # (release R5; the import of Crypto.Signature.DSS names neither, as here). So is .NET's
-        # DSASignatureFormat, which ECDsa.SignData takes too.
-        if family == "DSA" and "SIGNATURE" in upper and (set(words) == {"DSS"} or "FORMAT" in upper):
+        # DSASignatureFormat, which ECDsa.SignData takes too. The encoding is named by what is
+        # done to it (encode, decode, raw, DER, convert); without that, DSS beside a signature is
+        # DSA's own signature type (dropbear's DROPBEAR_SIGNATURE_DSS, ssh-dss).
+        if family == "DSA" and "SIGNATURE" in upper and (
+                (set(words) == {"DSS"} and upper & {"ENCODE", "DECODE", "RAW", "DER", "CONVERT"})
+                or "FORMAT" in upper):
             continue
         out.append((family, f"{family} used in a {use} ({name}); {components.MAC_OR_KDF_NOTE}"
                     if use else f"{family} carried by the identifier {name}"))

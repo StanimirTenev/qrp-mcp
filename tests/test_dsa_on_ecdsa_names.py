@@ -101,6 +101,8 @@ def test_dss_signature_encoding_is_not_dsa(tmp_path):
     "DSA dsa = DSA.Create(); var key = dsa.ExportParameters(true); DsaSignature sig = null;",
     "key = paramiko.DSSKey.generate(1024)",
     "if (DSA_verify(0, dgst, len, sig, siglen, dsa) != 1) return -1;",
+    # dropbear's ssh-dss signature type is DSA itself, not the shared (r, s) encoding
+    "DROPBEAR_SIGNATURE_DSS = DROPBEAR_SIGNKEY_DSS,",
 ])
 def test_real_dsa_stays(tmp_path, line):
     ext = ".py" if "paramiko" in line else ".c" if "DSA_verify" in line else ".cs"
