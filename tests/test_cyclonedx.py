@@ -159,7 +159,8 @@ def test_two_runs_of_the_same_code_over_the_same_corpus_share_a_serial(corpus):
 def test_the_timestamp_comes_from_the_tree_not_from_the_clock(scan, document):
     # Release A: the corpus commit time, so two runs give one document
     # (test_cbom_byte_identical.py); the read window stays in the scan result.
-    assert document["metadata"]["timestamp"] == scan["coverage"]["corpus"]["pinned_at"]["committed_at"]
+    committed = scan["coverage"]["corpus"]["pinned_at"]["committed_at"]
+    assert document["metadata"]["timestamp"] == committed.replace("Z", "+00:00")
 
 
 def test_a_different_emitter_commit_changes_the_serial_number(scan):

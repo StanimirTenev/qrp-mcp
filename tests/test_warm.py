@@ -22,6 +22,10 @@ def fresh_cache(tmp_path, monkeypatch):
     _warm._state.update(saved)
 
 
+# The regex half needs re._compiler (CPython 3.11+); on 3.10 _warm keeps it off.
+needs_regex = pytest.mark.skipif(_warm._sre is None, reason="re._compiler is CPython 3.11+")
+
+
 def _rule_patterns() -> list[re.Pattern]:
     found = [p for _, _, p in detectors.ALGORITHM_PATTERNS]
     for module in (detectors, detectors.components, detectors.oids, detectors.dnssec,
@@ -30,6 +34,7 @@ def _rule_patterns() -> list[re.Pattern]:
     return found
 
 
+@needs_regex
 def test_a_kept_regex_is_the_regex_compiled_afresh(fresh_cache):
     patterns = _rule_patterns()
     assert len(patterns) > 300
@@ -46,6 +51,7 @@ def test_a_kept_regex_is_the_regex_compiled_afresh(fresh_cache):
                for a, b in zip(second, afresh))
 
 
+@needs_regex
 def test_the_file_is_written_and_read_back(fresh_cache):
     _warm.start_regex()
     try:
@@ -62,6 +68,7 @@ def test_the_file_is_written_and_read_back(fresh_cache):
     assert _warm.derived("t", ("k",), lambda: pytest.fail("not read back")) == ("a", None)
 
 
+@needs_regex
 def test_a_damaged_file_is_computed_around(fresh_cache):
     path = _warm._path()
     path.parent.mkdir(parents=True)
