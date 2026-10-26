@@ -404,7 +404,10 @@ def _timestamp(coverage: dict[str, Any]) -> tuple[str | None, str]:
         return stamp, "SOURCE_DATE_EPOCH, set by whoever ran the scan"
     pin = coverage["corpus"].get("pinned_at") or {}
     if pin.get("pinned") and pin.get("dirty") is False and pin.get("committed_at"):
-        return pin["committed_at"], ("the commit time of the scanned tree's commit "
+        # git 2.45+ writes UTC as "Z" in %cI, older git as "+00:00": one form, so one commit
+        # gives the same bytes whichever git read it.
+        stamp = pin["committed_at"].replace("Z", "+00:00")
+        return stamp, ("the commit time of the scanned tree's commit "
                                      "(a clean checkout), not the time of the run")
     return None, ("not stated: the tree is not a clean checkout and SOURCE_DATE_EPOCH is "
                   "not set, so nothing but the clock could give one")

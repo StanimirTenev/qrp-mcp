@@ -5,7 +5,10 @@ qrp versions submitted were "Blocked by directory policy" with `uvx qrp-mcp` (20
 A pin that lags the release would run an old scanner, so it is held to pyproject.
 """
 import json
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10: the declared tomli backport
+    import tomli as tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent

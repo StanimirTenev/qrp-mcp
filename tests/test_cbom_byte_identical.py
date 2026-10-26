@@ -67,6 +67,14 @@ def test_the_timestamp_is_the_commit_time_of_a_clean_checkout(checkout):
     assert "commit" in props["qrp:timestamp_basis"]
 
 
+def test_a_utc_commit_time_has_one_form_whichever_git_wrote_it(monkeypatch):
+    monkeypatch.delenv("SOURCE_DATE_EPOCH", raising=False)
+    pin = {"pinned": True, "dirty": False}
+    stamps = {cyclonedx._timestamp({"corpus": {"pinned_at": {**pin, "committed_at": c}}})[0]
+              for c in ("2026-10-01T12:00:00Z", "2026-10-01T12:00:00+00:00")}
+    assert stamps == {"2026-10-01T12:00:00+00:00"}
+
+
 def test_source_date_epoch_wins(checkout, monkeypatch):
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1767225600")
     doc = cyclonedx.build(scan_directory(checkout))
