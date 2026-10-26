@@ -644,11 +644,13 @@ wheels = [
 
 [[package]]
 name = "qrp-mcp"
-version = "0.32.0"
+version = "0.37.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "mcp" },
     { name = "pydantic" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 
 [package.dev-dependencies]
@@ -660,8 +662,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=43.0" },
     { name = "mcp", specifier = ">=2.0.0" },
     { name = "pydantic", specifier = ">=2.0" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 
 [package.metadata.requires-dev]
