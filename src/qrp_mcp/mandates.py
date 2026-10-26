@@ -15,7 +15,7 @@ The gate: `lead_months` given, the run fails when any occurrence's deadline fall
 many months of the date; a deadline already passed fails without it. An occurrence the owner
 suppressed is not in `evidence` and does not count; one in the baseline is listed and does not
 trip it either -- a baseline is the owner's statement that it is known. Comments and bans are
-not uses and get no clause.
+not uses and get no clause; nor do identifier rows, which never move the headline either.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ MANDATES: dict[str, dict[str, Any]] = {
 
 # Evidence categories that are key establishment by what they are.
 _KEY_ESTABLISHMENT = {"tls_groups", "ssh_kex", "static_rsa_kex"}
-_NOT_USE = {"comment", "ban", "named_but_not_used"}
+_NOT_USE = {"comment", "ban", "named_but_not_used", "identifier"}
 _NETWORKING = re.compile(r"ipsec|swanctl|strongswan|libreswan|openswan|racoon|openvpn|"
                          r"wireguard|vpn", re.IGNORECASE)
 _WEB = re.compile(r"nginx|apache|httpd|haproxy|caddy|envoy|traefik|lighttpd|tomcat|"

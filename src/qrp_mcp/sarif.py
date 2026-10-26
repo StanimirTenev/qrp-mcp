@@ -1,8 +1,8 @@
 """SARIF 2.1.0 for code-scanning pipelines: `qrp-mcp scan PATH --format sarif`.
 
 Built from the scan result at the level asked for, so a masked run quotes masked snippets.
-One result per occurrence in `evidence`, ruled by family (`qrp/RSA`); comments and bans are
-`note`, uses are `warning`.
+One result per occurrence in `evidence`, ruled by family (`qrp/RSA`); comments, bans and
+identifier rows (which never move the headline) are `note`, uses are `warning`.
 
 What a SARIF viewer would otherwise not show is put where the format has room for it:
 
@@ -30,7 +30,7 @@ from typing import Any
 from . import baseline as baseline_mod
 
 SCHEMA = "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json"
-_NOTE = {"comment", "ban", "named_but_not_used"}
+_NOTE = {"comment", "ban", "named_but_not_used", "identifier"}
 _RANK = {"high": 90.0, "medium": 60.0, "low": 30.0}
 
 

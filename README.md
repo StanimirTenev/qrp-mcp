@@ -1128,7 +1128,8 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   `.cert` and a DER request are not unparsed certificates.
 - **Identifier rows never move the headline.** A family whose every use is an identifier row
   stays a finding, marked `identifier_only`, and is not counted in `pqc_readiness` or `by_role`;
-  identifier rows set no RSA or EC role.
+  identifier rows set no RSA or EC role. In SARIF an identifier row is a `note`, as a comment
+  is, and `--mandate` gives it no clause, so it counts in no block and trips no gate.
 - **Speed.** One search per file finds the lines a rule could match; files are read in parallel
   (`QRP_MCP_JOBS`); an optional compiled line gate, `qrp-mcp-core`, is used when installed
   (`QRP_MCP_CORE=0` turns it off; the answers are the same); the rules' compiled form is cached on
