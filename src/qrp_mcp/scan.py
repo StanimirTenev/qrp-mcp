@@ -133,8 +133,18 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     # the summary counted again with it.
     notes, set_aside, protected = _what_the_evidence_adds(scan_result, response.findings,
                                                           detected_by_name)
-    summary = summarize(response.findings, set_aside, protected)
-    summary.by_role = _by_role(response.findings, roles, detected_by_name, set_aside, protected)
+    # A family whose only use is identifier rows (release 3b/3e: `generate_rsa_keys`,
+    # `RSAUtil`) stays a finding and says so, and is not counted: identifier rows are low
+    # and never move the headline or by_role (rel3-rules; 20 of the 30 rows rel3e's mini
+    # hold-out added were such names, none strong enough to decide anything).
+    by_name_only = _identifier_only(scan_result)
+    for f in response.findings:
+        if detected_by_name.get(f.raw_value) in by_name_only:
+            notes.setdefault(f.algorithm_family, {})["identifier_only"] = True
+    counted = [f for f in response.findings
+               if detected_by_name.get(f.raw_value) not in by_name_only]
+    summary = summarize(counted, set_aside, protected)
+    summary.by_role = _by_role(counted, roles, detected_by_name, set_aside, protected)
 
     coverage_block = coverage.build(
         repo_path=repo_path,
@@ -452,6 +462,12 @@ def _in_use(scan_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
+def _identifier_only(scan_result: dict[str, Any]) -> set[str]:
+    """Families, by the detector's name, whose every use is an identifier row."""
+    return {name for name, items in _in_use(scan_result).items()
+            if all(i.get("evidence_kind") == "identifier" for i in items)}
+
+
 def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
                             detected_by_name: dict[str, str]
                             ) -> tuple[dict[str, dict[str, Any]], set[str], set[str]]:
@@ -552,7 +568,8 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
 def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:
     """Mark each RSA and EC occurrence with the role its line shows, and count them per
     family. Read here, before any level masks the line, so masking never changes a role.
-    Comments carry a role but are not counted: what a comment says is not what the code does."""
+    Comments carry a role but are not counted: what a comment says is not what the code does.
+    Nor are identifier rows: a name is too weak to set a role (rel3-rules)."""
     counts: dict[str, dict[str, int]] = {}
     for key in ("source_code_findings", "ci_pipeline_findings", "iac_findings",
                 "embedded_key_findings"):
@@ -561,7 +578,7 @@ def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:
             if role is None:
                 continue
             item["role"] = role
-            if item.get("evidence_kind") != "comment":
+            if item.get("evidence_kind") not in ("comment", "identifier"):
                 fam = counts.setdefault(item["algorithm"], {
                     "signature": 0, "key_establishment": 0, "undetermined": 0})
                 fam[role] += 1
