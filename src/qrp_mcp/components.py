@@ -125,6 +125,14 @@ def families(parts: list[str]) -> list[tuple[str, str | None]]:
             family = "ECDH"
         if not family or any(f == family for f, _ in out):
             continue
+        # Beside a post-quantum DSA or its XOF, a DSA component is that scheme's (libcrux's
+        # ML-DSA `DsaXof`); beside a KEM or an elliptic family, a DH is the hybrid's elliptic
+        # half (rel3-rules merge: the identifier block had lost these guards).
+        if family == "DSA" and set(parts) & {"MLDSA", "SLHDSA", "FNDSA", "XOF"}:
+            continue
+        if family == "DH" and any(q == "KEM" or q.startswith(("MLKEM", "KYBER"))
+                                  or FAMILY.get(q) in {"ECDH", "X25519", "X448"} for q in parts):
+            continue
         near = set(parts[max(0, i - 2):i + 3])
         use = None
         if family in {"MD5", "SHA1", "SHA224", "SHA3-224"}:

@@ -126,6 +126,13 @@ def test_identifiers_alone_are_not_crypto():
 @pytest.mark.parametrize("code,not_family", [
     ("ml_dsa_sign(sk, m); slh_dsa_verify(pk, m); EdDSA_sign(k);", "DSA"),
     ("mlkem768_dh_free(x); ECDH_compute_key(a);", "DH"),
+    # rel3-rules merge: the identifier block read libcrux's ML-DSA XOF as DSA, which the
+    # pattern rules had stopped doing (rel3-config-rust e4bc5d8). An ML-DSA, SLH-DSA or
+    # FN-DSA component, or the XOF, says the DSA is the post-quantum one.
+    ("let x: DsaXof = DsaXof::new(); impl libcrux_ml_dsa_DsaXof for S {}", "DSA"),
+    ("ml_dsa_dsa_key_free(k); SlhDsaKey k; fn_dsa_key_t k;", "DSA"),
+    # The DH of a hybrid KEM's key is its elliptic half, not finite-field DH.
+    ("mlkem768_dh_key_free(x); KyberDhKey k; x25519_dh_key k;", "DH"),
     ("arc4random_buf(p, n);", "RC4"),
     ("int test_md5_is_refused(void);", "MD5"),
     ("x = RC4 + RSA", "RSA"),
