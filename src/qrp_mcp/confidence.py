@@ -17,9 +17,9 @@ Two things decide it:
 A comment or a ban is `low` and is not counted as a use anywhere; the calibration below leaves
 it out, as the CBOM leaves it out of the inventory.
 
-`role` (signature / key establishment) is not an input: measured on Cryben, rows with a role
-were 27/31 on a truth line and rows without one 39/43, so knowing the role did not separate
-right from wrong.
+`role` (signature / key establishment) is not an input: measured on Cryben, rows that carry a
+`role` field (signature, key_establishment or undetermined) were 27/31 on a truth line and rows
+without one 42/45 (39/43 in release E), so knowing the role did not separate right from wrong.
 
 The levels are calibrated, not asserted: `MEASURED` is the precision of each level on two
 corpora with a foreign ground truth, with the rows counted. Both corpora were used to choose
@@ -148,9 +148,10 @@ MEASURED = {
     "levels": {
         "high": {"cryben": "60/60", "owasp": "348/348", "precision": "1.000"},
         "medium": {"cryben": "2/3", "owasp": "73/73", "precision": "0.987"},
-        "low": {"cryben": "4/11", "owasp": "0/0", "precision": "0.364"},
+        # Re-measured 26.10.2026 on 0.37.0's detection (kragg-3/07): round 3's identifier rows.
+        "low": {"cryben": "7/13", "owasp": "0/0", "precision": "0.538"},
     },
-    "limits": "small medium and low buckets on Cryben (3 and 11 rows); OWASP is Java only and "
+    "limits": "small medium and low buckets on Cryben (3 and 13 rows); OWASP is Java only and "
               "separates nothing (every graded row right); Cryben's truth does not label Go "
               "signature lines, which decides part of low",
 }

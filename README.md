@@ -681,9 +681,11 @@ reason in words. It is derived from what the scan read, not from a score it make
   file, or through an alias, a constant in another file or literals concatenated on the line is
   one step lower. The fallback of a `getProperty` lookup, read because no properties file in the
   tree sets the key, is `low` whatever the line.
-- Comments and bans are `low` and are not uses anywhere. Whether the role (signature, key
-  establishment) is known is **not** an input: on Cryben rows with a role were 27/31 on a truth
-  line and rows without one 39/43, so it separated nothing.
+- Comments and bans are `low` and are not uses anywhere. The role is **not** an input. A row
+  with a role is one that carries the `role` field (`signature`, `key_establishment` or
+  `undetermined`). On Cryben, comments and bans left out, rows with one were 27/31 on a truth line
+  and rows without one 42/45 (39/43 in release E), so it separated nothing. Counting only a known
+  role (`signature`, `key_establishment`) gives 13/13 against 56/63: 13 rows, too few to build on.
 
 It travels in the scan JSON, in SARIF (`rank` 90 / 60 / 30 and `properties.confidence`; `level`
 stays the severity) and in the CBOM: CycloneDX 1.6 gives an occurrence no properties, so each
@@ -692,13 +694,14 @@ component carries `qrp:confidence`, a JSON array with one level per occurrence i
 measured precision of each level, so the figure travels with the document it describes.
 
 **Precision by confidence level, measured on Cryben and the OWASP Benchmark 1.2, 25.10.2026**
-(release E; comments and bans left out):
+(release E; comments and bans left out). The low row was re-measured on 26.10.2026 on 0.37.0's
+detection; the high and medium rows did not move:
 
 | level | Cryben (authors' truth, a row on a truth file:line) | OWASP Benchmark crypto + hash, with `benchmark.properties` | pooled |
 |---|---:|---:|---:|
 | high | 60/60 | 348/348 | **1.000** (408 rows) |
 | medium | 2/3 | 73/73 | **0.987** (76) |
-| low | 4/11 | — | **0.364** (11) |
+| low | 7/13 | — | **0.538** (13) |
 
 On OWASP a row is graded when its family is one of the Benchmark's weak families for the case's
 category: right when the case is true. On the OWASP subset **without** `benchmark.properties`
@@ -707,11 +710,13 @@ category: right when the case is true. On the OWASP subset **without** `benchmar
 E as first measured; the table above has no fallback row and did not move when it changed).
 
 ⚠️ What the table is not. Both corpora were used to choose the mapping, so it is a regression
-figure, not a blind one. The medium and low buckets on Cryben are small (3 and 11 rows), OWASP is
+figure, not a blind one. The medium and low buckets on Cryben are small (3 and 13 rows), OWASP is
 Java only and separates nothing (every graded row there is right), and Cryben's truth does not
-label Go signature lines, which decides part of `low`. Three other tools in this class print a
-confidence, and none publishes its precision. Scored the same way on Cryben (05-novi-merki,
-25.10.2026): CryptoScan 1.5.0 `HIGH` 0/10, `MEDIUM` 69/122, `LOW` 2/27; qScan 0.12.0 `high`
+label Go signature lines, which decides part of `low`. 3 of the 7 right low rows are identifier
+rows, which round 3 added, and a row is right when it sits on a truth line, whatever its family:
+two of the three, `ec.dsa_sign_asn1` and `ec.dsa_verify_asn1` in `cinv-ruby-0014.rb`, say DSA
+where Ruby's method on an EC key is ECDSA. Three other tools in this class print a confidence,
+and none publishes its precision. Scored the same way on Cryben (05-novi-merki, 25.10.2026): CryptoScan 1.5.0 `HIGH` 0/10, `MEDIUM` 69/122, `LOW` 2/27; qScan 0.12.0 `high`
 30/33, `medium` 11/11 (inverted); PostShor 0.1.0 one bucket, 27/40.
 
 ## What a TLS line does not establish
@@ -1140,9 +1145,9 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   scanner and faster than one that runs on Node.js; how it was timed is in *How it is
   measured*.
 
-⚠️ What is not claimed: no detection figure. The rules of round 3 were written against corpora
+⚠️ What is not claimed here: a detection figure. The rules of round 3 were written against corpora
 read for that purpose; what they do on code nobody has read is what the final judgement of 0.37.0
-measures, and its results are not in this README yet.
+measured, and its results are in *How it is measured*.
 
 ### A classical group offered on its own
 
@@ -1412,11 +1417,17 @@ band below it is drawn again before its mean is kept. Labels are spot-checked by
 before any tool is scored; no label is changed after a tool's output has been seen.
 
 **Units.** Precision, recall and F1 at the chunk level and at the line level, each with its own
-denominator.
+denominator. On the blind corpus and the second hold-out only the nine quantum-vulnerable public-key
+families are scored: RSA, DSA, DH, ECDH, ECDSA, EdDSA, X25519, X448 and secp256k1. Hashes, ciphers
+and post-quantum rows are not scored there, so they are never a false positive. A generic `EC`
+row counts for ECDH, ECDSA and secp256k1, and an `ECDSA` row for secp256k1, for every tool alike.
 
 **Comparison.** Two tools are compared by a paired bootstrap over files (chunks of one file are
-correlated) of ΔF1, 2,000 resamples, fixed seed. A tool is beaten when the 95% interval of ΔF1 is
-above 0, loses when it is below 0, and otherwise it is a tie, reported as a tie.
+correlated) of ΔF1, 2,000 resamples, fixed seed 20261025. A tool is beaten when the 95% interval of
+ΔF1 is above 0, loses when it is below 0, and otherwise it is a tie, reported as a tie. A resample
+whose ΔF1 is undefined is dropped. The blind corpus's frozen `paired.py` then reads the interval at
+positions 50 and 1949 of the sorted list, which are the 2.5 % and 97.5 % points only when all
+2,000 resamples are kept; the hold-out's copy takes `int(0.025 · n)` of the n kept.
 
 **Other measures.**
 
@@ -1434,22 +1445,35 @@ above 0, loses when it is below 0, and otherwise it is a tie, reported as a tie.
 
 **The tools run.** Every other tool ran offline in a throwaway container
 (`docker run --rm --network none`, the corpora mounted read-only, `ubuntu:24.04` unless named);
-qrp-mcp ran on the host from a virtualenv. All with `SOURCE_DATE_EPOCH=1761350400`. JSON is the timed call; a CBOM, where the tool writes one, is a
-second untimed call. Outside the timing rounds the runs are at `nice -n 19`.
+qrp-mcp ran on the host from a virtualenv, with `SOURCE_DATE_EPOCH=1761350400`. The other tools
+got no `SOURCE_DATE_EPOCH`: they ran with their defaults. JSON is the timed call; a CBOM, where
+the tool writes one, is a second untimed call. Outside the timing rounds the other tools ran at
+`nice -n 19` (the container's default), and so did qrp-mcp in the blind and hold-out judges'
+runs; in the scoreboard's runs qrp-mcp ran at normal priority.
+
+Not every tool is scored on every corpus. The table lists the eleven tools the scoreboard ran, on
+certbot, Mbed TLS, curl, OpenSSH, the negative corpus and the probes (hyperion on certbot, the
+OWASP Benchmark and the reproductions only). The
+blind corpus scores qrp-mcp, CryptoScan, qScan, cipherscope, PostShor, QuantumSeal, RivicQ and
+hyperion; the second hold-out the same without RivicQ and hyperion; neither scores foxguard,
+snoot or cdxgen. Two readings are scored as tools of their own: `ours-code`, qrp-mcp without its
+comment, ban and `named_but_not_used` rows, and QuantumSeal read by its component id beside
+QuantumSeal read by the text it matched. The blind corpus's frozen `paired.py` bootstraps against
+QuantumSeal, CryptoScan and qScan only; the judges' wrapper adds the others.
 
 | tool | version | what was run |
 |---|---|---|
-| qrp-mcp | the candidate's commit | `qrp-mcp scan PATH --no-config --out FILE`, `qrp-mcp cbom PATH --no-config --out FILE`; with the compiled core and with `QRP_MCP_CORE=0` |
+| qrp-mcp | the candidate's commit | `qrp-mcp scan PATH --no-config --out FILE`, `qrp-mcp cbom PATH --no-config --out FILE`; with the compiled core and with `QRP_MCP_CORE=0`. The earlier releases the blind judge scores as references (`relall-re`, `v036-re`) ran without `--no-config` and with `QRP_MCP_CORE=0`; the blind and hold-out corpora hold no `.qrp.toml` |
 | CryptoScan | 1.5.0 | `cryptoscan scan PATH --no-config --format json --stream=false --no-color -o FILE`; `--format cbom` |
-| qScan | 0.12.0 | `node dist/cli.js PATH --format json --no-config-file --severity-threshold critical -o FILE`; `--format cbom` |
+| qScan | 0.12.0 | `node dist/cli.js PATH --format json --no-config-file --severity-threshold critical -o FILE`; `--format cbom`; the host's node v22.23.3, mounted into `ubuntu:24.04` |
 | cipherscope | 0.3.0 | `cipherscope --roots PATH --gitignore=false -o FILE.jsonl` |
 | RivicQ | build of 23.10.2026 | `rivicq scan PATH --format json --fail-on NONE`; `rivicq cbom PATH --format json` |
 | QuantumSeal | build of 23.10.2026 | `quantumseal scan PATH --format json --output FILE` |
 | PostShor | 0.1.0 | `postshor scan PATH -q -o FILE.json -o FILE.cdx.json` (in `python:3.12-slim`) |
 | foxguard | 0.14.1 | `foxguard pqc PATH -f json --output FILE -q`; `-f cbom` |
 | snoot | 0.1.0 | `snoot scan PATH --format json --output FILE --quiet --no-color`; `--format cbom` |
-| cdxgen | 13.5.0 | `cbom -o FILE --no-install-deps --spec-version 1.6 --json-pretty PATH`, `FETCH_LICENSE=false`, 300 s limit |
-| CBOMkit-hyperion | `ghcr.io/cbomkit/cbomkit-action:edge` (digest `sha256:7dfc905c614549fdb630d41a33b34a039af7f60c982501c6d74dfc63ef700512`) | `CBOMkit-action.jar` with `CBOMKIT_LANGUAGES=java,python,go`, `CBOMKIT_GENERATE_MODULE_CBOMS=false` |
+| cdxgen | 13.5.0 | `cbom -o FILE --no-install-deps --spec-version 1.6 --json-pretty PATH`, `FETCH_LICENSE=false`, `CDXGEN_TEMP_DIR=/tmp`; a 700 s limit on the probes and the four corpora, 300 s on the reproductions |
+| CBOMkit-hyperion | `ghcr.io/cbomkit/cbomkit-action:edge` (digest `sha256:7dfc905c614549fdb630d41a33b34a039af7f60c982501c6d74dfc63ef700512`) | `nice -n 19 java -Xmx4g -jar CBOMkit-action.jar` with `CBOMKIT_LANGUAGES=java,python,go`, `CBOMKIT_GENERATE_MODULE_CBOMS=false`, `CBOMKIT_EXCLUDE=zz_nomatch_zz` |
 
 **Reproducing it.** The scanner side is the two `qrp-mcp` commands above, run on each corpus
 at its pinned commit with `--no-config` and `SOURCE_DATE_EPOCH=1761350400`. The scripts that
@@ -1463,8 +1487,66 @@ label of every chunk. Cryben, the OWASP Benchmark and the recall corpus were see
 were written, so on them a result is a regression figure, not a blind one. A tie is a tie: it
 is not reported as a win.
 
-**Results: filled in after the final judgement of 0.37.0.** The final judges have not run on
-this candidate; no figure is given here until they have.
+**Results.** The final judgement of 0.37.0, 26.10.2026. The figures are for 0.37.0's detection
+as the judges ran it, commit `0adb299`; on these corpora it scores what the round-3 candidate
+before it scored, to the digit. The commit after it narrows DSA (ECDSA and EdDSA names, the
+signature encoding DSA and ECDSA share); it changes no row on certbot, Mbed TLS, curl, OpenSSH,
+the negative corpus or Cryben, and it was not re-measured on the blind corpus or the hold-out.
+The best other tool is the one with the highest F1 on that corpus and unit; ΔF1 = qrp-mcp − that
+tool.
+
+| corpus (exclusions) | unit | qrp-mcp 0.37.0 P / R / F1 | best other tool: P / R / F1 | ΔF1 (95% CI) | verdict |
+|---|---|---|---|---|---|
+| second hold-out, 9 repositories (cfssl and mina-sshd excluded: both are in the development corpus at the same commit, and cfssl is named in the source) | chunk | 0.938 / 0.864 / 0.899 | QuantumSeal (by matched text): 0.912 / 0.896 / 0.904 | −0.005 (−0.057, +0.042) | tie |
+| | line | 0.715 / 0.835 / 0.770 | QuantumSeal (by matched text): 0.764 / 0.832 / 0.797 | −0.027 (−0.080, +0.028) | tie |
+| blind corpus, 18 repositories (`ansible-collections/community.crypto` excluded: named in `detectors.py`) | chunk | 0.916 / 0.878 / 0.897 | QuantumSeal (by matched text): 0.922 / 0.763 / 0.835 | +0.062 (+0.026, +0.101) | beat |
+| | line | 0.723 / 0.851 / 0.782 | QuantumSeal (by matched text): 0.726 / 0.740 / 0.733 | +0.049 (+0.010, +0.090) | beat |
+| blind corpus, 18 repositories, configuration files only (24 truth pairs, 45 lines: low power) | chunk | 0.818 / 0.708 / 0.759 | QuantumSeal (by matched text): 0.909 / 0.750 / 0.822 | −0.063 (−0.222, +0.073) | tie |
+| | line | 0.725 / 0.733 / 0.729 | QuantumSeal (by matched text): 0.800 / 0.778 / 0.789 | −0.060 (−0.226, +0.097) | tie |
+| Cryben, full (197 occurrences; the authors' `compare.py --no-restrict`, location mode) | occurrence | 0.613 / 0.249 / 0.354 | CryptoScan 1.5.0: 0.428 / 0.345 / 0.382 | −0.028 (−0.108, +0.049) | tie |
+| Cryben, source only (166 occurrences; certificate, key-material and negative-control folders left out by a fixed path rule, for every tool) | occurrence | 0.672 / 0.235 / 0.348 | CryptoScan 1.5.0: 0.426 / 0.361 / 0.391 | −0.043 (−0.134, +0.052) | tie |
+| qScan's recall corpus (176 file-level labels; qScan's own metric; recall only) | label | R = 0.926 (163/176) | qScan 0.12.0: R = 0.847 (149/176) | sign test: 22 wins, 8 losses, p = 0.016 | beat |
+
+- "By matched text": QuantumSeal's family read from the text it reports matching with each
+  occurrence, the reading on which it scores higher; both readings were fixed before labelling.
+  Read by its own component id it scores F1 0.659 / 0.577 (hold-out, chunk / line) and 0.610 /
+  0.475 (blind), and qrp-mcp beats it on both corpora and both units.
+- With the excluded repositories put back (11 on the hold-out, 19 on the blind corpus) the verdicts
+  are the same, except the blind corpus's configuration files at chunk level: a loss to
+  QuantumSeal by matched text, −0.138 (−0.288, −0.029).
+- Every other tool (CryptoScan, qScan, cipherscope, PostShor, and on the blind corpus RivicQ and
+  hyperion) loses to qrp-mcp on the hold-out and the blind corpus, on both units. On Cryben,
+  PostShor loses to it, and qScan and cipherscope tie.
+
+**The scoreboard** (certbot, Mbed TLS, curl, OpenSSH, the negative corpus and the probes; the
+same commit, the same day) against the ten other tools:
+
+| measure | qrp-mcp 0.37.0 | best other tool | verdict |
+|---|---|---|---|
+| true rows only one side has, per pair of tools | more than the other tool on every pair | — | beat |
+| named CBOM fields (of 9) | 9 | hyperion 5 | beat |
+| CBOM schema validity | 8/8 | 8/8 (four tools) | tie |
+| a hybrid as a component depending on its two halves | 3 linked | 0 | beat |
+| CISA item 4: service / key length / certificate expiry | 1.00 / 0.67 / 1.00 | 1.00 / cdxgen 0.56 / 1.00 | tie / beat / tie |
+| CI: SARIF, inline suppression, baseline, configuration, accounted (of 5) | 5 | CryptoScan, PostShor 4.5 | beat |
+| PEM bundle | 3/3 with key, signature and validity | PostShor 3/3 | tie |
+| dependency manifests read (of 12) | 11 | qScan 7 | beat |
+| dated mandate clause, gate, HNDL (of 3) | 3 | qScan 3 | tie |
+| coverage inside the CBOM | 8 compositions | 0 | beat |
+| liboqs post-quantum families (of 17) | 16, plus XMSS and LMS | qScan 5 | beat |
+| findings on the negative corpus | 0 | 0 (every tool) | tie |
+| near misses: hits, recall | (102, 0.92) | none dominates it | tie (Pareto); on the hit count alone, lose |
+| silent truncation | 0 silent, 1 named | — | beat |
+| SHA-256 of every evidence file | 628/628 | 0 | beat |
+| byte-identical CBOM across runs | yes | snoot yes | tie |
+| OWASP Benchmark crypto / hash | 1.000 / 1.000 | hyperion 0.759 / 0.690 | beat |
+| speed, warm median, curl / OpenSSH | 1.35 s / 2.20 s with the compiled core; 3.48 s / 4.02 s without | cipherscope 0.94 s / 1.10 s; qScan 4.16 s / 2.32 s | under 10 s; faster than qScan with the core (20 of 20 paired rounds); slower than cipherscope |
+
+Five of six functions checked are in none of the ten other tools: a hybrid's two halves, the
+SHA-256 of every evidence file, `usedforsecurity=False` read as `non_security_use`, calibrated
+confidence levels, and a report document recognised and named. The key-length win is on the
+pre-registered column; on the open-size families (RSA, DSA, DH) qrp-mcp has 19/30 = 0.63 against
+cdxgen's and hyperion's 2/2.
 
 ## Measured against the other scanners
 
