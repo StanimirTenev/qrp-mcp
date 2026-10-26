@@ -87,8 +87,9 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e . pytest fastapi jsonschema
+          # The core first: qrp-mcp pins this version, which PyPI may not have yet.
           python -m pip install --no-index --find-links dist qrp-mcp-core
+          python -m pip install -e . pytest fastapi jsonschema
       - name: The core is the one in use
         run: python -c "from qrp_mcp import detectors as d; assert d.LINE_GATE.compiled() is not None"
       - name: Tests with the core

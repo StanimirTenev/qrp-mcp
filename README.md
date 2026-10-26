@@ -1138,12 +1138,15 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   identifier rows set no RSA or EC role. In SARIF an identifier row is a `note`, as a comment
   is, and `--mandate` gives it no clause, so it counts in no block and trips no gate.
 - **Speed.** One search per file finds the lines a rule could match; files are read in parallel
-  (`QRP_MCP_JOBS`); an optional compiled line gate, `qrp-mcp-core`, is used when installed
+  (`QRP_MCP_JOBS`); a compiled line gate, `qrp-mcp-core`, is used when installed
   (`QRP_MCP_CORE=0` turns it off; the answers are the same); the rules' compiled form is cached on
   disk (`QRP_MCP_CACHE=0` turns it off); the MCP SDK and pydantic are no longer imported on the
-  scan path. A scan of curl takes under 10 s on an Intel i5-3340M. That is slower than a compiled
-  scanner and faster than one that runs on Node.js; how it was timed is in *How it is
-  measured*.
+  scan path. `qrp-mcp-core` installs with qrp-mcp, as a wheel, on CPython for Linux x86_64 and
+  aarch64, macOS x86_64 and arm64, and Windows AMD64 and ARM64; elsewhere qrp-mcp is pure Python.
+  On an Intel i5-3340M (warm median): with the core, curl takes 1.35 s and OpenSSH 2.20 s, faster
+  than qScan 0.12.0 (4.16 s, 2.32 s) and slower than cipherscope 0.3.0, which is compiled (0.94 s,
+  1.10 s). Without it, curl takes 3.48 s and OpenSSH 4.02 s: still faster than qScan on curl, and
+  slower than qScan on OpenSSH. How it was timed is in *How it is measured*.
 
 ⚠️ What is not claimed here: a detection figure. The rules of round 3 were written against corpora
 read for that purpose; what they do on code nobody has read is what the final judgement of 0.37.0
@@ -1441,7 +1444,11 @@ positions 50 and 1949 of the sorted list, which are the 2.5 % and 97.5 % points 
   round after round, so drift in load hits every tool alike; a run waits while the machine is
   busy). A container tool's time includes the container's start; qrp-mcp runs on the host. The
   machine is named: for 0.37.0 an Intel Core i5-3340M (2 cores, 4 threads, 2.70 GHz). On it a
-  scan of curl takes under 10 s; qrp-mcp is faster than qScan 0.12.0 and slower than cipherscope 0.3.0.
+  scan of curl takes under 10 s. With the compiled core, qrp-mcp is faster than qScan 0.12.0 on
+  curl and OpenSSH (20 of 20 paired rounds) and slower than cipherscope 0.3.0. Without the core
+  it is faster than qScan on curl and slower on OpenSSH (0 of 10 rounds). qScan's time includes
+  its container's start (0.4 to 0.6 s); timed inside the container, outside the method, qScan
+  takes 1.85 s on OpenSSH, less than qrp-mcp's 2.20 s with the core.
 
 **The tools run.** Every other tool ran offline in a throwaway container
 (`docker run --rm --network none`, the corpora mounted read-only, `ubuntu:24.04` unless named);

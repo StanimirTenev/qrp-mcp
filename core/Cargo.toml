@@ -1,6 +1,6 @@
 [package]
 name = "qrp-mcp-core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Optional compiled line gate for qrp-mcp: which lines of a file any rule could match"
 license = "Apache-2.0"

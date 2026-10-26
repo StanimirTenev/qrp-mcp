@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "qrp-mcp-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "Optional compiled line gate for qrp-mcp (release D). qrp-mcp uses it when installed and reads the same lines without it."
 readme = "README.md"
 requires-python = ">=3.10"

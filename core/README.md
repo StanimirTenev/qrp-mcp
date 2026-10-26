@@ -11,8 +11,12 @@ handed to this module as strings, and what comes back is a set of line numbers.
 `QRP_MCP_CORE=0` makes qrp-mcp ignore an installed core.
 
 ```
-pip install qrp-mcp qrp-mcp-core
+pip install qrp-mcp
 ```
+
+qrp-mcp depends on it, at the version it was built with, on CPython for Linux x86_64 and aarch64,
+macOS x86_64 and arm64, and Windows AMD64 and ARM64, the platforms with a wheel. Elsewhere it is
+not installed and qrp-mcp is pure Python.
 
 Wheels are abi3 (CPython 3.10 and later), one per platform. Building from source needs a Rust
 toolchain: `pip install maturin && maturin build --release -m core/Cargo.toml`.

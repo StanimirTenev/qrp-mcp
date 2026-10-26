@@ -23,8 +23,15 @@ classifiers = [
 # mcp 2.0 moved the server class to mcp.server.mcpserver; 1.x resolves to a missing module.
 # cryptography parses certificates and keys (release C, ZA-OPRAVYANE row 127): declared,
 # not borrowed from mcp's tree. 43.0 for Certificate.public_key_algorithm_oid.
+# qrp-mcp-core is the compiled line gate (core/), pinned to the version built with this release.
+# Only where core-wheels.yml builds a wheel: CPython (abi3) on Linux x86_64/aarch64, macOS
+# x86_64/arm64 and Windows AMD64/ARM64. Elsewhere qrp-mcp stays pure Python and reads the same
+# lines without it.
 dependencies = ["mcp>=2.0.0", "pydantic>=2.0", 'tomli; python_version < "3.11"',
-                "cryptography>=43.0"]
+                "cryptography>=43.0",
+                'qrp-mcp-core==0.2.0; platform_python_implementation == "CPython" and sys_platform == "linux" and (platform_machine == "x86_64" or platform_machine == "aarch64")',
+                'qrp-mcp-core==0.2.0; platform_python_implementation == "CPython" and sys_platform == "darwin" and (platform_machine == "x86_64" or platform_machine == "arm64")',
+                'qrp-mcp-core==0.2.0; platform_python_implementation == "CPython" and sys_platform == "win32" and (platform_machine == "AMD64" or platform_machine == "ARM64")']
 
 [project.urls]
 Homepage = "https://quantumreadiness.eu"
@@ -39,6 +46,11 @@ packages = ["src/qrp_mcp"]
 # The commit a build is made from, as qrp_mcp/_build_info.py (hatch_build.py).
 [tool.hatch.build.hooks.custom]
 path = "hatch_build.py"
+
+# Until qrp-mcp-core is on PyPI, uv resolves it from the source in this repository (a Rust
+# toolchain builds it). pip and the built wheel's metadata ignore this table.
+[tool.uv.sources]
+qrp-mcp-core = { path = "core" }
 
 [dependency-groups]
 # jsonschema is a test dependency only. The emitted CBOM is validated against the
