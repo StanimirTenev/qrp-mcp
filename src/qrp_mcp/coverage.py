@@ -28,7 +28,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .certificates import UNPARSED_REASONS
 
@@ -221,6 +221,14 @@ def _git_pin(repo_path: Path) -> dict[str, Any]:
     because "not a repository" is repaired by putting the tree under version
     control and "git is missing" is repaired by the environment.
     """
+    return start_git_pin(repo_path)()
+
+
+def start_git_pin(repo_path: Path) -> Callable[[], dict[str, Any]]:
+    """_git_pin in two halves: the quick questions now, and `git status` -- the one slow
+    call, 0.21 s of a 2.2 s curl scan, all of it serial -- started and left running, so
+    it runs beside the reading. The returned function waits for it and gives the same
+    answer _git_pin gives (release 3c)."""
     reachable = True
 
     def git(*args: str) -> str | None:
@@ -234,11 +242,13 @@ def _git_pin(repo_path: Path) -> dict[str, Any]:
 
     commit = git("rev-parse", "HEAD")
     if not commit:
-        return _absent("vcs_unavailable" if not reachable else "not_a_repository")
+        absent = _absent("vcs_unavailable" if not reachable else "not_a_repository")
+        return lambda: absent
     if not git("ls-files", "--", "."):
         # An ignored build directory inside a checkout: HEAD exists, but nothing
         # scanned here is in it.
-        return _absent("not_tracked")
+        absent = _absent("not_tracked")
+        return lambda: absent
 
     # `git status` is the one call here that can run programs the scanned repository
     # configured for itself: an fsmonitor hook, or a clean filter consulted while
@@ -247,33 +257,44 @@ def _git_pin(repo_path: Path) -> dict[str, Any]:
     # repository still names an external program, status is not run at all and the
     # flag says it was not checked rather than guessing.
     runs_programs = git("config", "--local", "--includes", "--get-regexp", _REPO_PROGRAM_KEYS)
-    dirty_state: dict[str, Any]
-    if runs_programs:
-        dirty_state = {
-            "dirty": None,
-            "dirty_not_checked": "the repository configures external programs "
-                                 "(filters or hooks); status was not run on it",
-        }
-    else:
-        dirty_state = {"dirty": bool(git("status", "--porcelain", "--", "."))}
+    status = None if runs_programs else _start_git(repo_path, "status", "--porcelain", "--", ".")
 
-    shallow = git("rev-parse", "--is-shallow-repository") == "true"
-    return {
-        "pinned": True,
-        "kind": "git",
-        "commit": commit,
-        "committed_at": git("log", "-1", "--format=%cI"),
-        **dirty_state,
-        # A shallow clone has no history and, more to the point here, none of the
-        # build output or dependency trees a working checkout carries. The same
-        # tool over the same commit counts a different denominator in the two,
-        # which is a condition of collection rather than a property of the estate.
-        "shallow": shallow,
-    }
+    def finish() -> dict[str, Any]:
+        dirty_state: dict[str, Any]
+        if runs_programs:
+            dirty_state = {
+                "dirty": None,
+                "dirty_not_checked": "the repository configures external programs "
+                                     "(filters or hooks); status was not run on it",
+            }
+        else:
+            dirty_state = {"dirty": bool(_finish_git(status))}
+
+        shallow = git("rev-parse", "--is-shallow-repository") == "true"
+        return {
+            "pinned": True,
+            "kind": "git",
+            "commit": commit,
+            "committed_at": git("log", "-1", "--format=%cI"),
+            **dirty_state,
+            # A shallow clone has no history and, more to the point here, none of the
+            # build output or dependency trees a working checkout carries. The same
+            # tool over the same commit counts a different denominator in the two,
+            # which is a condition of collection rather than a property of the estate.
+            "shallow": shallow,
+        }
+    return finish
 
 
 # Repository-local keys under which git may start a program during status.
 _REPO_PROGRAM_KEYS = r"^(filter\..*\.(clean|smudge|process)|core\.fsmonitor|core\.hookspath)$"
+
+
+def _git_command(where: Path, *args: str) -> tuple[list[str], dict[str, str]]:
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0",
+               GIT_PAGER="cat", PAGER="cat")
+    return (["git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
+             "--no-optional-locks", "-C", str(where), *args], env)
 
 
 def _run_git(where: Path, *args: str) -> subprocess.CompletedProcess:
@@ -282,13 +303,33 @@ def _run_git(where: Path, *args: str) -> subprocess.CompletedProcess:
     No pager, no prompt, no optional locks (a read must not write the index), and
     fsmonitor off regardless of what the repository's own config says.
     """
-    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0",
-               GIT_PAGER="cat", PAGER="cat")
-    return subprocess.run(
-        ["git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
-         "--no-optional-locks", "-C", str(where), *args],
-        capture_output=True, text=True, timeout=10, check=False, env=env,
-    )
+    command, env = _git_command(where, *args)
+    return subprocess.run(command, capture_output=True, text=True, timeout=10, check=False,
+                          env=env)
+
+
+def _start_git(where: Path, *args: str) -> subprocess.Popen | None:
+    """_run_git started and not waited for; None where it could not be started."""
+    command, env = _git_command(where, *args)
+    try:
+        return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, env=env)
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _finish_git(started: subprocess.Popen | None) -> str | None:
+    """What _run_git's caller in _git_pin made of its answer: the output, stripped, when
+    it succeeded; None when it failed, could not start or took over 10 s (then killed)."""
+    if started is None:
+        return None
+    try:
+        out, _ = started.communicate(timeout=10)
+    except subprocess.SubprocessError:
+        started.kill()
+        started.communicate()
+        return None
+    return out.strip() if started.returncode == 0 else None
 
 
 def _tool_pin() -> dict[str, Any]:
@@ -343,6 +384,7 @@ def build(
     claimed_types: dict[str, list[str]],
     excluded_dirs: list[str],
     installed_distribution: dict[str, Any] | None = None,
+    corpus_pin: Callable[[], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Assemble the block. Every number here is derived, none is asserted."""
     present = scan_result["files_present"]
@@ -463,7 +505,8 @@ def build(
         },
         "corpus": {
             "target": str(repo_path),
-            "pinned_at": _git_pin(repo_path),
+            # Started before the reading where the caller did (start_git_pin).
+            "pinned_at": corpus_pin() if corpus_pin is not None else _git_pin(repo_path),
             # What identifies the corpus. The commit above is provenance a reader
             # can check; it is not identity -- two subdirectories share a commit,
             # and an ignored file the scan reads leaves the tree reporting clean.

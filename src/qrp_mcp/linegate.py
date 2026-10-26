@@ -44,7 +44,7 @@ import re
 from itertools import accumulate
 from typing import NamedTuple
 
-from . import components, registry
+from . import _warm, components, registry
 
 # --- literals ----------------------------------------------------------------------------
 # Lower-case; searched case-insensitively. Each line says which rule needs it.
@@ -60,35 +60,44 @@ LITERALS: set[str] = {
     "elbsecuritypolicy-", "sslpolicy.",
     # ike.fortios_addke: FORTIOS_ADDKE contains `addke`.
     "addke",
-    # assets._group_setting (scan_tls_groups, scan_hybrid_groups, and the ban test): every
-    # alternative of _TLS_GROUP_SETTING contains one of these, _HAPROXY_CURVES `curves`.
-    "ecdh_curve", "ecdhcurve", "groups", "curves", "curvepreferences",
-    # assets._cipher_setting (static RSA suites, cipher strings): every alternative of
-    # _TLS_CIPHER_SETTING and _HAPROXY_CIPHERS contains `cipher`.
-    "cipher",
+    # assets._group_setting (scan_tls_groups, scan_hybrid_groups) and assets._cipher_setting
+    # (static RSA suites, cipher strings): their regexes themselves, given to the Gate by
+    # detectors.line_gate (`rule_patterns`). Until release 3c the words every alternative
+    # holds -- "cipher", "groups", "curves", ...: 900 lines of OpenSSH and 440 of curl read,
+    # with one row between them, none from these rules.
     # detectors._cipher_string_parts: _GNUTLS_PRIORITY contains `priority`.
     "priority",
     # assets.scan_ssh_kex: _SSH_KEX_SETTING contains `KexAlgorithms`.
     "kexalgorithms",
     # detectors.PPK_CONFIG_ASSIGN.
     "ppk",
-    # detectors.scan_hybrid_names: nothing without one of these in the lowered line.
-    "kem", "sntrup", "wing",
-    # assets.scan_protocols: _BARE_TLS_VERSION_SETTING and _VERSION_MACRO contain
-    # `_version`; `SSLProtocol all` (_SSL_PROTOCOL_ALL) enables versions without naming one.
-    "_version", "sslprotocol",
+    # detectors.scan_hybrid_names: nothing without a name in _HYBRID_NAME, which are given to
+    # the Gate from detectors.HYBRIDS (`rule_words`). Until release 3c the gate was the words
+    # the rule asks first, "kem", "sntrup" and "wing": "wing" made 606 lines of OpenSSH hot
+    # (`following`, `showing`) and none named a hybrid.
+    # assets.scan_protocols: `SSLProtocol all` (_SSL_PROTOCOL_ALL) enables versions without
+    # naming one. _BARE_TLS_VERSION_SETTING and _VERSION_MACRO are a part below.
+    "sslprotocol",
     # oids.scan: nothing without one of these three.
     "840", "1.3.1", "3, 1",
     # dnssec.scan_records / unnamed_records: RRSIG; DNSKEY (the other spellings are below).
     "rrsig", "dnskey",
-    # detectors.scan_cipher_suites: a TLS_/SSL3_/TLS1_/SSL_ token (the dash-joined ones
-    # are below).
-    "tls_", "tls1_", "ssl3_", "ssl_",
-    # detectors._DENIAL_WORDS opens a denial block that governs the lines below it, so a
-    # line that could open one is read (the words are matched case-insensitively there).
+    # detectors.scan_cipher_suites: a TLS_/SSL3_/TLS1_/SSL_ token is a part below (the
+    # dash-joined ones too).
+}
+
+# detectors._DENIAL_WORDS opens a denial block that governs the lines below it, and no rule
+# reports on a line for its words alone (the ban test asks them of a line a rule has already
+# matched). So a line holding one and nothing above is read for that state only: Hot.state,
+# where scan_source_file works out the block a line opens, as it does on every line it
+# reads, and runs no rule (release 3c: 1,300 of the 11,600 lines of curl read were these).
+# The words are matched case-insensitively there.
+DENIAL_LITERALS: set[str] = {
     "disabled", "disallow", "banned", "blocked", "blocklist", "blacklist", "forbidden",
     "prohibited", "denied", "deny", "reject", "excluded", "unsupported", "removed",
 }
+# The three with a separator.
+DENIAL_PARTS: list[tuple[str, str]] = [(r"not[-_ ]?allowed|must[-_ ]?not|no[-_ ]?longer", "")]
 # registry.scan (release 3b): every registry name with a family, the first six characters of
 # each (a glob's stem), the quoted names, the command words, the PEM labels.
 LITERALS |= registry.literals()
@@ -111,8 +120,10 @@ PARTS: list[tuple[str, str]] = [
     # detectors.scan_cipher_suites, dash-joined tokens: a token of three or more parts, one
     # of which starts with a bulk cipher. The first part (then two more follow), or a
     # later one (then a part ends just before it).
-    (r"(?:" + _SUITE_CIPHERS + r")[a-z0-9]*-[a-z0-9]+-[a-z0-9]|[a-z0-9]-(?:"
-     + _SUITE_CIPHERS + r")", ""),
+    # The later part as a part of its own, so that the Python search can skip to the dash
+    # (release 3c): the look-behind reads the line's own character, as the core's class does.
+    (r"(?:" + _SUITE_CIPHERS + r")[a-z0-9]*-[a-z0-9]+-[a-z0-9]", ""),
+    (r"(?<=[a-z0-9])-(?:" + _SUITE_CIPHERS + r")", r"[a-z0-9]-(?:" + _SUITE_CIPHERS + r")"),
     # detectors._suite_table_entry: _SUITE_TABLE_ENTRY's code and the cipher among its
     # parts (case-sensitive, as there).
     (r"(?-i:0x[0-9A-Fa-f]{4}\s*,[\sA-Z0-9,]*(?:AES|CAMELLIA|CHACHA|SEED|IDEA|RC4|3DES|DES|"
@@ -125,8 +136,20 @@ PARTS: list[tuple[str, str]] = [
     # assets.scan_protocols, _SSH_PROTOCOL without its anchors.
     (r"(?-i:Protocol\s+[12]|HostKeyAlgorithms|KexAlgorithms|PubkeyAccepted|"
      r"HostbasedAcceptedAlgorithms|Ciphers\s+\S|MACs\s+\S)", ""),
-    # detectors._DENIAL_WORDS, the three with a separator.
-    (r"not[-_ ]?allowed|must[-_ ]?not|no[-_ ]?longer", ""),
+    # detectors.scan_cipher_suites, the prefixed alternatives of _SUITE_TOKEN up to what each
+    # requires, case-sensitive as there. Until release 3c these were the literals "tls_",
+    # "tls1_", "ssl3_" and "ssl_" in any case: 5,400 lines of curl (`Curl_ssl_`, `ssl_config`),
+    # not one a suite.
+    # The Python search drops the look-behind and loosens the rest, which matches more lines
+    # but lets its regex engine skip to the next T or S (with them, 1.2 s of curl).
+    (r"(?-i:TLS_[A-Z0-9_]|SSL3_|TLS1_|SSL_[A-Za-z0-9_]*WITH_)",
+     r"(?-i:(?:^|[^A-Za-z0-9])(?:TLS_[A-Z0-9_]|(?:SSL3|TLS1(?:_[123])?)_(?:CK|TXT|RFC)_|"
+     r"SSL_(?:[A-Z0-9]+_|anon_)+?WITH_))"),
+    # assets.scan_protocols: _VERSION_MACRO without its look-ahead, and
+    # _BARE_TLS_VERSION_SETTING without its anchors, case-sensitive as there. Until release 3c
+    # the literal "_version" in any case: 1,300 lines of curl, none a protocol version.
+    (r"(?-i:SSL[23]_VERSION|TLS1_VERSION|TLS1_[0-3]_VERSION|tls_min_version|tls_max_version)",
+     r"(?-i:(?:^|[^A-Za-z0-9_])(?:SSL[23]|TLS1(?:_[0-3])?)_VERSION|tls_(?:min|max)_version)"),
 ]
 
 
@@ -216,7 +239,8 @@ def _trie(words: list[str]) -> str:
 
 def _shortest(words: set[str]) -> list[str]:
     """The words without those containing a shorter one, which marks the same lines."""
-    return sorted(w for w in words if not any(v != w and v in w for v in words))
+    return _warm.derived("shortest", tuple(sorted(words)), lambda: sorted(
+        w for w in words if not any(v != w and v in w for v in words)))
 
 
 class Hot(NamedTuple):
@@ -231,6 +255,9 @@ class Hot(NamedTuple):
     lines: set[int]
     patterns: set[int]
     allowed: dict[int, frozenset[int]] | None = None
+    # Lines of neither set that may open a denial block (DENIAL_LITERALS): read for that
+    # state, by no rule.
+    state: frozenset[int] | set[int] = frozenset()
 
 
 class Gate:
@@ -238,18 +265,42 @@ class Gate:
 
     def __init__(self, algorithm_literals: list[tuple[str, ...] | None],
                  algorithm_patterns: list[re.Pattern] | None = None, blob: str | None = None,
-                 use_core: bool = True):
+                 use_core: bool = True, rule_words: tuple[str, ...] = (),
+                 rule_patterns: tuple[tuple[re.Pattern, tuple[str, ...] | None], ...] = ()):
         # A pattern with no literal can match any line: then every line is read.
         self.everything = any(found is None for found in algorithm_literals)
         self._algorithm_literals = algorithm_literals
         self._algorithm_patterns, self._blob = algorithm_patterns, blob
         # None: not yet looked for; False: not used.
         self._core: object = None if use_core else False
-        self.words = _shortest(set(LITERALS))
+        self._core_state: object = None
+        # `rule_words`: literals of rules defined after this module's tables (detectors'
+        # hybrid names), any case.
+        self.words = _shortest(set(LITERALS) | {w.lower() for w in rule_words})
+        self.denial_words = _shortest(set(DENIAL_LITERALS))
+        self._denial = re.compile("|".join(["(?:" + _trie(self.denial_words) + ")",
+                                            *(p for p, _ in DENIAL_PARTS)]))
         self.pattern_words = _shortest({_piece(s) for found in algorithm_literals if found
                                         for s in found})
         self.parts = [p for p, _ in PARTS]
         self.rust_parts = [r or p for p, r in PARTS]
+        # `rule_patterns`: (a rule's own regex, the literals every match of it holds) where every
+        # report of the rule is on a raw line the regex matches (detectors' cipher and group
+        # settings). The core searches each as rust_regex ports it -- anchors, \b and
+        # look-arounds dropped -- which matches wherever the regex does; one that does not
+        # port, and the core is not used. The Python search takes the lines holding a
+        # literal and asks the regex itself of each (a case-folded alternation over the whole
+        # file ran at 1.4 MB/s); without literals, every line is read.
+        ported = [_warm.derived("scoped_regex", (p.pattern, p.flags), lambda p=p: scoped_regex(p))
+                  for p, _ in rule_patterns]
+        self._rule_ported = None not in ported
+        self.rust_parts += [r for r in ported if r]
+        if any(found is None for _, found in rule_patterns):
+            self.everything = True
+        self._rule_patterns = [p for p, _ in rule_patterns]
+        self._rule_words = (re.compile(_trie(_shortest({s for _, found in rule_patterns
+                                                         for s in found or ()})))
+                            if rule_patterns else None)
         # How the pure-Python search is split, which is a matter of speed only (the same
         # union): Python's regex engine reads case-folded alternatives at a few MB/s, so
         # the case-insensitive gates are searched in the lower-cased text without
@@ -258,8 +309,10 @@ class Gate:
         # is a component's.
         sensitive = [p for p in self.parts[:-1] if p.startswith("(?-i:")]
         folded = [p for p in self.parts[:-1] if not p.startswith("(?-i:")]
-        self._folded = re.compile("|".join(["(?:" + _trie(self.words) + ")", *folded]))
-        self._sensitive = re.compile("|".join(p[5:-1] for p in sensitive))
+        self._folded = [re.compile(_trie(self.words)), *(re.compile(p) for p in folded)]
+        # One regex each: an alternation of them all lets the engine skip to no particular
+        # character, and searched apart each skips to its own first one (release 3c).
+        self._sensitive = [re.compile(p[5:-1]) for p in sensitive]
         self._component_shape = re.compile(self.parts[-1][5:-1])
         self._component_start = re.compile(
             "(?=" + _trie(sorted({w.lower() for w in _COMPONENT_WORDS})) + ")")
@@ -271,8 +324,15 @@ class Gate:
             return None
         core = self._core or None   # built by compiled(), for a tree big enough to repay it
         if core is not None:
-            read, patterns, allowed = core.hot_lines("\n".join(lines))
-            return Hot(set(read), set(patterns), {i: frozenset(k) for i, k in allowed})
+            text = "\n".join(lines)
+            if self._core_state is True:
+                read, patterns, allowed, state = core.hot_lines_and_state(text)
+                return Hot(set(read), set(patterns), {i: frozenset(k) for i, k in allowed},
+                           set(state))
+            read, patterns, allowed = core.hot_lines(text)
+            read = set(read)
+            return Hot(read, set(patterns), {i: frozenset(k) for i, k in allowed},
+                       set(self._core_state.hot_lines(text)[0]) - read)
         hot: set[int] = set()
         text = "\n".join(lines)
         if not text.isascii():
@@ -296,8 +356,15 @@ class Gate:
                 into.update(range(first, last + 1))
                 pos = starts[last + 1]
 
-        mark(self._folded, low, hot)
-        mark(self._sensitive, text, hot)
+        for regex in self._folded:
+            mark(regex, low, hot)
+        for regex in self._sensitive:
+            mark(regex, text, hot)
+        if self._rule_words is not None:
+            candidates: set[int] = set()
+            mark(self._rule_words, low, candidates)
+            hot.update(i for i in candidates - hot
+                       if any(p.search(lines[i]) for p in self._rule_patterns))
         pos, end = 0, len(text)
         while pos <= end:
             m = self._component_start.search(low, pos)
@@ -313,7 +380,9 @@ class Gate:
                 pos = m.start() + 1
         patterns: set[int] = set()
         mark(self._patterns, low, patterns)
-        return Hot(hot, patterns - hot)
+        state: set[int] = set()
+        mark(self._denial, low, state)
+        return Hot(hot, patterns - hot, None, state - hot)
 
     def compiled(self):
         """The compiled core's gate, built on first use; None when qrp-mcp-core is not
@@ -321,11 +390,16 @@ class Gate:
         Python, is used: it marks other lines, never other findings."""
         if self._core is None:
             self._core = False
-            if os.environ.get("QRP_MCP_CORE", "").strip() not in ("0", "off", "no"):
+            if (os.environ.get("QRP_MCP_CORE", "").strip() not in ("0", "off", "no")
+                    and self._rule_ported):
                 try:
                     import qrp_mcp_core
-                    patterns = [rust_regex(p) for p in self._algorithm_patterns or []]
-                    self._core = qrp_mcp_core.Gate(
+                    # Kept between runs by _warm, keyed by the pattern (release 3c).
+                    patterns = [_warm.derived("rust_regex", (p.pattern, p.flags),
+                                              lambda p=p: rust_regex(p))
+                                for p in self._algorithm_patterns or []]
+                    _warm.save()
+                    arguments = (
                         self.words, self.rust_parts,
                         [[_piece(s) for s in found or ()] for found in self._algorithm_literals],
                         # Without every pattern, a line with a pattern's literal is a pattern
@@ -333,6 +407,16 @@ class Gate:
                         patterns if patterns and None not in patterns
                         and len(patterns) == len(self._algorithm_literals) else None,
                         self._blob or "(?!)")
+                    state = (self.denial_words, [r or p for p, r in DENIAL_PARTS])
+                    try:
+                        # The denial words (Hot.state) in the same pass (core 3c).
+                        self._core = qrp_mcp_core.Gate(*arguments, *state)
+                        self._core_state = True
+                    except TypeError:
+                        # A core built before release 3c: the words in a gate of their own.
+                        self._core = qrp_mcp_core.Gate(*arguments)
+                        self._core_state = qrp_mcp_core.Gate(*state, [], None,
+                                                             self._blob or "x^")
                 except (ImportError, ValueError):
                     self._core = False
         return self._core or None
@@ -423,6 +507,17 @@ def _ported(items) -> str:
 
 
 _REPEATS = {_sre.MAX_REPEAT, _sre.MIN_REPEAT, getattr(_sre, "POSSESSIVE_REPEAT", None)} - {None}
+
+
+def scoped_regex(pattern: re.Pattern) -> str | None:
+    """rust_regex with the pattern's flags on a group of its own, `(?i:...)`, so it can sit
+    in an alternation in either dialect; None where rust_regex gives None."""
+    try:
+        body = _ported(_sre_parse.parse(pattern.pattern, pattern.flags))
+    except (_Unported, re.error):
+        return None
+    flags = _flags(pattern.flags, 0)
+    return "(?" + flags + ":" + body + ")" if flags else "(?:" + body + ")"
 
 
 def rust_regex(pattern: re.Pattern) -> str | None:

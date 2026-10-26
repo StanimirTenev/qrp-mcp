@@ -2,19 +2,29 @@
 
 from __future__ import annotations
 
+import bisect
 import fnmatch
+import functools
 import hashlib
 import json
 import os
 import posixpath
 import re
+import stat
+from itertools import accumulate
 from pathlib import Path
 from typing import Any
+
+from . import _warm
+
+# The rules' regexes compile through the cache of _warm until the end of this module.
+_warm.start_regex()
 
 from . import (aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, registry,
                suppression)
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
+from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
                      library_support, names_none_of, pinned_versions,
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
@@ -141,8 +151,10 @@ _TEST_DIRS = {"test", "tests", "testing", "spec", "specs", "fixtures", "testdata
 _TEST_FILE = re.compile(r"^(?:test_|conftest$)|(?:_test|\.test|Test|Tests|_spec|\.spec)$")
 
 
+@functools.lru_cache(maxsize=4096)
 def in_test_code(rel_path: str) -> bool:
-    """Whether a path is test code by `TEST_PATH_RULE`. Declared, not guessed silently."""
+    """Whether a path is test code by `TEST_PATH_RULE`. Declared, not guessed silently.
+    Asked once per finding of a file, so its answer is kept per path (release 3c)."""
     parts = rel_path.replace("\\", "/").split("/")
     # A directory is judged by the same shape as a file, so .NET's `App.Tests/` and
     # Go's `pkg/testdata/` both land, and `src/latest/` does not.
@@ -1379,7 +1391,9 @@ def _prefilter(pattern: re.Pattern) -> tuple[str, ...] | None:
 
 # ALGORITHM_PATTERNS with each pattern's literals; its shape is a public count, so the
 # literals ride alongside instead of inside it.
-_FILTERED_PATTERNS = [(algorithm, description, pattern, _prefilter(pattern))
+_FILTERED_PATTERNS = [(algorithm, description, pattern,
+                       _warm.derived("prefilter", (pattern.pattern, pattern.flags),
+                                     lambda pattern=pattern: _prefilter(pattern)))
                       for algorithm, description, pattern in ALGORITHM_PATTERNS]
 # Any literal of any pattern: most lines hold none, and then no pattern is tried at all.
 # One pattern without literals and the gate is the empty regex, which every line passes.
@@ -1415,10 +1429,15 @@ def _trie_regex(words: list[str]) -> str:
 
 _ALL_LITERALS = sorted({s for f in _FILTERED_PATTERNS if f[3] for s in f[3]},
                        key=lambda s: (-len(s), s))
-_LITERAL_AT = re.compile("(?=(" + _trie_regex(_ALL_LITERALS) + "))")
-_INSIDE = {s: frozenset(t for t in _ALL_LITERALS if t in s) for s in _ALL_LITERALS}
-_PATTERNS_WITH = {s: frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if f[3] and s in f[3])
-                  for s in _ALL_LITERALS}
+# Derived from the literals alone, so kept between runs by _warm under them (release 3c).
+_LITERALS_KEY = tuple(f[3] for f in _FILTERED_PATTERNS)
+_LITERAL_AT = re.compile(_warm.derived(
+    "literal_at", _LITERALS_KEY, lambda: "(?=(" + _trie_regex(_ALL_LITERALS) + "))"))
+_INSIDE = _warm.derived("inside", _LITERALS_KEY, lambda: {
+    s: frozenset(t for t in _ALL_LITERALS if t in s) for s in _ALL_LITERALS})
+_PATTERNS_WITH = _warm.derived("patterns_with", _LITERALS_KEY, lambda: {
+    s: frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if f[3] and s in f[3])
+    for s in _ALL_LITERALS})
 _ALWAYS_TRIED = frozenset(i for i, f in enumerate(_FILTERED_PATTERNS) if not f[3])
 
 
@@ -1428,6 +1447,11 @@ def _candidate_patterns(lowered: str | None, allowed: frozenset[int] | None = No
     line (linegate.Hot)."""
     if lowered is None:
         return _FILTERED_PATTERNS
+    if allowed is not None and not _ALWAYS_TRIED:
+        # The core gives `allowed` only where every pattern has literals, and both callers
+        # skip a pattern none of whose literals the line holds before trying it: so the
+        # patterns tried are the same, without the search for the literals (release 3c).
+        return [_FILTERED_PATTERNS[i] for i in sorted(allowed)]
     present: set[str] = set()
     for m in _LITERAL_AT.finditer(lowered):
         present |= _INSIDE[m.group(1)]
@@ -1958,6 +1982,8 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
             problems.append(("dir", rel(err.filename)))
 
     found: list[Path] = []
+    found_posix: list[str] = []
+    posix = os.name == "posix"
     for dirpath, dirnames, filenames in os.walk(repo_path, onerror=onerror):
         dirnames.sort()
         dir_parts = Path(dirpath).relative_to(repo_path).parts
@@ -1972,11 +1998,30 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
                         problems.append(("symlink_dir", rel(str(candidate))))
                     dirnames.remove(name)
         for name in filenames:
-            path = Path(dirpath) / name
             if hit is not None:
                 if excluded_counter is not None:
                     excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
                 continue
+            if posix:
+                # One lstat of the path as a string answers both questions below where
+                # there are no junctions (release 3c: the walk was two stats and three
+                # Paths per file, 0.15 s of curl). A file that is not a link is its own
+                # stat; one lstat cannot read is broken. Sockets, FIFOs and devices are
+                # not files the tool reads.
+                full = os.path.join(dirpath, name)
+                try:
+                    mode = os.lstat(full).st_mode
+                except OSError:
+                    if problems is not None:
+                        problems.append(("file", rel(full)))
+                    continue
+                if stat.S_ISLNK(mode):
+                    if problems is not None:
+                        problems.append(("symlink", rel(full)))
+                elif stat.S_ISREG(mode):
+                    found_posix.append(full)
+                continue
+            path = Path(dirpath) / name
             if _is_link(path):
                 # Not read, and named. A broken link is reported the same way: it
                 # is still a link, and its target is still outside this tool's say.
@@ -1996,6 +2041,10 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
                     problems.append(("file", rel(str(path))))
                 continue
             found.append(path)
+    if posix:
+        # In the order sorted(Paths) gives: a POSIX Path compares its string's parts.
+        yield from [Path(p) for p in sorted(found_posix, key=lambda p: p.split("/"))]
+        return
     yield from sorted(found)
 
 
@@ -2039,10 +2088,18 @@ def _read_within(root: Path, path: Path) -> bytes | None | object:
     """
     if not (os.open in os.supports_dir_fd and getattr(os, "O_NOFOLLOW", 0)):
         return _NO_DIRFD
-    try:
-        parts = _relative_parts(path.resolve(), root.resolve())
-    except (OSError, ValueError):
-        return None
+    # The walk built `path` from `root`, so its components below the root are the walk's
+    # own, and each is opened below without following a link. Resolving the path first
+    # (two realpath walks per file, a tenth of a curl scan) only changed which file a
+    # link swapped in after the walk led to; now such a link is refused like any other
+    # (release 3c). A path not plainly beneath the root is resolved as before.
+    lexical = path.parts[len(root.parts):]
+    if path.parts[:len(root.parts)] != root.parts or ".." in lexical:
+        try:
+            lexical = _relative_parts(path.resolve(), root.resolve())
+        except (OSError, ValueError):
+            return None
+    parts = lexical
     if not parts:
         return None
     flags = os.O_RDONLY | os.O_NOFOLLOW
@@ -2186,9 +2243,7 @@ def _is_excluded(line: str, start: int) -> bool:
 _BLOB = re.compile(r"(?:[0-9a-fA-F]{32,}|[A-Za-z0-9+/]{40,}={0,2})")
 
 # The lines of a file any rule could match, in one search of the file (release D; see
-# linegate.py). The other lines are passed over by every per-line rule.
-LINE_GATE = linegate.Gate([f[3] for f in _FILTERED_PATTERNS], [f[2] for f in _FILTERED_PATTERNS],
-                          _BLOB.pattern)
+# linegate.py), are LINE_GATE's: it is built below _HYBRID_NAME, whose names it is given.
 
 
 def _blob_spans(line: str) -> list[tuple[int, int]]:
@@ -2311,6 +2366,15 @@ def _docstring_spans(line: str, inside: str) -> tuple[list[tuple[int, int]], str
     return spans, ""
 
 
+# The characters _comment_spans stops at: outside a string a quote or one of the markers
+# (by which markers the language uses), inside one its closing quote or a backslash.
+_OUTSIDE_QUOTES = {
+    (slash, hash_, dash): re.compile("[\"'" + "/" * slash + "#" * hash_ + "\\-" * dash + "]")
+    for slash in (False, True) for hash_ in (False, True) for dash in (False, True)}
+_IN_DOUBLE = re.compile(r'[\\"]')
+_IN_SINGLE = re.compile(r"[\\']")
+
+
 def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[int, int]], bool]:
     """Where the comments are on this line, and whether the next line continues one.
 
@@ -2334,16 +2398,29 @@ def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[
             return [(0, n)], True
         spans.append((0, end + 2))
         i = end + 2
+    # Only a marker the file's language uses can open a comment: a line holding none of
+    # them has no other span, whatever its quotes (release 3c; the walk below is the
+    # same, jumping from one character that matters to the next).
+    if not ((slash and "/" in line) or (hash_ and "#" in line) or (dash and "-" in line)):
+        return spans, False
+    outside = _OUTSIDE_QUOTES[(slash, hash_, dash)]
     while i < n:
-        c = line[i]
         if quote:
-            if c == "\\":
+            m = (_IN_DOUBLE if quote == '"' else _IN_SINGLE).search(line, i)
+            if m is None:
+                break
+            i = m.start()
+            if line[i] == "\\":
                 i += 2
                 continue
-            if c == quote:
-                quote = ""
+            quote = ""
             i += 1
             continue
+        m = outside.search(line, i)
+        if m is None:
+            break
+        i = m.start()
+        c = line[i]
         if c in "\"'":
             quote = c
             i += 1
@@ -2577,6 +2654,27 @@ def _opens_a_denial_block(line: str) -> bool:
                 and not _CONDITION_OPENER.match(stripped))
 
 
+def _has_denial_word(text: str) -> bool:
+    return bool(_DENIAL_WORDS.search(text))
+
+
+def _is_a_list_line(line: str) -> bool:
+    return bool(_ALGORITHM_LIST_LINE.search(line) or _group_setting(line))
+
+
+# _is_banned_here is asked once per match, and a line of libcrux_internal.h holds dozens:
+# the two questions it asks of the whole line are answered once per line (release 3c). Keyed
+# by the string object itself, which the memo holds, so a different line is never taken for
+# the one before.
+_LINE_FACTS: list[Any] = [None, False, None, False]
+
+
+def _line_fact(slot: int, text: str, ask) -> bool:
+    if _LINE_FACTS[2 * slot] is not text:
+        _LINE_FACTS[2 * slot], _LINE_FACTS[2 * slot + 1] = text, ask(text)
+    return _LINE_FACTS[2 * slot + 1]
+
+
 def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
                     code: str | None = None) -> bool:
     """Whether the algorithm at this position is being forbidden rather than used.
@@ -2586,7 +2684,7 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     kept for compatibility` is a use, and reading the comment made it a ban.
     """
     searchable = line if code is None else code
-    if in_denial_block or _DENIAL_WORDS.search(searchable):
+    if in_denial_block or _line_fact(0, searchable, _has_denial_word):
         return True
     # Work in entries, not characters. A hyphen inside a name belongs to it --
     # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
@@ -2595,7 +2693,7 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     # A TLS group setting is a list too: `Groups = DEFAULT:-X25519MLKEM768` removes the
     # hybrid. The same test the TLS group rule asks, so the two cannot disagree
     # (ZA-OPRAVYANE row 56).
-    if not (_ALGORITHM_LIST_LINE.search(line) or _group_setting(line)):
+    if not _line_fact(1, line, _is_a_list_line):
         return False
     start = position
     while start > 0 and line[start - 1] not in ",;:=([{ \t\"'":
@@ -2747,9 +2845,16 @@ def _attach_providers(findings: list[dict[str, Any]], lines: list[str]) -> None:
     the family. Two in one file and none on the line: absent, not guessed. Comments
     and bans neither give nor get a provider.
     """
+    named_on: dict[int, list[str]] = {}
+
     def on(line_no: int) -> list[str]:
-        text = lines[line_no - 1] if 0 < line_no <= len(lines) else ""
-        return [name for name, pattern in PROVIDER_PATTERNS if pattern.search(text)]
+        # Asked twice per finding and once per finding on the same line: once per line
+        # (release 3c; a tenth of libcrux_internal.h's time).
+        if line_no not in named_on:
+            text = lines[line_no - 1] if 0 < line_no <= len(lines) else ""
+            named_on[line_no] = [name for name, pattern in PROVIDER_PATTERNS
+                                 if pattern.search(text)]
+        return named_on[line_no]
 
     used = [f for f in findings if f.get("evidence_kind") not in {"comment", "ban"}]
     in_file: dict[str, set[str]] = {}
@@ -2873,6 +2978,26 @@ _NAMES_A_PIECE = frozenset(f[2] for f in ALGORITHM_PATTERNS[
     max(i for i, f in enumerate(ALGORITHM_PATTERNS) if components.MAC_OR_KDF_NOTE in f[1]) + 1:])
 
 
+def _lines_to_visit(lines: list[str], ext: str, *marked_sets: set[int]) -> list[int]:
+    """The lines scan_source_file must visit: the gate's, and every line holding `/*` or
+    `*/` (or, in a file with docstrings, a triple quote; in Go, a backtick), ascending."""
+    marked: set[int] = set().union(*marked_sets)
+    text = "\n".join(lines)
+    starts: list[int] | None = None
+    for needle in ("/*", "*/", *(_TRIPLE if ext in _DOCSTRING_EXT else ()),
+                   *(("`",) if ext == ".go" else ())):
+        at = text.find(needle)
+        if at == -1:
+            continue
+        if starts is None:
+            starts = list(accumulate((len(line) + 1 for line in lines), initial=0))
+        while at != -1:
+            i = bisect.bisect_right(starts, at) - 1
+            marked.add(i)
+            at = text.find(needle, starts[i + 1])
+    return sorted(marked)
+
+
 def scan_source_file(path: Path, rel_path: str,
                      lines: list[str] | None = None,
                      cipher_exclusions: bool = False,
@@ -2882,7 +3007,9 @@ def scan_source_file(path: Path, rel_path: str,
     ext = path.suffix.lower()
     if hot is _ALL_LINES_UNKNOWN:
         hot = hot_lines(lines, ext)
-    read, patterns, allowed = (None, None, None) if hot is None else hot
+    read, patterns, allowed = (None, None, None) if hot is None else hot[:3]
+    # Lines read for the denial block they may open, by no rule (linegate.Hot.state).
+    state_only = getattr(hot, "state", frozenset())
     inside_block = False
     inside_doc = ""
     inside_raw = False  # a Go raw string (`...`) still open (release 3d)
@@ -2893,10 +3020,46 @@ def scan_source_file(path: Path, rel_path: str,
     by_identifier: list[dict[str, Any]] = []
     standing_alone: list[dict[str, Any]] = []   # release 3e: kept without that (stands_alone)
     rejection_tests = _rejection_tests(lines) if ext in _DOCSTRING_EXT else set()
-    for line_no, line in enumerate(lines, start=1):
+    # The lines visited: with a gate, those it marked and those a comment, docstring or Go
+    # raw string opens or closes on, and the rejection tests' `def` lines; the others change
+    # nothing below but the end of a denial block, which is looked for among them where one
+    # is open (release 3c: the walk over every line was 8% of a curl scan).
+    visited = (range(len(lines)) if read is None else
+               _lines_to_visit(lines, ext, read, patterns, state_only, rejection_tests))
+    previous = -1
+    for index in visited:
+        line_no, line = index + 1, lines[index]
+        if denial_block_indent is not None and index > previous + 1:
+            for passed in range(previous + 1, index):
+                text = lines[passed]
+                if text.strip() and len(text) - len(text.lstrip()) <= denial_block_indent:
+                    denial_block_indent = None
+                    break
+        previous = index
         if read is not None and line_no - 1 not in read and not (
                 line_no - 1 in patterns
                 and _a_pattern_matches(line, allowed.get(line_no - 1) if allowed else None)):
+            if line_no - 1 in state_only:
+                # Only a denial word: the steps below that move state -- Go raw strings,
+                # comments, docstrings, the denial block ending and opening, a rejection
+                # test -- and no rule.
+                if ext == ".go" and (inside_raw or "`" in line):
+                    inside_raw = _go_raw_spans(line, inside_raw, inside_block)[1]
+                spans, inside_block = _comment_spans(line, ext, inside_block)
+                if ext in _DOCSTRING_EXT:
+                    doc_spans, inside_doc = _docstring_spans(line, inside_doc)
+                    spans = spans + doc_spans
+                code = _code_only(line, spans)
+                indent = len(line) - len(line.lstrip())
+                if (denial_block_indent is not None and line.strip()
+                        and indent <= denial_block_indent):
+                    denial_block_indent = None
+                if _opens_a_denial_block(code):
+                    denial_block_indent = indent
+                    denial_block_calls = bool(_REJECTION_TEST.search(code))
+                if line_no - 1 in rejection_tests:
+                    denial_block_indent, denial_block_calls = indent, True
+                continue
             # No rule can match this line (linegate). Only what a later line reads moves:
             # a block comment, docstring or Go raw string opening or closing, a denial
             # block ending.
@@ -3310,6 +3473,10 @@ def scan_embedded_keys(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
 
     The key's family and size where the block, string literals and all, parses as a key
     (release C); otherwise `key_unread` says why (curl usercertinmem.c:67 is `XXXX...`)."""
+    # Every match of EMBEDDED_KEY_PATTERN holds this; one search of the file instead of a
+    # regex per line where it is absent (release 3c).
+    if "-----BEGIN" not in "\n".join(lines):
+        return []
     return [
         {"path": rel_path, "line": line_no,
          "description": "Embedded private key material", "excerpt": line.strip()[:200],
@@ -3521,6 +3688,28 @@ _HYBRID_NAME = re.compile(
     + r")(?:@openssh\.com)?(?![A-Za-z0-9])", re.IGNORECASE)
 
 
+def line_gate(use_core: bool = True) -> linegate.Gate:
+    """The line gate of these rules (linegate.Gate): every match of _HYBRID_NAME holds one of
+    the HYBRIDS names, which are its words for scan_hybrid_names, and the cipher and group
+    settings are their own regexes (release 3c)."""
+    return linegate.Gate([f[3] for f in _FILTERED_PATTERNS], [f[2] for f in _FILTERED_PATTERNS],
+                         _BLOB.pattern, use_core=use_core, rule_words=tuple(HYBRIDS),
+                         rule_patterns=_SETTING_PATTERNS)
+
+
+# assets._cipher_setting and assets._group_setting are true only where one of these matches
+# the raw line; the rules behind them (static RSA suites, cipher strings, TLS groups, hybrid
+# groups) report nothing elsewhere. The line gate searches them as they are (release 3c).
+_SETTING_PATTERNS = tuple(
+    (p, _warm.derived("prefilter", (p.pattern, p.flags), lambda p=p: _prefilter(p)))
+    for p in (_TLS_CIPHER_SETTING, _HAPROXY_CIPHERS, _TLS_GROUP_SETTING, _HAPROXY_CURVES))
+
+
+# The lines of a file any rule could match, in one search of the file (release D). The other
+# lines are passed over by every per-line rule.
+LINE_GATE = line_gate()
+
+
 def scan_hybrid_names(line: str) -> list[str]:
     """The hybrids this line names, by their registered spelling."""
     if "kem" not in line.lower() and "sntrup" not in line.lower() and "wing" not in line.lower():
@@ -3634,7 +3823,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      left_out, files_read, markers, excluded_by_config, material_problems, files_scanned,
      skipped_kinds, present_kinds, key_files, file_digests, codeowners, property_values) = (
         r[name] for name in _READING)
-    if resolved_exclude:
+    # A walked file is not a link, so it can only resolve to an excluded path of its own
+    # name: the name is asked first, and the path resolved only then (release 3c).
+    if resolved_exclude and path.name in {p.name for p in resolved_exclude}:
         try:
             if path.resolve() in resolved_exclude:
                 left_out.append(str(path.relative_to(repo_path)))
@@ -4280,3 +4471,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
                  if f.get("evidence_kind") not in {"comment", "ban"}]).items()
         },
     }
+
+
+# The end of the rules (see _warm.start_regex above).
+_warm.stop_regex()
+_warm.save()
