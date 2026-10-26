@@ -1385,7 +1385,90 @@ name inside. That narrows the rule and cannot add a role: on BoringSSL exactly 9
 from key establishment to undetermined, all `group()`. The seven are among them. The fix itself was
 not measured on a corpus it had not seen.
 
+## How it is measured
+
+From 0.37.0 detection is measured one way, against the free scanners we compared against, so
+that a reader can see what was done and repeat it. These are our measurements: the corpora were
+chosen here, the labels are a model's judgement checked by hand here, and the scripts were run
+here. No outside party has repeated them.
+
+**Corpora.**
+
+- **A blind corpus**: public repositories, each pinned to a commit, frozen before any rule was
+  tuned and never opened by anyone writing rules.
+- **A second hold-out**, frozen the same way. Repositories later found to overlap with data the
+  rules were tuned on are excluded, and the exclusion is stated beside the result.
+- **Cryben** (Näther & Hirsch, arXiv 2608.04857), scored with its authors' own `compare.py`.
+- **A recall corpus published by another scanner's authors**, scored with its own metric.
+- **The OWASP Benchmark** 1.2, its crypto and hash categories, with its own scorer.
+- **liboqs** at commit `e1f480f3`: its own `docs/cbom.json` is the declared list of post-quantum
+  families, and each tool's rows on `src/` are scored against it by family.
+
+**Labels.** Chunks of the blind corpora are sampled with a fixed seed. Truth is labelled by an
+LLM judge: a chunk counts as cryptographic at a score of T = 0.6 or more, and a chunk in the grey
+band below it is drawn again before its mean is kept. Labels are spot-checked by hand and frozen
+before any tool is scored; no label is changed after a tool's output has been seen.
+
+**Units.** Precision, recall and F1 at the chunk level and at the line level, each with its own
+denominator.
+
+**Comparison.** Two tools are compared by a paired bootstrap over files (chunks of one file are
+correlated) of ΔF1, 2,000 resamples, fixed seed. A tool is beaten when the 95% interval of ΔF1 is
+above 0, loses when it is below 0, and otherwise it is a tie, reported as a tie.
+
+**Other measures.**
+
+- **A negative corpus** of files with no quantum-vulnerable cryptography: the count of findings
+  there must be 0.
+- **Rewrite robustness**: the same use written another way (an alias, folded literals, a
+  constant from another file) must still be found.
+- **Near misses** — cryptography named, banned, discussed or tested against, but not used — read
+  as a Pareto pair (hits on the near misses, recall on the corpus), never as one number.
+- **Timing**: the warm median of interleaved rounds (one untimed warm-up, then each tool in turn,
+  round after round, so drift in load hits every tool alike; a run waits while the machine is
+  busy). A container tool's time includes the container's start; qrp-mcp runs on the host. The
+  machine is named: for 0.37.0 an Intel Core i5-3340M (2 cores, 4 threads, 2.70 GHz). On it a
+  scan of curl takes under 10 s; qrp-mcp is faster than qScan 0.12.0 and slower than cipherscope 0.3.0.
+
+**The tools run.** Every other tool ran offline in a throwaway container
+(`docker run --rm --network none`, the corpora mounted read-only, `ubuntu:24.04` unless named);
+qrp-mcp ran on the host from a virtualenv. All with `SOURCE_DATE_EPOCH=1761350400`. JSON is the timed call; a CBOM, where the tool writes one, is a
+second untimed call. Outside the timing rounds the runs are at `nice -n 19`.
+
+| tool | version | what was run |
+|---|---|---|
+| qrp-mcp | the candidate's commit | `qrp-mcp scan PATH --no-config --out FILE`, `qrp-mcp cbom PATH --no-config --out FILE`; with the compiled core and with `QRP_MCP_CORE=0` |
+| CryptoScan | 1.5.0 | `cryptoscan scan PATH --no-config --format json --stream=false --no-color -o FILE`; `--format cbom` |
+| qScan | 0.12.0 | `node dist/cli.js PATH --format json --no-config-file --severity-threshold critical -o FILE`; `--format cbom` |
+| cipherscope | 0.3.0 | `cipherscope --roots PATH --gitignore=false -o FILE.jsonl` |
+| RivicQ | build of 23.10.2026 | `rivicq scan PATH --format json --fail-on NONE`; `rivicq cbom PATH --format json` |
+| QuantumSeal | build of 23.10.2026 | `quantumseal scan PATH --format json --output FILE` |
+| PostShor | 0.1.0 | `postshor scan PATH -q -o FILE.json -o FILE.cdx.json` (in `python:3.12-slim`) |
+| foxguard | 0.14.1 | `foxguard pqc PATH -f json --output FILE -q`; `-f cbom` |
+| snoot | 0.1.0 | `snoot scan PATH --format json --output FILE --quiet --no-color`; `--format cbom` |
+| cdxgen | 13.5.0 | `cbom -o FILE --no-install-deps --spec-version 1.6 --json-pretty PATH`, `FETCH_LICENSE=false`, 300 s limit |
+| CBOMkit-hyperion | `ghcr.io/cbomkit/cbomkit-action:edge` (digest `sha256:7dfc905c614549fdb630d41a33b34a039af7f60c982501c6d74dfc63ef700512`) | `CBOMkit-action.jar` with `CBOMKIT_LANGUAGES=java,python,go`, `CBOMKIT_GENERATE_MODULE_CBOMS=false` |
+
+**Reproducing it.** The scanner side is the two `qrp-mcp` commands above, run on each corpus
+at its pinned commit with `--no-config` and `SOURCE_DATE_EPOCH=1761350400`. The scripts that
+sample the chunks, call the judge, score each tool, run the bootstrap and time the rounds are
+**not yet published**: they are not in this repository. Until they are, a reader can repeat the
+runs, not the scoring.
+
+**What it does not show.** These are our measurements, not an independent evaluation. The
+truth of the blind corpora is a model's judgement, checked by hand on a sample, not a human
+label of every chunk. Cryben, the OWASP Benchmark and the recall corpus were seen while rules
+were written, so on them a result is a regression figure, not a blind one. A tie is a tie: it
+is not reported as a win.
+
+**Results: filled in after the final judgement of 0.37.0.** The final judges have not run on
+this candidate; no figure is given here until they have.
+
 ## Measured against the other scanners
+
+⚠️ **Outdated.** This section and the next describe comparisons made in September 2026 on
+0.8.0 to 0.11.0. Their figures were not re-measured with the method of *How it is measured*,
+and they will be replaced by its results, not carried forward.
 
 In September 2026 three free tools that do the same job — CryptoScan, CBOMkit-hyperion
 (sonar-cryptography) and CBOMkit-theia — were run over the same repositories and the findings
@@ -1530,6 +1613,10 @@ Every file was written and labelled **before** the scanner was run over it, and 
 written by someone who had not read the scanner's rules. A corpus assembled by looking at what a
 tool reported measures the tool against itself, which is the circularity this document criticises
 elsewhere.
+
+⚠️ **Outdated:** the result below was measured on 0.11.0 (September 2026) and not re-measured
+with the method of *How it is measured*; the negative corpus there replaces it once its results
+are filled in.
 
 **Result: 200 of the 200 negative files are clean** — no finding of any kind. On the 100 near
 misses, this release reports 83 findings the labels say should not read as a use, down from 136.
