@@ -1076,6 +1076,65 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
+**From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
+
+- **For CI.** `qrp-mcp scan PATH --format sarif` writes SARIF 2.1.0; every file not read is a
+  notification with its reason. `qrp:ignore <family> <reason>` and
+  `qrp:ignore-next-line <family> <reason>` suppress a row, which is listed and counted, never
+  dropped; a marker without a family and a reason does not apply and is listed. `--write-baseline`
+  / `--baseline` mark rows new or baselined, and the counts are in `coverage.baseline`. A
+  `.qrp.toml` (profile, level, exclude, baseline, mandate, lead_months) is read unless
+  `--no-config`; the command line wins. `--mandate cnsa-2.0|nist-ir-8547` gives each
+  quantum-vulnerable occurrence its dated clause and `hndl_exposed`, and with `--lead-months`
+  the run exits 1 when a deadline falls inside the lead time. On Python 3.10 `tomli` is a
+  dependency, so `.qrp.toml` is read there too.
+- **The document names the code that ran.** `version` is the running code's, and a disagreeing
+  installed distribution is said beside it; `instrument.revision` gives the commit or the absence
+  of one in words; `dirty` looks at the package directory only. The CBOM is byte-identical across
+  two runs over one tree: its timestamp is `SOURCE_DATE_EPOCH`, else the commit time of a clean
+  checkout, else absent. Every file the evidence cites carries its SHA-256.
+- **Reports in the tree are not cryptography.** A CycloneDX document, a qrp-mcp result, a SARIF
+  log, a baseline and a `.qrp.toml` are named as report documents and not matched; a CycloneDX
+  document another tool wrote is listed as a supplier's declaration, for `--ingest`.
+- **The CBOM carries more.** OID, NIST and classical security levels, `cryptoFunctions` and the
+  curve on algorithm assets; one component per key size or parameter set, with the key length
+  wherever the files give one; a hybrid as a component that depends on its two halves; one
+  library component per bom-ref however the manifests spell it; certificates, parsed with
+  `cryptography`, as certificate assets with their subject key nested; `non_security_use` on the
+  occurrence.
+- **Every occurrence carries a confidence** (high, medium, low) and its basis, in the scan
+  JSON, SARIF (`rank`) and the CBOM; see *How sure the scan is of each occurrence*.
+- **Detection.** Algorithm names from the IANA SSH, TLS, JOSE and COSE registries, OpenSSH's
+  and OpenSSL's own name lists and PEM labels; a family as a component of an identifier, in a
+  file with other cryptography, at low confidence; XML-DSig URIs, pyOpenSSL types, DH-parameter
+  calls, key specs, COSE constants and SSH key-exchange messages; Jinja templates, SSH key file
+  names, key types in tasks, DH parameters and sshd RSA options in configuration; Rust types and
+  variants; cipher strings split at `+`, GnuTLS priorities and C suite tables; curl's crypto API
+  by its prefix; OpenSSL's curves API as EC key agreement and `ffdhe*` as DH; dependencies in
+  `pyproject.toml` and `Pipfile`, as requested; `crypto-js`; algorithm settings in `.properties`
+  joined to `getProperty` (a fallback default is low); key-type values in a key-type context;
+  `usedforsecurity=False` as the role `non_security_use`; sops, age and OpenPGP secrets at rest,
+  with HNDL; uses reached through an alias, folded literals or another file's constant.
+- **Read as what they are.** A Go `func` signature is a type reference; a suite part or key-type
+  value in a comment is a comment; libcrux's `DsaXof` and an ML-DSA component are not DSA, a
+  KEM's DH is not DH; the JDK's `EdECKey` is EdDSA; a Python test whose docstring says an option
+  is removed or disabled is a rejection test, and an expected error message is text; an OpenSSH
+  `.cert` and a DER request are not unparsed certificates.
+- **Identifier rows never move the headline.** A family whose every use is an identifier row
+  stays a finding, marked `identifier_only`, and is not counted in `pqc_readiness` or `by_role`;
+  identifier rows set no RSA or EC role.
+- **Speed.** One search per file finds the lines a rule could match; files are read in parallel
+  (`QRP_MCP_JOBS`); an optional compiled line gate, `qrp-mcp-core`, is used when installed
+  (`QRP_MCP_CORE=0` turns it off; the answers are the same); the rules' compiled form is cached on
+  disk (`QRP_MCP_CACHE=0` turns it off); the MCP SDK and pydantic are no longer imported on the
+  scan path. A scan of curl takes under 10 s on an Intel i5-3340M. That is slower than a compiled
+  scanner and faster than one that runs on Node.js; how it was timed is in *How it is
+  measured*.
+
+⚠️ What is not claimed: no detection figure. The rules of round 3 were written against corpora
+read for that purpose; what they do on code nobody has read is what the final judgement of 0.37.0
+measures, and its results are not in this README yet.
+
 ### A classical group offered on its own
 
 From 0.28.0 a classical group named as a group of its own in a group setting — `X25519` in
