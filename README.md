@@ -1495,17 +1495,17 @@ were written, so on them a result is a regression figure, not a blind one. A tie
 is not reported as a win.
 
 **Results.** The final judgement of 0.37.0, 26.10.2026. The figures are for 0.37.0's detection
-as the judges ran it, commit `0adb299`; on these corpora it scores what the round-3 candidate
-before it scored, to the digit. The commit after it narrows DSA (ECDSA and EdDSA names, the
-signature encoding DSA and ECDSA share); it changes no row on certbot, Mbed TLS, curl, OpenSSH,
-the negative corpus or Cryben, and it was not re-measured on the blind corpus or the hold-out.
+as the judges ran it, commit `a0c391f`, re-measured after the DSA fix (ECDSA and EdDSA names,
+the signature encoding DSA and ECDSA share). The last commit before the release narrows that
+fix so dropbear's `DROPBEAR_SIGNATURE_DSS` stays DSA; the two rows it restores lie outside every
+sampled chunk, and the output on certbot, Mbed TLS, curl and OpenSSH is unchanged.
 The best other tool is the one with the highest F1 on that corpus and unit; ΔF1 = qrp-mcp − that
 tool.
 
 | corpus (exclusions) | unit | qrp-mcp 0.37.0 P / R / F1 | best other tool: P / R / F1 | ΔF1 (95% CI) | verdict |
 |---|---|---|---|---|---|
-| second hold-out, 9 repositories (cfssl and mina-sshd excluded: both are in the development corpus at the same commit, and cfssl is named in the source) | chunk | 0.938 / 0.864 / 0.899 | QuantumSeal (by matched text): 0.912 / 0.896 / 0.904 | −0.005 (−0.057, +0.042) | tie |
-| | line | 0.715 / 0.835 / 0.770 | QuantumSeal (by matched text): 0.764 / 0.832 / 0.797 | −0.027 (−0.080, +0.028) | tie |
+| second hold-out, 9 repositories (cfssl and mina-sshd excluded: both are in the development corpus at the same commit, and cfssl is named in the source) | chunk | 0.944 / 0.864 / 0.902 | QuantumSeal (by matched text): 0.912 / 0.896 / 0.904 | −0.002 (−0.055, +0.047) | tie |
+| | line | 0.716 / 0.835 / 0.771 | QuantumSeal (by matched text): 0.764 / 0.832 / 0.797 | −0.026 (−0.079, +0.029) | tie |
 | blind corpus, 18 repositories (`ansible-collections/community.crypto` excluded: named in `detectors.py`) | chunk | 0.916 / 0.878 / 0.897 | QuantumSeal (by matched text): 0.922 / 0.763 / 0.835 | +0.062 (+0.026, +0.101) | beat |
 | | line | 0.723 / 0.851 / 0.782 | QuantumSeal (by matched text): 0.726 / 0.740 / 0.733 | +0.049 (+0.010, +0.090) | beat |
 | blind corpus, 18 repositories, configuration files only (24 truth pairs, 45 lines: low power) | chunk | 0.818 / 0.708 / 0.759 | QuantumSeal (by matched text): 0.909 / 0.750 / 0.822 | −0.063 (−0.222, +0.073) | tie |
