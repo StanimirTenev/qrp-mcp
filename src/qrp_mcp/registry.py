@@ -422,6 +422,12 @@ def _carried(name: str) -> tuple[tuple[str, str], ...]:
             else p) == family]
         if any(w in _SHORT for w in words) and not (upper & _CRYPTO_WORDS):
             continue
+        # DSS beside a signature is FIPS 186's (r, s) signature encoding, which DSA and ECDSA
+        # share: pyca's encode_dss_signature, cryptography-kotlin's DssRawSignatureVerifier
+        # (release R5; the import of Crypto.Signature.DSS names neither, as here). So is .NET's
+        # DSASignatureFormat, which ECDsa.SignData takes too.
+        if family == "DSA" and "SIGNATURE" in upper and (set(words) == {"DSS"} or "FORMAT" in upper):
+            continue
         out.append((family, f"{family} used in a {use} ({name}); {components.MAC_OR_KDF_NOTE}"
                     if use else f"{family} carried by the identifier {name}"))
     return tuple(out)

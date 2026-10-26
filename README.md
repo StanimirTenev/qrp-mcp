@@ -1125,7 +1125,9 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   value in a comment is a comment; libcrux's `DsaXof` and an ML-DSA component are not DSA, a
   KEM's DH is not DH; the JDK's `EdECKey` is EdDSA; a Python test whose docstring says an option
   is removed or disabled is a rejection test, and an expected error message is text; an OpenSSH
-  `.cert` and a DER request are not unparsed certificates.
+  `.cert` and a DER request are not unparsed certificates. ECDSA and EdDSA names are not DSA:
+  .NET's `eCDsa`, `testEcDsa256`, `EdDSA25519`; nor is the signature encoding DSA and ECDSA
+  share, pyca's `encode_dss_signature`, `DssRawSignatureVerifier`, .NET's `DSASignatureFormat`.
 - **Identifier rows never move the headline.** A family whose every use is an identifier row
   stays a finding, marked `identifier_only`, and is not counted in `pqc_readiness` or `by_role`;
   identifier rows set no RSA or EC role. In SARIF an identifier row is a `note`, as a comment

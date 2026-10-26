@@ -95,6 +95,14 @@ def components(name: str) -> list[str]:
     out: list[str] = []
     for p in parts:
         last = out[-1] if out else ""
+        # A size glued to DSA after EC, Ed or a post-quantum prefix is the curve's or the
+        # parameter set's, never a DSA key size: testEcDsa256, EdDSA25519, SlhDsa128 (release R5).
+        if re.fullmatch(r"DSA\d+", p) and last in {"EC", "ML", "SLH", "FN", "ED"}:
+            p = "DSA"
+        # lowerCamelCase splits `eCDsa` (.NET's ECDsa as a variable) into E + C + DSA.
+        if last == "C" and out[-2:-1] == ["E"] and p in {"DH", "DHE", "DSA"}:
+            out[-2:] = ["EC" + p]
+            continue
         if last == "SHA" and p in {"1", "224"}:
             out[-1] = "SHA" + p
         elif last == "SHA3" and p == "224":

@@ -1069,11 +1069,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # RsaKeypair, DsaKeypair, KeypairData::Dsa, Algorithm::Rsa; jwt-simple's
     # RsaOaepDecryptionKey; sigstore's RSAKeys). Case-sensitive: `MlDsa65` and `SlhDsa`
     # have no boundary before the D. DSA by its key and signature types only: libcrux's
-    # ML-DSA calls its XOF `DsaXof` (OpenSSH libcrux_internal.h, the relALL gate).
+    # ML-DSA calls its XOF `DsaXof` (OpenSSH libcrux_internal.h, the relALL gate). Not .NET's
+    # DSASignatureFormat, the encoding enum ECDsa.SignData takes too (release R5); its
+    # DSASignatureFormatter is DSA's own.
     ("RSA", "RSA named by a type or enum variant (RsaKeypair, RSAKeys, Algorithm::Rsa)",
      re.compile(r"\bRsa[A-Z0-9]\w*|\bRSA[A-Z][a-z]\w*|::Rsa\b")),
     ("DSA", "DSA named by a type or enum variant (DsaKeypair, KeypairData::Dsa)",
-     re.compile(r"\b(?:Dsa|DSA)(?:Key[Pp]air|PrivateKey|PublicKey|Signature|SigningKey|VerifyingKey|"
+     re.compile(r"\b(?:Dsa|DSA)(?:Key[Pp]air|PrivateKey|PublicKey|Signature(?!Format\b)|SigningKey|VerifyingKey|"
                 r"Params|Parameters|Components|Authentication)\w*|::Dsa\b")),
     # Rust only (RUST_ONLY below): the family as a word of a snake_case name, a module or a
     # cargo feature -- `fn decode_dsa_openssh`, `mod dsa;`, `#[cfg(feature = "dsa")]`,
