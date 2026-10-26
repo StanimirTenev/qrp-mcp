@@ -32,6 +32,11 @@ jobs:
           - { os: macos-14, target: aarch64 }
           - { os: windows-latest, target: x64 }
           - { os: windows-11-arm, target: aarch64 }
+          # The dependency marker is true on these too: musl Linux (Alpine) and 32-bit CPython on
+          # 64-bit Windows (platform_machine is AMD64 there). Without a wheel pip would build the sdist.
+          - { os: ubuntu-latest, target: x86_64, manylinux: musllinux_1_2, tag: -musl }
+          - { os: ubuntu-latest, target: aarch64, manylinux: musllinux_1_2, tag: -musl }
+          - { os: windows-latest, target: x86 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,11 +46,11 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          manylinux: auto
+          manylinux: ${{ matrix.manylinux || 'auto' }}
           args: --release --out dist --manifest-path core/Cargo.toml
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel-${{ matrix.os }}-${{ matrix.target }}
+          name: wheel-${{ matrix.os }}-${{ matrix.target }}${{ matrix.tag }}
           path: dist/*.whl
 
   sdist:
