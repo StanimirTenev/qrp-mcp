@@ -103,10 +103,32 @@ def _installed_vcs_commit() -> str | None:
     return commit if isinstance(commit, str) and commit else None
 
 
+BUILT_FROM = ("installed from a wheel built from this commit; the commit was recorded at build "
+              "time, and the installed files were not compared with it")
+
+
+def _built_from() -> dict[str, Any] | None:
+    """The commit an installed wheel was built from, where its build recorded one
+    (qrp_mcp/_build_info.py, written by hatch_build.py). None for a build without git."""
+    try:
+        from . import _build_info  # type: ignore[attr-defined]
+    except ImportError:
+        return None
+    commit, dirty = getattr(_build_info, "COMMIT", None), getattr(_build_info, "DIRTY", None)
+    if not (isinstance(commit, str) and commit):
+        return None
+    return {"pinned": True, "commit": commit,
+            "dirty": dirty if isinstance(dirty, bool) else None,
+            "basis": "built_from", "meaning": BUILT_FROM}
+
+
 def _revision(pin: dict[str, Any]) -> str:
     """Which code ran, in one field (ZA-OPRAVYANE row 148): the commit, or the absence
     of one said in words. An MCP server three versions behind its plugin printed nothing
     a reader could check; `source_commit` explains the absence, this names what ran."""
+    if pin.get("pinned") and pin.get("basis") == "built_from":
+        return pin["commit"] + (" (built from, with uncommitted changes)" if pin.get("dirty")
+                                else " (built from)")
     if pin.get("pinned"):
         return pin["commit"] + (" (with uncommitted changes)" if pin.get("dirty") else "")
     reason = pin.get("reason")
@@ -352,8 +374,10 @@ def _tool_pin() -> dict[str, Any]:
         # Asking git from inside site-packages answers for whatever repository the
         # environment happens to sit in -- a virtualenv inside the client's checkout
         # reported the client's commit as this tool's. An installed wheel has no
-        # commit of its own, so git is not asked.
-        return _absent("no_checkout")
+        # commit of its own, so git is not asked. A wheel built from a checkout carries the
+        # commit it was built from (hatch_build.py): said as that, not as a checkout.
+        built = _built_from()
+        return built if built is not None else _absent("no_checkout")
     try:
         out = _run_git(root, "rev-parse", "HEAD")
         tracked = _run_git(root, "ls-files", "--error-unmatch", Path(__file__).name)
@@ -490,7 +514,8 @@ def build(
             "version": tool_version,
             "revision": _revision(pin),
             # The version alone does not pin the emitter; the code can change
-            # without it. Null when running from an installed wheel.
+            # without it. From an installed wheel, the commit it was built from
+            # (basis: built_from) where its build recorded one, else no_checkout.
             "source_commit": pin,
             "ruleset": ruleset,
             "claimed_types": claimed_types,

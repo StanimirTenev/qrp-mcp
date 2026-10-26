@@ -488,8 +488,11 @@ another coverage figure. Four things, each answering something the percentage ca
 
 - **instrument** — the version *and the emitter's own commit*. Two runs of this package once
   reported the same version from code that differed by a commit, so the version alone does not
-  identify what did the reading. Where the tool runs from an installed wheel there is no commit,
-  and the field says which absence rather than going quiet.
+  identify what did the reading. Where the tool runs from an installed wheel built from a git
+  checkout (from 0.37.0), `source_commit` names the commit it was **built from**, with
+  `basis: built_from` — recorded at build time, not a checkout it runs from, and the installed
+  files are not compared with it. A wheel built without git has no commit, and the field says
+  which absence (`no_checkout`) rather than going quiet.
 - **corpus** — the commit that was read, whether the tree was dirty, and whether the clone was
   shallow. A commit identifies a tracked tree; a scanner walks a filesystem, and the two are not
   the same thing.
@@ -1092,7 +1095,10 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   installed distribution is said beside it; `instrument.revision` gives the commit or the absence
   of one in words; `dirty` looks at the package directory only. The CBOM is byte-identical across
   two runs over one tree: its timestamp is `SOURCE_DATE_EPOCH`, else the commit time of a clean
-  checkout, else absent. Every file the evidence cites carries its SHA-256.
+  checkout, else absent. Every file the evidence cites carries its SHA-256. An installed wheel
+  built from a git checkout names the commit it was built from (`source_commit.basis:
+  built_from`, `revision: "<commit> (built from)"`); one built without git still says
+  `no_checkout`. Two runs of wheels built from one commit can be compared by `prove_closure`.
 - **Reports in the tree are not cryptography.** A CycloneDX document, a qrp-mcp result, a SARIF
   log, a baseline and a `.qrp.toml` are named as report documents and not matched; a CycloneDX
   document another tool wrote is listed as a supplier's declaration, for `--ingest`.

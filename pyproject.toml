@@ -36,6 +36,10 @@ qrp-mcp = "qrp_mcp.server:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/qrp_mcp"]
 
+# The commit a build is made from, as qrp_mcp/_build_info.py (hatch_build.py).
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
 [dependency-groups]
 # jsonschema is a test dependency only. The emitted CBOM is validated against the
 # vendored CycloneDX schema in tests; the scanner itself hand-builds the document so
