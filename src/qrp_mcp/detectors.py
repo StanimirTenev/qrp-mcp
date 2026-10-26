@@ -2523,6 +2523,47 @@ _CONDITION_OPENER = re.compile(
 _REJECTION_TEST = re.compile(r"\b(?:pytest\.raises|assertRaises(?:Regex)?|assertThrows)\s*\(")
 
 
+# A Python test whose docstring says the thing is removed, disabled or refused tests the
+# refusal: everything in it is attempted in order to fail, as in a pytest.raises block.
+# Mbed TLS's test_config_checks.py sets `#define MBEDTLS_KEY_EXCHANGE_RSA_ENABLED` to check
+# that the removed option is rejected (rel3-rules review of rel3e: 10 sampled rows, FALSE).
+# The test's own name is part of it. Test functions only: a library function documenting
+# what it refuses still runs what it calls.
+_TEST_DEF = re.compile(r"^\s*(?:async\s+)?def\s+test\w*\s*\(.*:\s*(?:#.*)?$")
+_DOCSTRING_OPEN = re.compile(r"^\s*[rRuU]?(\"\"\"|\'\'\')")
+
+
+def _rejection_tests(lines: list[str]) -> set[int]:
+    """Indexes of the `def test...` lines whose docstring's first line has a denial word."""
+    out: set[int] = set()
+    for i, line in enumerate(lines[:-1]):
+        if "def" not in line or not _TEST_DEF.match(line):
+            continue
+        opened = _DOCSTRING_OPEN.match(lines[i + 1])
+        if opened:
+            first = lines[i + 1][opened.end():]
+            first = first.split(opened.group(1), 1)[0]
+            if _DENIAL_WORDS.search(first):
+                out.add(i)
+    return out
+
+
+# The message a call expects or raises, as a keyword argument's string (`error='... was
+# removed'`, pytest.raises(match=...)): text, as a prose string is (rel3-rules).
+_MESSAGE_KEYWORD = re.compile(
+    r"(?<![\w.])(?:error|match|msg|message|expected_error|expected_message)\s*=\s*"
+    r"[rRbBuU]{0,2}(?=[\"'])")
+
+
+def _message_spans(code: str) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    for m in _MESSAGE_KEYWORD.finditer(code):
+        literal = _STRING_LITERAL.match(code, m.end())
+        if literal:
+            spans.append((m.start(), literal.end()))
+    return spans
+
+
 def _opens_a_denial_block(line: str) -> bool:
     """`forbiddenAlgorithms:` on its own line, with the names indented below it.
 
@@ -2851,6 +2892,7 @@ def scan_source_file(path: Path, rel_path: str,
     # Release 3b: rows from identifiers alone, kept only if the file turns out to hold crypto.
     by_identifier: list[dict[str, Any]] = []
     standing_alone: list[dict[str, Any]] = []   # release 3e: kept without that (stands_alone)
+    rejection_tests = _rejection_tests(lines) if ext in _DOCSTRING_EXT else set()
     for line_no, line in enumerate(lines, start=1):
         if read is not None and line_no - 1 not in read and not (
                 line_no - 1 in patterns
@@ -2867,6 +2909,8 @@ def scan_source_file(path: Path, rel_path: str,
             if (denial_block_indent is not None and line.strip()
                     and len(line) - len(line.lstrip()) <= denial_block_indent):
                 denial_block_indent = None
+            if line_no - 1 in rejection_tests:
+                denial_block_indent, denial_block_calls = len(line) - len(line.lstrip()), True
             continue
         was_inside = inside_block or (bool(inside_doc) and not inside_doc.startswith("v"))
         raw: list[tuple[int, int]] = []
@@ -2892,6 +2936,8 @@ def scan_source_file(path: Path, rel_path: str,
         if _opens_a_denial_block(code):
             denial_block_indent = indent
             denial_block_calls = bool(_REJECTION_TEST.search(code))
+        if line_no - 1 in rejection_tests:
+            in_denial, denial_block_indent, denial_block_calls = True, indent, True
         # One line, one finding per algorithm. Several patterns can carry the same
         # name -- ECDSA is matched both by its own name and by secp256k1, X448 by
         # its upper and lower case forms -- and counting each pattern separately
@@ -2899,7 +2945,8 @@ def scan_source_file(path: Path, rel_path: str,
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
         first_on_line = len(findings)
-        prose = _prose_spans(code) if ('"' in code or "'" in code) else []
+        prose = ((_prose_spans(code) + (_message_spans(code) if ext in _DOCSTRING_EXT else []))
+                 if ('"' in code or "'" in code) else [])
         # The finding a row 136-143 pattern made, with where it matched (see components below).
         by_pattern: dict[str, tuple[dict[str, Any], list[tuple[int, int]]]] = {}
         experimental: list[tuple[int, int]] = []
