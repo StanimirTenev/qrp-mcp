@@ -1,0 +1,17 @@
+# Locks the server the plugin launches: `uv run --locked` installs exactly what uv.lock
+# names (versions, registry sources, hashes) and fails instead of re-resolving.
+[project]
+name = "qrp-plugin"
+version = "0.37.0"
+requires-python = ">=3.10"
+dependencies = ["qrp-mcp==0.37.0"]
+
+[tool.uv]
+package = false
+# Only the platforms qrp-mcp-core ships wheels for: keeps the lock well under the
+# directory's 256 KiB per-file limit (all platforms: ~279 KiB).
+environments = [
+    "sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')",
+    "sys_platform == 'darwin' and (platform_machine == 'x86_64' or platform_machine == 'arm64')",
+    "sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'ARM64')",
+]
