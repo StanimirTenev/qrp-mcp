@@ -9,7 +9,10 @@
         "--project",
         "${CLAUDE_PLUGIN_ROOT}",
         "qrp-mcp"
-      ]
+      ],
+      "env": {
+        "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/venv"
+      }
     }
   }
 }

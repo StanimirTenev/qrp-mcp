@@ -28,11 +28,14 @@ def test_the_launcher_runs_through_the_lock():
     assert server["command"] == "uv", server
     assert server["args"] == ["run", "--locked", "--no-dev", "--project",
                               "${CLAUDE_PLUGIN_ROOT}", "qrp-mcp"], server["args"]
+    # The docs: don't write state into the plugin root, which changes on update.
+    assert server["env"] == {"UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/venv"}, server
 
 
 def test_the_plugin_project_pins_the_released_version():
-    deps = tomllib.loads((PLUGIN / "pyproject.toml").read_text())["project"]["dependencies"]
-    assert deps == [f"qrp-mcp=={_version()}"], deps
+    project = tomllib.loads((PLUGIN / "pyproject.toml").read_text())["project"]
+    assert project["dependencies"] == [f"qrp-mcp=={_version()}"], project["dependencies"]
+    assert project["version"] == _version()
 
 
 def test_the_lock_holds_the_released_version_with_hashes():
