@@ -1,18 +1,10 @@
 {
   "mcpServers": {
     "qrp": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "run",
-        "--locked",
-        "--no-dev",
-        "--project",
-        "${CLAUDE_PLUGIN_ROOT}",
-        "qrp-mcp"
-      ],
-      "env": {
-        "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/venv"
-      }
+        "qrp-mcp==0.37.0"
+      ]
     }
   }
 }

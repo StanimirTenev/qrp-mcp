@@ -1,5 +1,6 @@
-# Locks the server the plugin launches: `uv run --locked` installs exactly what uv.lock
-# names (versions, registry sources, hashes) and fails instead of re-resolving.
+# The lock of the server the plugin launches (`uvx qrp-mcp==X` in .mcp.json): uv.lock names
+# its versions, registry sources and hashes for the directory to verify. uvx itself does
+# not read this lock; it resolves the dependencies from PyPI when it installs.
 [project]
 name = "qrp-plugin"
 version = "0.37.0"

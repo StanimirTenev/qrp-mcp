@@ -15,8 +15,8 @@ Then, in any project:
 ```
 
 **Requires [`uv`](https://docs.astral.sh/uv/)** on your PATH. The plugin runs the server with
-`uv run --locked` from the plugin's own `uv.lock`, which installs exactly the locked versions
-and hashes without a separate install step.
+`uvx qrp-mcp==<version>`, pinned to this release, without a separate install step. The
+plugin's `uv.lock` lists the exact dependency versions and hashes this release is locked to.
 
 Everything runs on your machine. The server makes zero outbound connections — enforced by a
 test in the repository, not promised in a paragraph.
