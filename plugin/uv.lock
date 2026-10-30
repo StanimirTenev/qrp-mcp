@@ -3,13 +3,13 @@ revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "(python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux')",
     "(python_full_version >= '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
-    "(python_full_version < '3.11' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
+    "(python_full_version < '3.11' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux')",
+    "(python_full_version < '3.11' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version < '3.11' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.11' and platform_machine == 'ARM64' and sys_platform == 'win32')",
 ]
 supported-markers = [
@@ -243,10 +243,10 @@ version = "2.16.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
     "(python_full_version >= '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
 ]
 dependencies = [
@@ -285,10 +285,10 @@ version = "2.16.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
     "(python_full_version >= '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
 ]
 dependencies = [
@@ -413,10 +413,10 @@ version = "3.12"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
     "(python_full_version >= '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cb/27/eeb9f307bf07060f3d9f9aa0fb8c15b01bdfded0a941e4b2719c7f94cacd/pycparser-3.12.tar.gz", hash = "sha256:f03387877eab82ce01bbdfd0ba7252ee55a90b1c708d5129e2ce915475cf1db6", size = 158785, upload-time = "2026-10-22T13:40:03.56Z" }
@@ -575,7 +575,7 @@ wheels = [
 
 [[package]]
 name = "qrp-mcp"
-version = "0.37.0"
+version = "0.38.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -584,9 +584,9 @@ dependencies = [
     { name = "qrp-mcp-core", marker = "platform_python_implementation == 'CPython'" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/11/105ed2d95f2a642638a06c20559e0137730fd0a5f5f80c97004cfc440a5e/qrp_mcp-0.37.0.tar.gz", hash = "sha256:67cad8b7f57f2c4fac12f7465b2c4c9b447eb8d4eba097d9d48838d63604e5a4", size = 817725, upload-time = "2026-10-26T20:35:56.996Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c5/34/e0c6304835394afbeaa3fc438914425809edc2dfe0c9a27c11bc73a5af56/qrp_mcp-0.38.0.tar.gz", hash = "sha256:c28e291f1a8bed50adc000f4f12fa6c4b2c716d3293a05d393d8ce3ef9ed7a8a", size = 893017, upload-time = "2026-10-30T13:25:38.479Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/41/c0d81629adae31ac0dc4b34ea791bdc0d8ec2e8504d7c2c7eedf2dbdcab7/qrp_mcp-0.37.0-py3-none-any.whl", hash = "sha256:aee3f932142d2af1f0dc1bab46d209d7115e4fc9268ef047175971e54ae77364", size = 334436, upload-time = "2026-10-26T20:34:15.717Z" },
+    { url = "https://files.pythonhosted.org/packages/62/f1/cc3c2442abeb8f8507f363c2837b7d13a02edf0a5fee9514c2e9e99281f7/qrp_mcp-0.38.0-py3-none-any.whl", hash = "sha256:ca47e3079ff2bd0746189bb1f16938f4a96102e274144f759057d2ff4f935a81", size = 346372, upload-time = "2026-10-30T13:25:36.723Z" },
 ]
 
 [[package]]
@@ -607,14 +607,14 @@ wheels = [
 
 [[package]]
 name = "qrp-plugin"
-version = "0.37.0"
+version = "0.38.0"
 source = { virtual = "." }
 dependencies = [
     { name = "qrp-mcp" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "qrp-mcp", specifier = "==0.37.0" }]
+requires-dist = [{ name = "qrp-mcp", specifier = "==0.38.0" }]
 
 [[package]]
 name = "referencing"
@@ -709,10 +709,10 @@ version = "2026.9.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
     "(python_full_version >= '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/68/3bd46b8a5e01d3c2ebdf9c5e9497912e3fe0cde02bac21a7130ca866e403/rpds_py-2026.9.1.tar.gz", hash = "sha256:4793ef7f78268b124b73fa933440f01d258bbae01de9fa53e9080c9ab0425a12", size = 63948, upload-time = "2026-10-04T16:32:36.469Z" }
@@ -809,10 +809,10 @@ version = "3.6.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
     "(python_full_version >= '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
 ]
 dependencies = [
@@ -848,10 +848,10 @@ version = "1.10.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "(python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
     "(python_full_version >= '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
-    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
+    "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'darwin')",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.14' and platform_machine == 'ARM64' and sys_platform == 'win32')",
 ]
 dependencies = [
