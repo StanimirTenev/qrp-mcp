@@ -2744,6 +2744,25 @@ def _drop_signatures_covered_by_a_call(findings: list[dict[str, Any]],
                             for line, group in calls))]
 
 
+# A classical elliptic-curve group among a group setting's values (or the classical half of a
+# hybrid's name): what makes the setting ECDH.
+_CLASSICAL_EC_VALUE = re.compile(r"x25519|x448|secp|sect|p-?256|p-?384|p-?521|prime\d|brainpool|"
+                                 r"curvep|curvesm2", re.IGNORECASE)
+
+
+def _drop_ecdh_named_only_by_the_setting(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """ZA-OPRAVYANE row 172(a): `ssl_ecdh_curve MLKEM768` named ECDH by the directive alone.
+    On a group setting whose values name no classical EC group, the ECDH rows go. A line
+    longer than the excerpt keeps them: its values were not all seen."""
+    def named_only_by_setting(f: dict[str, Any]) -> bool:
+        excerpt = str(f.get("excerpt") or "")
+        if f.get("algorithm") != "ECDH" or len(excerpt) >= 200:
+            return False
+        setting = _group_setting(excerpt)
+        return bool(setting) and not _CLASSICAL_EC_VALUE.search(excerpt[setting.end():])
+    return [f for f in findings if not named_only_by_setting(f)]
+
+
 def _drop_imports_covered_by_a_call(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """An import is not a second row when the call it enables is in the file.
 
@@ -3464,6 +3483,7 @@ def scan_source_file(path: Path, rel_path: str,
         findings = sorted(findings + by_identifier, key=lambda f: f["line"])
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
+    findings = _drop_ecdh_named_only_by_the_setting(findings)
     return _drop_signatures_covered_by_a_call(_drop_imports_covered_by_a_call(findings),
                                               signature_lines)
 
