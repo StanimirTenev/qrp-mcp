@@ -19,6 +19,23 @@ uploaded. A tool that reads your keys' surroundings has no business phoning home
 makes zero outbound connections — enforced by a test, not promised in a paragraph. The only process it
 starts is a local `git`, to pin what it read, with the scanned repository's own hooks and filters disarmed.
 
+Need a cryptographic inventory (a CBOM) for a post-quantum migration or an audit, without
+uploading your code? One command, no install step:
+
+```
+uvx qrp-mcp scan ~/code/my-project --out result.json
+```
+
+What comes back, run on this repository's own test fixtures -- the findings, and next to them
+what the scan did not read:
+
+```text
+"verdict": "This scan read 24 of 27 files (88.89%); the remaining 3 (1 of 1, by extension
+            — .b64 — being 100.0% of them) are listed with a reason each."
+"summary": { "total_findings": 10, "quantum_vulnerable_count": 6, "pqc_ready_count": 1,
+             "weak_count": 1, "pqc_readiness": "hybrid_partial", ... }
+```
+
 ## Why this matters for chains and wallets
 
 Bitcoin and Ethereum authenticate with **ECDSA over secp256k1**. Solana, Cardano and Polkadot
