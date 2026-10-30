@@ -150,6 +150,7 @@ _KEY_ESTABLISHMENT = re.compile(
 # A cipher list longer than the quoted excerpt: the part that was cut can carry the
 # other role, so what the excerpt shows is not the whole line.
 _EXCERPT_LIMIT = 200
+_EITHER_NAME = "signature or padding name"
 _GENERIC_RSA = re.compile(r"evp_pkey_rsa(?![_a-z])")
 _CIPHER_LIST = re.compile(r"[a-z0-9]+-[a-z0-9-]+:[a-z0-9]+-")
 
@@ -162,7 +163,11 @@ def role_of(item: dict[str, Any]) -> str | None:
     excerpt = str(item.get("excerpt") or "")
     if len(excerpt) >= _EXCERPT_LIMIT and _CIPHER_LIST.search(excerpt.lower()):
         return "undetermined"
-    text = f"{excerpt} {item.get('description') or ''}".lower()
+    # The JCA/Bouncy Castle name rule's description says "signature or padding name" for an
+    # OAEP padding too; it is no evidence of a signature (ZA-OPRAVYANE row 161: pyca
+    # `pub.encrypt(k, padding.OAEP(...))` read as both roles, and so undetermined).
+    description = str(item.get("description") or "").replace(_EITHER_NAME, "")
+    text = f"{excerpt} {description}".lower()
     # PSS named beside the generic RSA key type is a table of both uses, not a signature.
     if _GENERIC_RSA.search(text) and "pss" in text:
         return "undetermined"

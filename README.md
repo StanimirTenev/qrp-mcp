@@ -1165,6 +1165,13 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   `$VAR` or `${VAR}` in a file -- is listed in `chosen_outside_files` with the setting and where
   the value comes from (counted in the CBOM as `qrp:chosen_outside_files:count`); no family is
   claimed for it, and what the environment holds is not read. Its quoted line follows `--level`.
+- **RSA-OAEP encryption is key establishment** (row 161, Joeri Barbier). pyca's
+  `pub.encrypt(k, padding.OAEP(...))` was `role: undetermined`, because the rule's description
+  ("signature or padding name") was read as a signature signal beside the line's OAEP; it no
+  longer is, so the line is key transport and, under `--mandate`, HNDL-exposed. On the four
+  control trees one line moved the other way: paramiko's `padding=padding.PKCS1v15(),` is now
+  `undetermined` (PKCS#1 v1.5 pads both encryption and signatures; it was `signature` only by
+  that description).
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 
