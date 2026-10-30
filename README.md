@@ -1135,8 +1135,8 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
 - **A TLS default is said, not left blank** (rows 164, 167, Daniel Stokes). Where the tree
   configures TLS and no file sets a group or curve, `tls_termination.key_exchange` says the
   library's default applies and is not resolved, with the library versions the manifests pin;
-  each TLS protocol asset lists `groups` in `library_defaults` (in the CBOM,
-  `qrp:library_defaults`). Where no key-establishment family was found either, the headline is
+  each TLS protocol asset says `key_exchange: "library default, not resolved"` (in the CBOM,
+  `qrp:key_exchange`). Where no key-establishment family was found either, the headline is
   `not_established` with that reason instead of `unknown`, which now means only that nothing was
   found; `by_role.key_establishment` says `not_established` too. The default is not computed from
   the version: OpenSSL 3.5 offers a hybrid first, earlier versions a classical group, and what a

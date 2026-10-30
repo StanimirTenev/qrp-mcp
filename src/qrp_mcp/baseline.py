@@ -28,6 +28,7 @@ _NOT_IDENTITY = {"line", "in_test_code", "role", "provider", "tls_termination", 
                  "provider_pin", "fips_provider_configured_in", "group_places", "serves",
                  "serves_group_places", "owners", "owners_source", "baseline_state",
                  "mandates", "hndl_exposed", "suppression", "path", "confidence",
+                 "key_exchange", "unowned_by",
                  "confidence_basis"}
 
 

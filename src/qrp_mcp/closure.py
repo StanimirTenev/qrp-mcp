@@ -48,7 +48,9 @@ _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signi
                    "serves_group_places", "parameter_set",
                    # What a run says about the line -- against a baseline, a mandate, an
                    # owner's suppression -- is not the line.
-                   "baseline_state", "mandates", "hndl_exposed", "suppression")
+                   "baseline_state", "mandates", "hndl_exposed", "suppression",
+                   # Said from the rest of the tree, not the line (rows 164, 174).
+                   "key_exchange", "unowned_by")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

@@ -34,7 +34,7 @@ def test_tls_without_a_group_says_the_default_is_not_resolved(tmp_path):
     assert {"package": "cryptography", "version": "42.0.5", "path": "requirements.txt",
             "line": 2} in kx["libraries_pinned"]
     tls = [p for p in r["evidence"]["protocols"] if p.get("protocol") == "tls"]
-    assert tls and all("groups" in p["library_defaults"] for p in tls)
+    assert tls and all(p["key_exchange"].startswith("library default") for p in tls)
     s = r["summary"]
     assert s["pqc_readiness"] == "not_established"
     assert s["readiness_not_established"]["would_read"] == "unknown"
@@ -61,5 +61,22 @@ def test_the_flag_reaches_the_cbom(tmp_path):
     assert server.scan_to_file([str(t), "--out", str(out)], cbom=True) == 0
     tls = [c for c in json.loads(out.read_text())["components"]
            if c.get("cryptoProperties", {}).get("assetType") == "protocol"]
-    props = [p for c in tls for p in c["properties"] if p["name"] == "qrp:library_defaults"]
-    assert props and "groups" in props[0]["value"]
+    props = [p for c in tls for p in c["properties"] if p["name"] == "qrp:key_exchange"]
+    assert props and props[0]["value"].startswith("library default, not resolved")
+
+
+def test_setting_a_group_elsewhere_does_not_close_the_tls_line(tmp_path):
+    from qrp_mcp import closure
+    t = _tree(tmp_path, {"server.py": SERVER})
+    before = scan_directory(t)
+    (t / "groups.py").write_text('import ssl\nc = ssl.create_default_context()\n'
+                                 'c.set_ecdh_curve("prime256v1")\n')
+    after = scan_directory(t)
+    assert "key_exchange" not in after["tls_termination"]
+    from qrp_mcp import baseline
+
+    def ids(result):
+        return [(closure._identity("protocols", p), baseline.key("protocols", p))
+                for p in result["evidence"]["protocols"] if p["path"] == "server.py"]
+    # The same line: the same identity for closure and the same baseline key.
+    assert ids(before) and ids(before) == ids(after)

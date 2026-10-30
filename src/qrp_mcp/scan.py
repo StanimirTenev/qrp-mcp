@@ -357,6 +357,9 @@ LIBRARY_DEFAULT_KEY_EXCHANGE = (
     "first, earlier versions a classical group), and this scan does not resolve it.")
 
 
+KEY_EXCHANGE_NOT_SET = "library default, not resolved: no group is set in the files read"
+
+
 def _library_default_key_exchange(result: dict[str, Any]) -> None:
     tls = result.get("tls_termination")
     if not tls or any(place.get("basis") == "configured_group"
@@ -370,10 +373,11 @@ def _library_default_key_exchange(result: dict[str, Any]) -> None:
                               "path": d["path"], "line": d["line"]}
                              for d in result["evidence"]["dependencies"] if d.get("version")],
     }
+    # On each TLS place, so the CBOM's protocol component carries it. Read from the rest of
+    # the tree, not the line: closure and the baseline leave it out of an occurrence's identity.
     for asset in result["evidence"]["protocols"]:
         if asset.get("protocol") == "tls" and asset.get("tls_termination"):
-            said = list(asset.get("library_defaults") or [])
-            asset["library_defaults"] = said if "groups" in said else [*said, "groups"]
+            asset["key_exchange"] = KEY_EXCHANGE_NOT_SET
     summary = result["summary"]
     role = summary["by_role"]["key_establishment"]
     if role["families"]:

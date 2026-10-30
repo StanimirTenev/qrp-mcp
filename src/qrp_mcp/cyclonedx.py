@@ -264,7 +264,7 @@ _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versio
                     "fragmentation_default", "udp_setting", "udp_size", "included_by",
                     "listener", "library_defaults", "peer_verification",
                     "verification_setting", "dnssec_algorithm", "dnssec_mnemonic",
-                    "recipient_family", "hndl")
+                    "recipient_family", "hndl", "key_exchange")
 _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 
 
