@@ -343,6 +343,11 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         # stay in `baseline`, the path being this machine's.
         coverage_block["baseline"] = {k: result["baseline"][k] for k in
                                       ("meaning", "entries", "new", "baselined", "absent")}
+    # Row 157: a declaration joined to the files that import it, and the packages declared
+    # that the table does not know, named rather than left out.
+    files_read = result.get("files_read") or []
+    assets.join_imports(repo_path, files_read, result["evidence"]["dependencies"])
+    result["dependencies_not_in_table"] = _declared_not_known(repo_path, files_read)
     _library_default_key_exchange(result)
     _unowned(result)
     result["findings_fingerprint"] = findings_fingerprint(result)
@@ -356,6 +361,25 @@ LIBRARY_DEFAULT_KEY_EXCHANGE = (
     "No TLS group or curve is set in the files read: the key exchange is the TLS library's "
     "default, which depends on the library version that runs (OpenSSL 3.5 offers a hybrid "
     "first, earlier versions a classical group), and this scan does not resolve it.")
+
+
+def _declared_not_known(root: Path, files_read: list[str]) -> dict[str, Any]:
+    packages = []
+    for rel in files_read:
+        name = rel.rsplit("/", 1)[-1]
+        if name not in assets._REQUESTED_MANIFESTS:
+            continue
+        try:
+            lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        packages += [{"path": rel, "line": n, "package": p}
+                     for p, n in assets.declared_not_known(Path(rel), lines)]
+    return {"meaning": ("packages declared in requirements.txt, pyproject.toml, Pipfile or "
+                        "package.json that this scan's library table does not hold: whether "
+                        "they carry cryptography -- a provider's SDK doing TLS or signing "
+                        "inside -- is not determined"),
+            "count": len(packages), "packages": packages}
 
 
 def _unowned(result: dict[str, Any]) -> None:

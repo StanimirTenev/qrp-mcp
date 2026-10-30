@@ -1152,6 +1152,12 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   protocol asset with `policy_known: false` and "not determined" versions and groups; the
   listener is a TLS place, and the headline is `not_established` naming the policy. It claims
   no algorithm. Before, the listener dropped out: 0 findings, "read every one of the 1 files".
+- **A declaration says where it is imported** (row 157, Caleb Montour, Magpie Projects). A PyPI
+  or npm dependency row gets `imported_in` (the first ten `path:line`) and its description says
+  where; it stays `declared_dependency`, because an import does not say which algorithm a call
+  uses. `dependencies_not_in_table` lists the packages requirements.txt, pyproject.toml, Pipfile
+  or package.json declare that the library table does not hold: whether they carry cryptography
+  (a provider's SDK doing TLS inside) is not determined. Lockfiles are not listed there.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 

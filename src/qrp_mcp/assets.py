@@ -487,6 +487,85 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
     return findings
 
 
+# --- a declaration joined to the code that imports it (ZA-OPRAVYANE row 157) --------------
+#
+# Caleb Montour / Magpie: `paramiko` in requirements.txt read "declared, not observed" while
+# client.py called `paramiko.SSHClient().connect`. An import is not a call of any algorithm,
+# so the row stays a declaration; it says where the package is imported. The import names a
+# PyPI distribution gives itself where they differ from its name; npm imports by its name.
+_PY_IMPORT_NAMES = {"pycryptodome": "Crypto", "pycryptodomex": "Cryptodome",
+                    "pyopenssl": "OpenSSL", "pyjwt": "jwt", "python-jose": "jose",
+                    "pynacl": "nacl", "tink": "tink"}
+_PY_IMPORT = re.compile(r"^\s*(?:from\s+([A-Za-z_][\w]*)[\w.]*\s+import\b|"
+                        r"import\s+([A-Za-z_][\w.]*(?:\s*,\s*[A-Za-z_][\w.]*)*))")
+_JS_IMPORT = re.compile(r"""(?:\brequire\s*\(\s*|\bfrom\s+|^\s*import\s+)['"]((?:@[^/'"]+/)?[^/'"]+)""")
+_JS_SUFFIXES = (".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts")
+# Manifests that state what was asked for; a lockfile lists every transitive package, which
+# is not a list of what the project chose.
+_REQUESTED_MANIFESTS = {"requirements.txt", "pyproject.toml", "Pipfile", "package.json"}
+
+
+def _py_module(package: str) -> str:
+    return _PY_IMPORT_NAMES.get(package.lower(), package.lower().replace("-", "_"))
+
+
+def join_imports(root: Path, files_read: list[str], dependencies: list[dict[str, Any]]) -> None:
+    """Each pypi/npm dependency row gets `imported_in` (path:line, the first ten) where a file
+    read imports it, and its description says so. Nothing else on the row changes."""
+    wanted = {"pypi": {_py_module(d["package"]) for d in dependencies if d["ecosystem"] == "pypi"},
+              "npm": {d["package"] for d in dependencies if d["ecosystem"] == "npm"}}
+    if not wanted["pypi"] and not wanted["npm"]:
+        return
+    seen: dict[tuple[str, str], list[str]] = {}
+    for rel in files_read:
+        ecosystem = ("pypi" if rel.endswith(".py") else
+                     "npm" if rel.endswith(_JS_SUFFIXES) else None)
+        if ecosystem is None or not wanted[ecosystem]:
+            continue
+        try:
+            text = (root / rel).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for number, line in enumerate(text.splitlines(), 1):
+            if ecosystem == "pypi":
+                m = _PY_IMPORT.match(line)
+                names = ([m.group(1)] if m and m.group(1) else
+                         [n.strip().split(".")[0] for n in m.group(2).split(",")] if m else [])
+            else:
+                names = [m.group(1) for m in _JS_IMPORT.finditer(line)]
+            for name in names:
+                if name in wanted[ecosystem]:
+                    seen.setdefault((ecosystem, name), []).append(f"{rel}:{number}")
+    for d in dependencies:
+        key = (d["ecosystem"], _py_module(d["package"]) if d["ecosystem"] == "pypi"
+               else d["package"])
+        places = seen.get(key)
+        if not places:
+            continue
+        d["imported_in"] = places[:10]
+        d["imported_count"] = len(places)
+        d["description"] = (f"{d['package']} is declared in {d['path'].rsplit('/', 1)[-1]} and "
+                            f"imported in {places[0]}"
+                            f"{f' and {len(places) - 1} more places' if len(places) > 1 else ''}; "
+                            f"it implements {', '.join(d['families'])}. Which of them a call "
+                            f"uses is not read from the import.")
+
+
+def declared_not_known(path: Path, lines: list[str]) -> list[tuple[str, int]]:
+    """Packages a requesting manifest declares that the table does not hold: whether they
+    carry cryptography is not determined (row 157: a provider's SDK doing TLS inside)."""
+    if path.name not in _REQUESTED_MANIFESTS:
+        return []
+    ecosystem = _ecosystem_of(path)
+    table = DEPENDENCY_FAMILIES.get(ecosystem or "", {})
+    if path.name in {"pyproject.toml", "Pipfile"}:
+        named = [(p, n) for p, n, _ in _pep_requests(path.name, lines)]
+    else:
+        named = _names_from_manifest(ecosystem or "", path.name, lines)
+    return [(p, n) for p, n in named
+            if p not in table and p.lower() not in table and p.lower() != "python"]
+
+
 # --- secrets encrypted at rest (ZA-OPRAVYANE row 146) -----------------------
 #
 # A sops/age/OpenPGP file in the tree is ciphertext whose key was agreed with a recipient's
