@@ -348,6 +348,13 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     files_read = result.get("files_read") or []
     assets.join_imports(repo_path, files_read, result["evidence"]["dependencies"])
     result["dependencies_not_in_table"] = _declared_not_known(repo_path, files_read)
+    # Rows 156, 176: where the algorithm is chosen outside the files read.
+    places = scan_result.get("runtime_choices") or []
+    result["chosen_outside_files"] = {
+        "meaning": ("cryptographic settings whose value is read at run time -- from the "
+                    "environment, a CI variable or a secrets store: the algorithm is not in "
+                    "the files read, and no family is claimed for these lines"),
+        "count": len(places), "places": places}
     _library_default_key_exchange(result)
     _unowned(result)
     result["findings_fingerprint"] = findings_fingerprint(result)

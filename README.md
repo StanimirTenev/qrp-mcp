@@ -1158,6 +1158,13 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   uses. `dependencies_not_in_table` lists the packages requirements.txt, pyproject.toml, Pipfile
   or package.json declare that the library table does not hold: whether they carry cryptography
   (a provider's SDK doing TLS inside) is not determined. Lockfiles are not listed there.
+- **The size beside the algorithm, and a choice made outside the files** (rows 156, 176, Peter
+  van Walsem). `algorithm: RSA` with `key_size: 2048` in the same YAML block, or Terraform's
+  `algorithm = "RSA"` with `rsa_bits = 4096`, now gives the size. A cryptographic setting whose
+  value is read at run time -- `set_ciphers(os.environ[...])`, `JWT_ALGORITHM: ${{ vars.X }}`,
+  `$VAR` or `${VAR}` in a file -- is listed in `chosen_outside_files` with the setting and where
+  the value comes from (counted in the CBOM as `qrp:chosen_outside_files:count`); no family is
+  claimed for it, and what the environment holds is not read. Its quoted line follows `--level`.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 

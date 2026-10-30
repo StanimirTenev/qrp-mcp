@@ -298,6 +298,8 @@ def _evidence_lists(result: dict[str, Any]):
     suppressed, which are quoted the same way and so masked the same way."""
     yield from result.get("evidence", {}).values()
     yield from ((result.get("suppressed") or {}).get("evidence") or {}).values()
+    # The lines that read a setting at run time quote the line too (rows 156, 176).
+    yield (result.get("chosen_outside_files") or {}).get("places") or []
 
 
 def _strip_excerpts(result: dict[str, Any]) -> dict[str, Any]:

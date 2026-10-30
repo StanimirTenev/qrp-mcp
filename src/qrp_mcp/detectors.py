@@ -3563,6 +3563,33 @@ def scan_ci_file(path: Path, rel_path: str,
     return findings
 
 
+# A key size beside the algorithm in the same mapping or block (ZA-OPRAVYANE row 156):
+# `algorithm: RSA` / `key_size: 2048` in YAML, `algorithm = "RSA"` / `rsa_bits = 4096` in a
+# Terraform tls_private_key. Only lines indented exactly as the algorithm's, until the block
+# ends (a line indented less).
+_IAC_KEY_SIZE = re.compile(
+    r"""^\s*["']?(?:key_?size|key_?length|keySize|keyLength|rsa_bits|bits|size)["']?\s*[:=]\s*"""
+    r"""["']?(\d{3,5})["']?\s*,?\s*(?:#.*)?$""", re.IGNORECASE)
+
+
+def _iac_key_size(lines: list[str], index: int) -> int | None:
+    indent = len(lines[index]) - len(lines[index].lstrip())
+    for step in (1, -1):
+        j = index + step
+        while 0 <= j < len(lines):
+            text = lines[j]
+            if text.strip():
+                here = len(text) - len(text.lstrip())
+                if here < indent or text.strip() in ("}", "{"):
+                    break
+                if here == indent:
+                    m = _IAC_KEY_SIZE.match(text)
+                    if m:
+                        return int(m.group(1))
+            j += step
+    return None
+
+
 def scan_iac_file(path: Path, rel_path: str,
                   lines: list[str] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Returns (algorithm_findings, embedded_key_findings) for a Terraform/Kubernetes IaC file."""
@@ -3572,13 +3599,17 @@ def scan_iac_file(path: Path, rel_path: str,
     for line_no, line in enumerate(lines, start=1):
         for algorithm, description, pattern in IAC_ALGORITHM_PATTERNS:
             if pattern.search(line):
-                algorithm_findings.append({
+                item = {
                     "path": rel_path,
                     "line": line_no,
                     "algorithm": algorithm,
                     "description": description,
                     "excerpt": line.strip()[:200],
-                })
+                }
+                size = _iac_key_size(lines, line_no - 1)
+                if size is not None:
+                    item["key_size"] = size
+                algorithm_findings.append(item)
         if _is_embedded_key(lines, line_no - 1):
             embedded_key_findings.append({
                 "path": rel_path,
@@ -3587,6 +3618,41 @@ def scan_iac_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
             })
     return algorithm_findings, embedded_key_findings
+
+
+# A cryptographic setting whose value is read at run time (ZA-OPRAVYANE rows 156, 176): the
+# choice is in the environment or the CI system's settings, not in the files. Said, never
+# given a family. A line must name a cryptographic setting and read its value from the
+# environment: `set_ciphers(os.environ[...])`, `JWT_ALGORITHM: ${{ vars.X }}`, `ENV
+# TLS_CIPHERS=$CIPHERS`, `process.env.KEX`.
+_RUNTIME_REFERENCE = re.compile(
+    r"os\.environ|os\.getenv|\bgetenv\s*\(|process\.env\b|System\.getenv|"
+    r"Environment\.GetEnvironmentVariable|\$\{\{\s*(?:secrets|vars|env|inputs)\.|"
+    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?::-[^}]*)?\}|\$[A-Z][A-Z0-9_]{2,}\b")
+_RUNTIME_SETTING = re.compile(
+    r"cipher|curve|ecdh|\bkex|key_?exchange|kexalgorithms|tls_?groups?|ssl_?groups?|"
+    r"(?:sig(?:ning|nature)?|jwt|jws|hash|key|token)_?alg(?:orithm)?s?\b|\balgorithms?\b|"
+    r"key_?size|key_?length|rsa_?bits|tls_?(?:min|max)_?version|ssl_?protocols",
+    re.IGNORECASE)
+_RUNTIME_BYTES = (b"environ", b"getenv", b"process.env", b"System.getenv",
+                  b"GetEnvironmentVariable", b"${", b"$")
+
+
+def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for number, text in enumerate(lines, 1):
+        stripped = text.strip()
+        if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
+            continue
+        reference = _RUNTIME_REFERENCE.search(text)
+        if not reference:
+            continue
+        setting = _RUNTIME_SETTING.search(text[:reference.start()])
+        if not setting:
+            continue
+        out.append({"path": rel_path, "line": number, "setting": setting.group(0),
+                    "read_from": reference.group(0).strip(), "excerpt": stripped[:200]})
+    return out
 
 
 # Who owns a place, as the repository's CODEOWNERS says (ZA-OPRAVYANE row 94, Dhiraj S.,
@@ -3826,7 +3892,7 @@ _READING_LISTS = (
     "dependency_findings", "tls_group_findings", "static_rsa_findings", "hybrid_places",
     "hybrid_names", "pinned_images", "ssh_kex_findings", "weak_key_findings", "fips_findings",
     "pins", "property_reads", "skipped_files", "left_out", "files_read", "markers",
-    "excluded_by_config", "material_problems",)
+    "excluded_by_config", "material_problems", "runtime_choices",)
 _READING_COUNTS = ("files_scanned", "skipped_kinds", "present_kinds")
 _READING_MAPS = ("key_files", "file_digests", "codeowners")
 _READING_LIST_MAPS = ("property_values",)
@@ -3842,9 +3908,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      declarations, undecoded, content_parts, protocol_findings, dependency_findings,
      tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
      ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads, skipped_files,
-     left_out, files_read, markers, excluded_by_config, material_problems, files_scanned,
-     skipped_kinds, present_kinds, key_files, file_digests, codeowners, property_values) = (
-        r[name] for name in _READING)
+     left_out, files_read, markers, excluded_by_config, material_problems, runtime_choices_found,
+     files_scanned, skipped_kinds, present_kinds, key_files, file_digests, codeowners,
+     property_values) = (r[name] for name in _READING)
     # A walked file is not a link, so it can only resolve to an excluded path of its own
     # name: the name is asked first, and the path resolved only then (release 3c).
     if resolved_exclude and path.name in {p.name for p in resolved_exclude}:
@@ -3949,6 +4015,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             declarations.append(rel_path)
         return
     files_read.append(rel_path)
+    if any(b in raw for b in _RUNTIME_BYTES):
+        runtime_choices_found.extend(runtime_choices(rel_path, lines))
     if b"qrp:ignore" in raw:
         found, lines = suppression.read_markers(rel_path, lines)
         markers.extend(found)
@@ -4312,14 +4380,16 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     # `qrp:ignore` markers, read where the lines are; applied once the evidence is complete.
     markers: list[dict[str, Any]] = []
     excluded_by_config: list[str] = []
+    # Cryptographic settings whose value is read at run time (runtime_choices).
+    runtime_choices_found: list[dict[str, Any]] = []
     reading = dict(zip(_READING, (
         source_findings, ci_findings, iac_findings, embedded_key_findings, unreadable, reports,
         declarations, undecoded, content_parts, protocol_findings, dependency_findings,
         tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
         ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads,
         skipped_files, left_out, files_read, markers, excluded_by_config, material_problems,
-        files_scanned, skipped_kinds, present_kinds, key_files, file_digests, codeowners,
-        property_values)))
+        runtime_choices_found, files_scanned, skipped_kinds, present_kinds, key_files,
+        file_digests, codeowners, property_values)))
     reading["files_present"] = files_present
     _read_files(reading, list(iter_repo_files(repo_path, excluded_dir_counts, walk_problems)),
                 repo_path, resolved_exclude, config_excludes)
@@ -4425,6 +4495,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         "ssh_kex_findings": ssh_kex_findings,
         "weak_key_findings": weak_key_findings,
         "fips_provider_findings": fips_findings,
+        "runtime_choices": runtime_choices_found,
         # Files removed by EXCLUDED_DIRS before files_present counted anything,
         # by the directory name that removed them. Counted so the denominator
         # can state what it left out instead of leaving it in the source.

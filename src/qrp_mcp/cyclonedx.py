@@ -1275,7 +1275,14 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
               "value": scan_result["findings_fingerprint"]["sha256"]},
              {"name": f"{NS}findings_fingerprint:format",
               "value": scan_result["findings_fingerprint"]["format"]}]
-            if scan_result.get("findings_fingerprint") else []),
+            if scan_result.get("findings_fingerprint") else []) + (
+            # Where the algorithm is chosen outside the files read (rows 156, 176).
+            [{"name": f"{NS}chosen_outside_files:count",
+              "value": str(scan_result["chosen_outside_files"]["count"])},
+             {"name": f"{NS}chosen_outside_files:places",
+              "value": ", ".join(f"{p['path']}:{p['line']}"
+                                 for p in scan_result["chosen_outside_files"]["places"])}]
+            if scan_result.get("chosen_outside_files") else []),
     }
 
     # Signing commands found in CI are evidence of cryptography being used without
