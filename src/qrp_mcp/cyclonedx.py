@@ -459,24 +459,36 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
     file:line; where none names it (a protocol, a key block), of the rows there; the highest
     when several do."""
     at: dict[tuple[str, int], list[tuple[str, str]]] = {}
+    # How each occurrence was found (call, declaration, import, reference, default, or the
+    # basis of an asset): in the scan JSON and, until 0.38.0, not in the CBOM (row 149).
+    kinds_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
     for items in scan_result["evidence"].values():
         for item in items:
-            if isinstance(item, dict) and item.get("confidence") and "line" in item:
+            if isinstance(item, dict) and "line" in item:
                 name = baseline_mod.family(item)
-                at.setdefault((item["path"], item["line"]), []).append(
-                    (family_of.get(name, name), item["confidence"]))
+                kind = item.get("evidence_kind") or item.get("basis")
+                if kind:
+                    kinds_at.setdefault((item["path"], item["line"]), []).append(
+                        (family_of.get(name, name), str(kind)))
+                if item.get("confidence"):
+                    at.setdefault((item["path"], item["line"]), []).append(
+                        (family_of.get(name, name), item["confidence"]))
     for component in components:
         occurrences = component.get("evidence", {}).get("occurrences") or []
         if not occurrences:
             continue
-        levels = []
+        levels, kinds = [], []
+        own = (family_by_ref or {}).get(component["bom-ref"], component["name"])
         for o in occurrences:
             rows = at.get((o["location"], o.get("line")), [])
-            own = (family_by_ref or {}).get(component["bom-ref"], component["name"])
             mine = [lv for name, lv in rows if name == own] or [lv for _, lv in rows]
             levels.append(min(mine, key=confidence.LEVELS.index) if mine else "unknown")
+            said = kinds_at.get((o["location"], o.get("line")), [])
+            mine_kinds = sorted({k for name, k in said if name == own} or {k for _, k in said})
+            kinds.append("+".join(mine_kinds) or "not graded")
         component.setdefault("properties", []).append(
             {"name": f"{NS}confidence", "value": json.dumps(levels)})
+        component["properties"].append({"name": f"{NS}evidence_kind", "value": json.dumps(kinds)})
 
 
 def _scope(located: list[dict[str, Any]], family: str,

@@ -1180,6 +1180,10 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   `4*G` gave `EC-384` critical and `ECDSA-384` not weak, one key in two rows. Where the
   certificate's self-signature verifies, the signature's family is flagged too, saying it is the
   same key; a certificate signed by another key leaves the issuer's signature as it was.
+- **How each occurrence was found reaches the CBOM** (row 149). `qrp:evidence_kind` on a
+  component lists, per occurrence and in order, `call`, `declaration`, `import`, `reference`,
+  `default` or an asset's basis, as `qrp:confidence` lists the levels; a CycloneDX 1.6 occurrence
+  takes no properties of its own.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 
