@@ -562,6 +562,8 @@ _TLS_VERSION = re.compile(
 # these on the line, "TLSv1.2" in a sentence stays a sentence.
 _TLS_CONTEXT = re.compile(
     r"min_?version|max_?version|MinVersion|MaxVersion|ssl_protocols|"
+    # Python's ssl: `ctx.minimum_version = ssl.TLSVersion.TLSv1_3` (ZA-OPRAVYANE row 166).
+    r"(?:minimum|maximum)_version\s*=|TLSVersion\.|"
     r"enabled-protocols|SSLProtocol|set_ciphers|SslProtocols|protocol_version|"
     r"PROTOCOL_TLS|SSL_CTX_set_|supported_protocols|versions\s*[:=]|"
     r"ServerOptions|SSLContext|tls\.Config|rustls|sslVersion|"

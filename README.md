@@ -1130,6 +1130,8 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   pyproject.toml or a Pipfile); a range is not a version and gives none. The CBOM `library`
   component carries it as `version`, or `qrp:versions_pinned` with every pin where manifests
   disagree. Which default key exchange a library version brings is not resolved.
+- **Python's `ssl.TLSVersion`** (row 166): `ctx.minimum_version = ssl.TLSVersion.TLSv1_3` is a
+  protocol row and a TLS place, as pyOpenSSL's `set_min_proto_version` already was.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 
