@@ -343,8 +343,48 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         # stay in `baseline`, the path being this machine's.
         coverage_block["baseline"] = {k: result["baseline"][k] for k in
                                       ("meaning", "entries", "new", "baselined", "absent")}
+    _library_default_key_exchange(result)
     result["findings_fingerprint"] = findings_fingerprint(result)
     return result
+
+
+# ZA-OPRAVYANE rows 164 and 167 (Daniel Stokes): a TLS server that sets no group negotiates
+# whatever its library defaults to -- X25519 with OpenSSL 3.2, X25519MLKEM768 with 3.5 -- and
+# the scan said nothing, with the same `unknown` an empty directory gets.
+LIBRARY_DEFAULT_KEY_EXCHANGE = (
+    "No TLS group or curve is set in the files read: the key exchange is the TLS library's "
+    "default, which depends on the library version that runs (OpenSSL 3.5 offers a hybrid "
+    "first, earlier versions a classical group), and this scan does not resolve it.")
+
+
+def _library_default_key_exchange(result: dict[str, Any]) -> None:
+    tls = result.get("tls_termination")
+    if not tls or any(place.get("basis") == "configured_group"
+                      for place in tls.get("configured_in") or []):
+        return
+    tls["key_exchange"] = {
+        "configured": False,
+        "statement": LIBRARY_DEFAULT_KEY_EXCHANGE,
+        # The versions a manifest pins, which decide the default; named, not resolved.
+        "libraries_pinned": [{"package": d["package"], "version": d["version"],
+                              "path": d["path"], "line": d["line"]}
+                             for d in result["evidence"]["dependencies"] if d.get("version")],
+    }
+    for asset in result["evidence"]["protocols"]:
+        if asset.get("protocol") == "tls" and asset.get("tls_termination"):
+            said = list(asset.get("library_defaults") or [])
+            asset["library_defaults"] = said if "groups" in said else [*said, "groups"]
+    summary = result["summary"]
+    role = summary["by_role"]["key_establishment"]
+    if role["families"]:
+        return
+    role["pqc_readiness"] = "not_established"
+    if summary["pqc_readiness"] in ("unknown", *_REASSURING):
+        because = ("TLS is configured and no key exchange is set in the files read: the TLS "
+                   "library's default applies and is not resolved (tls_termination.key_exchange)")
+        summary["readiness_not_established"] = {
+            "would_read": summary["pqc_readiness"], "because": [because]}
+        summary["pqc_readiness"] = "not_established"
 
 
 # ZA-OPRAVYANE row 178 (Mark McGovern, 29.10.2026): two scans of one commit matched in every

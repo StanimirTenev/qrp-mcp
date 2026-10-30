@@ -1132,6 +1132,15 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   disagree. Which default key exchange a library version brings is not resolved.
 - **Python's `ssl.TLSVersion`** (row 166): `ctx.minimum_version = ssl.TLSVersion.TLSv1_3` is a
   protocol row and a TLS place, as pyOpenSSL's `set_min_proto_version` already was.
+- **A TLS default is said, not left blank** (rows 164, 167, Daniel Stokes). Where the tree
+  configures TLS and no file sets a group or curve, `tls_termination.key_exchange` says the
+  library's default applies and is not resolved, with the library versions the manifests pin;
+  each TLS protocol asset lists `groups` in `library_defaults` (in the CBOM,
+  `qrp:library_defaults`). Where no key-establishment family was found either, the headline is
+  `not_established` with that reason instead of `unknown`, which now means only that nothing was
+  found; `by_role.key_establishment` says `not_established` too. The default is not computed from
+  the version: OpenSSL 3.5 offers a hybrid first, earlier versions a classical group, and what a
+  deployed build does is not in the files.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 
