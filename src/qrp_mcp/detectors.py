@@ -3634,6 +3634,10 @@ _RUNTIME_SETTING = re.compile(
     r"(?:sig(?:ning|nature)?|jwt|jws|hash|key|token)_?alg(?:orithm)?s?\b|\balgorithms?\b|"
     r"key_?size|key_?length|rsa_?bits|tls_?(?:min|max)_?version|ssl_?protocols",
     re.IGNORECASE)
+_RUNTIME_ASSIGNMENT = re.compile(
+    r"(" + _RUNTIME_SETTING.pattern + r")[\w.-]*[\"']?\s*(?:[:=(,]|\s)\s*(?:get\(\s*)?[\"']?("
+    # The setting's name in any case; the reference as written (`$CIPHERS`, not `$cipher`).
+    + r"(?-i:" + _RUNTIME_REFERENCE.pattern + r"))", re.IGNORECASE)
 _RUNTIME_BYTES = (b"environ", b"getenv", b"process.env", b"System.getenv",
                   b"GetEnvironmentVariable", b"${", b"$")
 
@@ -3644,14 +3648,16 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         stripped = text.strip()
         if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
             continue
-        reference = _RUNTIME_REFERENCE.search(text)
-        if not reference:
+        if not _RUNTIME_REFERENCE.search(text):
             continue
-        setting = _RUNTIME_SETTING.search(text[:reference.start()])
-        if not setting:
+        # The reference must be the setting's value: right after it, past `=`, `:`, `(`, a
+        # comma or a space and an optional quote -- not merely on the same line.
+        found = _RUNTIME_ASSIGNMENT.search(text)
+        if not found:
             continue
-        out.append({"path": rel_path, "line": number, "setting": setting.group(0),
-                    "read_from": reference.group(0).strip(), "excerpt": stripped[:200]})
+        out.append({"path": rel_path, "line": number, "setting": found.group(1),
+                    "read_from": found.group(2).strip(), "excerpt": stripped[:200],
+                    "in_test_code": in_test_code(rel_path)})
     return out
 
 

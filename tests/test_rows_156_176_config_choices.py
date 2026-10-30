@@ -76,3 +76,10 @@ def test_the_quoted_line_follows_the_level(tmp_path):
         assert check(place.get("excerpt")), (level, place)
     masked = server.scan_repo(str(t))["chosen_outside_files"]["places"][0]["excerpt"]
     assert "TLS_CIPHERS" not in masked
+
+
+def test_a_variable_that_is_not_the_settings_value_is_not_a_choice(tmp_path):
+    r = scan_directory(_tree(tmp_path, {
+        "Makefile": "regress/unittests/kex/test_kex$(EXEEXT): ${UNITTESTS_TEST_KEX_OBJS}\n",
+        "speed.sh": "ciphers=`${SSH} -Q Ciphers`\necho \"Cipher is ${cipher}\"\n"}))
+    assert r["chosen_outside_files"]["count"] == 0
