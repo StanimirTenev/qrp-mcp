@@ -213,11 +213,14 @@ def test_cdk_legacy_is_named_without_algorithms(tmp_path):
     assert _families(result) == {}
 
 
-def test_an_unknown_policy_name_claims_nothing(tmp_path):
+def test_an_unknown_policy_name_claims_no_algorithm_and_is_named(tmp_path):
+    # Row 175: still no family claimed; the policy is named as not determined, not dropped.
     result = _tool(scan_repo)(str(_tree(tmp_path, {
         "main.tf": EXPLICIT.replace("2016-08", "2099-01")})))
     assert _families(result) == {}
-    assert _policies(result) == []
+    unknown = [p for p in result["evidence"]["protocols"] if p.get("policy")]
+    assert [(p["policy"], p["policy_known"]) for p in unknown] == [
+        ("ELBSecurityPolicy-2099-01", False)]
 
 
 def _git(root, *args):

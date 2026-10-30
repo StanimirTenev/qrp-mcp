@@ -3484,6 +3484,8 @@ def _policy_assets(line: str) -> list[dict[str, Any]]:
                     "basis": "configured_protocol", "description": said})
     for policy, _pos in aws_tls.scan(line):
         out.append(aws_tls.asset(policy))
+    for policy in aws_tls.unknown(line):
+        out.append(aws_tls.unknown_asset(policy))
     return out
 
 

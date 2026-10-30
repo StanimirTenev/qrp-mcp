@@ -432,7 +432,9 @@ evidence kind `default`. The console default is a PQ policy; that difference is 
 by Vladimir Mikhalev, whose probe — explicit `2016-08`, and no `ssl_policy` — gave 0 findings
 both ways until this release). Only a top-level `protocol` counts: the `redirect { protocol =
 "HTTPS" }` inside an HTTP listener does not make it an HTTPS listener, and `ssl_policy = var.x` is
-not absent. An unknown name, and CDK `LEGACY` (on neither AWS page), claim nothing.
+not absent. An unknown name, and CDK `LEGACY` (on neither AWS page), claim no algorithm; from
+0.38.0 an unknown `ELBSecurityPolicy-*` name set as a listener's policy is named as a TLS asset
+with `policy_known: false`, so the listener does not drop out.
 
 **IKEv2 fragmentation, where the configuration carries post-quantum.** An ML-DSA signature lands
 in IKE_AUTH, and draft-ietf-ipsecme-ikev2-pqc-auth makes RFC 7383 fragmentation a MUST for it;
@@ -1145,6 +1147,11 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   occurrence in a path no line covers carries `unowned_by: <that file>`, `codeowners.unowned`
   counts and lists them, and the CBOM occurrence reads `[owners: none per <file>]`. Owners are
   still the file's assumption, not a fact.
+- **An AWS TLS policy the table does not hold is named** (row 175, Tokunbo Taiwo). An
+  `ELBSecurityPolicy-*` name set as `ssl_policy`/`SslPolicy` that is not in the table is a TLS
+  protocol asset with `policy_known: false` and "not determined" versions and groups; the
+  listener is a TLS place, and the headline is `not_established` naming the policy. It claims
+  no algorithm. Before, the listener dropped out: 0 findings, "read every one of the 1 files".
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 

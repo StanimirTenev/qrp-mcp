@@ -386,8 +386,18 @@ KEY_EXCHANGE_NOT_SET = "library default, not resolved: no group is set in the fi
 
 def _library_default_key_exchange(result: dict[str, Any]) -> None:
     tls = result.get("tls_termination")
-    if not tls or any(place.get("basis") == "configured_group"
-                      for place in tls.get("configured_in") or []):
+    if not tls:
+        return
+    # Row 175: a vendor policy this scan has no table for leaves its listener undetermined.
+    unknown = sorted({f"AWS TLS policy {a['policy']} at {a['path']}:{a['line']} is not in this "
+                      f"scan's table; what it negotiates is not determined"
+                      for a in result["evidence"]["protocols"] if a.get("policy_known") is False})
+    if unknown:
+        _not_established(result["summary"], unknown)
+    unpoliced = [a for a in result["evidence"]["protocols"]
+                 if a.get("protocol") == "tls" and a.get("tls_termination") and not a.get("policy")]
+    if any(place.get("basis") == "configured_group"
+           for place in tls.get("configured_in") or []) or (unknown and not unpoliced):
         return
     tls["key_exchange"] = {
         "configured": False,
@@ -399,19 +409,30 @@ def _library_default_key_exchange(result: dict[str, Any]) -> None:
     }
     # On each TLS place, so the CBOM's protocol component carries it. Read from the rest of
     # the tree, not the line: closure and the baseline leave it out of an occurrence's identity.
+    # A named vendor policy (AWS) decides its listener's groups: not a library default.
     for asset in result["evidence"]["protocols"]:
-        if asset.get("protocol") == "tls" and asset.get("tls_termination"):
+        if (asset.get("protocol") == "tls" and asset.get("tls_termination")
+                and not asset.get("policy")):
             asset["key_exchange"] = KEY_EXCHANGE_NOT_SET
     summary = result["summary"]
     role = summary["by_role"]["key_establishment"]
     if role["families"]:
         return
     role["pqc_readiness"] = "not_established"
-    if summary["pqc_readiness"] in ("unknown", *_REASSURING):
-        because = ("TLS is configured and no key exchange is set in the files read: the TLS "
-                   "library's default applies and is not resolved (tls_termination.key_exchange)")
+    _not_established(summary, [
+        "TLS is configured and no key exchange is set in the files read: the TLS library's "
+        "default applies and is not resolved (tls_termination.key_exchange)"])
+
+
+def _not_established(summary: dict[str, Any], because: list[str]) -> None:
+    """The headline withheld for these reasons, where it would say nothing classical or nothing
+    at all; added to the reasons where it is already withheld."""
+    if summary["pqc_readiness"] == "not_established" and summary["readiness_not_established"]:
+        said = summary["readiness_not_established"]["because"]
+        said.extend(b for b in because if b not in said)
+    elif summary["pqc_readiness"] in ("unknown", *_REASSURING):
         summary["readiness_not_established"] = {
-            "would_read": summary["pqc_readiness"], "because": [because]}
+            "would_read": summary["pqc_readiness"], "because": list(because)}
         summary["pqc_readiness"] = "not_established"
 
 

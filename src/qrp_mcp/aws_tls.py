@@ -131,6 +131,29 @@ def scan(line: str) -> list[tuple[str, int]]:
     return out
 
 
+# ZA-OPRAVYANE row 175 (Tokunbo Taiwo): a name the table does not hold, on the line that sets
+# a listener's policy, dropped the listener out of the result. It claims no algorithm still;
+# it is named as a TLS policy whose versions and groups this scan does not determine.
+_POLICY_SETTING = re.compile(r"""(?:\bssl_policy\s*=|\bSslPolicy["']?\s*:)""")
+
+
+def unknown(line: str) -> list[str]:
+    """ELBSecurityPolicy-* names set as a policy on this line that the table does not hold."""
+    if "ELBSecurityPolicy-" not in line or not _POLICY_SETTING.search(line):
+        return []
+    return [m.group(1) for m in _LITERAL.finditer(line) if m.group(1) not in POLICIES]
+
+
+def unknown_asset(policy: str) -> dict[str, Any]:
+    return {
+        "protocol": "tls", "version": None, "policy": policy, "policy_known": False,
+        "deprecated": None, "basis": "configured_protocol",
+        "description": (f"AWS ELB TLS policy {policy} is not in this scan's table of AWS "
+                        f"policies: the TLS versions and key-exchange groups it allows are not "
+                        f"determined. AWS's own list of security policies says what it allows."),
+    }
+
+
 def families(policy: str) -> list[str]:
     _versions, pq, rsa = POLICIES[policy]
     return ["ECDH"] + (["ML-KEM"] if pq else []) + (["RSA"] if rsa else [])
