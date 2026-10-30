@@ -691,9 +691,22 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
     # so the finding, weak_count and the severity say what evidence.weak_keys says
     # (ZA-OPRAVYANE row 51: 4*G on P-384 beside an EC finding with weak_key false).
     recoverable: dict[str, list[str]] = {}
+    weak_places: dict[tuple[str, int], str] = {}
     for weak in scan_result.get("weak_key_findings") or []:
-        recoverable.setdefault(weak["algorithm"], []).append(
-            f"{weak['path']}:{weak['line']} ({weak['scalar']}*G on {weak['curve']})")
+        said = f"{weak['path']}:{weak['line']} ({weak['scalar']}*G on {weak['curve']})"
+        recoverable.setdefault(weak["algorithm"], []).append(said)
+        weak_places[(weak["path"], weak["line"])] = said
+    # ZA-OPRAVYANE row 155: a self-signed certificate whose signature verifies is signed by
+    # the same key, so the signature's family is recoverable too. An issuer's signature is
+    # another key and stays as it is.
+    for item in scan_result.get("source_code_findings") or []:
+        cert = item.get("certificate") or {}
+        said = weak_places.get((item.get("path"), item.get("line")))
+        if (said and cert.get("self_signature_verified")
+                and item.get("algorithm") in cert.get("signature_algorithm", {}).get("families", [])
+                and item.get("algorithm") not in recoverable):
+            recoverable[item["algorithm"]] = [f"{said}, the same key that signs this "
+                                              f"self-signed certificate"]
     for f in findings:
         if f.raw_value in detected_by_name and detected_by_name[f.raw_value] in recoverable:
             f.weak_key = True

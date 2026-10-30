@@ -1176,6 +1176,10 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   post-quantum group alone, reported ECDH because the directive is called `ecdh_curve`, and read
   `hybrid_partial`. On a group setting whose values name no classical elliptic-curve group, ECDH
   is not reported; `secp384r1` and `X25519MLKEM768` keep it.
+- **A recoverable key flags its own signature** (row 155). A self-signed certificate whose key is
+  `4*G` gave `EC-384` critical and `ECDSA-384` not weak, one key in two rows. Where the
+  certificate's self-signature verifies, the signature's family is flagged too, saying it is the
+  same key; a certificate signed by another key leaves the issuer's signature as it was.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 
