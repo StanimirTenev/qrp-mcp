@@ -409,6 +409,9 @@ _PY_PIN = re.compile(
 _GO_PIN = re.compile(r"^\s*(?:require\s+)?([a-z0-9][\w./-]*\.[a-z]{2,}/[\w./-]+)\s+(v[\w.+-]+)")
 
 
+_EXACT_REQUEST = re.compile(r"^===?\s*([A-Za-z0-9][A-Za-z0-9.+!_-]*)\s*$")
+
+
 def pinned_versions(path: Path, lines: list[str]) -> list[tuple[str, str, str, int]]:
     """(ecosystem, package, version, line) for each package pinned to one version."""
     if path.name == "requirements.txt":
@@ -451,6 +454,10 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
     else:
         named = [(package, number, None) for package, number
                  in _names_from_manifest(ecosystem, path.name, lines)]
+    # The one version a manifest pins (ZA-OPRAVYANE row 165): requirements.txt and go.mod by
+    # pinned_versions, and a pyproject/Pipfile request that is a single `==` (below).
+    pinned = {(package.lower(), number): version
+              for _, package, version, number in pinned_versions(path, lines)}
     for package, number, requested in named:
         families = table.get(package)
         if families is None and ecosystem == "pypi":
@@ -472,6 +479,10 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
         # What the manifest asks for, as written: `>=47.0.0` is a request, not a version.
         if requested:
             item["requested"] = requested
+        exact = _EXACT_REQUEST.match(requested or "")
+        version = pinned.get((package.lower(), number)) or (exact.group(1) if exact else None)
+        if version:
+            item["version"] = version
         findings.append(item)
     return findings
 

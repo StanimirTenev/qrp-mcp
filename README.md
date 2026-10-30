@@ -1125,6 +1125,11 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
 - **A fingerprint of the findings beside the file's digest** (row 178, from Mark McGovern's
   reply): see *Without an agent*. Two scans of one commit now print the same `findings sha256`
   and, as before, different file digests.
+- **The pinned version travels** (row 165, Daniel Stokes). A dependency row has `version` where
+  the manifest pins one (`cryptography==45.0.4` in requirements.txt or go.mod, a single `==` in
+  pyproject.toml or a Pipfile); a range is not a version and gives none. The CBOM `library`
+  component carries it as `version`, or `qrp:versions_pinned` with every pin where manifests
+  disagree. Which default key exchange a library version brings is not resolved.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 

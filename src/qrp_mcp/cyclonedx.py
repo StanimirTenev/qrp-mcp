@@ -1172,14 +1172,20 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             for family in dependency["families"]:
                 if family not in families:
                     families.append(family)
+        # The pinned version (row 165): the component's own field where every manifest that
+        # pins it agrees; where they disagree, each one is named instead of one chosen.
+        versions = sorted({d["version"] for d in group if d.get("version")})
         components.append({
             "type": "library",
             "bom-ref": _ref("dependency", f"{ecosystem}:{package}"),
             "name": package,
+            **({"version": versions[0]} if len(versions) == 1 else {}),
             "properties": [
                 {"name": f"{NS}basis", "value": "declared_dependency"},
                 {"name": f"{NS}ecosystem", "value": ecosystem},
                 {"name": f"{NS}implements", "value": ", ".join(families)},
+                *([{"name": f"{NS}versions_pinned", "value": ", ".join(versions)}]
+                  if len(versions) > 1 else []),
             ],
             "evidence": {"occurrences": [
                 {"location": dependency["path"], "line": dependency["line"],
