@@ -542,6 +542,9 @@ def _context(item: dict[str, Any]) -> str:
     # that said it, because it is the file's assumption and not a fact.
     if item.get("owners"):
         tags.append(f"[owners: {' '.join(item['owners'])} per {item['owners_source']}]")
+    elif item.get("unowned_by"):
+        # Row 174: said, so an occurrence nobody owns is not mistaken for one never checked.
+        tags.append(f"[owners: none per {item['unowned_by']}]")
     return f"{''.join(tags)} {text}" if tags else text
 
 

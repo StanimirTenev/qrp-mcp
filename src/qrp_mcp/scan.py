@@ -344,6 +344,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         coverage_block["baseline"] = {k: result["baseline"][k] for k in
                                       ("meaning", "entries", "new", "baselined", "absent")}
     _library_default_key_exchange(result)
+    _unowned(result)
     result["findings_fingerprint"] = findings_fingerprint(result)
     return result
 
@@ -355,6 +356,29 @@ LIBRARY_DEFAULT_KEY_EXCHANGE = (
     "No TLS group or curve is set in the files read: the key exchange is the TLS library's "
     "default, which depends on the library version that runs (OpenSSL 3.5 offers a hybrid "
     "first, earlier versions a classical group), and this scan does not resolve it.")
+
+
+def _unowned(result: dict[str, Any]) -> None:
+    """ZA-OPRAVYANE row 174 (Michael Wegger): with a CODEOWNERS file, an occurrence in a path
+    no line covers had no owner and nothing said so. Each is marked with the file that does
+    not cover it and counted; a comment is not an occurrence and is neither."""
+    block = result.get("codeowners")
+    if not block:
+        return
+    paths: set[str] = set()
+    count = 0
+    for items in result["evidence"].values():
+        for item in items:
+            if (not isinstance(item, dict) or not isinstance(item.get("path"), str)
+                    or item.get("owners") or item.get("evidence_kind") == "comment"):
+                continue
+            item["unowned_by"] = block["path"]
+            paths.add(item["path"])
+            count += 1
+    block["unowned"] = {
+        "count": count, "paths": sorted(paths),
+        "meaning": f"occurrences in paths no line of {block['path']} gives an owner: detected, "
+                   f"and nobody named for them"}
 
 
 KEY_EXCHANGE_NOT_SET = "library default, not resolved: no group is set in the files read"

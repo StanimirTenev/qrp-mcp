@@ -1141,6 +1141,10 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   found; `by_role.key_establishment` says `not_established` too. The default is not computed from
   the version: OpenSSL 3.5 offers a hybrid first, earlier versions a classical group, and what a
   deployed build does is not in the files.
+- **An occurrence nobody owns is said** (row 174, Michael Wegger). With a CODEOWNERS file, each
+  occurrence in a path no line covers carries `unowned_by: <that file>`, `codeowners.unowned`
+  counts and lists them, and the CBOM occurrence reads `[owners: none per <file>]`. Owners are
+  still the file's assumption, not a fact.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 
