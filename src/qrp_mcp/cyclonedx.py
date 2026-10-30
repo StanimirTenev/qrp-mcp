@@ -1204,7 +1204,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             ],
             "evidence": {"occurrences": [
                 {"location": dependency["path"], "line": dependency["line"],
-                 "additionalContext": dependency["description"]}
+                 # Where it is imported (row 157), said beside the manifest's statement.
+                 "additionalContext": dependency["description"] + (
+                     f" [{dependency['imported']}]" if dependency.get("imported") else "")}
                 for dependency in group
             ]},
         })

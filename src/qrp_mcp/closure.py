@@ -50,7 +50,7 @@ _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signi
                    # owner's suppression -- is not the line.
                    "baseline_state", "mandates", "hndl_exposed", "suppression",
                    # Said from the rest of the tree, not the line (rows 164, 174).
-                   "key_exchange", "unowned_by")
+                   "key_exchange", "unowned_by", "imported_in", "imported_count", "imported")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

@@ -542,13 +542,14 @@ def join_imports(root: Path, files_read: list[str], dependencies: list[dict[str,
         places = seen.get(key)
         if not places:
             continue
+        # Read from other files, so beside the row and outside its identity (closure,
+        # baseline): `description` keeps the manifest's own statement.
         d["imported_in"] = places[:10]
         d["imported_count"] = len(places)
-        d["description"] = (f"{d['package']} is declared in {d['path'].rsplit('/', 1)[-1]} and "
-                            f"imported in {places[0]}"
-                            f"{f' and {len(places) - 1} more places' if len(places) > 1 else ''}; "
-                            f"it implements {', '.join(d['families'])}. Which of them a call "
-                            f"uses is not read from the import.")
+        d["imported"] = (f"imported in {places[0]}"
+                         f"{f' and {len(places) - 1} more places' if len(places) > 1 else ''}: "
+                         f"declared and imported, not only declared; which algorithm a call uses "
+                         f"is not read from the import")
 
 
 def declared_not_known(path: Path, lines: list[str]) -> list[tuple[str, int]]:

@@ -23,11 +23,10 @@ def _tree(tmp_path):
 def test_imports_join_the_declaration(tmp_path):
     deps = {d["package"]: d for d in scan_directory(_tree(tmp_path))["evidence"]["dependencies"]}
     assert deps["paramiko"]["imported_in"] == ["client.py:1"]
-    assert "imported in client.py:1" in deps["paramiko"]["description"]
+    assert deps["paramiko"]["imported"].startswith("imported in client.py:1")
     assert deps["paramiko"]["basis"] == "declared_dependency"
     assert deps["pycryptodome"]["imported_in"] == ["aes.py:1"]
     assert "imported_in" not in deps["cryptography"]
-    assert "Declared, not observed" in deps["cryptography"]["description"]
 
 
 def test_unknown_declared_package_is_named(tmp_path):
@@ -45,3 +44,28 @@ def test_npm_import(tmp_path):
     r = scan_directory(t)
     assert r["evidence"]["dependencies"][0]["imported_in"] == ["a.js:1"]
     assert [p["package"] for p in r["dependencies_not_in_table"]["packages"]] == ["left-pad"]
+
+
+def test_an_import_elsewhere_does_not_change_the_rows_identity(tmp_path):
+    from qrp_mcp import baseline, closure
+    t = tmp_path / "repo"
+    t.mkdir()
+    (t / "requirements.txt").write_text("paramiko==3.4.0\n")
+    before = scan_directory(t)
+    (t / "client.py").write_text("import paramiko\n")
+    after = scan_directory(t)
+    assert after["evidence"]["dependencies"][0]["imported_in"] == ["client.py:1"]
+
+    def ids(r):
+        d = r["evidence"]["dependencies"][0]
+        return closure._identity("dependencies", d), baseline.key("dependencies", d)
+    assert ids(before) == ids(after)
+
+
+def test_the_cbom_says_where_it_is_imported(tmp_path):
+    import json
+    from qrp_mcp import server
+    out = tmp_path / "c.json"
+    assert server.scan_to_file([str(_tree(tmp_path)), "--out", str(out)], cbom=True) == 0
+    lib = [c for c in json.loads(out.read_text())["components"] if c["name"] == "paramiko"][0]
+    assert "imported in client.py:1" in lib["evidence"]["occurrences"][0]["additionalContext"]

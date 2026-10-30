@@ -1153,9 +1153,10 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   listener is a TLS place, and the headline is `not_established` naming the policy. It claims
   no algorithm. Before, the listener dropped out: 0 findings, "read every one of the 1 files".
 - **A declaration says where it is imported** (row 157, Caleb Montour, Magpie Projects). A PyPI
-  or npm dependency row gets `imported_in` (the first ten `path:line`) and its description says
-  where; it stays `declared_dependency`, because an import does not say which algorithm a call
-  uses. `dependencies_not_in_table` lists the packages requirements.txt, pyproject.toml, Pipfile
+  or npm dependency row gets `imported_in` (the first ten `path:line`), `imported_count` and
+  `imported`, a sentence the CBOM occurrence carries too; it stays `declared_dependency`, because
+  an import does not say which algorithm a call uses. These are read from other files, so they are
+  not part of the row's identity in `closure` or a baseline. `dependencies_not_in_table` lists the packages requirements.txt, pyproject.toml, Pipfile
   or package.json declare that the library table does not hold: whether they carry cryptography
   (a provider's SDK doing TLS inside) is not determined. Lockfiles are not listed there.
 - **The size beside the algorithm, and a choice made outside the files** (rows 156, 176, Peter
