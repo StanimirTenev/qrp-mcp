@@ -29,3 +29,12 @@ def test_a_classical_value_still_gives_ecdh(tmp_path):
 def test_a_hybrid_keeps_its_classical_half(tmp_path):
     fams = _families(_scan(tmp_path, "X25519MLKEM768"))
     assert {"X25519", "ML-KEM"} <= fams
+
+
+def test_a_table_naming_the_directive_keeps_its_row(tmp_path):
+    # Corpus regression, 30.10.2026: nginxinc/crossplane analyzer.py lists nginx directives.
+    t = tmp_path / "repo"
+    t.mkdir()
+    (t / "analyzer.py").write_text("DIRECTIVES = {\n    'ssl_ecdh_curve': [\n        NGX_CONF,\n    ],\n}\n")
+    r = scan_directory(t)
+    assert "ECDH" in {e["algorithm"] for e in r["evidence"]["source_code"] if e["line"] == 2}

@@ -2750,6 +2750,9 @@ _CLASSICAL_EC_VALUE = re.compile(r"x25519|x448|secp|sect|p-?256|p-?384|p-?521|pr
                                  r"curvep|curvesm2", re.IGNORECASE)
 
 
+_PQ_GROUP_VALUE = re.compile(r"mlkem|ml-kem|kyber|frodo|hqc|bike|mceliece", re.IGNORECASE)
+
+
 def _drop_ecdh_named_only_by_the_setting(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """ZA-OPRAVYANE row 172(a): `ssl_ecdh_curve MLKEM768` named ECDH by the directive alone.
     On a group setting whose values name no classical EC group, the ECDH rows go. A line
@@ -2759,7 +2762,12 @@ def _drop_ecdh_named_only_by_the_setting(findings: list[dict[str, Any]]) -> list
         if f.get("algorithm") != "ECDH" or len(excerpt) >= 200:
             return False
         setting = _group_setting(excerpt)
-        return bool(setting) and not _CLASSICAL_EC_VALUE.search(excerpt[setting.end():])
+        if not setting:
+            return False
+        values = excerpt[setting.end():]
+        # Only where the values are there and are post-quantum: a table that names the
+        # directive (crossplane's `'ssl_ecdh_curve': [`) has no values and keeps its row.
+        return bool(_PQ_GROUP_VALUE.search(values)) and not _CLASSICAL_EC_VALUE.search(values)
     return [f for f in findings if not named_only_by_setting(f)]
 
 
