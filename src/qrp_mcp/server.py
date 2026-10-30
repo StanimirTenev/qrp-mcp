@@ -482,11 +482,12 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
     if wanted:
         failed = mandates.apply(result, wanted, a.as_of or date.today(), lead)
     result = _at_level(result, level)
+    fingerprint = (result.get("findings_fingerprint") or {}).get("sha256")
     if cbom:
         result = cyclonedx.build(result)
     elif a.format == "sarif":
         result = sarif.build(result, keys)
-    code = _write(result, out_path, level)
+    code = _write(result, out_path, level, fingerprint)
     if failed:
         print("qrp-mcp: a mandate deadline has passed or falls within --lead-months; "
               "see mandates.*.gate", file=sys.stderr)
@@ -494,7 +495,8 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
     return code
 
 
-def _write(result: dict[str, Any], out_path: Path | None, label: str) -> int:
+def _write(result: dict[str, Any], out_path: Path | None, label: str,
+           fingerprint: str | None = None) -> int:
     # json.dumps(result, indent=2, ensure_ascii=False), byte for byte (jsonout).
     data = (jsonout.dumps(result) + "\n").encode()
     if out_path is not None:
@@ -508,6 +510,10 @@ def _write(result: dict[str, Any], out_path: Path | None, label: str) -> int:
         sys.stdout.buffer.write(data)
     # The digest of the exact bytes written: what a recipient will quote back.
     print(f"sha256 {hashlib.sha256(data).hexdigest()}", file=sys.stderr)
+    # Beside it, the findings alone (row 178): equal on two runs that found the same.
+    if fingerprint:
+        print(f"findings sha256 {fingerprint} (the same on every run that finds the same; "
+              f"rules in findings_fingerprint)", file=sys.stderr)
     return 0
 
 

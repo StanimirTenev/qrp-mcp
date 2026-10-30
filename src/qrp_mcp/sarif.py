@@ -138,6 +138,8 @@ def build(result: dict[str, Any], keys: dict[int, str]) -> dict[str, Any]:
             **({"baseline": {k: result["baseline"][k] for k in ("new", "baselined", "absent")}}
                if result.get("baseline") else {}),
             **({"mandates": result["mandates"]} if result.get("mandates") else {}),
+            **({"findings_fingerprint": result["findings_fingerprint"]}
+               if result.get("findings_fingerprint") else {}),
         },
     }
     return {"$schema": SCHEMA, "version": "2.1.0", "runs": [run]}

@@ -343,7 +343,53 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         # stay in `baseline`, the path being this machine's.
         coverage_block["baseline"] = {k: result["baseline"][k] for k in
                                       ("meaning", "entries", "new", "baselined", "absent")}
+    result["findings_fingerprint"] = findings_fingerprint(result)
     return result
+
+
+# ZA-OPRAVYANE row 178 (Mark McGovern, 29.10.2026): two scans of one commit matched in every
+# field but the read window, yet the printed SHA-256 differed, because it is the digest of the
+# whole file, times included. That digest stays -- it is the file's integrity. Beside it, a
+# fingerprint of the findings alone, normalised by these rules, says whether two runs reached
+# the same result.
+FINGERPRINT_FORMAT = "qrp-mcp findings fingerprint 1"
+FINGERPRINT_RULES = (
+    "each finding as [algorithm_family, raw_value, classification, severity]",
+    "each evidence occurrence as [category, path, line, family, role, key_size]; family is "
+    "algorithm, else family, type, protocol, command_type or package; an absent field is null",
+    "left out: the read window (start, end, duration), excerpts (they differ by --level), "
+    "confidence, owners, baseline state, mandate clauses, suppressed rows, coverage, the "
+    "target's absolute path and the tool's version",
+    "both lists sorted; serialised as JSON with sorted keys, separators ',' and ':', UTF-8, "
+    "no ASCII escaping; SHA-256 of those bytes, in hex",
+)
+
+
+def findings_fingerprint(result: dict[str, Any]) -> dict[str, Any]:
+    """The SHA-256 of the normalised findings (FINGERPRINT_RULES), with the rules beside it."""
+    import hashlib
+    import json
+
+    def family(item: dict[str, Any]) -> Any:
+        for key in ("algorithm", "family", "type", "protocol", "command_type", "package"):
+            if item.get(key):
+                return item[key]
+        return None
+
+    findings = sorted([f.get("algorithm_family"), f.get("raw_value"), f.get("classification"),
+                       f.get("severity")] for f in result["findings"])
+    occurrences = sorted(
+        [category, item.get("path"), item.get("line"), family(item), item.get("role"),
+         item.get("key_size")]
+        for category, items in result["evidence"].items() for item in items
+        if isinstance(item, dict))
+    material = json.dumps({"findings": findings, "evidence": occurrences}, sort_keys=True,
+                          separators=(",", ":"), ensure_ascii=False, default=str)
+    return {"sha256": hashlib.sha256(material.encode("utf-8", "surrogatepass")).hexdigest(),
+            "format": FINGERPRINT_FORMAT, "rules": list(FINGERPRINT_RULES),
+            "meaning": ("the same findings give the same fingerprint on every run and at every "
+                        "--level; the sha256 printed for the file is its integrity, which the "
+                        "read times change")}
 
 
 def _cited_digests(scan_result: dict[str, Any]) -> dict[str, str]:

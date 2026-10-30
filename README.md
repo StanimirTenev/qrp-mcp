@@ -93,6 +93,17 @@ line but the algorithm name, and `--level trimmed` removes the line altogether; 
 file and line number. The SHA-256 of the written bytes is printed,
 so anyone you send the file to can quote back exactly what they received.
 
+That digest is the file's integrity, and the file holds its read times, so two runs over one
+commit print different ones. Beside it, `findings sha256` is the fingerprint of the findings
+alone (`findings_fingerprint` in the JSON, in SARIF's run properties and in the CBOM as
+`qrp:findings_fingerprint:sha256`): the same on every run and at every `--level` that finds the
+same, different when a finding is added or removed. Its normalisation rules are written into the
+output beside it: each finding as family, raw value, classification and severity; each
+occurrence as category, path, line, family, role and key size; excerpts, confidence, owners,
+baseline state, mandate clauses, suppressed rows, coverage and the read window left out; both
+lists sorted, serialised as compact JSON with sorted keys, SHA-256 in hex. It says the result
+repeats; it says nothing about whether the result is complete.
+
 ```
 uvx qrp-mcp cbom ~/code/my-protocol --out cbom.json
 uvx qrp-mcp closure before.json after.json --out closure.json
@@ -1111,6 +1122,9 @@ the inside of a certificate (a PEM file is reported, not what signed it) and TPM
   (`X25519MLKEM768:X25519`) keeps its dates. The block names the date the gate counts
   (`gate_counts`, `next_gate_deadline`) beside `next_deadline`, the earliest date of any clause.
   The gate itself still counts the disallowance, as before.
+- **A fingerprint of the findings beside the file's digest** (row 178, from Mark McGovern's
+  reply): see *Without an agent*. Two scans of one commit now print the same `findings sha256`
+  and, as before, different file digests.
 
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 

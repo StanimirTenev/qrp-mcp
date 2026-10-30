@@ -1260,7 +1260,13 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         "properties": [
             {"name": f"{NS}coverage:{name}", "value": value}
             for name, value in _flatten({**coverage, "window": WINDOW_NOT_CARRIED})
-        ] + [{"name": f"{NS}timestamp_basis", "value": timestamp_basis}],
+        ] + [{"name": f"{NS}timestamp_basis", "value": timestamp_basis}] + (
+            # The fingerprint of the normalised findings (row 178), as the scan result has it.
+            [{"name": f"{NS}findings_fingerprint:sha256",
+              "value": scan_result["findings_fingerprint"]["sha256"]},
+             {"name": f"{NS}findings_fingerprint:format",
+              "value": scan_result["findings_fingerprint"]["format"]}]
+            if scan_result.get("findings_fingerprint") else []),
     }
 
     # Signing commands found in CI are evidence of cryptography being used without
