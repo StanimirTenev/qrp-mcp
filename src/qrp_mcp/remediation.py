@@ -22,11 +22,11 @@ SOURCES = {
     "FIPS 204": ("ML-DSA, final, 13 August 2024", "https://csrc.nist.gov/pubs/fips/204/final"),
     "FIPS 205": ("SLH-DSA, final, 13 August 2024", "https://csrc.nist.gov/pubs/fips/205/final"),
     "SP 800-208": ("LMS/HSS and XMSS/XMSS^MT, final", "https://csrc.nist.gov/pubs/sp/800/208/final"),
-    "NIST IR 8547": ("Transition to PQC Standards, initial public DRAFT, 12 November 2024: "
-                     "quantum-vulnerable signatures and key establishment deprecated after 2030 "
-                     "at 112-bit strength, disallowed after 2035 (Tables 2 and 4); hybrids "
+    "NIST IR 8547": ("Transition to PQC Standards, final, October 2026: every "
+                     "quantum-vulnerable signature and key-establishment scheme deprecated "
+                     "after 2030 and disallowed after 2035 (Tables 2 and 4); hybrids "
                      "accommodated as a temporary measure (Sec. 3.2)",
-                     "https://csrc.nist.gov/pubs/ir/8547/ipd"),
+                     "https://doi.org/10.6028/NIST.IR.8547"),
     "SP 800-131A r2": ("Transitioning the Use of Cryptographic Algorithms and Key Lengths, "
                        "final: RSA len(n) < 2048 disallowed for signature generation; three-key "
                        "TDEA encryption disallowed after 2023; SHA-1 disallowed for signature "

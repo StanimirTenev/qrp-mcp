@@ -260,27 +260,32 @@ PROFILES: dict[str, dict[str, Any]] = {
 
 
 # `--mandate nist-ir-8547` (mandates.py). The `nist` profile has no entry above -- it is the
-# default in remediation -- so its dated document is here. NIST IR 8547 ipd, "Transition to
-# Post-Quantum Cryptography Standards", Initial Public Draft, November 2024: section 4.1.1
-# Table 2 (quantum-vulnerable digital signatures) and section 4.1.2 Table 4 (quantum-vulnerable
-# key establishment). Every row reads the same: at 112 bits of security strength "Deprecated
-# after 2030 / Disallowed after 2035"; at "≥ 128 bits of security strength" "Disallowed after
-# 2035". EdDSA has only the >= 128-bit row. Lines 508-511 (section 4.1.2): "in order to
-# mitigate the risk of 'harvest now, decrypt later' attacks on network communications,
-# application-specific guidance ... may require or recommend migration to quantum-resistant
-# key establishment schemes before the classical schemes are generally disallowed."
-# Fetched live 25.10.2026 from nvlpubs.nist.gov/nistpubs/ir/2024/NIST.IR.8547.ipd.pdf (sha256
-# 6b551b4f...0ed6, identical to the copy of 27.09); csrc.nist.gov/pubs/ir/8547/ipd lists no
-# later draft or final on 25.10.2026. Security strength of a key size from SP 800-57 Part 1
-# Rev. 5, Table 2 (fetched 25.10.2026): IFC (RSA) k = 2048 and FFC L = 2048 give 112 bits,
-# k = 3072 / L = 3072 give 128; ECC f = 224-255 gives 112, f = 256-383 gives 128; k = 1024
-# and f = 160-223 give at most 80.
+# default in remediation -- so its dated document is here. NIST IR 8547, "Transition to
+# Post-Quantum Cryptography Standards", final, October 2026 (doi.org/10.6028/NIST.IR.8547;
+# the PDF read 28.10.2026, sha256 1cd01067...0f7f). Section 4.1.1 Table 2 (quantum-vulnerable
+# digital signatures: ECDSA and RSA at >= 112 bits, EdDSA at >= 128 bits) and section 4.1.2
+# Table 4 (quantum-vulnerable key establishment: finite-field DH and MQV, elliptic-curve DH and
+# MQV, RSA, each at >= 112 bits): every row reads "Deprecated after 2030 / Disallowed after
+# 2035". The text below each table: "NIST will deprecate all quantum-vulnerable cryptography
+# after 2030 and disallow its use under NIST standards and guidelines after 2035."
+# ZA-OPRAVYANE row 168: until 0.38.0 this was the initial public draft of November 2024, whose
+# 128-bit rows were "Disallowed after 2035" only, so RSA-3072, P-256 and Ed25519 had no 2030 date.
+# Section 4.1.2, below Table 4: "in order to mitigate the risk of 'harvest now, decrypt later'
+# attacks on network communications, application-specific guidance, as described in Sec. 4.2,
+# may require or recommend migration to quantum-resistant key-establishment schemes before the
+# classical schemes are generally disallowed." Section 3.2.1: "The generic composite
+# key-establishment technique is allowed, even if T is derived from an unapproved source
+# (including a disallowed algorithm)" -- the classical half of a hybrid (rows 170, 177).
+# Security strength of a key size from SP 800-57 Part 1 Rev. 5, Table 2 (fetched 25.10.2026):
+# IFC (RSA) k = 2048 and FFC L = 2048 give 112 bits, k = 3072 / L = 3072 give 128; ECC f =
+# 224-255 gives 112, f = 256-383 gives 128; k = 1024 and f = 160-223 give at most 80.
+# X25519 (f = 255) and X448 (f = 448) are named by their curve: 128 and 224 bits (RFC 7748).
 NIST_IR_8547: dict[str, Any] = {
     "name": "nist-ir-8547",
-    "document": "NIST IR 8547 ipd, Transition to Post-Quantum Cryptography Standards "
-                "(Initial Public Draft, November 2024)",
-    "url": "https://nvlpubs.nist.gov/nistpubs/ir/2024/NIST.IR.8547.ipd.pdf",
-    "read_on": "2026-10-25",
+    "document": "NIST IR 8547, Transition to Post-Quantum Cryptography Standards "
+                "(final, October 2026)",
+    "url": "https://doi.org/10.6028/NIST.IR.8547",
+    "read_on": "2026-10-28",
     "deprecated_after": "2030-12-31",
     "disallowed_after": "2035-12-31",
     "tables": {
@@ -288,9 +293,13 @@ NIST_IR_8547: dict[str, Any] = {
         "key_establishment": "section 4.1.2, Table 4: Quantum-vulnerable key-establishment "
                              "schemes",
     },
-    "hndl": "section 4.1.2, lines 508-511: 'harvest now, decrypt later' attacks on network "
-            "communications may require migration of key establishment before the classical "
-            "schemes are generally disallowed",
+    "hndl": "section 4.1.2, below Table 4: to mitigate 'harvest now, decrypt later' attacks on "
+            "network communications, application-specific guidance may require or recommend "
+            "migration of key establishment before the classical schemes are generally "
+            "disallowed",
+    "composite": "section 3.2.1, Hybrid Key-Establishment Techniques: the generic composite "
+                 "key-establishment technique of SP 800-56C is allowed even if one input is "
+                 "derived from a disallowed algorithm",
 }
 
 

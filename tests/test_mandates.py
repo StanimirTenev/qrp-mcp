@@ -1,8 +1,9 @@
 """`--mandate cnsa-2.0|nist-ir-8547`: each occurrence gets the dated clause that applies to it.
 
-NIST IR 8547 ipd (November 2024), section 4.1.1 Table 2 and section 4.1.2 Table 4: at 112 bits
-of security strength deprecated after 2030 and disallowed after 2035; at 128 bits and more
-disallowed after 2035. Lines 508-511 name "harvest now, decrypt later" for key establishment.
+NIST IR 8547 (final, October 2026), section 4.1.1 Table 2 and section 4.1.2 Table 4: every
+quantum-vulnerable row deprecated after 2030 and disallowed after 2035, whatever its strength
+(the November 2024 draft spared the 128-bit rows the 2030 date; row 168). Section 4.1.2 names
+"harvest now, decrypt later" for key establishment.
 
 NSA CNSA 2.0 advisory (PP-22-1338, Sep 2022 Ver. 1.0), "Other requirements for NSS": software
 and firmware signing and traditional networking equipment exclusively CNSA 2.0 by 2030; web
@@ -68,19 +69,21 @@ def test_nist_ir_8547_by_security_strength(tree):
     assert rsa2048["status"] == "due"
     assert "Table" in rsa2048["source"] and "8547" in rsa2048["source"]
     rsa3072 = _row(r, "app.py", 3, "RSA")["mandates"]["nist-ir-8547"]
-    assert "deprecated_after" not in rsa3072 and rsa3072["deadline"] == "2035-12-31"
+    assert rsa3072["strength"] == "128 bits or more"
+    assert rsa3072["deprecated_after"] == "2030-12-31" and rsa3072["deadline"] == "2035-12-31"
     ed = _row(r, "app.py", 6, "Ed25519")["mandates"]["nist-ir-8547"]
     assert ed["deadline"] == "2035-12-31" and "EdDSA" in ed["clause"]
 
 
-def test_strength_not_read_is_said_to_be_conditional(tree):
+def test_strength_from_the_line_and_dates_for_every_strength(tree):
     r = _annotated(tree, "nist-ir-8547")
+    # X25519 is named by its curve (row 171).
     x = _row(r, "app.py", 5, "X25519")["mandates"]["nist-ir-8547"]
-    assert x["strength"] == "not determined"
-    assert x["deprecated_after"] == "2030-12-31" and x["conditional"]
-    # A NIST curve named on the line gives the strength.
+    assert x["strength"] == "128 bits or more" and "conditional" not in x
+    assert x["deprecated_after"] == "2030-12-31"
+    # A NIST curve named on the line gives the strength; the dates no longer depend on it.
     ecdh = _row(r, "app.py", 4, "ECDH")["mandates"]["nist-ir-8547"]
-    assert ecdh["strength"] == "128 bits or more" and "deprecated_after" not in ecdh
+    assert ecdh["strength"] == "128 bits or more" and ecdh["deprecated_after"] == "2030-12-31"
 
 
 def test_cnsa_clause_follows_the_system_class(tree):

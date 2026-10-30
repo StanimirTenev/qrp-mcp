@@ -8,11 +8,20 @@ Each quantum-vulnerable occurrence in `evidence` gets `mandates.<name>`: the cla
 source with section, the deadline, a status as of a date, and months until it. Every such
 occurrence also gets `hndl_exposed`: true where it establishes keys (false for a signature,
 "not determined" for RSA or EC whose line shows no role), which is the exposure
-"harvest now, decrypt later" names (IR 8547 ipd, section 4.1.2) -- a signature cannot be
+"harvest now, decrypt later" names (IR 8547, section 4.1.2) -- a signature cannot be
 forged retroactively, a recorded key exchange can be decrypted later.
 
+The classical half of a hybrid group (`X25519MLKEM768`) on the line that names the hybrid is
+not dated as a bare X25519: IR 8547 section 3.2.1 allows the composite even when one input
+comes from a disallowed algorithm (rows 170, 177). Its clause says so (`composite_allowed`)
+and it is not HNDL-exposed. A classical group offered on its own in the same list
+(`X25519MLKEM768:X25519`) is its own `tls_groups` row and keeps its dates.
+
 The gate: `lead_months` given, the run fails when any occurrence's deadline falls within that
-many months of the date; a deadline already passed fails without it. An occurrence the owner
+many months of the date; a deadline already passed fails without it. The deadline the gate
+counts is the clause's `deadline` -- the disallowance for NIST IR 8547 -- and the block says so
+(`gate_counts`, `next_gate_deadline`) beside `next_deadline`, the earliest date of any clause,
+a deprecation included (row 160: the two disagreed and nothing said which the gate used). An occurrence the owner
 suppressed is not in `evidence` and does not count; one in the baseline is listed and does not
 trip it either -- a baseline is the owner's statement that it is known. Comments and bans are
 not uses and get no clause; nor do identifier rows, which never move the headline either.
@@ -44,6 +53,8 @@ _CURVE = re.compile(r"(?:P-?|secp|prime|nistp)(224|256|384|521)", re.IGNORECASE)
 _EDDSA = {"EdDSA", "Ed25519", "Ed448"}
 _EC_SIGNATURE = {"ECDSA"}
 _EC_AGREEMENT = {"ECDH", "X25519", "X448"}
+# Curves named by the algorithm itself (RFC 7748): X25519 is f = 255, X448 f = 448.
+_NAMED_CURVE_STRENGTH = {"X25519": "128 bits or more", "X448": "128 bits or more"}
 
 
 def _add_months(day: date, months: int) -> date:
@@ -87,6 +98,8 @@ def _strength(family: str, item: dict[str, Any]) -> str:
     """Security strength by SP 800-57 Part 1 Rev. 5, Table 2 (see profiles.NIST_IR_8547)."""
     if family in _EDDSA:
         return "128 bits or more"
+    if family in _NAMED_CURVE_STRENGTH:
+        return _NAMED_CURVE_STRENGTH[family]
     size = item.get("key_size")
     if family in ("RSA", "DH") and isinstance(size, int):
         return "below 112 bits" if size < 2048 else "112 bits" if size < 3072 else \
@@ -129,19 +142,36 @@ def _nist(item: dict[str, Any], family: str, role: str, day: date) -> dict[str, 
         table = f"{m['tables']['signature']}, or {m['tables']['key_establishment']}"
     out: dict[str, Any] = {"clause": f"{row} at {strength} of security strength",
                            "source": f"{m['document']}, {table}", "strength": strength}
-    if strength in ("112 bits", "below 112 bits", "not determined"):
-        out["deprecated_after"] = m["deprecated_after"]
+    # The final text deprecates every row after 2030, whatever its strength (row 168).
+    out["deprecated_after"] = m["deprecated_after"]
     out["disallowed_after"] = out["deadline"] = m["disallowed_after"]
     if strength == "below 112 bits":
         out["note"] = ("below the tables' lowest row (112 bits); the 112-bit row's dates are "
                        "the latest that can apply")
-    if strength == "not determined":
-        out["conditional"] = ("the key size or curve was not read on this line: deprecated "
-                              "after 2030 if it is 112 bits, disallowed after 2035 either way")
     passed_dis = day > date.fromisoformat(m["disallowed_after"])
-    passed_dep = "deprecated_after" in out and day > date.fromisoformat(m["deprecated_after"])
+    passed_dep = day > date.fromisoformat(m["deprecated_after"])
     out["status"] = "disallowed" if passed_dis else "deprecated" if passed_dep else "due"
     out["months_until"] = _months_until(day, date.fromisoformat(out["deadline"]))
+    return out
+
+
+def _composite(halves: set[str]) -> dict[str, Any]:
+    m = MANDATES["nist-ir-8547"]
+    return {"clause": f"classical half of a composite (hybrid) key establishment with "
+                      f"{', '.join(sorted(halves))} on this line",
+            "source": f"{m['document']}, {m['composite']}",
+            "status": "composite_allowed"}
+
+
+def _hybrid_halves(result: dict[str, Any]) -> dict[tuple[str, int], set[str]]:
+    """(path, line) -> the families a hybrid named on that line is made of, with ECDH for an
+    elliptic-curve half: the generic family a group setting's line is also read as."""
+    out: dict[tuple[str, int], set[str]] = {}
+    for h in result.get("hybrid_names") or []:
+        halves = {str(name) for name, _ in h.get("halves") or []}
+        if halves & _EC_AGREEMENT:
+            halves.add("ECDH")
+        out.setdefault((h.get("path"), h.get("line")), set()).update(halves)
     return out
 
 
@@ -180,6 +210,8 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             "in_scope": 0, "not_in_scope": 0, "hndl_exposed": 0, "hndl_not_determined": 0,
             "within_lead": 0,
             "by_status": {}, "next_deadline": None, "gate": "pass",
+            "gate_counts": "deadline" if name == "cnsa-2.0" else "disallowed_after",
+            "next_gate_deadline": None,
         }
         if name == "cnsa-2.0":
             blocks[name]["new_products"] = m["new_products"]
@@ -187,6 +219,8 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                                            "clause": m["complete_by"][1]}
         else:
             blocks[name]["hndl_source"] = m["hndl"]
+            blocks[name]["composite"] = 0
+    hybrid_lines = _hybrid_halves(result)
     for category, items in result["evidence"].items():
         for item in items:
             if not isinstance(item, dict) or "path" not in item:
@@ -203,8 +237,20 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                     block["not_in_scope"] += 1
                 continue
             role = "signature" if signing else _role(category, item, family or "", kinds)
+            # The classical half of a hybrid named on this very line (source rows only: a
+            # group offered alone is a tls_groups row and is dated as itself).
+            halves = hybrid_lines.get((item.get("path"), item.get("line")), set())
+            composite = category == "source_code" and family in halves
             said: dict[str, Any] = {}
             for name in names:
+                if composite and name == "nist-ir-8547":
+                    clause = _composite(halves - {family, "ECDH"} or halves)
+                    said[name] = clause
+                    blocks[name]["in_scope"] += 1
+                    blocks[name]["composite"] += 1
+                    blocks[name]["by_status"]["composite_allowed"] = blocks[name][
+                        "by_status"].get("composite_allowed", 0) + 1
+                    continue
                 clause = (_cnsa(category, item, day) if name == "cnsa-2.0"
                           else None if signing else _nist(item, family or "", role, day))
                 if clause is None:
@@ -215,6 +261,9 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                 block["in_scope"] += 1
                 block["by_status"][clause["status"]] = block["by_status"].get(
                     clause["status"], 0) + 1
+                if block["next_gate_deadline"] is None or clause["deadline"] < block[
+                        "next_gate_deadline"]:
+                    block["next_gate_deadline"] = clause["deadline"]
                 upcoming = [d for d in (clause.get("deprecated_after"), clause["deadline"])
                             if d and date.fromisoformat(d) >= day]
                 if upcoming and (block["next_deadline"] is None
@@ -232,7 +281,8 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             if said:
                 item["mandates"] = said
                 # RSA and EC whose line shows no role may be either: said, not guessed.
-                item["hndl_exposed"] = (True if role == "key_establishment" else
+                item["hndl_exposed"] = (False if composite else
+                                        True if role == "key_establishment" else
                                         "not determined" if role == "undetermined" else False)
     result["mandates"] = blocks
     return failed

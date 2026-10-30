@@ -1101,6 +1101,17 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
+**From 0.38.0**, the fixes promised in public comments and the rows of the fix list since 0.37.0:
+- **`--mandate nist-ir-8547` follows the final NIST IR 8547 (October 2026).** Every
+  quantum-vulnerable signature and key establishment is deprecated after 2030 and disallowed
+  after 2035, whatever its strength; the November 2024 draft spared RSA-3072, P-256 and Ed25519
+  the 2030 date. X25519 and X448 get their strength from their names. The classical half of a
+  hybrid group on the line that names it (`X25519MLKEM768`) is `composite_allowed` (section
+  3.2.1) and not HNDL-exposed; a classical group offered on its own in the same list
+  (`X25519MLKEM768:X25519`) keeps its dates. The block names the date the gate counts
+  (`gate_counts`, `next_gate_deadline`) beside `next_deadline`, the earliest date of any clause.
+  The gate itself still counts the disallowance, as before.
+
 **From 0.37.0**, the work of releases A to E and of round 3 (the commits after `v0.36.0`):
 
 - **For CI.** `qrp-mcp scan PATH --format sarif` writes SARIF 2.1.0; every file not read is a
@@ -1289,9 +1300,10 @@ applied, nothing leaves the machine, no model is asked.
 | RC4, DES, 3DES | AES (AES-GCM for RC4's place) | RFC 7465, FIPS 46-3 (withdrawn), SP 800-131A Rev. 2 |
 | a post-quantum scheme that is not a NIST standard | a standardised one | FIPS 203/204/205 |
 
-Transition dates come from NIST IR 8547, which is still an **initial public draft** (12 Nov
-2024): quantum-vulnerable signatures and key establishment deprecated after 2030 at 112-bit
-strength, disallowed after 2035. Hybrids are named as NIST names them — accommodated, and
+Transition dates come from the final NIST IR 8547 (October 2026): every quantum-vulnerable
+signature and key-establishment scheme deprecated after 2030 and disallowed after 2035, whatever
+its strength. Until 0.38.0 they came from the November 2024 draft, which spared the 128-bit rows
+(RSA-3072, P-256, Ed25519) the 2030 date. Hybrids are named as NIST names them — accommodated, and
 temporary. The CBOM is not changed: CycloneDX has no standard field for a recommendation, and
 this project does not add a private one.
 
