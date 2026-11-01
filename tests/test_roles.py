@@ -114,24 +114,30 @@ def test_the_role_survives_masking(tmp_path):
     assert key(full) == key(masked) and key(full)
 
 
-def test_the_role_stays_out_of_the_cbom(tmp_path):
+def test_the_role_reaches_the_cbom(tmp_path):
+    """Until 0.39.0 the role stayed out of the CBOM; a reader of only the CBOM then had to
+    count RSA against both signatures and key establishment (ZA-OPRAVYANE row 184). Now one
+    value per occurrence, as `qrp:role`, and nowhere else in the document."""
     (tmp_path / "a.py").write_text("jwt.encode(p, k, algorithm='RS256')\n")
     r = subprocess.run([sys.executable, "-m", "qrp_mcp.server", "cbom", str(tmp_path)],
                        check=True, capture_output=True, text=True)
-    keys = []
+    keys, roles = [], []
 
     def walk(node):
         if isinstance(node, dict):
             keys.extend(node)
             if str(node.get("name", "")).startswith("qrp:"):
                 keys.append(node["name"])
+                if node["name"] == "qrp:role":
+                    roles.extend(json.loads(node["value"]))
             for v in node.values():
                 walk(v)
         elif isinstance(node, list):
             for v in node:
                 walk(v)
     walk(json.loads(r.stdout))
-    assert keys and not [k for k in keys if "role" in k.lower()]
+    assert [k for k in keys if "role" in k.lower()] == ["qrp:role"]
+    assert roles == ["signature"]
 
 
 def test_the_role_is_not_part_of_closure_identity():

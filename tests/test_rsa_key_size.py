@@ -63,4 +63,5 @@ def test_an_ec_key_signed_by_rsa_gets_no_rsa_size(tmp_path):
     (tmp_path / "ec.crt").write_bytes(
         _cert(subject.public_key(), issuer).public_bytes(serialization.Encoding.PEM))
     found = scan_directory(tmp_path)["evidence"]["source_code"]
-    assert [f.get("key_size") for f in found if f["algorithm"] == "RSA"] == [None]
+    # No size, and since 0.39.0 said so rather than left out (ZA-OPRAVYANE row 181).
+    assert [f.get("key_size") for f in found if f["algorithm"] == "RSA"] == ["undetermined"]

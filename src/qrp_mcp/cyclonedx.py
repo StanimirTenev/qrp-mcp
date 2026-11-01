@@ -51,7 +51,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from . import baseline as baseline_mod, confidence
+from . import baseline as baseline_mod, confidence, remediation
+from .classifier import SIZED_FAMILIES, classical_status
 from .assets import TLS_SETTING_NOTE
 from .detectors import in_test_code
 from .classifier import known_algorithms
@@ -462,10 +463,20 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
     # How each occurrence was found (call, declaration, import, reference, default, or the
     # basis of an asset): in the scan JSON and, until 0.38.0, not in the CBOM (row 149).
     kinds_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
+    # The role an RSA or EC line shows (row 184) and where ML-KEM stands in a configured
+    # order (row 185): in the scan JSON and, until 0.39.0, not in the CBOM.
+    roles_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
+    orders_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
     for items in scan_result["evidence"].values():
         for item in items:
             if isinstance(item, dict) and "line" in item:
                 name = baseline_mod.family(item)
+                if item.get("role") in ("signature", "key_establishment", "undetermined"):
+                    roles_at.setdefault((item["path"], item["line"]), []).append(
+                        (family_of.get(name, name), item["role"]))
+                if item.get("order"):
+                    orders_at.setdefault((item["path"], item["line"]), []).append(
+                        (family_of.get(name, name), _order_text(item["order"])))
                 kind = item.get("evidence_kind") or item.get("basis")
                 if kind:
                     kinds_at.setdefault((item["path"], item["line"]), []).append(
@@ -489,6 +500,34 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
         component.setdefault("properties", []).append(
             {"name": f"{NS}confidence", "value": json.dumps(levels)})
         component["properties"].append({"name": f"{NS}evidence_kind", "value": json.dumps(kinds)})
+        # One role per occurrence, only on a component of a family whose role a line can
+        # show (RSA, EC); an occurrence whose line showed none is "not read".
+        if own in remediation.ROLE_FAMILIES:
+            roles = []
+            for o in occurrences:
+                said = sorted({r for name, r in roles_at.get((o["location"], o.get("line")), [])
+                               if name == own})
+                roles.append("+".join(said) or "not read")
+            component["properties"].append({"name": f"{NS}role", "value": json.dumps(roles)})
+        if own == "ML-KEM":
+            orders = []
+            for o in occurrences:
+                said = [t for name, t in orders_at.get((o["location"], o.get("line")), [])
+                        if name == own]
+                orders.append(said[0] if said else
+                              "seen in code only: no configured order on this line; whether "
+                              "it is negotiated is not established")
+            component["properties"].append({"name": f"{NS}negotiation",
+                                            "value": json.dumps(orders)})
+
+
+def _order_text(order: dict[str, Any]) -> str:
+    """One occurrence's place in a configured order, in words (row 185)."""
+    if order.get("position") is None:
+        return f"offered in {order['setting']}: {order['note']}"
+    head = "preferred" if order["preferred"] else "offered"
+    return (f"{head}: position {order['position']} of {order['of']} in {order['setting']} "
+            f"(first: {order['first']}); {order['note']}")
 
 
 def _scope(located: list[dict[str, Any]], family: str,
@@ -689,7 +728,34 @@ def _certificate_components(located: list[dict[str, Any]],
 
 # What a family's own component says that its parameter-set components do not (release 3d).
 _CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_pins",
-                                 "provider_configuration", "not_negotiable_by")}
+                                 "provider_configuration", "not_negotiable_by", "not_enabled")}
+
+
+def _size_and_status(family: str, finding: dict[str, Any], sizes: list[int],
+                     curve: str | None = None) -> list[dict[str, str]]:
+    """`qrp:key_size` and the classical status with its source, for one component of an RSA,
+    DSA, DH or EC family (ZA-OPRAVYANE rows 181, 182). The size is this component's own --
+    a child's, never the family's smallest -- and `undetermined` where none was read, never
+    left out. Not on a post-quantum or fixed-size component: no size decides anything there."""
+    if family not in SIZED_FAMILIES or finding.get("classification") != "classical_vulnerable":
+        return []
+    if len(sizes) == 1:
+        said, size = str(sizes[0]), sizes[0]
+    elif len(sizes) > 1:
+        said, size = "several: see qrp:observedKeySizes", min(sizes)
+    elif curve:
+        said, size = f"set by the curve {curve}", None
+    else:
+        said, size = "undetermined", None
+    out = [{"name": f"{NS}key_size", "value": said}]
+    status = classical_status(family, size)
+    if status:
+        if len(sizes) > 1:
+            status = {"status": status["status"],
+                      "source": f"for the smallest, {min(sizes)} bits: {status['source']}"}
+        out += [{"name": f"{NS}classical_status", "value": status["status"]},
+                {"name": f"{NS}classical_status_source", "value": status["source"]}]
+    return out
 
 
 def _parameter_components(family: str, finding: dict[str, Any],
@@ -737,6 +803,7 @@ def _parameter_components(family: str, finding: dict[str, Any],
         for key in ("pqc_family", "pqc_status"):
             if finding.get(key):
                 component["properties"].append({"name": f"{NS}{key}", "value": finding[key]})
+        component["properties"] += _size_and_status(family, finding, sizes, fields.get("curve"))
         if all(item.get("in_test_code") for item in items):
             component["scope"] = "excluded"
         family_by_ref[component["bom-ref"]] = family
@@ -836,6 +903,11 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         for key in ("pqc_family", "pqc_status"):
             if finding.get(key):
                 component["properties"].append({"name": f"{NS}{key}", "value": finding[key]})
+        component["properties"] += _size_and_status(family, finding, family_sizes)
+        # Row 183: present in the files, compiled only under a build switch nothing turns on.
+        if finding.get("not_enabled"):
+            component["properties"].append({"name": f"{NS}not_enabled",
+                                            "value": finding["not_enabled"]["basis"]})
         # The modules the evidence names, one JSON array like every other list here.
         # Not `certificationLevel`: that field states a validation, and nothing in a
         # file establishes one. Not `implementationPlatform`: that is a CPU.

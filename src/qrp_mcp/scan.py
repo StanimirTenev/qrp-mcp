@@ -11,7 +11,8 @@ from typing import Any
 
 from . import (__version__, assets, aws_tls, baseline as baseline_mod, certificates, confidence,
                config, coverage, detectors, dnssec, ike, opcua, profiles, remediation, suppression)
-from .classifier import _OID_FAMILIES, FingerprintRequest, fingerprint, known_algorithms, summarize
+from .classifier import (_OID_FAMILIES, SIZED_FAMILIES, FingerprintRequest, classical_status,
+                         fingerprint, known_algorithms, summarize)
 
 
 def _version() -> str:
@@ -97,6 +98,8 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         scan_result = detectors.scan_repo(repo_path)
     seconds, finished_at = time.monotonic() - clock, _now()
     roles = _read_roles(scan_result)
+    _mark_unread_sizes(scan_result)
+    _read_order(scan_result)
 
     # Detected algorithms are passed as explicit algorithms so each one is classified.
     # (The gateway's ingest contract routes them through package_metadata instead, which
@@ -136,6 +139,21 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     # the summary counted again with it.
     notes, set_aside, protected = _what_the_evidence_adds(scan_result, response.findings,
                                                           detected_by_name)
+    # Row 183: present, and compiled only under a build switch nothing in the tree turns on.
+    for family, said in _build_gates(repo_path, response.findings).items():
+        notes.setdefault(family, {})["not_enabled"] = said
+        set_aside.add(family)
+    # Row 182: the classical status of the smallest size read, with its source; row 185:
+    # where ML-KEM stands in a configured order, or that it was seen in code only.
+    sizes_read = scan_result.get("algorithm_key_sizes", {})
+    for f in response.findings:
+        name = detected_by_name.get(f.raw_value)
+        status = classical_status(f.algorithm_family, sizes_read.get(name))
+        if status and f.classification == "classical_vulnerable":
+            notes.setdefault(f.algorithm_family, {})["classical_status"] = status
+        if f.algorithm_family == "ML-KEM":
+            notes.setdefault(f.algorithm_family, {})["negotiation"] = _negotiation(
+                scan_result, name)
     # A family whose only use is identifier rows (release 3b/3e: `generate_rsa_keys`,
     # `RSAUtil`) stays a finding and says so, and is not counted: identifier rows are low
     # and never move the headline or by_role (rel3-rules; 20 of the 30 rows rel3e's mini
@@ -766,6 +784,164 @@ def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:
                     "signature": 0, "key_establishment": 0, "undetermined": 0})
                 fam[role] += 1
     return counts
+
+
+def _mark_unread_sizes(scan_result: dict[str, Any]) -> None:
+    """ZA-OPRAVYANE row 181: an RSA, DSA, DH or EC occurrence whose line gave no size says
+    `key_size: "undetermined"` instead of leaving the field out, which read the same as a
+    field nobody looked for. A curve or a parameter set already names the size."""
+    for key in ("source_code_findings", "iac_findings"):
+        for item in scan_result.get(key) or []:
+            if (item.get("algorithm") in SIZED_FAMILIES and "key_size" not in item
+                    and not item.get("curve") and not item.get("parameter_set")):
+                item["key_size"] = "undetermined"
+
+
+# -- ML-KEM: offered or preferred (ZA-OPRAVYANE row 185) ----------------------------------
+#
+# Read from the configured list on the line, never from a connection. SSH: RFC 4253 Sec. 7.1
+# (read 01.11.2026) -- "The first algorithm MUST be the preferred (and guessed) algorithm"
+# and, failing a common guess, the first algorithm on the CLIENT's list that the server also
+# supports is chosen. So the head of an ssh_config list is what that client asks for first,
+# and the head of an sshd_config list is the server's preference only. TLS: the position in
+# the group list is stated; who decides is the TLS library's setting and is not read here.
+_SSH_ORDER_NOTE = {
+    "server": ("server's list (sshd_config): under RFC 4253 Sec. 7.1 the client's order "
+               "chooses among the algorithms both sides support, so this order does not by "
+               "itself decide what a connection uses"),
+    "client": ("client's list (ssh_config): under RFC 4253 Sec. 7.1 the first algorithm on "
+               "this list that the server also supports is chosen"),
+    None: ("whose list this is is not known from the file name; under RFC 4253 Sec. 7.1 the "
+           "client's order chooses"),
+}
+_TLS_ORDER_NOTE = ("position in the configured group list; whether this side's order decides "
+                   "the group is set by the TLS library and its server-preference option, "
+                   "which is not read")
+
+
+def _ssh_side(path: str) -> str | None:
+    name = path.rsplit("/", 1)[-1]
+    if name.startswith("sshd_config"):
+        return "server"
+    if name.startswith("ssh_config") or path.endswith(".ssh/config"):
+        return "client"
+    return None
+
+
+def _order_on_line(path: str, excerpt: str) -> dict[str, Any] | None:
+    """Where the first ML-KEM entry stands in an SSH KexAlgorithms or TLS group list on this
+    line, or None where the line holds no such list."""
+    if excerpt.lstrip().startswith(assets._COMMENT_START):
+        return None
+    ssh = assets._SSH_KEX_SETTING.search(excerpt)
+    if ssh:
+        value = ssh.group(1)
+        prefix, names = value[:1] if value[:1] in "+-^" else "", value.lstrip("+-^").split(",")
+        names = [n.strip() for n in names if n.strip()]
+        at = next((i for i, n in enumerate(names) if "mlkem" in n.lower()), None)
+        if at is None or prefix == "-":
+            return None
+        order: dict[str, Any] = {"setting": "KexAlgorithms", "list": names,
+                                 "position": at + 1, "of": len(names), "first": names[0],
+                                 "preferred": at == 0, "note": _SSH_ORDER_NOTE[_ssh_side(path)]}
+        if prefix == "+":
+            # sshd_config(5): '+' appends to the default set, which the line does not name.
+            order.update(position=None, of=None, first=None, preferred=None,
+                         note="appended after the default list, which this line does not "
+                              "name: the position is not established; " + order["note"])
+        elif prefix == "^":
+            order["note"] = ("placed at the head of the default list; " + order["note"])
+        return order
+    setting = assets._group_setting(excerpt)
+    if setting:
+        names = [m.group(0) for m in assets._GROUP_TOKEN.finditer(excerpt, setting.end())
+                 if not (m.start() > 0 and excerpt[m.start() - 1] in "-!")]
+        at = next((i for i, n in enumerate(names) if "mlkem" in n.lower()), None)
+        if at is None:
+            return None
+        return {"setting": " ".join(setting.group(0).replace("=", " ").split()), "list": names,
+                "position": at + 1, "of": len(names), "first": names[0],
+                "preferred": at == 0, "note": _TLS_ORDER_NOTE}
+    return None
+
+
+def _read_order(scan_result: dict[str, Any]) -> None:
+    """Mark each ML-KEM occurrence on a configured list with its place in the order. Read
+    here, before any level masks the line, like the roles."""
+    for key in ("source_code_findings", "iac_findings"):
+        for item in scan_result.get(key) or []:
+            if item.get("algorithm") == "ML-KEM" and item.get("evidence_kind") not in (
+                    "comment", "ban"):
+                order = _order_on_line(item.get("path", ""), str(item.get("excerpt") or ""))
+                if order:
+                    item["order"] = order
+
+
+def _negotiation(scan_result: dict[str, Any], name: str | None) -> dict[str, Any]:
+    ordered = [i for i in _in_use(scan_result).get(name or "", []) if i.get("order")]
+    if not ordered:
+        return {"configured_order_read": False,
+                "statement": ("seen in code only: no configured order names it, and whether "
+                              "it is negotiated is not established; no connection is made")}
+    first = [i for i in ordered if i["order"]["preferred"]]
+    return {"configured_order_read": True,
+            "places": len(ordered), "first_in_list_at": len(first),
+            "statement": (f"named in {len(ordered)} configured list(s), first in {len(first)}; "
+                          f"see `order` on each occurrence for whose list it is. Configured, "
+                          f"not negotiated: no connection is made")}
+
+
+# -- Present, not enabled (ZA-OPRAVYANE row 183) -------------------------------------------
+#
+# A family compiled only under a build switch. One switch, verified at the source: OpenSSH
+# portable at V_9_9_P1 (53a80ba, 2024-09-20) wraps every XMSS file and the XMSS entries of
+# `keyimpls[]` in sshkey.c in `#ifdef WITH_XMSS`, and neither configure.ac nor Makefile.in
+# names the macro, so a default build has no XMSS key type. Raised only where the tree has
+# a preprocessor condition on the macro and NO other line in any file present names it: a
+# `#define`, `-DWITH_XMSS`, `AC_DEFINE`, a CMake or meson line is taken as a possible
+# definer and nothing is said. Other gates are not judged.
+BUILD_GATES = {"XMSS": "WITH_XMSS"}
+_CONDITIONAL = re.compile(r"^\s*#\s*(?:if|ifdef|ifndef|elif|else|endif)\b")
+
+
+def _build_gates(repo_path: Path, findings: list[Any]) -> dict[str, dict[str, Any]]:
+    families = {f.algorithm_family for f in findings
+                if f.algorithm_family in BUILD_GATES
+                and f.classification in ("pqc_ready", "pqc_pre_standard")}
+    out: dict[str, dict[str, Any]] = {}
+    for family in sorted(families):
+        macro = BUILD_GATES[family]
+        token = macro.encode()
+        conditions: list[str] = []
+        other = False
+        for path in detectors.iter_repo_files(repo_path, {}, []):
+            try:
+                data = path.read_bytes()
+            except OSError:
+                continue
+            if token not in data:
+                continue
+            rel = detectors.display_path(str(path.relative_to(repo_path)))
+            for n, line in enumerate(data.decode("utf-8", "replace").splitlines(), start=1):
+                if macro in line:
+                    if _CONDITIONAL.match(line):
+                        conditions.append(f"{rel}:{n}")
+                    else:
+                        other = True
+        if conditions and not other:
+            out[family] = {
+                "gate": macro,
+                "conditions": len(conditions),
+                "first_condition": conditions[0],
+                "basis": (f"built only where {macro} is defined: {len(conditions)} "
+                          f"preprocessor conditions name it (first at {conditions[0]}), and "
+                          f"no other line in any file present in the scan does -- no "
+                          f"#define, -D{macro}, AC_DEFINE, CMake or meson line. OpenSSH "
+                          f"puts every {family} file and key type under this switch (checked "
+                          f"at V_9_9_P1), so a default build has no {family}. A builder can "
+                          f"still pass -D{macro}; the files cannot show whether one does"),
+            }
+    return out
 
 
 def _with_providers(finding: dict[str, Any], providers: dict[str, set[str]],

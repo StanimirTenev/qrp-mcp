@@ -3250,7 +3250,7 @@ def scan_source_file(path: Path, rel_path: str,
             seen_on_line.add(family)
             said = (" (XDH, which generates X25519 unless initialised for X448)"
                     if name.upper() == "XDH" else f" ({name})")
-            findings.append({
+            item = {
                 "path": rel_path,
                 "line": line_no,
                 "algorithm": family,
@@ -3258,7 +3258,13 @@ def scan_source_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
                 "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial, code) else kind,
                 "in_test_code": in_test_code(rel_path),
-            })
+            }
+            # `getInstance("DH"); g.initialize(512);` on one line: the size rules already
+            # read `.initialize(N)`, and this branch never asked them (ZA-OPRAVYANE row 180).
+            size = key_size_on_line(line, family) if family in ("RSA", "DSA", "DH") else None
+            if size:
+                item["key_size"] = size
+            findings.append(item)
 
         # Names that stand for a configuration of several algorithms: an OPC UA
         # SecurityPolicy and an AWS load-balancer TLS policy. Each policy's families come

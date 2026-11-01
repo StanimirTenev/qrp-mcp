@@ -287,6 +287,74 @@ _SEVERITY_RANK: dict[str, int] = {
 
 WEAK_RSA_MIN_BITS = 2048
 
+# -- The classical status of a key size, with its source (ZA-OPRAVYANE rows 179, 182) -----
+#
+# Read from the publication itself, NIST SP 800-131A Rev. 2 (March 2019,
+# doi:10.6028/NIST.SP.800-131Ar2), on 01.11.2026:
+# * Table 2 (digital signatures): generation disallowed for RSA len(n) < 2048, ECDSA
+#   len(n) < 224 and DSA (L, N) other than (2048, 224), (2048, 256), (3072, 256); legacy use
+#   for verification only down to RSA 1024, DSA L 512, ECDSA len(n) 160.
+# * Table 4 (SP 800-56A key agreement): finite-field DH disallowed for len(p) < 2048 or
+#   len(q) < 224; elliptic-curve DH disallowed for len(n) < 224.
+# * Table 5 (SP 800-56B): RSA key agreement and key transport disallowed for len(n) < 2048.
+# The minimum is the same for every role, so a role the line does not show changes nothing
+# here. The scan reads one number: the modulus, p (or L), or the curve's size. For RSA that
+# is the whole condition; for DH and DSA, len(q) and conformance to SP 800-56A / the exact
+# (L, N) pair are not read, so a size at the minimum only "meets the minimum length".
+#
+# A break done in public, apart from a policy minimum: Boudot, Gaudry, Guillevic, Heninger,
+# Thome and Zimmermann, "Comparing the difficulty of factorization and discrete logarithm:
+# a 240-digit experiment" (CRYPTO 2020, ePrint 2020/697), factored RSA-240, a 795-bit
+# number, and computed a discrete logarithm over a 795-bit prime field. A key at or below
+# that size is of a size already broken; this key itself was not.
+_SP800_131A = "NIST SP 800-131A Rev. 2 (March 2019)"
+_MIN_BITS = {"RSA": 2048, "DSA": 2048, "DH": 2048, "EC": 224, "ECDSA": 224, "ECDH": 224}
+_BROKEN_IN_PUBLIC_BITS = {"RSA": 795, "DSA": 795, "DH": 795}
+_RECORD = ("ePrint 2020/697 (Boudot et al., CRYPTO 2020): a 795-bit RSA modulus factored "
+           "and a 795-bit prime-field discrete logarithm computed, in public")
+_TABLES = {
+    "RSA": "Table 2 (signature generation: len(n) < 2048 disallowed; verification: legacy "
+           "use down to 1024) and Table 5 (key agreement and transport: len(n) < 2048 "
+           "disallowed)",
+    "DSA": "Table 2 (signature generation: (L, N) other than (2048, 224), (2048, 256), "
+           "(3072, 256) disallowed; verification: legacy use down to L = 512)",
+    "DH": "Table 4 (finite-field DH: len(p) < 2048 or len(q) < 224 disallowed)",
+    "EC": "Table 2 (ECDSA: len(n) < 224 disallowed for signature generation) and Table 4 "
+          "(EC DH: len(n) < 224 disallowed)",
+}
+_TABLES["ECDSA"] = _TABLES["EC"]
+_TABLES["ECDH"] = _TABLES["EC"]
+# The families whose key has a size the scan can read and whose status depends on it.
+SIZED_FAMILIES = frozenset(_MIN_BITS)
+
+
+def classical_status(family: str, key_size: int | None) -> dict[str, str] | None:
+    """`{status, source}` for a classical key of this family and size, or None where
+    SP 800-131A Rev. 2 sets no size for the family (a fixed-size curve, a post-quantum
+    scheme). Status: broken_in_public, disallowed, acceptable, meets_minimum_length, or
+    undetermined when no size was read -- never a guess."""
+    if family not in _MIN_BITS:
+        return None
+    where = f"{_SP800_131A}, {_TABLES[family]}"
+    if not isinstance(key_size, int) or key_size <= 0:
+        return {"status": "undetermined",
+                "source": f"key size not read on the lines that name it; {where} not applied"}
+    minimum = _MIN_BITS[family]
+    if key_size <= _BROKEN_IN_PUBLIC_BITS.get(family, 0):
+        return {"status": "broken_in_public",
+                "source": f"{key_size} bits is at or below a size broken in public: {_RECORD}; "
+                          f"this key itself was not. Also below the {minimum}-bit minimum "
+                          f"of {where}"}
+    if key_size < minimum:
+        return {"status": "disallowed", "source": f"below the {minimum}-bit minimum of {where}"}
+    if family == "RSA":
+        return {"status": "acceptable", "source": f"len(n) >= 2048: {where}"}
+    unread = ("len(q) and conformance to SP 800-56A are not read" if family == "DH" else
+              "N and the (L, N) pair are not read" if family == "DSA" else
+              "whether the curve is one SP 800-56A or SP 800-186 lists is not checked")
+    return {"status": "meets_minimum_length",
+            "source": f"meets the {minimum}-bit minimum length of {where}; {unread}"}
+
 # Said in the reason where the family has something specific to say.
 _PRE_STANDARD_NOTE = {
     "Kyber": (
@@ -611,6 +679,10 @@ def classify_algorithm(
         # size on the same line as the algorithm.
         m = re.search(r"(?:^|[^A-Za-z0-9])RSA[-_ ]?(\d{3,5})(?![0-9])", raw_value or "",
                       re.IGNORECASE)
+        # The same for DSA, DH and the EC families, in the scanner's own spelling only
+        # ("DH-512"): until 0.39.0 no size but RSA's was parsed, so DH-512 was never weak
+        # (ZA-OPRAVYANE row 179).
+        m = m or re.fullmatch(r"(?:DSA|DH|EC|ECDSA|ECDH)-(\d{3,5})", (raw_value or "").strip())
         if m:
             key_size = int(m.group(1))
     weak = _find_weak_token(squashed)
@@ -738,15 +810,17 @@ def classify_algorithm(
             )
 
         # classical_vulnerable public-key algorithm
-        weak_key = bool(
-            family == "RSA" and key_size is not None and 0 < key_size < WEAK_RSA_MIN_BITS
-        )
+        # Below the classical minimum for its family (rows 179, 182): RSA, DSA, DH and the
+        # EC families, each against its own table, with the table named in the reason.
+        status = classical_status(family, key_size)
+        weak_key = bool(status and status["status"] in ("broken_in_public", "disallowed"))
 
         severity = "high"
         reasons = [f"{family} is broken by a large-scale quantum computer (Shor's algorithm)."]
         if weak_key:
             severity = "critical"
-            reasons.append(f"RSA key size {key_size} is below the {WEAK_RSA_MIN_BITS}-bit minimum.")
+            reasons.append(f"{family} key size {key_size}: {status['status']}, "
+                           f"{status['source']}.")
         if weak is not None:
             severity = "critical"
             reasons.append(weak[1] + ".")
