@@ -624,6 +624,12 @@ CycloneDX's word for a protocol it has no name for), `qrp:policy`, `qrp:allows_v
 `qrp:fragmentation_default` (IKE) — because the matched text is masked by default and cannot carry
 them.
 
+From 0.39.0 an RSA, DSA, DH or EC component carries `qrp:key_size` (never left out:
+`undetermined` where no size was read) and `qrp:classical_status` with
+`qrp:classical_status_source`; RSA and EC components carry `qrp:role`, one per occurrence;
+ML-KEM components `qrp:negotiation`, one per occurrence; and a family compiled only under a build
+switch nothing in the tree defines, `qrp:not_enabled` (see *From 0.39.0*).
+
 Where the scan named the module, an algorithm component carries `qrp:providers` (a JSON array)
 and `qrp:provider_validation`, which says that validation is not claimed and has to be checked
 against the CMVP list for the deployed version. `certificationLevel` is never written: it states
@@ -1114,6 +1120,54 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
+**From 0.39.0**, rows 179–185 of the fix list: what a reader of the CBOM alone could not get.
+Every field below is in the scan JSON and in the CBOM, through `qrp-mcp cbom` and `export_cbom`.
+
+- **DH, DSA and EC below their minimum are weak keys** (row 179, found in our own probe of
+  31 Oct 2026). `dh.generate_parameters(key_size=512)` was read as DH-512 and reported
+  `weak_key: false`, severity high, beside a critical RSA-1024: the check covered RSA only, and no
+  other family's size was parsed. Each family is now held to its own minimum — RSA, DSA and
+  finite-field DH 2048 bits, the EC families 224 — and the reason names the table.
+- **A JCA size on the `getInstance` line** (row 180). `getInstance("DH"); g.initialize(512);` gave
+  DH with no size; that branch now reads `.initialize(N)` for RSA, DSA and DH, as the other rules
+  did. A size set on another line is still not read.
+- **`undetermined`, said** (row 181). An RSA, DSA, DH or EC occurrence whose line gives no size
+  has `key_size: "undetermined"` in the evidence instead of no field; a curve or a parameter set
+  already names the size. In the CBOM every RSA, DSA, DH and EC component has `qrp:key_size`:
+  the size, `undetermined`, `set by the curve …`, or `several: see qrp:observedKeySizes`.
+- **The classical status, with its source** (row 182). `classical_status` on the finding (for its
+  smallest size) and `qrp:classical_status` / `qrp:classical_status_source` on each CBOM component
+  (for that component's own size): `broken_in_public` at or below 795 bits for RSA, DSA and DH — a
+  795-bit RSA modulus was factored and a 795-bit prime-field discrete logarithm computed in public
+  (ePrint 2020/697); that key itself was not — `disallowed` below the minimum of NIST SP 800-131A
+  Rev. 2 (March 2019), Tables 2, 4 and 5, `acceptable` for RSA at 2048 or more, and
+  `meets_minimum_length` for DSA, DH and EC at the minimum, because the scan reads one number:
+  len(q), the (L, N) pair, SP 800-56A conformance and whether a curve is a listed one are not
+  read. `undetermined` where no size was read. Not on a post-quantum or fixed-size component
+  (X25519, Ed25519): SP 800-131A Rev. 2 sets no size for them. Every one of these is still
+  quantum-vulnerable; the status is the classical question only.
+- **Present, not enabled** (row 183). OpenSSH compiles XMSS only when `WITH_XMSS` is defined, and
+  its build files never define it (checked at V_9_9_P1: every XMSS file and the XMSS entries of
+  `keyimpls[]` sit under `#ifdef WITH_XMSS`; configure.ac and Makefile.in do not name it). Where a
+  tree has preprocessor conditions on `WITH_XMSS` and no other line in any file names the macro,
+  the XMSS finding carries `not_enabled` (CBOM: `qrp:not_enabled`), keeps `pqc_ready` — that is
+  about the algorithm — and is no longer counted in `pqc_readiness` or `by_role`. On OpenSSH 9.9
+  the signature part goes from `hybrid_partial` to `classical_only`. One switch, verified at the
+  source; other build switches are not judged.
+- **The role reaches the CBOM** (row 184). Until now `role` stopped at the scan JSON, and RSA
+  arrived in the CBOM as `primitive: pke` only. `qrp:role` is one value per occurrence, in the
+  order of `evidence.occurrences` — `signature`, `key_establishment`, `undetermined`, or `not
+  read` — on RSA and EC components; read from one line, with the limits measured under *The role
+  of an RSA or EC line*.
+- **ML-KEM offered or preferred** (row 185). Where ML-KEM sits in an SSH `KexAlgorithms` list or a
+  TLS group setting, the occurrence carries `order` (setting, the list, position, `first`,
+  `preferred`, whose list it is) and the finding `negotiation`; in the CBOM, `qrp:negotiation`
+  per occurrence. For SSH, RFC 4253 §7.1: the first algorithm on the client's list that the
+  server also supports is chosen, so the head of an `sshd_config` list is the server's preference
+  and not what a connection uses. `+` (appended to defaults) gives no position. For TLS only the
+  position is stated: who decides is the library's setting, not read. Without such a list:
+  `seen in code only`. No connection is made.
+
 **From 0.38.0**, the fixes promised in public comments and the rows of the fix list since 0.37.0:
 - **`--mandate nist-ir-8547` follows the final NIST IR 8547 (October 2026).** Every
   quantum-vulnerable signature and key establishment is deprecated after 2030 and disallowed
@@ -1431,6 +1485,8 @@ line, so such a line stays `undetermined`; so does a line with signals for both,
 longer than the 200-character excerpt. The finding's `replacement` counts the roles of its lines
 of code (comments carry a role but are not counted) in `roles_seen`, and drops a path only when
 no line showed that role **and** no line was undetermined. Every path says how many lines it is for.
+From 0.39.0 the role is in the CBOM too, as `qrp:role` on RSA and EC components, one value per
+occurrence; before, it stopped at the scan JSON.
 
 ⚠️ **Against this:** on every corpus measured, both paths stayed. Undetermined lines of code:
 certbot 208 of 229, OpenSSH 172 of 456, Vault 361 of 656, OpenSSL 3,354 of 3,893. The count is
@@ -1861,6 +1917,11 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
   `proxy_ssl_verify` is off by default and only an explicit `off` is reported. Which TLS library
   an image carries is known for one image (`nginx:1.24.0`); a `Dockerfile`'s `FROM` line is not
   read as a pin (the file itself is read from 0.35.0), so it is not joined to anything.
+- **Build switches and default orders** (from 0.39.0 the one verified case is read). Only
+  OpenSSH's `WITH_XMSS` is judged as a switch that leaves an algorithm out of a default build;
+  other `#ifdef`, CMake or meson options are not. A default key-exchange order written in code
+  (OpenSSH's `myproposal.h`) is code, not configuration, and is not read as an order; for TLS,
+  whether the server's or the client's group order decides is not read.
 - **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
   scope by design.** This tool reports what a cryptographically relevant quantum computer would
   break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,
