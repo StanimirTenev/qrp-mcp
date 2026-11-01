@@ -1160,8 +1160,8 @@ Every field below is in the scan JSON and in the CBOM, through `qrp-mcp cbom` an
   read` — on RSA and EC components; read from one line, with the limits measured under *The role
   of an RSA or EC line*.
 - **ML-KEM offered or preferred** (row 185). Where ML-KEM sits in an SSH `KexAlgorithms` list or a
-  TLS group setting, the occurrence carries `order` (setting, the list, position, `first`,
-  `preferred`, whose list it is) and the finding `negotiation`; in the CBOM, `qrp:negotiation`
+  TLS group setting, the occurrence carries `order` (setting, position, `of`, `first`,
+  `preferred`, whose list it is; only the setting's value is read, not the rest of the line) and the finding `negotiation`; in the CBOM, `qrp:negotiation`
   per occurrence. For SSH, RFC 4253 §7.1: the first algorithm on the client's list that the
   server also supports is chosen, so the head of an `sshd_config` list is the server's preference
   and not what a connection uses. `+` (appended to defaults) gives no position. For TLS only the

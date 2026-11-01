@@ -87,3 +87,19 @@ def test_order_reaches_the_cbom(tmp_path):
                 said[o["location"]] = v
     assert said["sshd_config"].startswith("offered: position 2 of 2")
     assert said["a.py"].startswith("seen in code only")
+
+
+def test_haproxy_bind_line_counts_only_the_curves_value(tmp_path):
+    (tmp_path / "haproxy.cfg").write_text(
+        "frontend f\n  bind :443 ssl crt x.pem curves X25519MLKEM768:X25519 alpn h2\n")
+    [row] = _mlkem(scan_directory(tmp_path))
+    assert (row["order"]["position"], row["order"]["of"]) == (1, 2)
+    assert row["order"]["preferred"] is True and "list" not in row["order"]
+
+
+def test_nginx_trailing_comment_is_not_in_the_list(tmp_path):
+    (tmp_path / "nginx.conf").write_text(
+        "server {\n  ssl_ecdh_curve X25519:X25519MLKEM768; # prefer pq later\n}\n")
+    [row] = _mlkem(scan_directory(tmp_path))
+    assert (row["order"]["position"], row["order"]["of"], row["order"]["first"]) == \
+        (2, 2, "X25519")

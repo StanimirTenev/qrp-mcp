@@ -515,8 +515,8 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                 said = [t for name, t in orders_at.get((o["location"], o.get("line")), [])
                         if name == own]
                 orders.append(said[0] if said else
-                              "seen in code only: no configured order on this line; whether "
-                              "it is negotiated is not established")
+                              "seen in code only, or in a list this scan does not read as an "
+                              "order: whether it is negotiated is not established")
             component["properties"].append({"name": f"{NS}negotiation",
                                             "value": json.dumps(orders)})
 

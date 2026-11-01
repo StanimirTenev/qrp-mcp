@@ -44,7 +44,7 @@ def test_gated_and_undefined_is_flagged_and_not_counted(tmp_path):
     assert f["classification"] == "pqc_ready"
     gate = f["not_enabled"]
     assert gate["gate"] == "WITH_XMSS"
-    assert "no other line in any file" in gate["basis"]
+    assert "no other line in the files the scan read or skipped" in gate["basis"]
     assert result["summary"]["pqc_ready_count"] == 0
     assert "XMSS" not in result["summary"]["by_role"]["signature"]["families"] or \
         result["summary"]["by_role"]["signature"]["pqc_readiness"] != "pqc_ready"
@@ -77,3 +77,21 @@ def test_flag_reaches_the_cbom(tmp_path):
         if c["name"].startswith("XMSS"):
             props.update({p["name"]: p["value"] for p in c.get("properties", [])})
     assert "WITH_XMSS" in props["qrp:not_enabled"]
+
+
+def test_a_second_run_with_its_output_inside_the_tree_says_the_same(tmp_path):
+    """The scan's own output names -DWITH_XMSS in its basis; it must never be read back."""
+    tree = _tree(tmp_path)
+    for _ in range(2):
+        r = subprocess.run([sys.executable, "-m", "qrp_mcp.server", "scan", str(tree),
+                            "--out", str(tree / "scan.json")], capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        result = json.loads((tree / "scan.json").read_text())
+        assert "not_enabled" in _xmss(result)
+
+
+def test_a_file_excluded_by_config_does_not_count(tmp_path):
+    tree = _tree(tmp_path, {".qrp.toml": 'exclude = ["notes"]\n'})
+    (tree / "notes").mkdir()
+    (tree / "notes" / "howto.txt").write_text("build with CFLAGS=-DWITH_XMSS\n")
+    assert "not_enabled" in _xmss(scan_directory(tree))

@@ -140,7 +140,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     notes, set_aside, protected = _what_the_evidence_adds(scan_result, response.findings,
                                                           detected_by_name)
     # Row 183: present, and compiled only under a build switch nothing in the tree turns on.
-    for family, said in _build_gates(repo_path, response.findings).items():
+    for family, said in _build_gates(repo_path, scan_result, response.findings).items():
         notes.setdefault(family, {})["not_enabled"] = said
         set_aside.add(family)
     # Row 182: the classical status of the smallest size read, with its source; row 185:
@@ -841,7 +841,7 @@ def _order_on_line(path: str, excerpt: str) -> dict[str, Any] | None:
         at = next((i for i, n in enumerate(names) if "mlkem" in n.lower()), None)
         if at is None or prefix == "-":
             return None
-        order: dict[str, Any] = {"setting": "KexAlgorithms", "list": names,
+        order: dict[str, Any] = {"setting": "KexAlgorithms",
                                  "position": at + 1, "of": len(names), "first": names[0],
                                  "preferred": at == 0, "note": _SSH_ORDER_NOTE[_ssh_side(path)]}
         if prefix == "+":
@@ -854,15 +854,22 @@ def _order_on_line(path: str, excerpt: str) -> dict[str, Any] | None:
         return order
     setting = assets._group_setting(excerpt)
     if setting:
-        names = [m.group(0) for m in assets._GROUP_TOKEN.finditer(excerpt, setting.end())
-                 if not (m.start() > 0 and excerpt[m.start() - 1] in "-!")]
+        # The setting's one value, not the rest of the line: `curves A:B alpn h2` on an
+        # HAProxy bind line, or a trailing comment, is not part of the list.
+        value = _GROUP_VALUE.match(excerpt, setting.end())
+        names = [n.lstrip("*") for n in re.split(r"[:,/]", value.group(1) if value else "")
+                 if n and n[0] not in "-!"]
+        names = [n for n in names if assets._GROUP_TOKEN.fullmatch(n)]
         at = next((i for i, n in enumerate(names) if "mlkem" in n.lower()), None)
         if at is None:
             return None
-        return {"setting": " ".join(setting.group(0).replace("=", " ").split()), "list": names,
+        return {"setting": " ".join(setting.group(0).replace("=", " ").split()),
                 "position": at + 1, "of": len(names), "first": names[0],
                 "preferred": at == 0, "note": _TLS_ORDER_NOTE}
     return None
+
+
+_GROUP_VALUE = re.compile(r"""[\s=:(\"']*([^\s;"')]+)""")
 
 
 def _read_order(scan_result: dict[str, Any]) -> None:
@@ -881,8 +888,9 @@ def _negotiation(scan_result: dict[str, Any], name: str | None) -> dict[str, Any
     ordered = [i for i in _in_use(scan_result).get(name or "", []) if i.get("order")]
     if not ordered:
         return {"configured_order_read": False,
-                "statement": ("seen in code only: no configured order names it, and whether "
-                              "it is negotiated is not established; no connection is made")}
+                "statement": ("seen in code only, or in a list this scan does not read as an "
+                              "order: whether it is negotiated is not established; no "
+                              "connection is made")}
     first = [i for i in ordered if i["order"]["preferred"]]
     return {"configured_order_read": True,
             "places": len(ordered), "first_in_list_at": len(first),
@@ -904,7 +912,8 @@ BUILD_GATES = {"XMSS": "WITH_XMSS"}
 _CONDITIONAL = re.compile(r"^\s*#\s*(?:if|ifdef|ifndef|elif|else|endif)\b")
 
 
-def _build_gates(repo_path: Path, findings: list[Any]) -> dict[str, dict[str, Any]]:
+def _build_gates(repo_path: Path, scan_result: dict[str, Any],
+                 findings: list[Any]) -> dict[str, dict[str, Any]]:
     families = {f.algorithm_family for f in findings
                 if f.algorithm_family in BUILD_GATES
                 and f.classification in ("pqc_ready", "pqc_pre_standard")}
@@ -914,14 +923,17 @@ def _build_gates(repo_path: Path, findings: list[Any]) -> dict[str, dict[str, An
         token = macro.encode()
         conditions: list[str] = []
         other = False
-        for path in detectors.iter_repo_files(repo_path, {}, []):
+        # The files this scan read or skipped by type: every exclusion the scan made holds,
+        # and its own output (left out) is never read back -- a second run with `--out`
+        # inside the tree would otherwise find this very sentence and unflag it.
+        for rel in sorted(set(scan_result.get("files_read") or [])
+                          | set(scan_result.get("files_skipped") or [])):
             try:
-                data = path.read_bytes()
+                data = (repo_path / rel).read_bytes()
             except OSError:
                 continue
             if token not in data:
                 continue
-            rel = detectors.display_path(str(path.relative_to(repo_path)))
             for n, line in enumerate(data.decode("utf-8", "replace").splitlines(), start=1):
                 if macro in line:
                     if _CONDITIONAL.match(line):
@@ -935,7 +947,7 @@ def _build_gates(repo_path: Path, findings: list[Any]) -> dict[str, dict[str, An
                 "first_condition": conditions[0],
                 "basis": (f"built only where {macro} is defined: {len(conditions)} "
                           f"preprocessor conditions name it (first at {conditions[0]}), and "
-                          f"no other line in any file present in the scan does -- no "
+                          f"no other line in the files the scan read or skipped by type does -- no "
                           f"#define, -D{macro}, AC_DEFINE, CMake or meson line. OpenSSH "
                           f"puts every {family} file and key type under this switch (checked "
                           f"at V_9_9_P1), so a default build has no {family}. A builder can "
