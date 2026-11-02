@@ -548,6 +548,9 @@ _PPK_NOT_REQUIRED = re.compile(r"(?<![A-Za-z])ppk(?:_required)?\s*=\s*(?:no|fals
 # optional PPK too (ZA-OPRAVYANE row 89).
 _PPK_ID = re.compile(r"(?<![A-Za-z])ppk_id\s*=", re.IGNORECASE)
 _PPK_REQUIRED = re.compile(r"(?<![A-Za-z])ppk_required\s*=\s*(?:yes|true)\b", re.IGNORECASE)
+# Libreswan's `ppk=`: only `insist` requires the PPK; "propose or yes (the default)" proposes
+# it and `never`/`no` turns it off (ipsec.conf(5), v3.32-v4.12; ZA-OPRAVYANE row 109).
+_LIBRESWAN_PPK = re.compile(r"(?<![A-Za-z_])ppk\s*=\s*(\w+)", re.IGNORECASE)
 
 
 # Values that say nothing classical is present. Each is withheld while the scan did not
@@ -739,7 +742,9 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
     required: set[str] = set()
     for item in uses.get("PPK", []):
         excerpt = item.get("excerpt") or ""
-        optional = bool(_PPK_NOT_REQUIRED.search(excerpt))
+        libreswan = _LIBRESWAN_PPK.search(excerpt)
+        optional = bool(_PPK_NOT_REQUIRED.search(excerpt)) or bool(
+            libreswan and libreswan.group(1).lower() != "insist")
         ppk_files[item["path"]] = ppk_files.get(item["path"], False) or optional
         if _PPK_ID.search(excerpt):
             with_id.add(item["path"])

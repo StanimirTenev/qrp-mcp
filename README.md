@@ -1023,7 +1023,9 @@ and points raised on LinkedIn — what is read and named grows, and the summary 
 - **RFC 8784, two narrowings.** strongSwan's `ppk_required` defaults to `no` (its swanctl.opt),
   so a `ppk_id` without `ppk_required = yes` is an optional PPK and protects nothing; and a family
   is protected only when every use of it sits under a required PPK — EC in a second tunnel
-  without one was counted protected by the first.
+  without one was counted protected by the first. After 0.39.0 the same for Libreswan: only
+  `ppk=insist` requires the PPK (ipsec.conf(5): `propose` or `yes`, the default, proposes it),
+  so any other value protects nothing.
 - **Two shapes of the denial block.** A block a condition opens (`} catch
   (UnsupportedAlgorithmError) {`) is the code that runs then, not a list of banned names, so a
   declaration inside it is a use; a `pytest.raises`/`assertRaises` block whose line says
