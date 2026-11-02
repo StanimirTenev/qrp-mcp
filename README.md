@@ -88,7 +88,7 @@ uvx qrp-mcp scan ~/code/my-protocol --out result.json
 ```
 
 This produces the same result as the `scan_repo` tool, written to a file you can read
-before it goes anywhere. Nothing is sent. By default (after 0.39.0, as `cbom` since 0.16.0 and
+before it goes anywhere. Nothing is sent. By default (from 0.40.0, as `cbom` since 0.16.0 and
 the tools) the quoted line is masked: everything in it but the algorithm name is starred out.
 `--level full` writes the line as it is, and `--level trimmed` removes the line altogether; all
 three keep each file and line number. The SHA-256 of the written bytes is printed,
@@ -385,7 +385,7 @@ v2.0, agreeing with RFC 5903 §3. **Not checked**: compressed points, keys insid
 containers (PKCS#12, encrypted PEM), other curves (brainpool, Ed25519 and X25519 keys), points
 quoted in source code or in a `known_hosts`/`authorized_keys` line read as configuration, and any
 scalar above 256 — the bound is the finding's, and a key with scalar 257 is not reported.
-After 0.39.0 the bound is said where the check ran, found or not (row 154): `weak_key_check`
+From 0.40.0 the bound is said where the check ran, found or not (row 154): `weak_key_check`
 gives `bound: 256`, the number of EC public keys compared and "checked up to 256", and the CBOM
 carries `qrp:weak_key_check:bound`. Where no EC public key was read it is `null`.
 Debian's weak OpenSSL keys and ROCA are a different family of weak key and are not checked. The
@@ -832,7 +832,7 @@ line as group settings; the names are HAProxy's own (Configuration Manual 3.5,
 cipher suite. Of the other terminators, Envoy (`tls_minimum_protocol_version: TLSv1_2`,
 `ecdh_curves`, `cipher_suites`) was already read; **Traefik** (`minVersion: VersionTLS12`, a
 `curvePreferences` list over several lines) and **Caddy** (a `Caddyfile` has no extension and was
-not read; from 0.35.0 it is, and `x25519` in it is found as X25519; after 0.39.0 its `curves`
+not read; from 0.35.0 it is, and `x25519` in it is found as X25519; from 0.40.0 its `curves`
 line is a group setting and `protocols tls1.2 tls1.3` names the versions, both a TLS place) are
 not, tested on 22 Oct 2026.
 
@@ -883,10 +883,10 @@ the code scan missing:
   the pin and the groups are named side by side, not joined. In the probe the repository set
   X25519MLKEM768 for a service that ops ran on nginx:1.24.0 with a classical hotfix mounted
   instead; nginx refused the repository's configuration. A `Dockerfile` is read from 0.35.0 for
-  the algorithms it names; after 0.39.0 its `FROM nginx:1.24.0` is a pin too (named beside the
+  the algorithms it names; from 0.40.0 its `FROM nginx:1.24.0` is a pin too (named beside the
   groups, joined to nothing: a `FROM` line mounts nothing), and a package pin is not read for this. The
   places and the mounts are not part of the finding's identity in `closure`; in the CBOM it is a
-  `container` component. On OpenSSH and certbot: none. After 0.39.0 (row 117), where every use of
+  `container` component. On OpenSSH and certbot: none. From 0.40.0 (row 117), where every use of
   the post-quantum family is a place such a `not_established` image serves, the finding names it
   (`negotiation_not_established_by`) and the headline is `not_established`, with the would-be
   value (`hybrid_partial`) and the image in `readiness_not_established`; ML-KEM used by code
@@ -1031,7 +1031,7 @@ and points raised on LinkedIn — what is read and named grows, and the summary 
 - **RFC 8784, two narrowings.** strongSwan's `ppk_required` defaults to `no` (its swanctl.opt),
   so a `ppk_id` without `ppk_required = yes` is an optional PPK and protects nothing; and a family
   is protected only when every use of it sits under a required PPK — EC in a second tunnel
-  without one was counted protected by the first. After 0.39.0 the same for Libreswan: only
+  without one was counted protected by the first. From 0.40.0 the same for Libreswan: only
   `ppk=insist` requires the PPK (ipsec.conf(5): `propose` or `yes`, the default, proposes it),
   so any other value protects nothing.
 - **Two shapes of the denial block.** A block a condition opens (`} catch
@@ -1044,7 +1044,7 @@ and points raised on LinkedIn — what is read and named grows, and the summary 
   not per component, because one algorithm sits in many teams' code. In the CBOM it is an
   `[owners: … per FILE:N]` tag on the occurrence: the schema has no field for it. It is the
   file's assumption, not a fact about who runs the code; `codeowners` says which file was used.
-  After 0.39.0 the handles are masked like a quoted line (`@****/******-****`) at every level
+  From 0.40.0 the handles are masked like a quoted line (`@****/******-****`) at every level
   but `full` (row 112); the file and line they come from stay.
 - **Key establishment and signatures apart.** `summary.by_role` gives each its families and its
   own readiness: nginx offering X25519MLKEM768 with an ECDSA certificate is `hybrid_partial` for
@@ -1132,6 +1132,38 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 ⚠️ What is not claimed: recall on real code. The rules were written against the measured names;
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
+
+**From 0.40.0**, a batch of the fix list (rows 99, 107, 109–112, 115, 117, 129, 150, 152, 154). Each
+was reproduced as a failing test before the fix, and each fix was reverted once to see its test fail.
+
+- **`scan` masks quoted lines by default** (row 152), on stdout, in `--out` and in `--format sarif`,
+  as `cbom` has since 0.16.0. The file a client sends for a report is exactly `scan --out`, and it
+  carried whole lines unless the command said otherwise. `--level full` (or a level in `.qrp.toml`)
+  still gives the whole line. What is found does not change, only how a line is quoted.
+- **A classical fallback beside a hybrid is marked** (row 99). `X25519MLKEM768:X25519` and
+  `X25519MLKEM768` read the same; now the finding carries `fallback_beside_hybrid`, the summary
+  `by_role.key_establishment.fallback_beside_hybrid`, and the CBOM `qrp:fallback_beside_hybrid`.
+  X25519 counts as classical in both cases, as before.
+- **A pinned image whose support is not established does not headline a hybrid** (row 117), when
+  every use of the post-quantum family is such a place; a Dockerfile `FROM` is now a pin too
+  (row 110), named beside the groups and joined to nothing, since it mounts nothing.
+- **Commented settings are not settings** (row 107): `# ssl_protocols TLSv1` no longer makes a
+  protocol asset. On OpenSSH and certbot the findings, the families and the verdict are the same
+  as in 0.39.0.
+- **Libreswan `ppk=` other than `insist` is optional** (row 109), checked against ipsec.conf(5)
+  of v3.32, v4.0 and v4.12; Caddyfile `curves` / `protocols` are a TLS place (row 111); TPM 2.0
+  names (`TPM2_ALG_RSA`, `tpm2_createek -G rsa`) are found (row 115); an EC family whose every line
+  names a curve is a component such as `EC-P-256` in the CBOM (row 129).
+- **The weak-key bound is said where the check ran** (row 154): `weak_key_check` gives the bound
+  (256), how many keys were checked and "checked up to 256"; `null` when no EC key was read.
+- **CODEOWNERS handles are masked** at `masked` and `trimmed` (row 112).
+- **Windows** (row 150): a key file without an extension and with CRLF endings was never opened,
+  and `files_left_out` used the OS separator; both fixed. Three tests still cannot pass there:
+  Windows has no `dir_fd` and no `O_NOFOLLOW`, so a link swapped in after the walk is followed.
+  Not run on Windows for this release.
+
+On the corpus of 185 public repositories the disagreement with the labelling model is unchanged in
+both splits (A' 404 / 71, B' 244 / 40); that is disagreement with a model, not recall or precision.
 
 **From 0.39.0**, rows 179–185 of the fix list: what a reader of the CBOM alone could not get.
 Every field below is in the scan JSON and in the CBOM, through `qrp-mcp cbom` and `export_cbom`.
@@ -1281,7 +1313,7 @@ Every field below is in the scan JSON and in the CBOM, through `qrp-mcp cbom` an
   wherever the files give one; a hybrid as a component that depends on its two halves; one
   library component per bom-ref however the manifests spell it; certificates, parsed with
   `cryptography`, as certificate assets with their subject key nested; `non_security_use` on the
-  occurrence. After 0.39.0 (row 129) the curve also comes from code: an EC, ECDSA or ECDH row whose
+  occurrence. From 0.40.0 (row 129) the curve also comes from code: an EC, ECDSA or ECDH row whose
   line names exactly one NIST prime curve (`ec.SECP256R1()`, `prime256v1`, `elliptic.P384()`,
   `secp521r1`) carries `curve`, and its component the field; two curves on one line name none.
 - **Every occurrence carries a confidence** (high, medium, low) and its basis, in the scan
@@ -1342,7 +1374,7 @@ three source findings on the edited line still close and reopen, because their i
 the line's text; that is how every edited line has always been compared. On certbot: 3 (X25519,
 prime256v1, secp384r1 in the Apache options file); on OpenSSH: none.
 
-After 0.39.0 (row 99) the summary tells the two apart as well: a classical group or SSH key
+From 0.40.0 (row 99) the summary tells the two apart as well: a classical group or SSH key
 exchange offered alone on a line that also offers a hybrid stays a classical finding and carries
 `fallback_beside_hybrid` (its places), listed in `summary.by_role.key_establishment.
 fallback_beside_hybrid` and as `qrp:fallback_beside_hybrid` on its CBOM component. A pure hybrid
@@ -1938,7 +1970,7 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
   listener without `ssl-min-ver` or a cipher list says the defaults apply, not which. nginx's
   `proxy_ssl_verify` is off by default and only an explicit `off` is reported. Which TLS library
   an image carries is known for one image (`nginx:1.24.0`); a `Dockerfile`'s `FROM` line is read
-  as a pin after 0.39.0, but it mounts nothing, so it is not joined to any configuration.
+  as a pin from 0.40.0, but it mounts nothing, so it is not joined to any configuration.
 - **Build switches and default orders** (from 0.39.0 the one verified case is read). Only
   OpenSSH's `WITH_XMSS` is judged as a switch that leaves an algorithm out of a default build;
   other `#ifdef`, CMake or meson options are not. A default key-exchange order written in code
