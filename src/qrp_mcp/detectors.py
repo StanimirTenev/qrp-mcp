@@ -3985,7 +3985,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     if resolved_exclude and path.name in {p.name for p in resolved_exclude}:
         try:
             if path.resolve() in resolved_exclude:
-                left_out.append(str(path.relative_to(repo_path)))
+                left_out.append(_relative_posix(path, repo_path))
                 return
         except (OSError, ValueError):
             pass
@@ -3993,7 +3993,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # The owner's settings, whether or not this run loaded them (`--no-config`, a
         # nested service's own): its comments name what it excludes. Left out and named,
         # as the loaded one is.
-        left_out.append(str(path.relative_to(repo_path)))
+        left_out.append(_relative_posix(path, repo_path))
         return
     r["files_present"] += 1
     # The composition of the denominator, not just its size. A coverage figure
