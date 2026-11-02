@@ -356,6 +356,16 @@ def _mask_excerpts(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _mask_owners(result: dict[str, Any]) -> None:
+    """CODEOWNERS handles are names of people and teams: below `full` they are masked as
+    a line is, on every occurrence, and so in the CBOM built from it (ZA-OPRAVYANE row 112)."""
+    for items in _evidence_lists(result):
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict) and item.get("owners"):
+                    item["owners"] = [_mask_excerpt(str(o), "") for o in item["owners"]]
+
+
 def _at_level(result: dict[str, Any], level: str) -> dict[str, Any]:
     """One place that turns a level into what the result carries.
 
@@ -371,6 +381,8 @@ def _at_level(result: dict[str, Any], level: str) -> dict[str, Any]:
     # Said in the result, so a later comparison can tell a masked line from a real
     # one; two results quoting at different levels are not the same text.
     result["excerpt_level"] = level
+    if level != "full":
+        _mask_owners(result)
     if level == "trimmed":
         return _strip_excerpts(result)
     if level == "masked":

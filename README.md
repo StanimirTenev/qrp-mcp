@@ -1037,6 +1037,8 @@ and points raised on LinkedIn — what is read and named grows, and the summary 
   not per component, because one algorithm sits in many teams' code. In the CBOM it is an
   `[owners: … per FILE:N]` tag on the occurrence: the schema has no field for it. It is the
   file's assumption, not a fact about who runs the code; `codeowners` says which file was used.
+  After 0.39.0 the handles are masked like a quoted line (`@****/******-****`) at every level
+  but `full` (row 112); the file and line they come from stay.
 - **Key establishment and signatures apart.** `summary.by_role` gives each its families and its
   own readiness: nginx offering X25519MLKEM768 with an ECDSA certificate is `hybrid_partial` for
   key establishment and `classical_only` for signatures, where the whole read only
