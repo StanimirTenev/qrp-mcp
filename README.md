@@ -886,7 +886,11 @@ the code scan missing:
   the algorithms it names; after 0.39.0 its `FROM nginx:1.24.0` is a pin too (named beside the
   groups, joined to nothing: a `FROM` line mounts nothing), and a package pin is not read for this. The
   places and the mounts are not part of the finding's identity in `closure`; in the CBOM it is a
-  `container` component. On OpenSSH and certbot: none.
+  `container` component. On OpenSSH and certbot: none. After 0.39.0 (row 117), where every use of
+  the post-quantum family is a place such a `not_established` image serves, the finding names it
+  (`negotiation_not_established_by`) and the headline is `not_established`, with the would-be
+  value (`hybrid_partial`) and the image in `readiness_not_established`; ML-KEM used by code
+  beside it still counts.
 
 The same probe said that two comments were counted as uses — `# … classical X25519 as fallback.`
 above HAProxy's curves line, and `# … hybrid ML-KEM group preferred.` in an nginx file whose

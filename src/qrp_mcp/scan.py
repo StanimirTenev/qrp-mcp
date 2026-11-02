@@ -226,6 +226,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     )
 
     _withhold_reassurance(summary, coverage_block, scan_result, response.findings)
+    _unestablished_negotiation(summary, notes, set_aside)
     if summary.readiness_not_established:
         for part in ("key_establishment", "signature"):
             if summary.by_role[part]["pqc_readiness"] in _REASSURING:
@@ -563,6 +564,31 @@ _REASSURING = ("pqc_ready", "pqc_pre_standard", "mechanism_protected",
                "no_quantum_vulnerable_detected")
 
 
+def _unestablished_negotiation(summary: Any, notes: dict[str, dict[str, Any]],
+                               set_aside: set[str]) -> None:
+    """ZA-OPRAVYANE row 117: a post-quantum family whose every use is a TLS place served by a
+    pinned image whose support is not established does not make the headline: whether that
+    image negotiates it is not known, and the headline says so."""
+    because = [f"{', '.join(note['negotiation_not_established_by'])} pinned beside {family}: "
+               f"whether that image can negotiate it is not established "
+               f"(evidence.library_support)"
+               for family, note in sorted(notes.items())
+               if note.get("negotiation_not_established_by") and family not in set_aside]
+    if not because:
+        return
+    if summary.pqc_readiness == "not_established" and summary.readiness_not_established:
+        summary.readiness_not_established["because"].extend(because)
+    elif summary.pqc_readiness in (*_REASSURING, "hybrid_partial"):
+        summary.readiness_not_established = {"would_read": summary.pqc_readiness,
+                                             "because": because}
+        summary.pqc_readiness = "not_established"
+    else:
+        return
+    part = summary.by_role["key_establishment"]
+    if part["pqc_readiness"] in (*_REASSURING, "hybrid_partial"):
+        part["pqc_readiness"] = "not_established"
+
+
 def _withhold_reassurance(summary: Any, block: dict[str, Any], scan_result: dict[str, Any],
                           findings: list[Any]) -> None:
     if summary.pqc_readiness not in _REASSURING:
@@ -699,6 +725,24 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
             notes.setdefault(family, {})["not_negotiable_by"] = sorted(
                 {image for place in places for image in unable[place]})
             set_aside.add(family)
+
+    # Row 117: the same, where what the image carries is not in this scan's table
+    # (`support: not_established`). Not set aside -- nothing says it cannot -- but named, and
+    # the headline withheld for it (_unestablished_negotiation).
+    unsure: dict[str, list[str]] = {}
+    for item in scan_result.get("library_support_findings") or []:
+        if item.get("support") == "not_established":
+            for place in item.get("group_places") or []:
+                unsure.setdefault(place, []).append(
+                    f"{item['image']} ({item['path']}:{item['line']})")
+    for name, items in uses.items():
+        family = family_of.get(name)
+        if family not in pqc or family in set_aside or not unsure:
+            continue
+        places = {f"{i['path']}:{i['line']}" for i in items}
+        if places <= set(unsure):
+            notes.setdefault(family, {})["negotiation_not_established_by"] = sorted(
+                {image for place in places for image in unsure[place]})
 
     # A family found only in test code says so on its finding, and a post-quantum one is
     # not counted as deployed: the CBOM already marked it `scope: excluded` while the
