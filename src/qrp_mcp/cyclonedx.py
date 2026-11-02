@@ -728,7 +728,8 @@ def _certificate_components(located: list[dict[str, Any]],
 
 # What a family's own component says that its parameter-set components do not (release 3d).
 _CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_pins",
-                                 "provider_configuration", "not_negotiable_by", "not_enabled")}
+                                 "provider_configuration", "not_negotiable_by", "not_enabled",
+                                 "fallback_beside_hybrid")}
 
 
 def _size_and_status(family: str, finding: dict[str, Any], sizes: list[int],
@@ -936,6 +937,11 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["properties"].append({
                 "name": f"{NS}not_negotiable_by",
                 "value": json.dumps(finding["not_negotiable_by"], ensure_ascii=False)})
+        # Offered alone beside a hybrid on the same line: its classical fallback (row 99).
+        if finding.get("fallback_beside_hybrid"):
+            component["properties"].append({
+                "name": f"{NS}fallback_beside_hybrid",
+                "value": json.dumps(finding["fallback_beside_hybrid"], ensure_ascii=False)})
         occurrences = _occurrences([item for item in located if id(item) not in routed],
                                    family, family_of)
         children = _parameter_components(family, finding, by_parameter, family_by_ref)

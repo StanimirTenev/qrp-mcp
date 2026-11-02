@@ -166,6 +166,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
                if detected_by_name.get(f.raw_value) not in by_name_only]
     summary = summarize(counted, set_aside, protected)
     summary.by_role = _by_role(counted, roles, detected_by_name, set_aside, protected)
+    summary.by_role["key_establishment"]["fallback_beside_hybrid"] = {
+        family: note["fallback_beside_hybrid"] for family, note in sorted(notes.items())
+        if note.get("fallback_beside_hybrid")}
 
     coverage_block = coverage.build(
         repo_path=repo_path,
@@ -725,6 +728,19 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
             notes.setdefault(family, {})["not_negotiable_by"] = sorted(
                 {image for place in places for image in unable[place]})
             set_aside.add(family)
+
+    # Row 99: a classical group or SSH key exchange offered alone on a line that also offers
+    # a hybrid is the hybrid's classical fallback. It stays a classical finding and says so;
+    # a pure hybrid gets nothing, so the two read apart.
+    hybrid_lines = {(h["path"], h["line"]) for h in scan_result.get("hybrid_names") or []}
+    for item in ((scan_result.get("tls_group_findings") or [])
+                 + (scan_result.get("ssh_kex_findings") or [])):
+        if (item["path"], item["line"]) in hybrid_lines:
+            family = family_of.get(item["family"], item["family"])
+            places = notes.setdefault(family, {}).setdefault("fallback_beside_hybrid", [])
+            place = f"{item['path']}:{item['line']}"
+            if place not in places:
+                places.append(place)
 
     # Row 117: the same, where what the image carries is not in this scan's table
     # (`support: not_established`). Not set aside -- nothing says it cannot -- but named, and
