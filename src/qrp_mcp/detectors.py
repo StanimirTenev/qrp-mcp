@@ -3871,6 +3871,24 @@ def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
             item["parameter_set"] = found.pop()
 
 
+# The NIST prime curves by their SEC 2, ANSI X9.62 and NIST spellings (SEC 2 v2.0 Table 1:
+# secp256r1 = prime256v1 = P-256). An EC row whose line names exactly one of them carries it as
+# `curve`, which the CBOM's algorithmProperties.curve takes (ZA-OPRAVYANE row 129).
+_NIST_CURVE = re.compile(
+    r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))(?![0-9])",
+    re.IGNORECASE)
+
+
+def _tag_curves(items: list[dict[str, Any]]) -> None:
+    for item in items:
+        if item.get("algorithm") not in ("EC", "ECDSA", "ECDH") or item.get("curve"):
+            continue
+        found = {f"P-{next(g for g in m.groups() if g)}"
+                 for m in _NIST_CURVE.finditer(item.get("excerpt") or "")}
+        if len(found) == 1:
+            item["curve"] = found.pop()
+
+
 # baseline.FORMAT and config.FILENAME, written out here so this module imports neither.
 BASELINE_FORMAT = "qrp-mcp baseline 1"
 CONFIG_FILENAME = ".qrp.toml"
@@ -4492,6 +4510,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             _read_codeowners(owners_file, codeowners[owners_file]))
     _join_pins(source_findings + iac_findings, pins)
     _tag_parameter_sets(source_findings + iac_findings)
+    _tag_curves(source_findings + iac_findings)
     _join_fips(source_findings + iac_findings, fips_findings)
     return {
         "files_scanned": files_scanned,

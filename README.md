@@ -1281,7 +1281,9 @@ Every field below is in the scan JSON and in the CBOM, through `qrp-mcp cbom` an
   wherever the files give one; a hybrid as a component that depends on its two halves; one
   library component per bom-ref however the manifests spell it; certificates, parsed with
   `cryptography`, as certificate assets with their subject key nested; `non_security_use` on the
-  occurrence.
+  occurrence. After 0.39.0 (row 129) the curve also comes from code: an EC, ECDSA or ECDH row whose
+  line names exactly one NIST prime curve (`ec.SECP256R1()`, `prime256v1`, `elliptic.P384()`,
+  `secp521r1`) carries `curve`, and its component the field; two curves on one line name none.
 - **Every occurrence carries a confidence** (high, medium, low) and its basis, in the scan
   JSON, SARIF (`rank`) and the CBOM; see *How sure the scan is of each occurrence*.
 - **Detection.** Algorithm names from the IANA SSH, TLS, JOSE and COSE registries, OpenSSH's

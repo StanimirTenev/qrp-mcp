@@ -39,13 +39,13 @@ _LOCATION_FIELDS = ("line",)
 # The TLS-termination pointer is a note about the line, the same on every TLS line, and
 # absent from results written before 0.31.0.
 # The parameter set is read off the excerpt, which is already identity, and is absent
-# from results written before release A.
+# from results written before release A; so is an EC row's curve (row 129).
 # The signing key joined to a signing step is read from another file, like the provider.
 # So are the version pinned for the provider and the FIPS activation beside it.
 # A pinned image's group places and the files it serves are read from other files too.
 _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signing_key",
                    "provider_pin", "fips_provider_configured_in", "group_places", "serves",
-                   "serves_group_places", "parameter_set",
+                   "serves_group_places", "parameter_set", "curve",
                    # What a run says about the line -- against a baseline, a mandate, an
                    # owner's suppression -- is not the line.
                    "baseline_state", "mandates", "hndl_exposed", "suppression",

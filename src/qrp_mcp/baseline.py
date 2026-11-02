@@ -29,7 +29,7 @@ _NOT_IDENTITY = {"line", "in_test_code", "role", "provider", "tls_termination", 
                  "serves_group_places", "owners", "owners_source", "baseline_state",
                  "mandates", "hndl_exposed", "suppression", "path", "confidence",
                  "key_exchange", "unowned_by", "imported_in", "imported_count", "imported",
-                 "confidence_basis"}
+                 "confidence_basis", "curve"}
 
 
 def family(item: dict[str, Any]) -> str:
