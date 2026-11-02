@@ -26,9 +26,7 @@ flowchart TD
     Q --> N["Not read<br/>each file with its reason"]
     F --> J["scan --out result.json"]
     N --> J
-    J --> C["CBOM<br/>CycloneDX 1.6"]
-    J --> S["SARIF"]
-    J --> X["closure<br/>what a change closed"]
+    J --> O["CBOM (CycloneDX 1.6)<br/>SARIF<br/>closure: what a change closed"]
 ```
 
 Need a cryptographic inventory (a CBOM) for a post-quantum migration or an audit, without
