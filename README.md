@@ -88,9 +88,10 @@ uvx qrp-mcp scan ~/code/my-protocol --out result.json
 ```
 
 This produces the same result as the `scan_repo` tool, written to a file you can read
-before it goes anywhere. Nothing is sent. `--level masked` stars out everything in the quoted
-line but the algorithm name, and `--level trimmed` removes the line altogether; both keep each
-file and line number. The SHA-256 of the written bytes is printed,
+before it goes anywhere. Nothing is sent. By default (after 0.39.0, as `cbom` since 0.16.0 and
+the tools) the quoted line is masked: everything in it but the algorithm name is starred out.
+`--level full` writes the line as it is, and `--level trimmed` removes the line altogether; all
+three keep each file and line number. The SHA-256 of the written bytes is printed,
 so anyone you send the file to can quote back exactly what they received.
 
 That digest is the file's integrity, and the file holds its read times, so two runs over one

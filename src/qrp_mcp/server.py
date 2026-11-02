@@ -392,14 +392,15 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
                      "Scan a directory and write the result as JSON. Nothing is sent anywhere."))
     p.add_argument("path", help="directory to scan")
     p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
-    # The CBOM is the document built to be sent, so it quotes masked by default, as
-    # export_cbom does.
+    # Both files are built to be sent -- the scan file is what a customer sends for the
+    # free report -- so both quote masked by default, as the tools do (ZA-OPRAVYANE row 152;
+    # the CBOM since 0.16.0).
     p.add_argument("--level", choices=config.LEVELS, default=None,
                    help="what the quoted line of evidence carries: 'full' the line "
                         "itself, 'masked' its shape with everything but the algorithm "
                         "name starred out, 'trimmed' nothing. Files and line numbers "
                         "stay in all three. Default: the config file's, else "
-                        + ("masked" if cbom else "full"))
+                        "masked")
     # The CBOM carries no replacement, so a profile would change nothing in it.
     if not cbom:
         p.add_argument("--profile", choices=profiles.names(), default=None,
@@ -448,7 +449,7 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
         p.error(f"config: {err}")
     values = (settings or {}).get("values", {})
     # The command line wins over the file.
-    level = a.level or values.get("level") or ("masked" if cbom else "full")
+    level = a.level or values.get("level") or "masked"
     profile = getattr(a, "profile", None) or values.get("profile") or "nist"
     wanted = (getattr(a, "mandate", None) or values.get("mandate") or []) if not cbom else []
     lead = getattr(a, "lead_months", None)
