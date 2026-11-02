@@ -12,6 +12,10 @@ of a chain of elif branches.
 
 from __future__ import annotations
 
+import os
+
+import pytest
+
 from qrp_mcp.scan import scan_directory
 
 TREE = {
@@ -75,6 +79,8 @@ def test_a_yaml_that_is_not_a_manifest_is_still_counted(tmp_path):
     assert "docs/values.yaml" not in result["unreadable_files"]
 
 
+# ZA-OPRAVYANE row 150: chmod 000 does not make a file unreadable on Windows.
+@pytest.mark.skipif(os.name == "nt", reason="chmod cannot make a file unreadable on Windows")
 def test_nothing_opened_disappears(tmp_path):
     """Read, counted, or listed as unreadable. There is no fourth outcome.
 

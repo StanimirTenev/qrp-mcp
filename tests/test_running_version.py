@@ -11,6 +11,7 @@ release CBOM.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -46,10 +47,22 @@ def test_a_matching_distribution_adds_nothing(monkeypatch, tmp_path):
     assert "installed_distribution" not in scan_directory(tmp_path)["coverage"]["instrument"]
 
 
+def _child_env(pkg_parent: Path) -> dict:
+    """A bare environment that still finds git. ZA-OPRAVYANE row 150: `/usr/bin:/bin` alone
+    has no git on Windows, so the pin read `vcs_unavailable` there; Windows also needs
+    SYSTEMROOT for a child Python to start."""
+    git = shutil.which("git")
+    path = [str(Path(git).parent)] if git else []
+    env = {"PYTHONPATH": str(pkg_parent), "PATH": os.pathsep.join(path + ["/usr/bin", "/bin"])}
+    if "SYSTEMROOT" in os.environ:
+        env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
+    return env
+
+
 def _pin_from(pkg_parent: Path) -> dict:
     code = "import json; from qrp_mcp.coverage import _tool_pin; print(json.dumps(_tool_pin()))"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
-                         env={"PYTHONPATH": str(pkg_parent), "PATH": "/usr/bin:/bin"},
+                         env=_child_env(pkg_parent),
                          check=True)
     return json.loads(out.stdout)
 

@@ -70,10 +70,21 @@ import pytest as _pytest
 _PKG = Path(__file__).resolve().parents[1] / "src" / "qrp_mcp"
 
 
+def _child_env(pkg_parent: Path) -> dict:
+    """See tests/test_running_version._child_env (ZA-OPRAVYANE row 150, Windows)."""
+    import os
+    git = _shutil.which("git")
+    path = [str(Path(git).parent)] if git else []
+    env = {"PYTHONPATH": str(pkg_parent), "PATH": os.pathsep.join(path + ["/usr/bin", "/bin"])}
+    if "SYSTEMROOT" in os.environ:
+        env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
+    return env
+
+
 def _pin_from(pkg_parent: Path) -> dict:
     code = "import json; from qrp_mcp.coverage import _tool_pin; print(json.dumps(_tool_pin()))"
     out = _subprocess.run([_sys.executable, "-c", code], capture_output=True, text=True,
-                          env={"PYTHONPATH": str(pkg_parent), "PATH": "/usr/bin:/bin"},
+                          env=_child_env(pkg_parent),
                           check=True)
     return json.loads(out.stdout)
 

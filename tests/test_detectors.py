@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from pathlib import Path
 
@@ -133,6 +135,9 @@ def test_is_ci_config_file_recognizes_known_paths(tmp_path: Path):
     assert is_ci_config_file(regular, tmp_path) is False
 
 
+# ZA-OPRAVYANE row 150: chmod 000 does not make a file unreadable on Windows, so the test
+# cannot set up its case there; what it checks is not exercised, not passed.
+@pytest.mark.skipif(os.name == "nt", reason="chmod cannot make a file unreadable on Windows")
 def test_a_file_that_cannot_be_read_is_reported_not_counted_as_clean(tmp_path: Path):
     """A failed read must not look like a pass: it leaves the scanned count and shows up
     as unreadable, so "0 findings" can be checked against what was actually opened."""

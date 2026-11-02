@@ -139,7 +139,9 @@ def test_a_tilde_in_the_output_path_is_written_not_refused(tmp_path):
     done = subprocess.run(
         [sys.executable, "-m", "qrp_mcp.server", "scan", str(tmp_path),
          "--out", "~/result.json"],
-        capture_output=True, text=True, env={**os.environ, "HOME": str(home)})
+        # Windows expands ~ from USERPROFILE, not HOME (ZA-OPRAVYANE row 150).
+        capture_output=True, text=True,
+        env={**os.environ, "HOME": str(home), "USERPROFILE": str(home)})
     assert done.returncode == 0, done.stderr[-400:]
     assert (home / "result.json").is_file()
 
