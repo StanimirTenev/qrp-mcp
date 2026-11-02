@@ -457,6 +457,16 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bDsa(?:KeyPair|Parameters)Generator\b|"                                  # Bouncy Castle
         r"\bOPENSSL_KEYTYPE_DSA\b|\bx509\.DSAWithSHA\d+\b|\bKeyType\.DSA\b",
     )),
+    # TPM 2.0 (ZA-OPRAVYANE row 115): only TPM 1.2's TPM_ALG_RSA was read. tpm2-tss
+    # (include/tss2/tss2_tpm2_types.h), tpm2-pytss (`TPM2_ALG.RSA`, `TPM2_ECC.NIST_P256`,
+    # constants.py) and tpm2-tools' `-G`/`--key-algorithm` specifiers on a tpm2_ command
+    # (man/common/alg.md), read 2 Nov 2026. ECDSA and ECDH were already read as components.
+    ("RSA", "RSA named by a TPM 2.0 API", re.compile(
+        r"\bTPM2_ALG(?:_ID)?[._](?:RSA|RSASSA|RSAPSS|RSAES)\b|"
+        r"\btpm2_\w+\b[^\n]*\s(?:-G\s*|--key-algorithm[=\s]\s*)rsa\d*\b")),
+    ("EC", "EC named by a TPM 2.0 API", re.compile(
+        r"\bTPM2_ALG(?:_ID)?[._]ECC\b|\bTPM2_ECC(?:_CURVE)?[._](?:NIST|BN)_P\d+\b|"
+        r"\btpm2_\w+\b[^\n]*\s(?:-G\s*|--key-algorithm[=\s]\s*)ecc(?:\d+|_nist_p\d+)?\b")),
     # wolfCrypt, wolfSSL's crypto library: its classical API names the family only inside
     # a wc_ identifier, and a whole wolfSSL program scanned as empty (ZA-OPRAVYANE row 72).
     # Every prefix checked against wolfssl/wolfcrypt/{rsa,ecc,dh,md5,sha,hash,des3,falcon}.h
