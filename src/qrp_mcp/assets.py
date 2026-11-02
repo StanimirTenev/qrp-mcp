@@ -904,7 +904,8 @@ _PROTOCOL_WORDS = ("_version", "tls", "sslv", "protocol", "ssh-", "ecdsa-sha2-",
 
 def scan_protocols(line: str) -> list[dict[str, Any]]:
     """Protocol versions pinned on this line, as assets with no algorithm claim."""
-    if names_none_of(line, _PROTOCOL_WORDS):
+    # A commented setting configures nothing (ZA-OPRAVYANE row 107).
+    if names_none_of(line, _PROTOCOL_WORDS) or line.lstrip().startswith(_COMMENT_START):
         return []
     out: list[dict[str, Any]] = []
     seen: set[tuple[str, bool]] = set()
