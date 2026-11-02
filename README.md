@@ -20,15 +20,15 @@ makes zero outbound connections — enforced by a test, not promised in a paragr
 starts is a local `git`, to pin what it read, with the scanned repository's own hooks and filters disarmed.
 
 ```mermaid
-flowchart LR
-    R["Your repository<br/>on your machine, at a commit"] --> Q["qrp-mcp<br/>offline, zero network calls"]
-    Q --> F["Found<br/>file:line, family,<br/>quantum-vulnerable / post-quantum / weak"]
-    Q --> N["Not read<br/>every skipped file, with its reason"]
+flowchart TD
+    R["Your repository, on your machine, at a commit"] --> Q["qrp-mcp — offline, zero network calls"]
+    Q --> F["Found<br/>file:line and family"]
+    Q --> N["Not read<br/>each file with its reason"]
     F --> J["scan --out result.json"]
     N --> J
-    J --> C["CycloneDX 1.6 CBOM<br/>qrp-mcp cbom"]
-    J --> S["SARIF<br/>--format sarif"]
-    J --> X["What a change closed<br/>qrp-mcp closure BEFORE AFTER"]
+    J --> C["CBOM<br/>CycloneDX 1.6"]
+    J --> S["SARIF"]
+    J --> X["closure<br/>what a change closed"]
 ```
 
 Need a cryptographic inventory (a CBOM) for a post-quantum migration or an audit, without
