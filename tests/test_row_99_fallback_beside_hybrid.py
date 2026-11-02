@@ -4,7 +4,7 @@ with the same families and counts; only the evidence told them apart (SSH the sa
 classical group offered alone beside a hybrid stays a classical finding, and now carries
 `fallback_beside_hybrid` with its places -- on the finding, in
 `summary.by_role.key_establishment.fallback_beside_hybrid`, and on the CBOM component. A pure
-hybrid carries none of it."""
+hybrid carries none of it (the key is absent)."""
 
 import json
 import subprocess
@@ -44,7 +44,7 @@ def test_a_fallback_is_marked_and_a_pure_hybrid_is_not(tmp_path, name, fallback,
     assert finding["fallback_beside_hybrid"] == [place]
     role = with_fallback["summary"]["by_role"]["key_establishment"]
     assert role["fallback_beside_hybrid"] == {family: [place]}
-    assert without["summary"]["by_role"]["key_establishment"]["fallback_beside_hybrid"] == {}
+    assert "fallback_beside_hybrid" not in without["summary"]["by_role"]["key_establishment"]
     assert not any("fallback_beside_hybrid" in f for f in without["findings"])
 
 

@@ -1344,7 +1344,7 @@ After 0.39.0 (row 99) the summary tells the two apart as well: a classical group
 exchange offered alone on a line that also offers a hybrid stays a classical finding and carries
 `fallback_beside_hybrid` (its places), listed in `summary.by_role.key_establishment.
 fallback_beside_hybrid` and as `qrp:fallback_beside_hybrid` on its CBOM component. A pure hybrid
-has `{}` there and no marker. The classical half inside the hybrid's own name is counted as
+has neither. The classical half inside the hybrid's own name is counted as
 before.
 
 ⚠️ What is not claimed: that a connection ever uses the fallback. That is settled where TLS

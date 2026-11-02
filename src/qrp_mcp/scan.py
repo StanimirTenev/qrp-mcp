@@ -166,9 +166,10 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
                if detected_by_name.get(f.raw_value) not in by_name_only]
     summary = summarize(counted, set_aside, protected)
     summary.by_role = _by_role(counted, roles, detected_by_name, set_aside, protected)
-    summary.by_role["key_establishment"]["fallback_beside_hybrid"] = {
-        family: note["fallback_beside_hybrid"] for family, note in sorted(notes.items())
-        if note.get("fallback_beside_hybrid")}
+    fallbacks = {family: note["fallback_beside_hybrid"] for family, note in sorted(notes.items())
+                 if note.get("fallback_beside_hybrid")}
+    if fallbacks:
+        summary.by_role["key_establishment"]["fallback_beside_hybrid"] = fallbacks
 
     coverage_block = coverage.build(
         repo_path=repo_path,
