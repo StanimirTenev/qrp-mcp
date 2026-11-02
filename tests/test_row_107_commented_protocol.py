@@ -27,3 +27,16 @@ def test_a_commented_ssl_protocols_line_is_not_a_protocol_setting(tmp_path):
     protocols = result["evidence"]["protocols"]
     assert [(a["line"], a["version"]) for a in protocols] == [(4, "TLSv1.3")]
     assert result["summary"]["deprecated_protocols"] == []
+
+
+def test_a_known_hosts_pattern_starting_with_a_star_is_not_a_comment(tmp_path):
+    """OpenSSH's regress/unittests/hostkeys/testdata/known_hosts:12-14 begin with the host
+    pattern `*.example.com,...`; the positive control on OpenSSH showed them dropped by the
+    first form of this fix."""
+    from qrp_mcp.scan import scan_directory
+    (tmp_path / "known_hosts").write_text(
+        "*.example.com,192.0.2.* ssh-ed25519 "
+        "AAAAC3NzaC1lZDI1NTE5AAAAIBlYfExtYZAPqYvYdrlpGlSWxh4jWbCs\n"
+        "# ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDX8F93W3SH4ZSus4XUQ2c\n", encoding="utf-8")
+    protocols = scan_directory(str(tmp_path))["evidence"]["protocols"]
+    assert [(a["line"], a["protocol"]) for a in protocols] == [(1, "ssh")]

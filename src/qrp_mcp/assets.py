@@ -905,10 +905,16 @@ _PROTOCOL_WORDS = ("_version", "tls", "sslv", "protocol", "ssh-", "ecdsa-sha2-",
                    "algorithms", "pubkeyaccepted", "ciphers", "macs")
 
 
+_HOST_PATTERN_START = re.compile(r"\*[^\s/*]")
+
+
 def scan_protocols(line: str) -> list[dict[str, Any]]:
     """Protocol versions pinned on this line, as assets with no algorithm claim."""
-    # A commented setting configures nothing (ZA-OPRAVYANE row 107).
-    if names_none_of(line, _PROTOCOL_WORDS) or line.lstrip().startswith(_COMMENT_START):
+    # A commented setting configures nothing (ZA-OPRAVYANE row 107). A `*` that a host
+    # pattern starts (`*.example.com ssh-rsa ...` in known_hosts) is not a comment.
+    stripped = line.lstrip()
+    if names_none_of(line, _PROTOCOL_WORDS) or (
+            stripped.startswith(_COMMENT_START) and not _HOST_PATTERN_START.match(stripped)):
         return []
     out: list[dict[str, Any]] = []
     seen: set[tuple[str, bool]] = set()
