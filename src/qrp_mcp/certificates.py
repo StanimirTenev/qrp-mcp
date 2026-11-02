@@ -335,8 +335,9 @@ _KEY_HEADER = re.compile(rb"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----", re.M)
 # A header on its own is documentation: OpenSSL's PEM_read.pod prints the markers
 # with the body elided ("MIICdg...."). Key material carries real base64, and the
 # smallest private key there is runs to several hundred characters of it. Summed
-# over lines rather than measured on one, because wrap width varies by writer.
-_KEY_BODY_LINE = re.compile(rb"^[ \t]*[A-Za-z0-9+/]{16,}={0,2}[ \t]*$", re.M)
+# over lines rather than measured on one, because wrap width varies by writer. `\r`: a key
+# saved with CRLF line endings is a key too (ZA-OPRAVYANE row 150, Windows).
+_KEY_BODY_LINE = re.compile(rb"^[ \t]*[A-Za-z0-9+/]{16,}={0,2}[ \t\r]*$", re.M)
 KEY_BODY_MIN_CHARS = 100
 
 
