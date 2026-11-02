@@ -635,7 +635,8 @@ _TLS_VERSION = re.compile(
     r"SslProtocols\.Tls(1[123])?|"               # .NET
     r"PROTOCOL_TLSv1(?:_(\d))?|"                 # Python ssl
     r"TLS1_(\d)_VERSION|"                        # OpenSSL
-    r"TLS_?v?1\.(\d)"                            # rustls, prose in config
+    r"TLS_?v?1\.(\d)|"                           # rustls, prose in config
+    r"tls1\.(\d)"                                # Caddy `protocols tls1.2 tls1.3`
     r")(?![A-Za-z0-9])")
 
 # Where a protocol is being configured rather than mentioned. Without one of
@@ -649,7 +650,9 @@ _TLS_CONTEXT = re.compile(
     r"ServerOptions|SSLContext|tls\.Config|rustls|sslVersion|"
     # HAProxy: `ssl-min-ver`/`ssl-max-ver` on a bind or server line, and the global
     # defaults that carry them (Configuration Manual 3.5; ZA-OPRAVYANE row 30).
-    r"ssl-(?:min|max)-ver|ssl-default-(?:bind|server)-options",
+    r"ssl-(?:min|max)-ver|ssl-default-(?:bind|server)-options|"
+    # Caddy's `tls` block: `protocols <min> [<max>]` (ZA-OPRAVYANE row 111).
+    r"^\s*protocols\s+tls1\.[0-3]",
     re.IGNORECASE)
 
 # SSH transport, configured the same way.
@@ -1032,7 +1035,10 @@ _TLS_GROUP_SETTING = re.compile(
     r"set1_(?:groups|curves)|supported_groups|"
     # HAProxy's global defaults (Configuration Manual 3.5; ZA-OPRAVYANE row 30). Its
     # `curves` keyword on a bind or server line is matched below, by the line's shape.
-    r"ssl-default-(?:bind|server)-curves",
+    r"ssl-default-(?:bind|server)-curves|"
+    # Caddy's `tls` block: `curves x25519 secp256r1`, the names alone on the line
+    # (caddyserver.com/docs/caddyfile/directives/tls; ZA-OPRAVYANE row 111).
+    r"^\s*curves(?=(?:\s+[\w-]+)+\s*$)",
     re.IGNORECASE)
 
 # `curves X25519:P-256` as a keyword of an HAProxy `bind` or `server` line. The word on

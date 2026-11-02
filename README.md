@@ -828,8 +828,9 @@ line as group settings; the names are HAProxy's own (Configuration Manual 3.5,
 cipher suite. Of the other terminators, Envoy (`tls_minimum_protocol_version: TLSv1_2`,
 `ecdh_curves`, `cipher_suites`) was already read; **Traefik** (`minVersion: VersionTLS12`, a
 `curvePreferences` list over several lines) and **Caddy** (a `Caddyfile` has no extension and was
-not read; from 0.35.0 it is, and `x25519` in it is found as X25519, but `protocols tls1.2` and
-the `curves` line are still not recognised as a TLS place) are not, tested on 22 Oct 2026.
+not read; from 0.35.0 it is, and `x25519` in it is found as X25519; after 0.39.0 its `curves`
+line is a group setting and `protocols tls1.2 tls1.3` names the versions, both a TLS place) are
+not, tested on 22 Oct 2026.
 
 **From 0.33.0**, after a local probe of 22 Oct 2026 that put a network scan of three TLS
 endpoints beside a scan of the repository that configures them, five things that probe showed
