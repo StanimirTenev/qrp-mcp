@@ -1038,7 +1038,8 @@ _TLS_GROUP_SETTING = re.compile(
     r"ssl-default-(?:bind|server)-curves|"
     # Caddy's `tls` block: `curves x25519 secp256r1`, the names alone on the line
     # (caddyserver.com/docs/caddyfile/directives/tls; ZA-OPRAVYANE row 111).
-    r"^\s*curves(?=(?:\s+[\w-]+)+\s*$)",
+    # Each of Caddy's names holds a digit, so `curves P-256 are fine` stays prose.
+    r"^\s*curves(?=(?:\s+[a-z][a-z0-9]*\d[a-z0-9]*)+\s*$)",
     re.IGNORECASE)
 
 # `curves X25519:P-256` as a keyword of an HAProxy `bind` or `server` line. The word on
