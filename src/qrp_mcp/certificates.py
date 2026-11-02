@@ -229,11 +229,14 @@ def _point_markers(curve: str) -> list[bytes]:
     return markers
 
 
-def small_scalar_keys(rel_path: str, raw: bytes) -> list[dict[str, Any]]:
+def small_scalar_keys(rel_path: str, raw: bytes,
+                      checked: list[str] | None = None) -> list[dict[str, Any]]:
     """EC public points in this file that equal k*G for k <= SMALL_SCALAR_BOUND.
 
     Only uncompressed points, in DER or in OpenSSH's encoding; a compressed point, a
-    key inside an encrypted container and a raw point with no marker are not checked."""
+    key inside an encrypted container and a raw point with no marker are not checked.
+    `checked` gets this path once per point compared, so the bound can be stated where
+    nothing was found (ZA-OPRAVYANE row 154)."""
     text = raw.decode("utf-8", errors="replace")
     blobs: list[tuple[bytes, int]] = []
     for match in _PEM_BLOCK.finditer(text):
@@ -264,6 +267,8 @@ def small_scalar_keys(rel_path: str, raw: bytes) -> list[dict[str, Any]]:
                         point = (int.from_bytes(body[:size], "big"),
                                  int.from_bytes(body[size:], "big"))
                         k = _small_multiples(curve).get(point)
+                        if checked is not None:
+                            checked.append(rel_path)
                         if k is not None and (curve, k) not in seen:
                             seen.add((curve, k))
                             out.append({

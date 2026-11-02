@@ -274,6 +274,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         # Where the owners on evidence items come from: a CODEOWNERS file, read as an
         # assumption about who owns a path. None when the tree has none.
         "codeowners": scan_result.get("codeowners"),
+        # How far the recoverable-key check looks (evidence.weak_keys): k <= 256, said where
+        # it ran, found or not (ZA-OPRAVYANE row 154). None when no EC public key was read.
+        "weak_key_check": scan_result.get("weak_key_check"),
         "named_but_not_used": scan_result["named_but_not_used"],
         "unreadable_files": scan_result["unreadable_files"],
         "symlinks_not_followed": scan_result["symlinks_not_followed"],

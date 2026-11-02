@@ -385,6 +385,9 @@ v2.0, agreeing with RFC 5903 §3. **Not checked**: compressed points, keys insid
 containers (PKCS#12, encrypted PEM), other curves (brainpool, Ed25519 and X25519 keys), points
 quoted in source code or in a `known_hosts`/`authorized_keys` line read as configuration, and any
 scalar above 256 — the bound is the finding's, and a key with scalar 257 is not reported.
+After 0.39.0 the bound is said where the check ran, found or not (row 154): `weak_key_check`
+gives `bound: 256`, the number of EC public keys compared and "checked up to 256", and the CBOM
+carries `qrp:weak_key_check:bound`. Where no EC public key was read it is `null`.
 Debian's weak OpenSSL keys and ROCA are a different family of weak key and are not checked. The
 table is built once per curve (four curves: 39 ms) and a key costs a lookup: on OpenSSH's 130 key
 and certificate files the check took 3 ms. In the CBOM each weak key is a

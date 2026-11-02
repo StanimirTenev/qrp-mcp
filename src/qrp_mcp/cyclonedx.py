@@ -1379,4 +1379,13 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     document["properties"].append(
         {"name": f"{NS}evidence:ci_signing_commands", "value": str(len(ci))}
     )
+    # The bound of the recoverable-key check, where it ran, found or not (row 154).
+    check = scan_result.get("weak_key_check")
+    if check:
+        document["properties"].extend([
+            {"name": f"{NS}weak_key_check:bound", "value": str(check["bound"])},
+            {"name": f"{NS}weak_key_check:ec_public_keys_checked",
+             "value": str(check["ec_public_keys_checked"])},
+            {"name": f"{NS}weak_key_check:statement", "value": check["statement"]},
+        ])
     return document

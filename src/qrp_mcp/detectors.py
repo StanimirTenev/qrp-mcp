@@ -31,7 +31,8 @@ from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
 from .certificates import (is_certificate_file, is_undecoded, key_in_source, looks_like_key_file,
-                           scan_certificate_file, small_scalar_keys, unparsed_material)
+                           scan_certificate_file, small_scalar_keys, unparsed_material,
+                           SMALL_SCALAR_BOUND)
 
 SOURCE_EXTENSIONS = {
     ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
@@ -3942,7 +3943,7 @@ _READING_LISTS = (
     "dependency_findings", "tls_group_findings", "static_rsa_findings", "hybrid_places",
     "hybrid_names", "pinned_images", "ssh_kex_findings", "weak_key_findings", "fips_findings",
     "pins", "property_reads", "skipped_files", "left_out", "files_read", "markers",
-    "excluded_by_config", "material_problems", "runtime_choices",)
+    "excluded_by_config", "material_problems", "runtime_choices", "ec_points_checked",)
 _READING_COUNTS = ("files_scanned", "skipped_kinds", "present_kinds")
 _READING_MAPS = ("key_files", "file_digests", "codeowners")
 _READING_LIST_MAPS = ("property_values",)
@@ -3959,7 +3960,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
      ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads, skipped_files,
      left_out, files_read, markers, excluded_by_config, material_problems, runtime_choices_found,
-     files_scanned, skipped_kinds, present_kinds, key_files, file_digests, codeowners,
+     ec_points_checked, files_scanned, skipped_kinds, present_kinds, key_files, file_digests, codeowners,
      property_values) = (r[name] for name in _READING)
     # A walked file is not a link, so it can only resolve to an excluded path of its own
     # name: the name is asked first, and the path resolved only then (release 3c).
@@ -4159,7 +4160,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         source_findings.extend(algo_findings)
         key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
         embedded_key_findings.extend(key_findings)
-        for weak in small_scalar_keys(rel_path, raw):
+        for weak in small_scalar_keys(rel_path, raw, ec_points_checked):
             weak["in_test_code"] = in_test_code(rel_path)
             weak_key_findings.append(weak)
         if is_undecoded(algo_findings, key_findings):
@@ -4435,13 +4436,16 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     excluded_by_config: list[str] = []
     # Cryptographic settings whose value is read at run time (runtime_choices).
     runtime_choices_found: list[dict[str, Any]] = []
+    # One path per EC public point the small-scalar check compared (row 154).
+    ec_points_checked: list[str] = []
     reading = dict(zip(_READING, (
         source_findings, ci_findings, iac_findings, embedded_key_findings, unreadable, reports,
         declarations, undecoded, content_parts, protocol_findings, dependency_findings,
         tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
         ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads,
         skipped_files, left_out, files_read, markers, excluded_by_config, material_problems,
-        runtime_choices_found, files_scanned, skipped_kinds, present_kinds, key_files,
+        runtime_choices_found, ec_points_checked, files_scanned, skipped_kinds, present_kinds,
+        key_files,
         file_digests, codeowners, property_values)))
     reading["files_present"] = files_present
     _read_files(reading, list(iter_repo_files(repo_path, excluded_dir_counts, walk_problems)),
@@ -4547,6 +4551,16 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         "library_support_findings": library_support(pinned_images, hybrid_places, files_read),
         "ssh_kex_findings": ssh_kex_findings,
         "weak_key_findings": weak_key_findings,
+        # The bound of that check, said where it ran even when it found nothing (row 154).
+        "weak_key_check": ({
+            "ec_public_keys_checked": len(ec_points_checked),
+            "files": sorted(set(ec_points_checked)),
+            "bound": SMALL_SCALAR_BOUND,
+            "statement": (f"each EC public key read was compared with k*G for every k <= "
+                          f"{SMALL_SCALAR_BOUND} (checked up to {SMALL_SCALAR_BOUND}); a "
+                          f"private scalar above {SMALL_SCALAR_BOUND} is not found by this "
+                          f"check"),
+        } if ec_points_checked else None),
         "fips_provider_findings": fips_findings,
         "runtime_choices": runtime_choices_found,
         # Files removed by EXCLUDED_DIRS before files_present counted anything,
