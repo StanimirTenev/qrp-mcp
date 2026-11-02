@@ -89,7 +89,9 @@ def test_the_pinned_version_is_joined_to_the_provider(tmp_path):
     assert not [f for f in result["evidence"]["source_code"]
                 if f["path"] != "kem.py" and "provider_pin" in f]
     cbom = build(result)
-    comp = next(c for c in cbom["components"] if c["name"] == "EC")
+    # `ec.SECP256R1()` names the curve (row 129), so the component is the curve's, and the
+    # family's properties are carried onto it (release 3d).
+    comp = next(c for c in cbom["components"] if c["name"] == "EC-P-256")
     props = {p["name"]: p["value"] for p in comp["properties"]}
     assert json.loads(props["qrp:provider_pins"]) == {
         "pyca/cryptography": "44.0.0 (requirements.txt:1)"}
