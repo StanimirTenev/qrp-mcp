@@ -1133,6 +1133,14 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
+**From 0.40.1**, on Windows a file reached through a link swapped in after the walk is refused
+when it lies outside the scanned tree (row 150, the last three tests). Windows has no `dir_fd` and
+no `O_NOFOLLOW`, so the open still follows the link; the opened handle is then asked where it ended
+up (`GetFinalPathNameByHandleW`) and the file is named in `unreadable_files` instead of read. A link
+that stays inside the tree is read as before. Run on Windows (Python 3.12): the whole suite passes,
+and with the check removed exactly these tests fail. Nothing changes on Linux or macOS, and no
+detection figure moves.
+
 **From 0.40.0**, a batch of the fix list (rows 99, 107, 109–112, 115, 117, 129, 150, 152, 154). Each
 was reproduced as a failing test before the fix, and each fix was reverted once to see its test fail.
 
@@ -1158,9 +1166,9 @@ was reproduced as a failing test before the fix, and each fix was reverted once 
   (256), how many keys were checked and "checked up to 256"; `null` when no EC key was read.
 - **CODEOWNERS handles are masked** at `masked` and `trimmed` (row 112).
 - **Windows** (row 150): a key file without an extension and with CRLF endings was never opened,
-  and `files_left_out` used the OS separator; both fixed. Three tests still cannot pass there:
-  Windows has no `dir_fd` and no `O_NOFOLLOW`, so a link swapped in after the walk is followed.
-  Not run on Windows for this release.
+  and `files_left_out` used the OS separator; both fixed. Three tests still could not pass there:
+  Windows has no `dir_fd` and no `O_NOFOLLOW`, so a link swapped in after the walk was followed
+  (closed in 0.40.1, above).
 
 On the corpus of 185 public repositories the disagreement with the labelling model is unchanged in
 both splits (A' 404 / 71, B' 244 / 40); that is disagreement with a model, not recall or precision.
