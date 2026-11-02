@@ -10,7 +10,7 @@ import sys
 
 def _run(*args):
     return subprocess.run([sys.executable, "-m", "qrp_mcp.server", *args],
-                          capture_output=True, text=True)
+                          capture_output=True, encoding="utf-8", errors="replace")
 
 
 def _tree(tmp_path):

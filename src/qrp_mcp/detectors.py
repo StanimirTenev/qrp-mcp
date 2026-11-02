@@ -2096,8 +2096,8 @@ def _read_within(root: Path, path: Path) -> bytes | None | object:
     redirecting it.
 
     Linux and the other platforms that carry `dir_fd`. Where the interpreter has no
-    `dir_fd` support -- Windows -- this falls back to the single-component
-    protection, and that limit is stated rather than implied away.
+    `dir_fd` support -- Windows -- this falls back to a plain open, after which the
+    handle is asked where it ended up (`_opened_within`) and refused outside the root.
     """
     if not (os.open in os.supports_dir_fd and getattr(os, "O_NOFOLLOW", 0)):
         return _NO_DIRFD
@@ -2178,12 +2178,40 @@ def _read_file(path: Path, root: Path | None = None) -> tuple[bytes, list[str]] 
         descriptor = os.open(path, flags)
     except OSError:
         return None
+    if root is not None and os.name == "nt" and not _opened_within(descriptor, root):
+        os.close(descriptor)
+        return None  # a link swapped in after the walk led outside the root (row 150)
     try:
         with os.fdopen(descriptor, "rb", closefd=True) as handle:
             raw = handle.read()
     except OSError:
         return None
     return raw, _decode(raw)
+
+
+def _opened_within(descriptor: int, root: Path) -> bool:
+    """Windows: whether the file actually opened lies under `root`.
+
+    Windows has neither `O_NOFOLLOW` nor `dir_fd`, so the open follows a link at any
+    component, the last or a parent swapped after the walk. Asking the handle where it
+    ended up (GetFinalPathNameByHandleW) after the open answers both, with no window
+    between the check and the read: the bytes read are the handle's.
+    """
+    import ctypes
+    import msvcrt
+    buf = ctypes.create_unicode_buffer(32768)
+    get_final = ctypes.windll.kernel32.GetFinalPathNameByHandleW
+    n = get_final(msvcrt.get_osfhandle(descriptor), buf, len(buf), 0)
+    if not 0 < n < len(buf):
+        return False
+    final = buf.value
+    if final.startswith("\\\\?\\UNC\\"):
+        final = "\\\\" + final[8:]
+    elif final.startswith("\\\\?\\"):
+        final = final[4:]
+    final = os.path.normcase(final)
+    base = os.path.normcase(os.path.realpath(root)).rstrip("\\")
+    return final == base or final.startswith(base + "\\")
 
 
 def _decode(raw: bytes) -> list[str]:
