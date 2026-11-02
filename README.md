@@ -879,8 +879,8 @@ the code scan missing:
   the pin and the groups are named side by side, not joined. In the probe the repository set
   X25519MLKEM768 for a service that ops ran on nginx:1.24.0 with a classical hotfix mounted
   instead; nginx refused the repository's configuration. A `Dockerfile` is read from 0.35.0 for
-  the algorithms it names, but its `FROM nginx:1.24.0` is not read as a pin, and a package pin is
-  not read for this. The
+  the algorithms it names; after 0.39.0 its `FROM nginx:1.24.0` is a pin too (named beside the
+  groups, joined to nothing: a `FROM` line mounts nothing), and a package pin is not read for this. The
   places and the mounts are not part of the finding's identity in `closure`; in the CBOM it is a
   `container` component. On OpenSSH and certbot: none.
 
@@ -1916,8 +1916,8 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
 - **What a TLS library defaults to is not stated** (from 0.33.0 the absence is): an HAProxy
   listener without `ssl-min-ver` or a cipher list says the defaults apply, not which. nginx's
   `proxy_ssl_verify` is off by default and only an explicit `off` is reported. Which TLS library
-  an image carries is known for one image (`nginx:1.24.0`); a `Dockerfile`'s `FROM` line is not
-  read as a pin (the file itself is read from 0.35.0), so it is not joined to anything.
+  an image carries is known for one image (`nginx:1.24.0`); a `Dockerfile`'s `FROM` line is read
+  as a pin after 0.39.0, but it mounts nothing, so it is not joined to any configuration.
 - **Build switches and default orders** (from 0.39.0 the one verified case is read). Only
   OpenSSH's `WITH_XMSS` is judged as a switch that leaves an algorithm out of a default build;
   other `#ifdef`, CMake or meson options are not. A default key-exchange order written in code

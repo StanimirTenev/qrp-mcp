@@ -1336,9 +1336,9 @@ TLS_SETTING_NOTE = (
 #   1.24.0 (stable/debian/Dockerfile: FROM debian:bullseye-slim), whose OpenSSL is 1.1.1
 #   (packages.debian.org, bullseye: openssl 1.1.1w). Every other tag, an -alpine one
 #   included, is "not established".
-# Pins are read from `image:` lines (compose, Kubernetes); a Dockerfile's `FROM` line is
-# not read for this (the file is read since 0.35.0, for the algorithms it names), and a
-# package pin is not read for this. A compose service is
+# Pins are read from `image:` lines (compose, Kubernetes) and from a Dockerfile's `FROM`
+# line (ZA-OPRAVYANE row 110; it names no mount, so it is joined to nothing); a package pin
+# is not read for this. A compose service is
 # joined to the configuration file it mounts (short volume syntax, inside the tree);
 # without such a mount the pin and the group are named side by side, not joined.
 HYBRID_TLS_GROUPS = {
@@ -1357,6 +1357,11 @@ _IMAGE_TLS_LIBRARY = {
 _TLS_SERVER_IMAGES = {"nginx", "haproxy", "httpd", "traefik", "caddy", "envoy", "openresty"}
 _IMAGE_LINE = re.compile(
     r"^(\s*)(?:-\s+)?image:\s*[\"']?([A-Za-z0-9][\w./-]*?):([A-Za-z0-9_][\w.-]*)[\"']?\s*(?:#.*)?$")
+# `FROM [--platform=…] name:tag [AS stage]` (Dockerfile reference); a digest after the tag
+# is allowed, an image without a tag is not a pin.
+_FROM_LINE = re.compile(
+    r"^\s*FROM\s+(?:--platform=\S+\s+)?([A-Za-z0-9][\w./-]*?):([A-Za-z0-9_][\w.-]*)"
+    r"(?:@\S+)?(?:\s+AS\s+\S+)?\s*$", re.IGNORECASE)
 _VOLUME_ITEM = re.compile(r"^\s*-\s+[\"']?([^\s\"':]+):(/[^\s\"':]*)(?::\w+)?[\"']?\s*$")
 
 
@@ -1417,6 +1422,18 @@ def image_pins(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
                 mounts.append(posixpath.normpath(posixpath.join(base, volume.group(1))))
         pins.append({"path": rel_path, "line": number, "image": f"{name}:{tag}",
                      "name": name.rsplit("/", 1)[-1], "tag": tag, "mounts": mounts})
+    return pins
+
+
+def dockerfile_pins(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """`FROM name:tag` lines naming a TLS-terminating server; no mounts (row 110)."""
+    pins: list[dict[str, Any]] = []
+    for number, text in enumerate(lines, 1):
+        image = _FROM_LINE.match(text)
+        if image and image.group(1).rsplit("/", 1)[-1] in _TLS_SERVER_IMAGES:
+            name, tag = image.group(1), image.group(2)
+            pins.append({"path": rel_path, "line": number, "image": f"{name}:{tag}",
+                         "name": name.rsplit("/", 1)[-1], "tag": tag, "mounts": []})
     return pins
 
 
