@@ -10,6 +10,7 @@ import json
 import os
 import posixpath
 import re
+import subprocess
 import stat
 from itertools import accumulate
 from pathlib import Path
@@ -2153,6 +2154,46 @@ def _link_target(repo_path: Path, rel: str) -> str:
 
 
 _OUTSIDE_ROOT = "outside the scanned directory"
+
+# Row 432: git records a symbolic link as an index entry of mode 120000 whose content is the
+# target path. Checked out with core.symlinks=false (Windows' default) it is written as a small
+# text file holding that path; read as a file it was a `.pem` claimed and not decoded, and the
+# same commit's coverage differed between operating systems (certbot: 48 such entries).
+_LINK_STUB = ("a symbolic link in git (index mode 120000) checked out as a text file holding "
+              "its target, as git does with core.symlinks=false; counted as the link is")
+
+
+def _git_link_stubs(repo_path: Path) -> set[str]:
+    """Paths under repo_path that git records as links and that are regular files here."""
+    from .coverage import _run_git
+    try:
+        out = _run_git(repo_path, "ls-files", "-s", "-z", "--", ".")
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if out.returncode != 0 or "120000 " not in out.stdout:
+        return set()
+    stubs: set[str] = set()
+    for entry in out.stdout.split("\0"):
+        meta, _, name = entry.partition("\t")
+        if meta.startswith("120000 ") and name:
+            full = repo_path / name
+            try:
+                if not full.is_symlink() and full.is_file():
+                    stubs.add(name)
+            except OSError:
+                continue
+    return stubs
+
+
+def _stub_target(repo_path: Path, rel: str) -> str:
+    """The target the stub names, said as _link_target says a link's."""
+    try:
+        named = (repo_path / rel).read_bytes()[:4096].decode("utf-8").strip()
+        resolved = ((repo_path / rel).parent / named).resolve(strict=False)
+        inside = resolved.relative_to(repo_path.resolve(strict=False))
+    except (OSError, ValueError, RuntimeError, UnicodeDecodeError):
+        return _OUTSIDE_ROOT
+    return display_path(inside.as_posix())
 
 
 def _is_link(path: Path) -> bool:
@@ -5328,8 +5369,18 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         key_files,
         file_digests, codeowners, file_digests_lf, property_values)))
     reading["files_present"] = files_present
-    _read_files(reading, list(iter_repo_files(repo_path, excluded_dir_counts, walk_problems)),
-                repo_path, resolved_exclude, config_excludes)
+    walked = list(iter_repo_files(repo_path, excluded_dir_counts, walk_problems))
+    stubs = _git_link_stubs(repo_path)
+    if stubs:
+        kept = []
+        for one in walked:
+            rel_one = Path(one).relative_to(repo_path).as_posix()
+            if rel_one in stubs:
+                walk_problems.append(("symlink_text", display_path(rel_one)))
+            else:
+                kept.append(one)
+        walked = kept
+    _read_files(reading, walked, repo_path, resolved_exclude, config_excludes)
     files_present = reading["files_present"]
 
     # Entries the walk could see but not read count as present and unreadable, so the
@@ -5342,7 +5393,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             files_present += 1
             present_kinds["(unreadable entry)"] = present_kinds.get("(unreadable entry)", 0) + 1
             unreadable.append(rel)
-        elif kind in {"symlink", "symlink_dir"}:
+        elif kind in {"symlink", "symlink_dir", "symlink_text"}:
             # A linked file is one of the files present -- it was seen -- and it was
             # not read, so it keeps the identity present = scanned + unreadable +
             # skipped + links. A linked directory holds an unknown number of files,
@@ -5351,7 +5402,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             if not is_dir:
                 files_present += 1
                 present_kinds["(symlink)"] = present_kinds.get("(symlink)", 0) + 1
-            target = _link_target(repo_path, rel)
+            target = (_stub_target(repo_path, rel) if kind == "symlink_text"
+                      else _link_target(repo_path, rel))
             symlinks.append({
                 "path": rel + ("/" if is_dir else ""),
                 "kind": "directory" if is_dir else "file",
@@ -5362,9 +5414,13 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             # walk enters that directory under its own name.
             if is_dir and target != _OUTSIDE_ROOT:
                 symlinks[-1]["points_into_tree"] = True
+            if kind == "symlink_text":
+                symlinks[-1]["checked_out_as_text"] = True
+                symlinks[-1]["form"] = _LINK_STUB
         else:
             unreadable_dirs.append(rel + "/")
-        content_parts.append(f"{rel}\0{kind}")
+        # A stub is the link it records: the same corpus on either side of core.symlinks.
+        content_parts.append(f"{rel}\0{'symlink' if kind == 'symlink_text' else kind}")
 
     _join_properties(property_reads, property_values, source_findings)
     _link_signing_keys(ci_findings, key_files)
