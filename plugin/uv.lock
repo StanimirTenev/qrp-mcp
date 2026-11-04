@@ -575,7 +575,7 @@ wheels = [
 
 [[package]]
 name = "qrp-mcp"
-version = "0.42.0"
+version = "0.43.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -584,9 +584,9 @@ dependencies = [
     { name = "qrp-mcp-core", marker = "platform_python_implementation == 'CPython'" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0f/c8/713022ce54365bbba9a97c290f4591355bec77ab772cc1f36c9b22d9ce38/qrp_mcp-0.42.0.tar.gz", hash = "sha256:95dad51ac584ed42a892415ee0cac0edc323f74b8c1586fa0fc29fd13ff9a7d4", size = 989562, upload-time = "2026-11-04T11:49:32.421Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/22/1e29dac18e218ab97c32cd7a7caf984f367a7f23e447792390c4020b9e95/qrp_mcp-0.43.0.tar.gz", hash = "sha256:825e4d0416847acf8fd729a1e47f597a169176f922c4189ea8204c3854348949", size = 1028033, upload-time = "2026-11-04T15:58:42.052Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0f/d3/dbb179bc4efdad7f025937204f8776d77438eb8037e996aa68d5c32db3a8/qrp_mcp-0.42.0-py3-none-any.whl", hash = "sha256:ba326da5601a426e4baf707b7dff0f5b1126592b225eceee807946b3198ae50e", size = 351307, upload-time = "2026-11-04T11:49:30.685Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/24/9fc404167293994d115df537e583a9d9f04a176e1507db9cc70dbd9f657b/qrp_mcp-0.43.0-py3-none-any.whl", hash = "sha256:84c1507d891156c866f2382cb275898395e0fef08e398eb62fe85746715e046a", size = 371639, upload-time = "2026-11-04T15:58:39.915Z" },
 ]
 
 [[package]]
@@ -607,14 +607,14 @@ wheels = [
 
 [[package]]
 name = "qrp-plugin"
-version = "0.42.0"
+version = "0.43.0"
 source = { virtual = "." }
 dependencies = [
     { name = "qrp-mcp" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "qrp-mcp", specifier = "==0.42.0" }]
+requires-dist = [{ name = "qrp-mcp", specifier = "==0.43.0" }]
 
 [[package]]
 name = "referencing"
