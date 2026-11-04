@@ -192,6 +192,7 @@ SSH_RSA_KEY_FILE = "RSA named by an SSH key file name (ssh_host_rsa_key, id_rsa)
 SSH_DSA_KEY_FILE = "DSA named by an SSH key file name (ssh_host_dsa_key, id_dsa)"
 CONFIG_ONLY = frozenset({SSH_RSA_KEY_FILE, SSH_DSA_KEY_FILE})
 
+SHA1_COMPOUND_NAME = "SHA-1 named in a compound name"
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
         r"Crypto\.PublicKey\.RSA|Crypto\.PublicKey\s+import\s+RSA|"
@@ -1053,7 +1054,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # other than with/and/kdf. Joined on at least one side (`_`, `-`, `.`, `/`, `=`, a glued
     # word, a capital) or quoted alone: "legacy SHA1 path removed" is prose, not a name (the
     # A-C negative control). Bare `SHA` only glued to `with` or `/` and a signature.
-    ("SHA1", "SHA-1 named in a compound name", re.compile(
+    ("SHA1", SHA1_COMPOUND_NAME, re.compile(
         r"(?:(?<=[_./=-])|(?<=[Ww][Ii][Tt][Hh])|(?<=[Aa][Nn][Dd])|(?<=[Hh][Mm][Aa][Cc])|"
         r"(?<=[Mm][Dd]5)|(?<=[Mm][Gg][Ff]1))(?i:sha[-_]?1)(?:(?![0-9a-z])|(?=with|and|kdf|ckdf))|"
         r"(?<![A-Za-z0-9])(?i:sha[-_]?1)(?=[_(-]|[A-Z]|with|and|kdf|ckdf)|"
@@ -1539,6 +1540,17 @@ def _a_pattern_matches(line: str, allowed: frozenset[int] | None = None) -> bool
             return True
     return False
 
+def _names_an_assigned_variable(line: str, match: re.Match) -> bool:
+    """The match is a piece of a word that is assigned to: `implicitSha1 = ...`."""
+    start, end = match.start(), match.end()
+    while start > 0 and (line[start - 1].isalnum() or line[start - 1] == "_"):
+        start -= 1
+    while end < len(line) and (line[end].isalnum() or line[end] == "_"):
+        end += 1
+    return start < match.start() or end > match.end() \
+        if re.match(r"\s*=(?!=)", line[end:]) else False
+
+
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(r"\bgpg\s+(--detach-sign|--sign|-s)\b")),
@@ -1546,7 +1558,8 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("cosign_sign", re.compile(r"\bcosign\s+sign\b")),
     ("signtool_sign", re.compile(r"\bsigntool\s+sign\b", re.IGNORECASE)),
     ("jarsigner", re.compile(r"\bjarsigner\b")),
-    ("codesign", re.compile(r"\bcodesign\b")),
+    # Row 367: the command, followed by an option -- not `/f codesign.pfx`.
+    ("codesign", re.compile(r"(?:^|[\s;&|(/\"'])codesign\s+-")),
     # Secure Boot, kernel modules and IMA/EVM (ZA-OPRAVYANE row 34), from each tool's
     # manual: sbsign(1), pesign(1) `-s`/`--sign`, kmodsign(1), evmctl(1) `sign`,
     # `ima_sign`, `sign_hash`, and the kernel's scripts/sign-file (module-signing.rst).
@@ -1888,13 +1901,18 @@ _KEY_SIZE = re.compile(
     r"\bRSA\.(?:new|generate)\(\s*(\d{3,5})\b|\bRsa::generate\(\s*(\d{3,5})\b|"
     r"\bRsaPrivateKey::new\([^,]*,\s*(\d{3,5})\b|\bwc_MakeRsaKey\([^,]*,\s*(\d{3,5})\b|"
     r"\bEVP_RSA_gen\(\s*(\d{3,5})\b|set_rsa_keygen_bits\([^,]*,\s*(\d{3,5})\b|"
-    r"RSAKeyGenParameterSpec\(\s*(\d{3,5})\b|" + _SIZE_OPTIONS,
+    r"RSAKeyGenParameterSpec\(\s*(\d{3,5})\b|"
+    # Rows 369, 370, 374 (W1): .NET `RSA.Create(1024)`, `new RSACryptoServiceProvider(512)`,
+    # `new RSACng(3072)`; PowerShell `New-SelfSignedCertificate ... -KeyLength 1024`.
+    r"\bRSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:RSACryptoServiceProvider|RSACng)\(\s*(\d{3,5})\s*\)|"
+    r"\bNew-SelfSignedCertificate\b[^\n]*?\s-KeyLength\s+(\d{3,5})\b|" + _SIZE_OPTIONS,
     re.IGNORECASE)
 # The same for DSA and DH (release 3d): only the forms that name no algorithm themselves.
 _KEY_SIZE_GENERIC = re.compile(
     r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|(?:\.|\b)initialize\(\s*(\d{3,5})\b|"
     r"\b(?:DSA|DH)\.(?:new|generate)\(\s*(\d{3,5})\b|\bcreateDiffieHellman\(\s*(\d{3,5})\b|"
     r"set_dsa_paramgen_bits\([^,]*,\s*(\d{3,5})\b|set_dh_paramgen_prime_len\([^,]*,\s*(\d{3,5})\b|"
+    r"\bDSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:DSACryptoServiceProvider|DSACng)\(\s*(\d{3,5})\s*\)|"
     + _SIZE_OPTIONS,
     re.IGNORECASE)
 
@@ -3333,6 +3351,11 @@ def scan_source_file(path: Path, rel_path: str,
                 evidence = "ban"
             elif in_comment:
                 evidence = "comment"
+            elif (description == SHA1_COMPOUND_NAME
+                  and all(_names_an_assigned_variable(searched, m) for m in matches)):
+                # Row 368: `implicitSha1 = new Rfc2898DeriveBytes(..., SHA256)` -- the name
+                # the result is stored under, not what the call does.
+                evidence = "identifier"
             else:
                 evidence = kind
             item = {

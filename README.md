@@ -1169,7 +1169,12 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
   OpenSSL 3 `EVP_RSA_gen`, `EVP_PKEY_Q_keygen`, `set_rsa_keygen_bits`, Java
   `RSAKeyGenParameterSpec`, Rust `Rsa::generate` and `RsaPrivateKey::new`, wolfSSL
   `wc_MakeRsaKey`, IKE `modpN` (the smallest group offered on the line), and an RSA JWK's `n`
-  (a `kid` label names nothing). Not yet: a size on another line than the family.
+  (a `kid` label names nothing), .NET `RSA.Create(N)`, `RSACryptoServiceProvider(N)`,
+  `RSACng(N)`, `DSA.Create(N)`, and PowerShell `New-SelfSignedCertificate -KeyLength N`. Not
+  yet: a size on another line than the family.
+- **Misread names**: `signtool sign /f codesign.pfx` is one SignTool step, not also Apple's
+  `codesign` (the command is now the word followed by an option); a variable named
+  `implicitSha1 = ...` is an `identifier`, not a SHA-1 call.
 - **Switched off is not a use**: `echo "USE_ML_KEM_768=false" >> ...`, a SCHANNEL key with
   `"Enabled"=dword:00000000`, `Disable-TlsCipherSuite`, `Disable-TlsEccCurve` are bans, and no
   longer raise readiness.
