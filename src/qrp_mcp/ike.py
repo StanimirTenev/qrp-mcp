@@ -240,3 +240,46 @@ def scan_groups(lines: list[str]) -> list[dict[str, Any]]:
                 item["curve"] = curve
             out.append(item)
     return out
+
+
+# IKE peer authentication by signature (ZA-OPRAVYANE row 342). Cisco IOS XE 17 IKEv2 guide
+# (https://www.cisco.com/c/en/us/td/docs/routers/ios/config/17-x/sec-vpn/b-security-vpn/m_sec-cfg-ikev2-flex.html):
+# "authentication remote rsa-sig", "pki trustpoint trustpoint-remote verify". Junos
+# `proposal (Security IKE)`
+# (https://networkingdocs.hpe.com/documentation/us/en/software/junos/cli-reference/topics/ref/statement/security-edit-proposal.html):
+# authentication-method `dsa-signatures` "Specifies that the Digital Signature Algorithm (DSA)
+# is used", `ecdsa-signatures-384` "the ECDSA using the 384-bit elliptic curve secp384r1",
+# `rsa-signatures` "a public key algorithm, which supports encryption and digital signatures".
+_JUNOS_AUTH = re.compile(r"\bauthentication-method\s+(rsa|dsa|ecdsa)-signatures(?:-(256|384|521))?"
+                         r"\s*;?\s*$", re.I)
+_CISCO_PROFILE = re.compile(r"^crypto\s+ikev2\s+profile\b", re.I)
+_CISCO_AUTH = re.compile(r"^\s+authentication\s+(?:remote|local)\s+rsa-sig\s*$", re.I)
+_AUTH_FAMILY = {"rsa": "RSA", "dsa": "DSA", "ecdsa": "ECDSA"}
+
+
+def scan_auth(lines: list[str]) -> list[dict[str, Any]]:
+    """IKE peer authentication methods that sign with a named family (Cisco IOS XE, Junos)."""
+    out: list[dict[str, Any]] = []
+    in_profile = False
+    for number, line in enumerate(lines, 1):
+        if line[:1] and not line[:1].isspace():
+            in_profile = bool(_CISCO_PROFILE.match(line))
+        if line.lstrip().startswith(("#", "!")):
+            continue
+        junos = _JUNOS_AUTH.search(line)
+        if junos:
+            family, size = _AUTH_FAMILY[junos.group(1).lower()], junos.group(2)
+            setting = f"Junos authentication-method {junos.group(0).split()[-1].rstrip(';')}"
+        elif in_profile and _CISCO_AUTH.match(line):
+            family, size, setting = "RSA", None, "Cisco IOS XE IKEv2 profile authentication rsa-sig"
+        else:
+            continue
+        item: dict[str, Any] = {
+            "line": number, "algorithm": family, "excerpt": line.strip()[:200],
+            "evidence_kind": "declaration",
+            "description": f"IKE peer authentication by {family} signature ({setting})",
+        }
+        if size:
+            item["key_size"], item["curve"] = int(size), f"P-{size}"
+        out.append(item)
+    return out

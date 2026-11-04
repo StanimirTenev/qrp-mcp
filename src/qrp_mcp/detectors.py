@@ -4496,7 +4496,12 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _beside_in_block(src, lines)
         if path.suffix.lower() in (".yaml", ".yml"):
             src.extend(fabric_bccsp(rel_path, lines))
-        for item in ike.scan_groups(lines):
+        # The IKE rows say more than a generic row on the same line (its size, the setting),
+        # so they replace it rather than sit beside it.
+        ike_rows = ike.scan_groups(lines) + ike.scan_auth(lines)
+        replaced = {(item["line"], item["algorithm"]) for item in ike_rows}
+        src[:] = [f for f in src if (f["line"], f["algorithm"]) not in replaced]
+        for item in ike_rows:
             item.update(path=rel_path, in_test_code=in_test_code(rel_path))
             src.append(item)
         firmware_defaults = fortios.defaults(lines)
