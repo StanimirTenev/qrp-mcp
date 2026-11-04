@@ -543,6 +543,20 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bmbedtls_dhm_\w+|\bMBEDTLS_DHM_\w+|\bPSA_ALG_FFDH\b|\bPSA_KEY_TYPE_DH_\w+")),
     ("RSA", "RSA named by the PSA Crypto API", re.compile(
         r"\bPSA_KEY_TYPE_RSA_\w+|\bPSA_ALG_RSA_\w+")),
+    # phpseclib, the pure-PHP library (row 303): its classes by namespace (`\phpseclib3`,
+    # `\phpseclib4`, 2.x `\phpseclib`; README) and v3's static key generators. phpseclib
+    # 3.0 phpseclib/Crypt/RSA.php: `namespace phpseclib3\Crypt;`, `public static function
+    # createKey($bits = 2048)`. Laravel Passport makes its OAuth key with `RSA::createKey`.
+    ("RSA", "RSA named by phpseclib", re.compile(
+        r"\bphpseclib\d?\\+Crypt\\+RSA\b|(?<![\w\\])RSA::createKey\s*\(")),
+    ("DSA", "DSA named by phpseclib", re.compile(
+        r"\bphpseclib\d?\\+Crypt\\+DSA\b|(?<![\w\\])DSA::createKey\s*\(")),
+    ("DH", "DH named by phpseclib", re.compile(
+        r"\bphpseclib\d?\\+Crypt\\+DH\b|(?<![\w\\])DH::createKey\s*\(")),
+    ("EC", "EC named by phpseclib", re.compile(
+        r"\bphpseclib\d?\\+Crypt\\+EC\b|"
+        # `EC::createKey('Ed25519')` is the Ed25519 rule's, not a second family.
+        r"(?<![\w\\])EC::createKey\s*\((?!\s*['\"](?:Ed|Curve|X)(?:25519|448))")),
     ("EC", "EC named by the Mbed TLS API", re.compile(
         r"\bmbedtls_ecp_\w+|\bMBEDTLS_ECP_DP_\w+|\bPSA_KEY_TYPE_ECC_\w+")),
     # EC J-PAKE (row 304): RFC 8236, "a Password-Authenticated Key Exchange by Juggling
@@ -1886,6 +1900,8 @@ _KEY_SIZE = re.compile(
     # a whole quoted value (`rsa512_key.pem` is a fixture's file name, as for the key specs).
     r"(?<![A-Za-z])rsa_(?:len|bits|size)\s*=\s*(\d{3,5})\b|[\"'](?i:rsa)(\d{3,5})[\"']|"
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
+    # phpseclib 3: `RSA::createKey(4096)` (row 303).
+    r"(?<![\w\\])RSA::createKey\(\s*(\d{3,5})\s*\)|"
     r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
     r"EVP_PKEY_Q_keygen\([^)]*?(\d{3,5})\s*\)|"
