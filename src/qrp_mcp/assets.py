@@ -287,6 +287,81 @@ def _names_from_lockfile(name: str, lines: list[str]) -> list[tuple[str, int]]:
     return out
 
 
+# Rows 425-428 (W1, 04.11.2026): the .NET and Go lockfiles, each read by its documented
+# structure (the sources are quoted in tests/test_lockfiles_dotnet_and_go.py). Their names are
+# not fixed: `App.deps.json`, `packages.<project>.lock.json`, and modules.txt only under vendor/.
+_PROJECT_LOCK = re.compile(r"^packages(?:\.[^/\\]+)?\.lock\.json$")
+_GO_SUM_LINE = re.compile(r"^\s*(\S+)\s+(v\S+?)(/go\.mod)?\s+h\d+:\S+\s*$")
+_GO_VENDOR_MODULE = re.compile(r"^#\s+(\S+)\s+(v\S+)(?:\s|$)")
+
+
+def _lock_kind(path: Path) -> str | None:
+    name = path.name
+    if name == "go.sum":
+        return "go.sum"
+    if name == "modules.txt" and path.parent.name == "vendor":
+        return "modules.txt"
+    if name.endswith(".deps.json") and len(name) > len(".deps.json"):
+        return "deps.json"
+    if _PROJECT_LOCK.match(name):
+        return "packages.lock.json"
+    return None
+
+
+def is_lockfile(path: Path) -> bool:
+    """A file read only for the packages it lists, never matched as text."""
+    return path.name in _LOCKFILES or _lock_kind(path) is not None
+
+
+def _first_line(lines: list[str], text: str) -> int:
+    return next((n for n, line in enumerate(lines, 1) if text in line), 1)
+
+
+def _packages_from_lock(kind: str, lines: list[str]) -> list[tuple[str, int, str | None]]:
+    """(package, line, version) out of a .NET or Go lockfile."""
+    out: list[tuple[str, int, str | None]] = []
+    if kind == "go.sum":
+        for number, text in enumerate(lines, 1):
+            match = _GO_SUM_LINE.match(text)
+            # A `/go.mod` line hashes the module's go.mod only: the module was consulted while
+            # resolving versions, not downloaded (go.dev/ref/mod#go-sum-files).
+            if match and not match.group(3):
+                out.append((match.group(1), number, match.group(2)))
+        return out
+    if kind == "modules.txt":
+        for number, text in enumerate(lines, 1):
+            match = _GO_VENDOR_MODULE.match(text)
+            if match:
+                out.append((match.group(1), number, match.group(2)))
+        return out
+    try:
+        data = json.loads("\n".join(lines))
+    except (ValueError, TypeError):
+        return out
+    if not isinstance(data, dict):
+        return out
+    if kind == "deps.json":
+        for key, entry in (data.get("libraries") or {}).items():
+            if not isinstance(entry, dict) or entry.get("type") != "package" or "/" not in key:
+                continue
+            package, _, version = key.rpartition("/")
+            out.append((package, _first_line(lines, f'"{key}"'), version or None))
+        return out
+    seen: set[tuple[str, str | None]] = set()
+    for framework in (data.get("dependencies") or {}).values():
+        if not isinstance(framework, dict):
+            continue
+        for package, entry in framework.items():
+            if not isinstance(entry, dict) or entry.get("type") == "Project":
+                continue
+            version = entry.get("resolved") if isinstance(entry.get("resolved"), str) else None
+            if (package, version) in seen:
+                continue
+            seen.add((package, version))
+            out.append((package, _first_line(lines, f'"{package}"'), version))
+    return out
+
+
 def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tuple[str, int]]:
     """(package name, line number) pairs, read structurally."""
     out: list[tuple[str, int]] = []
@@ -532,13 +607,16 @@ def _suffix_ecosystem(path: Path) -> str | None:
 
 
 def is_manifest(path: Path) -> bool:
-    return (path.name in MANIFEST_FILENAMES
+    return (path.name in MANIFEST_FILENAMES or _lock_kind(path) is not None
             or path.name in _NUGET_FILENAMES
             or path.suffix in _NUGET_SUFFIXES
             or path.name in _RESOLVED_NAMES or _suffix_ecosystem(path) is not None)
 
 
 def _ecosystem_of(path: Path) -> str | None:
+    kind = _lock_kind(path)
+    if kind is not None:
+        return "go" if kind in ("go.sum", "modules.txt") else "nuget"
     if path.name in _NUGET_FILENAMES or path.suffix in _NUGET_SUFFIXES:
         return "nuget"
     return (MANIFEST_FILENAMES.get(path.name) or _RESOLVED_NAMES.get(path.name)
@@ -552,7 +630,14 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
         return []
     table = DEPENDENCY_FAMILIES.get(ecosystem, {})
     findings: list[dict[str, Any]] = []
-    if path.name in {"pyproject.toml", "Pipfile"}:
+    kind = _lock_kind(path)
+    lock_versions: dict[tuple[str, int], str] = {}
+    if kind is not None:
+        found = _packages_from_lock(kind, lines)
+        named = [(package, number, None) for package, number, _ in found]
+        lock_versions = {(package.lower(), number): version
+                         for package, number, version in found if version}
+    elif path.name in {"pyproject.toml", "Pipfile"}:
         named = _pep_requests(path.name, lines)
     else:
         named = [(package, number, None) for package, number
@@ -563,8 +648,10 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
               for _, package, version, number in pinned_versions(path, lines)}
     for package, number, requested in named:
         families = table.get(package)
-        if families is None and ecosystem == "pypi":
-            families = table.get(package.lower())
+        if families is None and ecosystem in ("pypi", "nuget"):
+            # NuGet ids are case-insensitive; a lockfile spells them as restored.
+            families = table.get(package.lower()) or next(
+                (f for key, f in table.items() if key.lower() == package.lower()), None)
         if not families:
             continue
         item = {
@@ -583,7 +670,8 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
         if requested:
             item["requested"] = requested
         exact = _EXACT_REQUEST.match(requested or "")
-        version = pinned.get((package.lower(), number)) or (exact.group(1) if exact else None)
+        version = (pinned.get((package.lower(), number)) or lock_versions.get((package.lower(), number))
+                   or (exact.group(1) if exact else None))
         if version:
             item["version"] = version
         findings.append(item)

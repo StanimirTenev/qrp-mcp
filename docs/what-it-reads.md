@@ -11,6 +11,7 @@
 | `compare_coverage(first, second)` | Whether two scans produced numbers that can be compared at all |
 | `prove_closure(before, after)` | Which findings a change actually closed, from two saved scans of one tree — only if the two runs can be compared for it |
 | `list_algorithms()` | The algorithm families the server recognises and how each is classified |
+| `run_self_seeded_control(path, seed)` | Plants known lines into a temporary copy, scans it and says what the scan did with each: robustness on known patterns ([control.md](control.md)) |
 
 ## What it looks at
 
@@ -86,7 +87,12 @@ an installed library is not a line of code that calls it. A version is not a ver
 TLSv1.0 is marked deprecated, and quantum vulnerability is not claimed from a version number,
 since TLS 1.3 is vulnerable over X25519 and is not over X25519MLKEM768. `-SSLv3` in an
 `SSLProtocol` line is a ban, and is recorded as one. Manifests are parsed structurally, so a
-library named in a comment is not a dependency.
+library named in a comment is not a dependency. The lockfiles read the same way: `package-lock.json`, `yarn.lock`,
+`pnpm-lock.yaml`, `Cargo.lock`, `Gemfile.lock`, `composer.lock`, `Pipfile.lock`, `poetry.lock`,
+and since 0.43.0 .NET's `*.deps.json` (`libraries` entries of type `package`), NuGet's
+`packages.lock.json` and `packages.<project>.lock.json`, Go's `go.sum` (the module lines, not the
+`/go.mod`-only ones, which hash a go.mod consulted while resolving versions) and
+`vendor/modules.txt` — the one file under `vendor/` that is read; the vendored code is not.
 
 **Key sizes** — a size named on the line (`key_size=1024`, `rsa:1024`, `genrsa 1024`,
 `GenerateKey(..., 1024)`, `-newkey rsa:3072`, `ssh-keygen -b 4096`, `rsa-key-size = 4096`,

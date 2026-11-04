@@ -25,7 +25,7 @@ from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirec
                wireguard)
 from . import grammar
 from .classifier import _PQC_SCHEMES
-from .assets import _LOCKFILES as LOCKFILES
+from .assets import is_lockfile
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
 from .assets import _DEPRECATED_TLS, _TLS_VERSION, _tls_version_name, GROUP_CONSTANT
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
@@ -2223,7 +2223,11 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
                         problems.append(("symlink_dir", rel(str(candidate))))
                     dirnames.remove(name)
         for name in filenames:
-            if hit is not None:
+            # Row 427: Go's vendor/modules.txt is the list of what was vendored, and the one
+            # file of vendor/ that is read; the vendored code itself stays left out.
+            if hit is not None and not (hit == "vendor" and name == "modules.txt"
+                                        and dir_parts[-1] == "vendor"
+                                        and sum(p in EXCLUDED_DIRS for p in dir_parts) == 1):
                 if excluded_counter is not None:
                     excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
                 continue
@@ -4742,7 +4746,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # directories (`/crypto/rsa/`), not uses.
         files_scanned["config"] += 1
         codeowners[rel_path] = lines
-    elif path.name in LOCKFILES:
+    elif is_lockfile(path):
         # A lockfile is read for its packages (dependency_findings, above), by its
         # structure. Its text is package names, versions and hashes: matching it as
         # source made `ecdsa-sig-formatter` an "ECDSA usage" beside the dependencies row
