@@ -136,7 +136,11 @@ CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
                     "Dockerfile", "Containerfile", "Kconfig", "Caddyfile",
                     # Postfix's main.cf and master.cf: its TLS protocols, ciphers and curves
                     # (postconf(5); ZA-OPRAVYANE row 336).
-                    "main.cf", "master.cf"}
+                    "main.cf", "master.cf",
+                    # OpenID Connect Discovery 1.0, 4: "a JSON document ... at the path formed
+                    # by concatenating the string /.well-known/openid-configuration"; it lists
+                    # the JWS algorithms (id_token_signing_alg_values_supported; row 352).
+                    "openid-configuration"}
 
 # The same names with a variant after them (Dockerfile-QUIC, Dockerfile.alpine,
 # Kconfig.defconfig) or before them (nginx.Dockerfile).

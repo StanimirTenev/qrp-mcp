@@ -131,3 +131,12 @@ def test_switches_reach_the_cbom_as_their_own_components(tmp_path):
     (tmp_path / "fw.conf").write_text(FORTIOS)
     names = {c["name"] for c in build(scan_directory(tmp_path))["components"]}
     assert {"TLS disabled (tls_disable)", "Strong cryptography off (strong-crypto)"} <= names
+
+
+def test_vault_version_words_in_an_error_message_are_not_a_setting(tmp_path):
+    # vault/diagnose/tls_verification.go: the accepted values, listed in a message.
+    (tmp_path / "tls.go").write_text(
+        'minVersionError = "\'tls_min_version\' value %q not supported, please specify one of '
+        '[tls10,tls11,tls12,tls13]"\n')
+    result = scan_directory(tmp_path)
+    assert [p for p in result["evidence"]["protocols"] if p.get("version") == "TLSv1.0"] == []

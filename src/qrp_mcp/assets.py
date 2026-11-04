@@ -687,10 +687,7 @@ _TLS_VERSION = re.compile(
     r"VersionTLS(1[0-3])|"
     # FortiOS (7.6.4 CLI reference, row 226): admin-https-ssl-versions `tlsv1-1 tlsv1-2`,
     # vpn ssl settings ssl-min/max-proto-ver `tls1-0`..`tls1-3`.
-    r"tlsv1-([0-3])|tls1-([0-3])|"
-    # Vault's listener: tls_min_version "Accepted values are "tls10", "tls11", "tls12" or
-    # "tls13"" (row 305).
-    r"tls(1[0-3])"
+    r"tlsv1-([0-3])|tls1-([0-3])"
     r")(?![A-Za-z0-9])")
 
 # Where a protocol is being configured rather than mentioned. Without one of
@@ -940,8 +937,10 @@ def _tls_version_name(match: re.Match) -> str:
 # (ZA-OPRAVYANE row 103).
 # OpenVPN 2.6 writes it bare too: "tls-version-min version ['or-highest'] Sets the minimum
 # TLS version we will accept" (reference manual; ZA-OPRAVYANE row 332).
+# Vault's listener, the whole value only: tls_min_version "Accepted values are "tls10",
+# "tls11", "tls12" or "tls13"" (row 305). Vault's own error messages list the same words.
 _BARE_TLS_VERSION_SETTING = re.compile(
-    r"^\s*(?:tls_(?:min|max)_version\s*=\s*[\"']?1\.([0-3])[\"']?|"
+    r"^\s*(?:tls_(?:min|max)_version\s*=\s*[\"']?(?:1\.|tls1)([0-3])[\"']?|"
     r"tls-version-(?:min|max)\s+1\.([0-3])(?:\s+or-highest)?)\s*(?:#.*)?$")
 
 
