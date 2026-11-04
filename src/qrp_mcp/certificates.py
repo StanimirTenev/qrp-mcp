@@ -492,11 +492,30 @@ def _iso(moment: Any) -> str:
 
 
 def _as_of() -> tuple[Any, str]:
-    """What `expired` is relative to: SOURCE_DATE_EPOCH, else the clock of this scan."""
+    """What `expired` is relative to: SOURCE_DATE_EPOCH, else the date of this scan at 00:00
+    UTC. Not the clock (row 431): the time of day made two scans of one tree differ in every
+    certificate row. `--as-of` overrides both after the scan (pin_expiry)."""
     epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
     if epoch.isdigit():
         return datetime.fromtimestamp(int(epoch), timezone.utc), "SOURCE_DATE_EPOCH"
-    return datetime.now(timezone.utc), "scan time"
+    today = datetime.now(timezone.utc)
+    return datetime(today.year, today.month, today.day, tzinfo=timezone.utc), "scan date"
+
+
+def pin_expiry(result: dict[str, Any], as_of: Any) -> None:
+    """`--as-of YYYY-MM-DD`: every certificate's `expired` relative to that date, 00:00 UTC."""
+    moment = datetime(as_of.year, as_of.month, as_of.day, tzinfo=timezone.utc)
+    lists = list((result.get("evidence") or {}).values()) + list(
+        ((result.get("suppressed") or {}).get("evidence") or {}).values())
+    for items in lists:
+        for item in items if isinstance(items, list) else []:
+            cert = item.get("certificate") if isinstance(item, dict) else None
+            if not isinstance(cert, dict) or not cert.get("not_after"):
+                continue
+            not_after = datetime.strptime(cert["not_after"], "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=timezone.utc)
+            cert.update(expired=moment > not_after, expired_as_of=_iso(moment),
+                        expired_basis="--as-of")
 
 
 def _cn(name: Any) -> str | None:

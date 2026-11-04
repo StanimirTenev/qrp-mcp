@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from . import __version__, closure, config, control, coverage, cyclonedx, jsonout, mandates, profiles, sarif
+from . import __version__, certificates, closure, config, control, coverage, cyclonedx, jsonout, mandates, profiles, sarif
 from . import baseline as baseline_mod
 from .classifier import known_algorithms
 from .scan import scan_directory
@@ -468,8 +468,8 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
                             "present were read (coverage.scope.coverage_pct); without it a "
                             "gate over unread files reads not_established and exits 0")
         p.add_argument("--as-of", type=date.fromisoformat, metavar="YYYY-MM-DD", default=None,
-                       help="with --mandate: the date the deadlines are counted from "
-                            "(default: today)")
+                       help="the date a certificate's `expired` is relative to and, with "
+                            "--mandate, the deadlines are counted from (default: today)")
     p.add_argument("--control-seed", type=int, metavar="N", default=None,
                    help="also run `qrp-mcp control PATH --seed N` and carry its block as "
                         "coverage.claims.self_seeded_control (robustness on known patterns; "
@@ -546,6 +546,8 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
             for lists in (result["evidence"],
                           (result.get("suppressed") or {}).get("evidence") or {})
             for category, items in lists.items() for item in items}
+    if getattr(a, "as_of", None) is not None:
+        certificates.pin_expiry(result, a.as_of)
     failed = False
     if wanted:
         failed = mandates.apply(result, wanted, a.as_of or date.today(), lead, min_coverage)

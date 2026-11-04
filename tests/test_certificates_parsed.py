@@ -131,13 +131,16 @@ def test_expiry_is_relative_to_source_date_epoch(tmp_path, three, monkeypatch):
     assert certs[lines[0]]["expired_basis"] == "SOURCE_DATE_EPOCH"
 
 
-def test_expiry_without_source_date_epoch_is_the_scan_clock(tmp_path, three, monkeypatch):
+def test_expiry_without_source_date_epoch_is_the_scan_date(tmp_path, three, monkeypatch):
+    # Row 431: the date of the scan at 00:00 UTC, not the clock (it was `scan time`).
     monkeypatch.delenv("SOURCE_DATE_EPOCH", raising=False)
     path, _ = _bundle(tmp_path, three[0][:1])
     algorithms, _ = scan_certificate_file(path, "bundle.pem")
     cert = _cert_rows(algorithms)[0]["certificate"]
-    assert cert["expired_basis"] == "scan time"
-    assert cert["expired"] is (datetime.datetime.now(UTC) > START + datetime.timedelta(days=365))
+    assert cert["expired_basis"] == "scan date"
+    today = datetime.datetime.now(UTC)
+    midnight = datetime.datetime(today.year, today.month, today.day, tzinfo=UTC)
+    assert cert["expired"] is (midnight > START + datetime.timedelta(days=365))
 
 
 def test_a_certificate_signed_by_another_is_not_self_signed(tmp_path, three):
