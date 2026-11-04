@@ -64,3 +64,32 @@ def test_every_file_read_still_passes(tmp_path):
 def test_a_failing_gate_stays_failed_with_files_not_read(tmp_path):
     code, block = _run(tmp_path, _tree(tmp_path, binaries=True), "--lead-months", "60")
     assert block["gate"] == "fail" and code == 1
+
+
+# Row 204, decided by Stanimir (04.11.2026): `--min-coverage <percent>`. Below it the gate
+# fails, exit 1, and says why; without the flag the gate reads as above.
+
+def test_min_coverage_below_fails_the_gate(tmp_path):
+    code, block = _run(tmp_path, _tree(tmp_path, binaries=True), "--lead-months", "12",
+                       "--min-coverage", "90")
+    assert code == 1
+    assert block["gate"] == "fail"
+    assert block["gate_failed_because"].startswith("coverage 50.0% is below --min-coverage 90")
+
+
+def test_min_coverage_met_leaves_the_gate_as_it_was(tmp_path):
+    code, block = _run(tmp_path, _tree(tmp_path, binaries=True), "--lead-months", "12",
+                       "--min-coverage", "50")
+    assert block["gate"] == "not_established" and code == 0
+    assert "gate_failed_because" not in block
+    other = tmp_path / "all-read"
+    code, block = _run(other, _tree(other, binaries=False), "--lead-months", "12",
+                       "--min-coverage", "100")
+    assert block["gate"] == "pass" and code == 0
+
+
+def test_min_coverage_needs_a_mandate(tmp_path):
+    r = subprocess.run([sys.executable, "-m", "qrp_mcp.server", "scan",
+                        str(_tree(tmp_path, binaries=True)), "--min-coverage", "90"],
+                       capture_output=True, text=True)
+    assert r.returncode == 2 and "--min-coverage needs --mandate" in r.stderr

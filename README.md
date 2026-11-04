@@ -1163,6 +1163,10 @@ reverted once to see its test fail.
 - **A gate over files not read is not a pass** (row 204). Where it would pass while files went
   unread (a `.jar`, a `.so`), `gate` reads `not_established` and `gate_not_established_because`
   gives the count. The exit code of that case stays 0, as for a pass; a fail is still a fail.
+  **`--min-coverage PERCENT`** (with `--mandate`) makes it a failure: when fewer than PERCENT of the
+  files present were read (`coverage.scope.coverage_pct`), the gate is `fail`, exit 1, and
+  `gate_failed_because` says how many files were not read. Without the flag nothing changes. It is
+  a command-line option only (not in `.qrp.toml`, and the MCP tools have no gate).
 - **A switch set off is not a use** (rows 203, 196). `USE_RSA = False` and Kconfig
   `CONFIG_ECDSA=n` are bans now, as `!MD5` is; switched on they are uses as before. A list named
   LEGACY (`LEGACY_ALGS = ["RSA-PSS", "DSA"]`) is an identifier row: low, not counted in the

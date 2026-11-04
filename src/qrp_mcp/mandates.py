@@ -22,7 +22,8 @@ many months of the date; a deadline already passed fails without it. For NIST IR
 the gate counts is the deprecation (2030), from 0.41.0; it counted the disallowance (2035)
 while `next_deadline` said 2030 (row 160). The block says which (`gate_counts`,
 `next_gate_deadline`). A gate that would pass while files went unread reads `not_established`
-with the count (row 204); the exit code is that of a pass. An occurrence the owner
+with the count (row 204); the exit code is that of a pass, unless `--min-coverage` is given and
+the files read fall below it: then the gate fails, with the reason (`gate_failed_because`). An occurrence the owner
 suppressed is not in `evidence` and does not count; one in the baseline is listed and does not
 trip it either -- a baseline is the owner's statement that it is known. Comments and bans are
 not uses and get no clause; nor do identifier rows, which never move the headline either.
@@ -209,7 +210,7 @@ def _parameter_set(name: str, item: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def apply(result: dict[str, Any], names: list[str], day: date,
-          lead_months: int | None = None) -> bool:
+          lead_months: int | None = None, min_coverage: float | None = None) -> bool:
     """Annotate `result` in place; return True when the gate fails."""
     kinds = {a["family"]: a["kind"] for a in known_algorithms()}
     vulnerable = {f["algorithm_family"] for f in result["findings"] if f.get("quantum_vulnerable")}
@@ -312,11 +313,24 @@ def apply(result: dict[str, Any], names: list[str], day: date,
     # Row 204: a pass over files the scan did not read is a pass over the files it read. Said
     # in the gate's word; the exit code is the same as for a pass.
     unread = _unread(result)
-    if unread:
-        for block in blocks.values():
-            if block["gate"] == "pass":
-                block["gate"] = "not_established"
-                block["gate_not_established_because"] = unread
+    # Row 204, decided 04.11.2026: `--min-coverage` makes too few files read a failure of its
+    # own, whatever the deadlines say. Without it the pass over unread files is withheld only.
+    scope = (result.get("coverage") or {}).get("scope") or {}
+    pct = scope.get("coverage_pct")
+    short = min_coverage is not None and pct is not None and pct < min_coverage
+    for block in blocks.values():
+        if min_coverage is not None:
+            block["min_coverage"] = min_coverage
+        if short:
+            block["gate"] = "fail"
+            block["gate_failed_because"] = (
+                f"coverage {pct}% is below --min-coverage {min_coverage:g}%: "
+                f"{scope.get('files_not_examined')} of {scope.get('files_present')} files were "
+                f"not read (coverage.not_examined)")
+            failed = True
+        elif unread and block["gate"] == "pass":
+            block["gate"] = "not_established"
+            block["gate_not_established_because"] = unread
     result["mandates"] = blocks
     return failed
 

@@ -426,6 +426,10 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
         p.add_argument("--lead-months", type=int, metavar="N", default=None,
                        help="with --mandate: exit 1 when a deadline falls within N months "
                             "(a deadline already passed exits 1 without it)")
+        p.add_argument("--min-coverage", type=float, metavar="PERCENT", default=None,
+                       help="with --mandate: exit 1 when fewer than PERCENT of the files "
+                            "present were read (coverage.scope.coverage_pct); without it a "
+                            "gate over unread files reads not_established and exits 0")
         p.add_argument("--as-of", type=date.fromisoformat, metavar="YYYY-MM-DD", default=None,
                        help="with --mandate: the date the deadlines are counted from "
                             "(default: today)")
@@ -466,6 +470,11 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
     wanted = (getattr(a, "mandate", None) or values.get("mandate") or []) if not cbom else []
     lead = getattr(a, "lead_months", None)
     lead = values.get("lead_months") if lead is None else lead
+    min_coverage = getattr(a, "min_coverage", None)
+    if min_coverage is not None and not wanted:
+        p.error("--min-coverage needs --mandate: it is a condition of the mandate gate")
+    if min_coverage is not None and not 0 <= min_coverage <= 100:
+        p.error("--min-coverage is a percentage, 0 to 100")
 
     # The result must not become part of the next run's input. Writing it inside
     # the scanned tree made a second run see one more file, quote the findings out
@@ -495,7 +504,7 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
             for category, items in lists.items() for item in items}
     failed = False
     if wanted:
-        failed = mandates.apply(result, wanted, a.as_of or date.today(), lead)
+        failed = mandates.apply(result, wanted, a.as_of or date.today(), lead, min_coverage)
     result = _at_level(result, level)
     fingerprint = (result.get("findings_fingerprint") or {}).get("sha256")
     if cbom:
@@ -504,8 +513,8 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
         result = sarif.build(result, keys)
     code = _write(result, out_path, level, fingerprint)
     if failed:
-        print("qrp-mcp: a mandate deadline has passed or falls within --lead-months; "
-              "see mandates.*.gate", file=sys.stderr)
+        print("qrp-mcp: a mandate deadline has passed or falls within --lead-months, or "
+              "fewer files were read than --min-coverage; see mandates.*.gate", file=sys.stderr)
         return code or 1
     return code
 
@@ -568,11 +577,11 @@ def closure_to_file(argv: list[str]) -> int:
 USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MCP clients run)
        qrp-mcp scan PATH [--out FILE] [--level full|masked|trimmed] [--profile NAME]
                     [--format json|sarif] [--mandate cnsa-2.0|nist-ir-8547]
-                    [--lead-months N] [--as-of YYYY-MM-DD]
+                    [--lead-months N] [--min-coverage PERCENT] [--as-of YYYY-MM-DD]
                     [--config FILE | --no-config] [--baseline FILE] [--write-baseline FILE]
                                scan a directory and write the result as JSON or SARIF;
                                exit 1 when a --mandate deadline has passed or falls
-                               within --lead-months
+                               within --lead-months, or coverage is below --min-coverage
        qrp-mcp cbom PATH [--out FILE] [--level full|masked|trimmed]
                     [--config FILE | --no-config] [--baseline FILE] [--write-baseline FILE]
                                scan a directory and write a CycloneDX 1.6 CBOM
