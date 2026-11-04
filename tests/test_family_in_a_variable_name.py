@@ -45,3 +45,14 @@ def test_a_use_beside_the_name_is_still_read(tmp_path, name, line, family, kind)
     rows = [r for r in scan_directory(tmp_path, settings=None)["evidence"]["source_code"]
             if r["algorithm"] == family]
     assert rows and rows[0]["evidence_kind"] == kind
+
+
+def test_a_terraform_key_named_after_the_family_is_the_setting(tmp_path):
+    """In Terraform the key names the setting: tls_private_key's ecdsa_curve chooses the curve.
+    The first cut of row 421 turned it into an identifier at medium; the L1 harness re-run
+    caught it on its terraform_tls_key style (high -> medium in 6 of 7 trees)."""
+    (tmp_path / "k.tf").write_text('resource "tls_private_key" "x" {\n  algorithm   = "ECDSA"\n'
+                                    '  ecdsa_curve = "P256"\n}\n')
+    rows = [r for rows in scan_directory(tmp_path, settings=None)["evidence"].values() for r in rows
+            if r.get("line") == 3 and r.get("algorithm") == "ECDSA"]
+    assert rows and {r["evidence_kind"] for r in rows} == {"declaration"}

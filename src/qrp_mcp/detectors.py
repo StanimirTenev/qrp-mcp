@@ -3625,8 +3625,10 @@ def scan_source_file(path: Path, rel_path: str,
                 # Row 368: `implicitSha1 = new Rfc2898DeriveBytes(..., SHA256)` -- the name
                 # the result is stored under, not what the call does.
                 evidence = "identifier"
-            elif kind in ("declaration", "reference") and _only_names_the_assigned_variable(
-                    searched, matches):
+            elif (kind in ("declaration", "reference") and ext in SOURCE_EXTENSIONS
+                  and _only_names_the_assigned_variable(searched, matches)):
+                # Code only: in Terraform or a config file the key is the setting's name
+                # (`ecdsa_curve = "P256"` chooses the curve), not a variable's.
                 evidence = "identifier"
             else:
                 evidence = kind
