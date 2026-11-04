@@ -30,6 +30,13 @@ PROFILES: dict[str, dict[str, Any]] = {
         "signatures": "ML-DSA-87 (the only parameter set in CNSA 2.0); SLH-DSA is not "
                       "approved for any use in NSS",
         "firmware": "LMS or XMSS, single-tree only; HSS and XMSS^MT are not allowed",
+        # Row 210: from the key_establishment and signatures lines above.
+        "parameter_sets": {
+            "ML-KEM-512": "not in CNSA 2.0: ML-KEM-1024 is the only parameter set",
+            "ML-KEM-768": "not in CNSA 2.0: ML-KEM-1024 is the only parameter set",
+            "ML-DSA-44": "not in CNSA 2.0: ML-DSA-87 is the only parameter set",
+            "ML-DSA-65": "not in CNSA 2.0: ML-DSA-87 is the only parameter set",
+        },
         "hybrid": "Not required: NSA 'will not require NSS developers to use hybrid "
                   "certified products'; accepted where a protocol or interoperability needs it.",
         "dates": "From 1 January 2027, unless excepted, CNSA 2.0 algorithms 'will be required "
@@ -126,6 +133,14 @@ PROFILES: dict[str, dict[str, Any]] = {
         "weak_cipher": "AES-128, AES-192 or AES-256, preferably AES-256 (AES-192 or AES-256 for TOP "
                        "SECRET)",
         "weak_rsa": "at least 2048 bits, preferably 3072; RSA 'will not be approved beyond 2030'",
+        # What the document says of a post-quantum parameter set short of its first choice
+        # (ZA-OPRAVYANE row 210), from the key_establishment and signatures lines above.
+        "parameter_sets": {
+            "ML-KEM-768": "approved but 'will not be approved beyond 2030'",
+            "ML-KEM-512": "not among the approved sets",
+            "ML-DSA-65": "approved but 'will not be approved beyond 2030'",
+            "ML-DSA-44": "not among the approved sets",
+        },
     },
     "ca-cccs": {
         "authority": "Canadian Centre for Cyber Security",
@@ -311,6 +326,13 @@ def source(profile: str) -> dict[str, str]:
     p = PROFILES[profile]
     return {"standard": f"{p['authority']}: {p['document']}", "what": p["version"],
             "url": p["url"], "read_on": READ_ON}
+
+
+def parameter_set_name(item: dict[str, Any]) -> str:
+    """`ML-KEM-768` from an occurrence's family and `parameter_set` (`768`, or a certificate's
+    `ML-DSA-65`)."""
+    family, said = str(item.get("algorithm")), str(item["parameter_set"])
+    return said if said.startswith(f"{family}-") else f"{family}-{said}"
 
 
 def standing(profile: str, family: str) -> dict[str, Any] | None:

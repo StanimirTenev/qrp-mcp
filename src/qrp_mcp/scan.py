@@ -341,6 +341,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         "evidence_file_sha256": _cited_digests(scan_result),
     }
 
+    _profile_parameter_sets(result, profile)
     # How sure the scan is of each occurrence, from what it read (release E); before the
     # suppression below, so a suppressed occurrence keeps its level.
     confidence.annotate(result["evidence"])
@@ -1123,6 +1124,38 @@ def _build_gates(repo_path: Path, scan_result: dict[str, Any],
                           f"still pass -D{macro}; the files cannot show whether one does"),
             }
     return out
+
+
+def _profile_parameter_sets(result: dict[str, Any], profile: str) -> None:
+    """ZA-OPRAVYANE row 210: ML-KEM-768 under au-ism read `pqc_ready` with nothing said, though
+    the ISM approves it only until 2030. The classification stays (detection is the same under
+    every profile); the finding and its role's part quote what the profile says of each
+    parameter set read, with the places."""
+    limits = profiles.PROFILES.get(profile, {}).get("parameter_sets") or {}
+    if not limits:
+        return
+    places: dict[str, dict[str, list[str]]] = {}
+    for items in result["evidence"].values():
+        for item in items:
+            if (not isinstance(item, dict) or not item.get("parameter_set")
+                    or item.get("evidence_kind") in ("comment", "ban")):
+                continue
+            name = profiles.parameter_set_name(item)
+            if name in limits:
+                places.setdefault(item["algorithm"], {}).setdefault(name, []).append(
+                    f"{item['path']}:{item['line']}")
+    kinds = {a["family"]: a["kind"] for a in known_algorithms()}
+    for finding in result["findings"]:
+        family = finding["algorithm_family"]
+        if family not in places or finding.get("classification") != "pqc_ready":
+            continue
+        said = [{"parameter_set": name, "standing": limits[name], "profile": profile,
+                 "places": where} for name, where in sorted(places[family].items())]
+        finding["profile_parameter_sets"] = said
+        part = {"key_exchange": "key_establishment",
+                "signature": "signature"}.get(kinds.get(family, ""))
+        if part:
+            result["summary"]["by_role"][part].setdefault("profile_parameter_sets", []).extend(said)
 
 
 def _with_providers(finding: dict[str, Any], providers: dict[str, set[str]],

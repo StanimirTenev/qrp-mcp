@@ -193,6 +193,20 @@ def _cnsa(category: str, item: dict[str, Any], day: date) -> dict[str, Any]:
             "months_until": _months_until(day, date.fromisoformat(deadline))}
 
 
+def _parameter_set(name: str, item: dict[str, Any]) -> dict[str, Any] | None:
+    """ZA-OPRAVYANE row 210: a post-quantum parameter set the mandate does not list
+    (ML-KEM-768 under CNSA 2.0, which has ML-KEM-1024 only). Said, with no deadline: the gate
+    counts deadlines and is not moved by it."""
+    if name != "cnsa-2.0" or not item.get("parameter_set"):
+        return None
+    said = profiles.PROFILES["us-cnsa2"]["parameter_sets"].get(profiles.parameter_set_name(item))
+    if said is None:
+        return None
+    m = MANDATES[name]
+    return {"clause": said, "source": f"{m['document']}, {m['section']}",
+            "status": "parameter_set_not_in_mandate"}
+
+
 def apply(result: dict[str, Any], names: list[str], day: date,
           lead_months: int | None = None) -> bool:
     """Annotate `result` in place; return True when the gate fails."""
@@ -233,8 +247,15 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                 family in vulnerable or raw.get(family) in vulnerable
                 or any(r.startswith(f"{family}-") and v in vulnerable for r, v in raw.items()))
             if not (in_vulnerable or signing):
-                for block in blocks.values():
-                    block["not_in_scope"] += 1
+                for name, block in blocks.items():
+                    clause = _parameter_set(name, item)
+                    if clause is None:
+                        block["not_in_scope"] += 1
+                        continue
+                    item.setdefault("mandates", {})[name] = clause
+                    block["in_scope"] += 1
+                    block["by_status"][clause["status"]] = block["by_status"].get(
+                        clause["status"], 0) + 1
                 continue
             role = "signature" if signing else _role(category, item, family or "", kinds)
             # The classical half of a hybrid named on this very line (source rows only: a
