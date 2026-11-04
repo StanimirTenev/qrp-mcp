@@ -71,6 +71,9 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("MLDSA44ED25519EXPERIMENTAL", "ML-DSA-44-Ed25519 experimental",
      "pqc_ready", "signature"),
     ("DILITHIUM", "ML-DSA", "pqc_ready", "signature"),
+    # Rows 415, 416: the round-3 schemes by their libraries' own names (detectors).
+    ("DILITHIUMROUND3", "Dilithium round 3", "pqc_ready", "signature"),
+    ("SPHINCSROUND3", "SPHINCS+ round 3", "pqc_ready", "signature"),
     ("SLHDSA", "SLH-DSA", "pqc_ready", "signature"),
     ("SPHINCS", "SLH-DSA", "pqc_ready", "signature"),
     ("FALCON", "Falcon", "pqc_ready", "signature"),
@@ -189,6 +192,8 @@ _PQC_SCHEMES: dict[str, tuple[str, str]] = {
     "ML-KEM": ("structured lattice", "standardised"),
     "Kyber": ("structured lattice", "superseded"),
     "ML-DSA-44-Ed25519 experimental": ("structured lattice", "superseded"),
+    "Dilithium round 3": ("structured lattice", "superseded"),
+    "SPHINCS+ round 3": ("hash-based", "superseded"),
     "ML-DSA": ("structured lattice", "standardised"),
     "SLH-DSA": ("hash-based", "standardised"),
     "XMSS": ("hash-based", "standardised"),
@@ -363,6 +368,17 @@ _PRE_STANDARD_NOTE = {
         "two do not interoperate. Whether this code was updated to FIPS 203 under the "
         "old name is not visible from the name; the standard is ML-KEM."
     ),
+    "Dilithium round 3": (
+        " Named as round-3 CRYSTALS-Dilithium (Bouncy Castle's crystals.dilithium classes), not "
+        "as FIPS 204 ML-DSA: FIPS 204 Appendix D documents the differences from Dilithium 3.1, "
+        "and Bouncy Castle calls these the pre-standardisation round-3 algorithms. The "
+        "standard is ML-DSA."
+    ),
+    "SPHINCS+ round 3": (
+        " Named as round-3 SPHINCS+ (liboqs's sphincs ids, the NIST Round 3 submission v3.1; "
+        "Bouncy Castle's sphincsplus classes), not as FIPS 205 SLH-DSA, which differs from it. "
+        "liboqs removed SPHINCS+ in 0.16.0. The standard is SLH-DSA."
+    ),
     "ML-DSA-44-Ed25519 experimental": (
         " A composite of ML-DSA-44 and Ed25519 in the encoding OpenSSH 10.4 shipped as an "
         "experiment, with the @openssh.com suffix. OpenSSH 10.6 enabled the scheme without "
@@ -433,7 +449,8 @@ def _starts_a_word(raw: str, token: str) -> bool:
     algorithm names are camelCase: the RSA in "md5WithRSAEncryption" is a name,
     while the ec in "specification" is not.
     """
-    pattern = r"[-_ .]*".join(re.escape(c) for c in token)
+    # `+` too: "SPHINCS+ round 3" (row 416) is the scheme's own name.
+    pattern = r"[-_ .+]*".join(re.escape(c) for c in token)
     suffix = _WORDLIKE_SUFFIX.get(token)
     for match in re.finditer(pattern, raw, re.IGNORECASE):
         start = match.start()

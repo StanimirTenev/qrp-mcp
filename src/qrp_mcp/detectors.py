@@ -173,6 +173,12 @@ def in_test_code(rel_path: str) -> bool:
 # Description of the rule for "kyber" with no identifier around it.
 EXPERIMENTAL_SSH_MLDSA = ("OpenSSH 10.4 experimental ML-DSA-44-Ed25519 key type "
                           "(@openssh.com), not the one 10.6 enabled")
+_CREATE_ECDH = re.compile(r"\bcreateECDH\(\s*[\"'`]$")
+# Rows 415, 416: the round-3 submissions under their own library names. ML-DSA and SLH-DSA skip
+# the matches inside these, as they do inside the experimental SSH key type.
+PRE_STANDARD_DILITHIUM = ("round-3 CRYSTALS-Dilithium by a Bouncy Castle class or package "
+                          "(crystals.dilithium), not FIPS 204 ML-DSA")
+PRE_STANDARD_SPHINCS = "round-3 SPHINCS+ by a liboqs or Bouncy Castle name, not FIPS 205 SLH-DSA"
 KYBER_BY_NAME_ONLY = "Kyber named without an identifier (round-3 Kyber, or an old name for ML-KEM)"
 # Read in .rs files only (scan_source_file): elsewhere `rsa_` and `_dsa_` are too often a
 # variable's word for a value it does not hold.
@@ -582,8 +588,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
     # Blockchain / wallet signing. These map onto the same classical primitives -- a
     # secp256k1 signature is ECDSA, and Shor breaks it like any other elliptic curve.
+    # Not Node's `crypto.createECDH('secp256k1')`: "Creates an Elliptic Curve Diffie-Hellman
+    # (ECDH) key exchange object" (https://nodejs.org/api/crypto.html), no signature (row 413).
     ("ECDSA", "secp256k1 (ECDSA) usage", re.compile(
-        r"secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
+        r"(?<!createECDH\(.)secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
         r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|\bweb3\b|"
         # Whole method names: `personal_signature` is a form field, not the JSON-RPC
         # call (ZA-OPRAVYANE row 78).
@@ -1143,6 +1151,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # ML-DSA, which then skips the matches inside it (scan_source_file).
     ("ML-DSA-44-Ed25519 experimental", EXPERIMENTAL_SSH_MLDSA, re.compile(
         r"(?<![A-Za-z])ssh-mldsa44-ed25519@openssh\.com", re.IGNORECASE)),
+    ("Dilithium round 3", PRE_STANDARD_DILITHIUM, re.compile(
+        r"\bcrystals\.dilithium\b|\bDilithium(?:KeyPairGenerator|Signer|KeyGenerationParameters|"
+        r"PrivateKeyParameters|PublicKeyParameters|Parameters)\b")),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
         # CIRCL's eddilithium2/3 hybrids carry Dilithium after "ed" (row 77).
         r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])(?:ed)?dilithium|pqcrystals[-_]?dilithium",
@@ -1154,6 +1165,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
      re.compile(r"(?<![A-Za-z])eddilithium2(?![0-9])", re.IGNORECASE)),
     ("Ed448", "Ed448 half of the Ed448-Dilithium3 hybrid (CIRCL eddilithium3)",
      re.compile(r"(?<![A-Za-z])eddilithium3(?![0-9])", re.IGNORECASE)),
+    ("SPHINCS+ round 3", PRE_STANDARD_SPHINCS, re.compile(
+        r"\bOQS_SIG_alg_sphincs_\w+|\bcrypto\.sphincsplus\b|"
+        r"\bSPHINCSPlus(?:Signer|KeyPairGenerator|KeyGenerationParameters|PrivateKeyParameters|"
+        r"PublicKeyParameters)\b")),
     ("SLH-DSA", "SLH-DSA (SPHINCS+) usage", re.compile(
         r"(?<![A-Za-z])slh[-_]?dsa|(?<![A-Za-z])sphincs", re.IGNORECASE,
     )),
@@ -3268,10 +3283,12 @@ def scan_source_file(path: Path, rel_path: str,
             # judging the line by its first match would throw the real use away
             # along with the exclusion.
             matches = [m for m in pattern.finditer(searched) if not _in_blob(m.start(), blobs)]
-            if description == EXPERIMENTAL_SSH_MLDSA:
-                experimental = [(m.start(), m.end()) for m in matches]
-            elif algorithm == "ML-DSA":
-                # The experimental key type's own "mldsa" is not a second, standard key.
+            if description in (EXPERIMENTAL_SSH_MLDSA, PRE_STANDARD_DILITHIUM,
+                               PRE_STANDARD_SPHINCS):
+                experimental += [(m.start(), m.end()) for m in matches]
+            elif algorithm in ("ML-DSA", "SLH-DSA"):
+                # The experimental key type's own "mldsa", and the round-3 names' own
+                # "dilithium" and "sphincs", are not a second, standard key.
                 matches = [m for m in matches
                            if not any(s <= m.start() < e for s, e in experimental)]
             if not matches:
@@ -3524,6 +3541,11 @@ def scan_source_file(path: Path, rel_path: str,
         on_line = {f["algorithm"]: f for f in findings[first_on_line:]}
         for family, pos, said, params in registry.scan(searched):
             if _in_blob(pos, blobs):
+                continue
+            if family == "ECDSA" and _CREATE_ECDH.search(searched[max(0, pos - 16):pos]):
+                # Row 413: the curve of an ECDH object, not a signature; its size goes to ECDH.
+                if "ECDH" in on_line and params and "key_size" not in on_line["ECDH"]:
+                    on_line["ECDH"].update(params)
                 continue
             if family in seen_on_line:
                 held = on_line.get(family)
