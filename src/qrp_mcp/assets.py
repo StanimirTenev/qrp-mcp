@@ -778,7 +778,9 @@ def scan_openssl_fips(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
 # scan does not infer. The hop behind a proxy is the one thing the wire outside cannot
 # see (ZA-OPRAVYANE row 44). `verify` on a `bind` line is the client-certificate check,
 # not this, and is left alone.
-_HAPROXY_BIND = re.compile(r"^\s*bind\s")
+# HAProxy's `bind` takes an address first; NetScaler's `bind ssl profile|vserver|service` is
+# not an HAProxy listener and read as one five times in one ns.conf (ZA-OPRAVYANE row 206).
+_HAPROXY_BIND = re.compile(r"^\s*bind\s+(?!ssl\s)")
 _HAPROXY_SERVER = re.compile(r"^\s*(?:server|default-server)\s")
 _HAPROXY_VERSION_OPTION = re.compile(
     r"(?<!\S)(?:ssl-min-ver|ssl-max-ver|force-(?:sslv3|tlsv1\d?)|no-(?:sslv3|tlsv1\d?))(?!\S)",
