@@ -231,6 +231,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
 
     _withhold_reassurance(summary, coverage_block, scan_result, response.findings)
     _unestablished_negotiation(summary, notes, set_aside)
+    _named_for_a_role(summary, scan_result)
     if summary.readiness_not_established:
         for part in ("key_establishment", "signature"):
             if summary.by_role[part]["pqc_readiness"] in _REASSURING:
@@ -742,6 +743,38 @@ def _by_role(findings: list[Any], roles: dict[str, dict[str, int]],
         }
     out["role_not_determined"] = sorted(undetermined)
     return out
+
+
+def _named_for_a_role(summary: Any, scan_result: dict[str, Any]) -> None:
+    """ZA-OPRAVYANE row 208: an identifier row is too weak to count (rel3-rules), and a part it
+    alone names a classical family for read `pqc_ready` -- AWS KMS `RSAES_OAEP_SHA_256` key
+    transport beside an ML-KEM key. Still not counted; the part that would say nothing
+    classical reads `not_established` and names the rows, and so does the headline."""
+    named: dict[str, list[str]] = {}
+    for key in ("source_code_findings", "ci_pipeline_findings", "iac_findings"):
+        for item in scan_result.get(key) or []:
+            if (item.get("evidence_kind") == "identifier"
+                    and item.get("role") in ("key_establishment", "signature")):
+                named.setdefault(item["role"], []).append(
+                    f"{item['algorithm']} at {item['path']}:{item['line']}")
+    because: list[str] = []
+    for part, rows in sorted(named.items()):
+        role = summary.by_role[part]
+        if role["pqc_readiness"] not in _REASSURING:
+            continue
+        said = (f"{', '.join(rows)} named for {part.replace('_', ' ')} by an identifier "
+                f"row only, which is not counted: the part is not established")
+        role["pqc_readiness"] = "not_established"
+        role.setdefault("because", []).append(said)
+        because.append(said)
+    if not because:
+        return
+    if summary.pqc_readiness == "not_established" and summary.readiness_not_established:
+        summary.readiness_not_established["because"].extend(because)
+    elif summary.pqc_readiness in _REASSURING:
+        summary.readiness_not_established = {"would_read": summary.pqc_readiness,
+                                             "because": because}
+        summary.pqc_readiness = "not_established"
 
 
 def _in_use(scan_result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
