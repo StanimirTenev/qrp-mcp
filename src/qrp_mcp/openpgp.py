@@ -1,4 +1,5 @@
-"""OpenPGP keys (`.asc`, `.gpg`, `.pgp` and armored key blocks; ZA-OPRAVYANE row 337), read
+"""OpenPGP keys and signatures (`.asc`, `.gpg`, `.pgp` and armored key blocks; ZA-OPRAVYANE row
+337), read
 from their packets as RFC 9580 lays them out (https://www.rfc-editor.org/rfc/rfc9580):
 
 * 4.2: the first octet's bit 6 tells the OpenPGP format ("Bits 5 to 0 -- Packet Type ID") from
@@ -36,8 +37,16 @@ _CURVES = {bytes.fromhex("2A8648CE3D030107"): ("P-256", 256),
            bytes.fromhex("2B240303020801010D"): ("brainpoolP512r1", 512),
            bytes.fromhex("2B06010401DA470F01"): ("Ed25519", None),
            bytes.fromhex("2B060104019755010501"): ("Curve25519", None)}
-_ARMOR = re.compile(rb"-----BEGIN PGP (?:PUBLIC|PRIVATE) KEY BLOCK-----\r?\n(.*?)"
-                    rb"-----END PGP (?:PUBLIC|PRIVATE) KEY BLOCK-----", re.S)
+_ARMOR = re.compile(rb"-----BEGIN PGP (PUBLIC KEY BLOCK|PRIVATE KEY BLOCK|SIGNATURE)-----\r?\n(.*?)"
+                    rb"-----END PGP \1-----", re.S)
+# Signatures (packet type 2), 5.2.3: "A 1-octet version number. This is 4 for version 4
+# signatures and 6 for version 6 signatures.", "A 1-octet Signature Type ID.", "A 1-octet
+# public key algorithm.", "A 1-octet hash algorithm." 9.5: hash 1 MD5, 2 SHA-1, 3 RIPEMD-160,
+# 8 SHA2-256, 9 SHA2-384, 10 SHA2-512, 11 SHA2-224, 12 SHA3-256, 14 SHA3-512. A detached
+# release signature names the signer's algorithm, not its key size.
+_SIGNATURE_TAG = 2
+_HASHES = {1: "MD5", 2: "SHA1", 3: "RIPEMD-160", 8: "SHA2-256", 9: "SHA2-384", 10: "SHA2-512",
+           11: "SHA2-224", 12: "SHA3-256", 14: "SHA3-512"}
 
 
 def _packets(data: bytes) -> list[tuple[int, bytes]] | None:
@@ -106,7 +115,7 @@ def keys(raw: bytes) -> list[dict[str, Any]] | None:
     blobs = []
     if b"-----BEGIN PGP" in raw:
         for match in _ARMOR.finditer(raw):
-            parts = re.split(rb"\r?\n[ \t]*\r?\n", match.group(1), maxsplit=1)
+            parts = re.split(rb"\r?\n[ \t]*\r?\n", match.group(2), maxsplit=1)
             text = parts[-1]                # after the armor headers and their blank line
             body = b"".join(line.strip() for line in text.splitlines()
                             if line.strip() and not line.startswith(b"="))
@@ -127,12 +136,20 @@ def keys(raw: bytes) -> list[dict[str, Any]] | None:
                 if key is None:
                     return None
                 out.append({**key, "packet": _KEY_TAGS[tag]})
+            elif tag == _SIGNATURE_TAG and len(body) >= 4 and body[0] in (4, 6):
+                out.append({"family": _ALGORITHMS.get(body[2]), "algorithm_id": body[2],
+                            "hash": _HASHES.get(body[3], f"hash algorithm {body[3]}"),
+                            "packet": "signature"})
     return out or None
 
 
 def scan(rel_path: str, raw: bytes) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """(algorithm rows, secret key rows); both empty when the file does not decode."""
     found = keys(raw)
+    # A key block carries its own self-signatures; only a file with no key in it (a detached
+    # or cleartext signature) is reported for its signatures.
+    if found and any(k["packet"] != "signature" for k in found):
+        found = [k for k in found if k["packet"] != "signature"]
     rows: list[dict[str, Any]] = []
     secrets: list[dict[str, Any]] = []
     for key in found or []:
@@ -141,6 +158,13 @@ def scan(rel_path: str, raw: bytes) -> tuple[list[dict[str, Any]], list[dict[str
             continue
         size = f", {key['key_size']} bits" if "key_size" in key else ""
         curve = f", curve {key['curve']}" if "curve" in key else ""
+        if key["packet"] == "signature":
+            size = f", hash {key['hash']}; the signer's key size is not in a signature"
+            if key["hash"] in ("MD5", "SHA1"):
+                rows.append({"path": rel_path, "line": 1, "algorithm": key["hash"],
+                             "evidence_kind": "declaration",
+                             "excerpt": f"OpenPGP signature packet, hash {key['hash']}",
+                             "description": f"{key['hash']} as the hash of an OpenPGP signature"})
         row = {"path": rel_path, "line": 1, "algorithm": family, "evidence_kind": "declaration",
                "excerpt": f"OpenPGP {key['packet']} packet, algorithm {key['algorithm_id']}",
                "description": (f"{family} in an OpenPGP {key['packet']} (RFC 9580 algorithm "

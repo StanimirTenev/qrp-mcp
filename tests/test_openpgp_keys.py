@@ -64,3 +64,32 @@ def test_secret_key_export(tmp_path):
     assert [(f["algorithm"], f.get("key_size")) for f in result["evidence"]["source_code"]] == [("RSA", 3072)]
     [key] = result["evidence"]["embedded_keys"]
     assert (key["key_algorithm"], key["key_size"]) == ("RSA", 3072)
+
+
+@pytest.mark.skipif(shutil.which("gpg") is None, reason="gpg not installed")
+def test_detached_signature(tmp_path):
+    """RFC 9580 5.2.3: a v4/v6 signature carries "A 1-octet public key algorithm." and "A
+    1-octet hash algorithm."; 9.5: hash 2 is SHA-1, 10 SHA2-512."""
+    import subprocess
+    home = tmp_path / "gnupg"
+    home.mkdir(mode=0o700)
+    env = {"GNUPGHOME": str(home), "PATH": "/usr/bin:/bin"}
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "release.tar.gz").write_bytes(b"payload")
+    try:
+        subprocess.run(["gpg", "--batch", "--passphrase", "", "--quick-gen-key", "s@example.org",
+                        "rsa2048", "sign", "never"], env=env, check=True, capture_output=True)
+        for digest, out in (("SHA512", "release.tar.gz.asc"), ("SHA1", "old.tar.gz.asc")):
+            subprocess.run(["gpg", "--batch", "--pinentry-mode", "loopback", "--passphrase", "",
+                            "--digest-algo", digest, "--armor", "--detach-sign", "--output",
+                            str(repo / out), str(repo / "release.tar.gz")],
+                           env=env, check=True, capture_output=True)
+    finally:
+        subprocess.run(["gpgconf", "--kill", "gpg-agent"], env=env, capture_output=True)
+    result = scan_directory(repo)
+    rows = sorted((f["path"], f["algorithm"]) for f in result["evidence"]["source_code"])
+    assert rows == [("old.tar.gz.asc", "RSA"), ("old.tar.gz.asc", "SHA1"),
+                    ("release.tar.gz.asc", "RSA")]
+    assert result["claimed_but_not_decoded"] == []
+    assert result["evidence"]["embedded_keys"] == []
