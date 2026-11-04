@@ -1413,13 +1413,46 @@ CLASSICAL_GROUPS.update({
 _GROUP_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_-]*")
 
 
+# TLS group IDs as library constants (row 419), each the library's own name for an IANA TLS
+# Supported Group: mbedTLS `MBEDTLS_SSL_IANA_TLS_GROUP_X25519` ("TLS 1.3 NamedGroup values"),
+# wolfSSL `WOLFSSL_ECC_SECP256R1` (its "Named Groups" enum), BoringSSL `SSL_GROUP_X25519`
+# ("SSL_GROUP_* define TLS group IDs"), rustls `kx_group::SECP256R1` ("Ephemeral ECDH on
+# secp256r1"). A hybrid's constant (`SSL_GROUP_X25519_MLKEM768`) is not in CLASSICAL_GROUPS.
+# A `#define` or enum entry defines the name and configures nothing.
+GROUP_CONSTANT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:MBEDTLS_SSL_IANA_TLS_GROUP_|WOLFSSL_ECC_|SSL_GROUP_|kx_group::)"
+    r"([A-Z][A-Z0-9_]*)(?![A-Za-z0-9_])")
+_CONSTANT_DEFINITION = re.compile(r"^\s*#\s*define\b|^\s*[A-Z][A-Z0-9_]*\s*=\s*(?:0x)?\d")
+
+
+def _group_constants(line: str) -> list[dict[str, Any]]:
+    if _CONSTANT_DEFINITION.match(line):
+        return []
+    out: list[dict[str, Any]] = []
+    for match in GROUP_CONSTANT.finditer(line):
+        family = CLASSICAL_GROUPS.get(match.group(1).lower().replace("_", ""))
+        if family is None or any(g["group"] == match.group(0) for g in out):
+            continue
+        out.append({
+            "group": match.group(0),
+            "family": family,
+            "setting": "group constant",
+            "offered": "alone",
+            "basis": "configured_group",
+            "description": (f"{match.group(0)} is named here as a TLS group of its own, "
+                            f"without a post-quantum half. What a connection negotiates is "
+                            f"not stated by this line."),
+        })
+    return out
+
+
 def scan_tls_groups(line: str) -> list[dict[str, Any]]:
     """Classical groups this line offers as groups of their own in a TLS group setting."""
     if line.lstrip().startswith(_COMMENT_START):
         return []
     setting = _group_setting(line)
     if not setting:
-        return []
+        return _group_constants(line) if "_" in line or "::" in line else []
     name = " ".join(setting.group(0).replace("=", " ").split())
     out: list[dict[str, Any]] = []
     seen: set[str] = set()

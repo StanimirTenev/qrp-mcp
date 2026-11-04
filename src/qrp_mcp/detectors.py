@@ -27,7 +27,7 @@ from . import grammar
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
-from .assets import _DEPRECATED_TLS, _TLS_VERSION, _tls_version_name
+from .assets import _DEPRECATED_TLS, _TLS_VERSION, _tls_version_name, GROUP_CONSTANT
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
                      os_packages,
                      dockerfile_pins, library_support, names_none_of, pinned_versions,
@@ -4257,7 +4257,8 @@ def line_gate(use_core: bool = True) -> linegate.Gate:
 # groups) report nothing elsewhere. The line gate searches them as they are (release 3c).
 _SETTING_PATTERNS = tuple(
     (p, _warm.derived("prefilter", (p.pattern, p.flags), lambda p=p: _prefilter(p)))
-    for p in (_TLS_CIPHER_SETTING, _HAPROXY_CIPHERS, _TLS_GROUP_SETTING, _HAPROXY_CURVES))
+    for p in (_TLS_CIPHER_SETTING, _HAPROXY_CIPHERS, _TLS_GROUP_SETTING, _HAPROXY_CURVES,
+              GROUP_CONSTANT))
 
 
 # The lines of a file any rule could match, in one search of the file (release D). The other
