@@ -377,6 +377,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # Ruby, the Rust openssl crate, and BouncyCastle -- the vocabulary a rival
         # reads and this scanner did not. Fix #9 of the September comparison.
         r"\bdh\.compute_key\b|\bDh::generate_params\b|\bDh::from_params\b|"
+        r"OpenSSL::PKey::DH\b|"                                # Ruby, row 412
         r"\bDHBasicAgreement\b|\bDHKeyPairGenerator\b|\bDHParametersGenerator\b|"
         # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
         # finite-field Diffie-Hellman.
@@ -710,7 +711,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # does not share: crypto_sign_keypair, crypto_sign_open and the *BYTES constants
         # are also every post-quantum reference implementation's.
         r"\bcrypto_sign_(?:detached|verify_detached|seed_keypair|init|update|"
-        r"final_create|final_verify|state|statebytes)\b|\bnacl\.signing\b",
+        r"final_create|final_verify|state|statebytes)\b|\bnacl\.signing\b|"
+        # Row 402: PyNaCl's binding of the default key pair, named through its module.
+        r"\bnacl\.bindings\.crypto_sign_(?:seed_)?keypair\b",
         re.IGNORECASE,
     )),
     ("Schnorr", "Schnorr signature usage", re.compile(
