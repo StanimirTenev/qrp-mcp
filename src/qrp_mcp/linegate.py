@@ -44,7 +44,7 @@ import re
 from itertools import accumulate
 from typing import NamedTuple
 
-from . import _warm, components, registry
+from . import _warm, components, registry, switches
 
 # --- literals ----------------------------------------------------------------------------
 # Lower-case; searched case-insensitively. Each line says which rule needs it.
@@ -80,6 +80,8 @@ LITERALS: set[str] = {
     "sslprotocol",
     # oids.scan: nothing without one of these three.
     "840", "1.3.1", "3, 1",
+    # switches.scan: nothing without one of switches.LITERALS.
+    *switches.LITERALS,
     # dnssec.scan_records / unnamed_records: RRSIG; DNSKEY (the other spellings are below).
     "rrsig", "dnskey",
     # detectors.scan_cipher_suites: a TLS_/SSL3_/TLS1_/SSL_ token is a part below (the
@@ -130,7 +132,7 @@ PARTS: list[tuple[str, str]] = [
      r"NULL|ARIA|RC2))", ""),
     # assets.scan_protocols, _TLS_VERSION: each alternative's fixed start.
     (r"(?-i:TLSv1|SSLv[23]|VersionTLS1[0-3]|SslProtocols\.Tls|TLS1_\d_VERSION|"
-     r"TLS_?v?1\.\d|tls1\.\d|TLSV1_[0-3])", ""),
+     r"TLS_?v?1\.\d|tls1\.\d|TLSV1_[0-3]|tlsv1-[0-3]|tls1-[0-3]|tls1[0-3])", ""),
     # assets.scan_protocols, _SSH_KEY_LINE without its leading boundary.
     (r"(?-i:ssh-(?:rsa|dss|ed25519|mldsa)|ecdsa-sha2-nistp\d|sk-\S+\s+[A-Za-z0-9+/]{20})", ""),
     # assets.scan_protocols, _SSH_PROTOCOL without its anchors.

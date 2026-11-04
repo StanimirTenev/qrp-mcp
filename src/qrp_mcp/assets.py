@@ -673,7 +673,7 @@ def _at_rest(protocol: str, path: str, line: int, excerpt: str,
 # The spellings a version pin actually takes, across the languages that pin one.
 _TLS_VERSION = re.compile(
     r"(?<![A-Za-z0-9])(?:"
-    r"TLSv1(?:[._](\d))?|"                       # TLSv1.2, TLSv1_2, TLSv1
+    r"TLSv1(?:[._-](\d))?|"                      # TLSv1.2, TLSv1_2, TLSv1, FortiOS TLSv1-1
     r"SSLv(2|3)|"                                # SSLv3
     r"tls\.VersionTLS(1[0-3])|"                  # Go
     r"SslProtocols\.Tls(1[123])?|"               # .NET
@@ -684,7 +684,13 @@ _TLS_VERSION = re.compile(
     # Istio's TLSProtocol enum (`TLSV1_0`) and Traefik's bare Go constant name
     # (`minVersion: VersionTLS10`), ZA-OPRAVYANE row 332.
     r"TLSV1_([0-3])|"
-    r"VersionTLS(1[0-3])"
+    r"VersionTLS(1[0-3])|"
+    # FortiOS (7.6.4 CLI reference, row 226): admin-https-ssl-versions `tlsv1-1 tlsv1-2`,
+    # vpn ssl settings ssl-min/max-proto-ver `tls1-0`..`tls1-3`.
+    r"tlsv1-([0-3])|tls1-([0-3])|"
+    # Vault's listener: tls_min_version "Accepted values are "tls10", "tls11", "tls12" or
+    # "tls13"" (row 305).
+    r"tls(1[0-3])"
     r")(?![A-Za-z0-9])")
 
 # Where a protocol is being configured rather than mentioned. Without one of
@@ -707,7 +713,9 @@ _TLS_CONTEXT = re.compile(
     # `ssl.enabledProtocols`/`ssl.protocol`, MySQL `tls_version`. (Traefik's `minVersion`
     # is MinVersion above.)
     r"ssl-protocols|(?:min|max)ProtocolVersion|ssl_(?:min|max)_protocol|"
-    r"ssl\.enabled\.?protocols|ssl\.(?:quorum\.)?protocol\s*=|^\s*tls_version\s*=",
+    r"ssl\.enabled\.?protocols|ssl\.(?:quorum\.)?protocol\s*=|^\s*tls_version\s*=|"
+    # FortiOS: `set admin-https-ssl-versions`, `set ssl-min-proto-ver(sion)`, `-max-`.
+    r"^\s*set\s+[\w-]*ssl-versions\s|^\s*set\s+ssl-(?:min|max)-proto-ver",
     re.IGNORECASE)
 
 # SSH transport, configured the same way.

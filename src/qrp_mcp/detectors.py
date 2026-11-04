@@ -21,7 +21,7 @@ from . import _warm
 _warm.start_regex()
 
 from . import (aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, registry,
-               suppression)
+               suppression, switches)
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
@@ -4332,6 +4332,13 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         for asset in _policy_assets(text_line):
             asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
             protocol_findings.append(asset)
+        places, static = switches.scan(text_line)
+        for asset in places:
+            asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
+            protocol_findings.append(asset)
+        for item in static:
+            item.update(path=rel_path, line=number, in_test_code=in_test_code(rel_path))
+            static_rsa_findings.append(item)
         if not text_line.lstrip().startswith(_NOT_A_SETTING):
             for asset in dnssec.unnamed_records(text_line):
                 asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
