@@ -1,4 +1,4 @@
-"""ZA-OPRAVYANE row 165 (Daniel Stokes): the version a manifest pins was lost. Two trees that
+"""ZA-OPRAVYANE row 165: the version a manifest pins was lost. Two trees that
 differ only in `cryptography==42.0.5` vs `45.0.4` -- a classical default against a hybrid one --
 scanned the same, and the CBOM's library component had no version. Now the dependency row has
 `version` where the manifest pins one, and the CBOM library component

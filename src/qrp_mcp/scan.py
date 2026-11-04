@@ -401,7 +401,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     return result
 
 
-# ZA-OPRAVYANE rows 164 and 167 (Daniel Stokes): a TLS server that sets no group negotiates
+# ZA-OPRAVYANE rows 164 and 167: a TLS server that sets no group negotiates
 # whatever its library defaults to -- X25519 with OpenSSL 3.2, X25519MLKEM768 with 3.5 -- and
 # the scan said nothing, with the same `unknown` an empty directory gets.
 LIBRARY_DEFAULT_KEY_EXCHANGE = (

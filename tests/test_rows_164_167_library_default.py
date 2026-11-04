@@ -1,4 +1,4 @@
-"""ZA-OPRAVYANE rows 164 and 167 (Daniel Stokes). A pyOpenSSL server that sets no group gave no
+"""ZA-OPRAVYANE rows 164 and 167. A pyOpenSSL server that sets no group gave no
 key-exchange row and `pqc_readiness: unknown`, the same word an empty directory gets; yet the
 handshake was X25519 with cryptography 42.0.5 and X25519MLKEM768 with 45.0.4. The scan cannot
 resolve the default; it now says that it applies and is not resolved, with the pinned library

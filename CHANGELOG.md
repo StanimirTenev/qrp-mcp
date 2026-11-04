@@ -345,14 +345,14 @@ Every field below is in the scan JSON and in the CBOM, through `qrp-mcp cbom` an
 - **A fingerprint of the findings beside the file's digest** (row 178, from Mark McGovern's
   reply): see *Without an agent*. Two scans of one commit now print the same `findings sha256`
   and, as before, different file digests.
-- **The pinned version travels** (row 165, Daniel Stokes). A dependency row has `version` where
+- **The pinned version travels** (row 165). A dependency row has `version` where
   the manifest pins one (`cryptography==45.0.4` in requirements.txt or go.mod, a single `==` in
   pyproject.toml or a Pipfile); a range is not a version and gives none. The CBOM `library`
   component carries it as `version`, or `qrp:versions_pinned` with every pin where manifests
   disagree. Which default key exchange a library version brings is not resolved.
 - **Python's `ssl.TLSVersion`** (row 166): `ctx.minimum_version = ssl.TLSVersion.TLSv1_3` is a
   protocol row and a TLS place, as pyOpenSSL's `set_min_proto_version` already was.
-- **A TLS default is said, not left blank** (rows 164, 167, Daniel Stokes). Where the tree
+- **A TLS default is said, not left blank** (rows 164, 167). Where the tree
   configures TLS and no file sets a group or curve, `tls_termination.key_exchange` says the
   library's default applies and is not resolved, with the library versions the manifests pin;
   each TLS protocol asset says `key_exchange: "library default, not resolved"` (in the CBOM,
