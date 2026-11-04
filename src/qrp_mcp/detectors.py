@@ -27,6 +27,7 @@ from . import grammar
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
+from .assets import _DEPRECATED_TLS, _TLS_VERSION, _tls_version_name
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
                      os_packages,
                      dockerfile_pins, library_support, names_none_of, pinned_versions,
@@ -151,7 +152,10 @@ CONFIG_FILENAME_PATTERN = re.compile(
     r"^(?:Dockerfile|Containerfile|Kconfig)[-.][\w.-]+$|^[\w.-]+\.(?:Dockerfile|Containerfile)$|"
     # ESP-IDF's project configuration: sdkconfig, sdkconfig.defaults and
     # sdkconfig.defaults.TARGET_NAME (ESP-IDF build system guide; ZA-OPRAVYANE row 304).
-    r"^sdkconfig(?:\.[\w.-]+)?$")
+    r"^sdkconfig(?:\.[\w.-]+)?$|"
+    # An alternate java.security, as `-Djava.security.properties=<URL>` applies one
+    # (`java.security.override`; ZA-OPRAVYANE row 222).
+    r"^java\.security\.[\w.-]+$")
 
 # Directories whose files are configuration without an extension: FreeRADIUS keeps its
 # EAP-TLS settings in raddb/mods-available/eap (ZA-OPRAVYANE row 103), and Debian's nginx
@@ -4717,6 +4721,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                 asset["path"] = rel_path
                 protocol_findings.append(asset)
         _schannel_disabled(src, lines)
+        for asset in _java_security_bans(src, lines):
+            asset.update(path=rel_path, excerpt=lines[asset["line"] - 1].strip()[:200])
+            protocol_findings.append(asset)
         src = _jwk_sizes(src, lines)
         _ssh_public_keys(src, lines)
         # The IKE and setting rows say more than a generic row on the same line (its size,
@@ -4810,6 +4817,43 @@ def _schannel_disabled(found: list[dict[str, Any]], lines: list[str]) -> None:
     for item in found:
         if item.get("line") in off and item.get("evidence_kind") != "comment":
             item["evidence_kind"] = "ban"
+
+
+# Row 222: the JDK's disabled-algorithm lists, continuation lines (`\` at the end) included.
+# "Disabled algorithms will not be negotiated for SSL/TLS connections, even if they are
+# enabled explicitly in an application" (OpenJDK, conf/security/java.security). Only the
+# property's first line holds the word "disabled"; the lines after it were read as uses.
+_JAVA_DISABLED = re.compile(r"^\s*jdk\.(tls|certpath)\.disabledAlgorithms\s*[=:]")
+
+
+def _java_security_bans(found: list[dict[str, Any]], lines: list[str]) -> list[dict[str, Any]]:
+    """Mark what the two lists name as bans; the TLS versions the TLS list disables."""
+    banned: dict[int, str] = {}
+    current = None
+    for number, line in enumerate(lines, 1):
+        if current is None:
+            head = _JAVA_DISABLED.match(line)
+            current = head.group(1) if head else None
+        if current is not None:
+            banned[number] = current
+            if not line.rstrip().endswith("\\"):
+                current = None
+    if not banned:
+        return []
+    for item in found:
+        if item.get("line") in banned and item.get("evidence_kind") != "comment":
+            item["evidence_kind"] = "ban"
+    out: list[dict[str, Any]] = []
+    for number, kind in banned.items():
+        if kind != "tls":
+            continue
+        for match in _TLS_VERSION.finditer(lines[number - 1]):
+            name = _tls_version_name(match)
+            out.append({
+                "protocol": "tls", "version": name, "banned": True, "line": number,
+                "basis": "configured_protocol", "deprecated": name in _DEPRECATED_TLS,
+                "description": f"{name} is disabled here (jdk.tls.disabledAlgorithms)."})
+    return out
 
 
 # Row 331: in a JWK the size is the modulus, "The "n" (modulus) parameter contains the modulus
