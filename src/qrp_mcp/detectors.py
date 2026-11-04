@@ -22,6 +22,7 @@ _warm.start_regex()
 
 from . import (aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, registry,
                suppression)
+from . import grammar
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
@@ -30,7 +31,7 @@ from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
-from .certificates import (embedded_material, is_certificate_file, is_undecoded, key_in_source,
+from .certificates import (decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
                            looks_like_key_file, scan_certificate_file, small_scalar_keys,
                            unparsed_material, SMALL_SCALAR_BOUND)
 
@@ -2226,22 +2227,8 @@ def _opened_within(descriptor: int, root: Path) -> bool:
 
 
 def _decode(raw: bytes) -> list[str]:
-    """Bytes to lines, with the encodings a repository actually contains."""
-    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
-        return raw.decode("utf-16", errors="ignore").splitlines()
-    if raw.startswith(b"\xef\xbb\xbf"):
-        raw = raw[3:]
-    # UTF-16 without a byte-order mark: ASCII text puts a NUL in every pair, on the same
-    # side. Decoded as UTF-8 it read as clean and was counted as read (ZA-OPRAVYANE row 61).
-    head = raw[:4096]
-    pairs = len(head) // 2
-    if pairs >= 4:
-        odd, even = head[1::2].count(0), head[0::2].count(0)
-        if odd >= 0.9 * pairs and even == 0:
-            return raw.decode("utf-16-le", errors="ignore").splitlines()
-        if even >= 0.9 * pairs and odd == 0:
-            return raw.decode("utf-16-be", errors="ignore").splitlines()
-    return raw.decode("utf-8", errors="ignore").splitlines()
+    """Bytes to lines, with the encodings a repository actually contains (decode_text)."""
+    return decode_text(raw).splitlines()
 
 
 def _read_lines(path: Path) -> list[str] | None:
@@ -2718,8 +2705,24 @@ _SWITCH_NAME = re.compile(
     r"(?:[_.-]|$)", re.IGNORECASE)
 
 
+# Row 302: the same switch written into a file by a build script, `echo "USE_ML_KEM_768=false"
+# >> Makefile.inc.local` (Libreswan's mk/config.mk reads USE_* as make variables). The echo, the
+# assignment, an optional redirection, and nothing else.
+_SWITCH_ECHOED_OFF = re.compile(
+    r"^\s*(?:echo|printf)\s+(?:-\w+\s+)?[\"']?([A-Za-z_][\w.-]*)\s*=\s*(false|no|off|disabled|n)"
+    r"[\"']?\s*(?:>>?\s*\S+)?\s*;?\s*$", re.IGNORECASE)
+
+
+# Rows 365, 366: the Windows TLS cmdlets that remove a suite or a curve from the list.
+# "The Disable-TlsCipherSuite cmdlet disables a cipher suite"
+# (https://learn.microsoft.com/en-us/powershell/module/tls/disable-tlsciphersuite);
+# Disable-TlsEccCurve: "Specifies the name of the ECC curve to disable"
+# (https://learn.microsoft.com/en-us/powershell/module/tls/disable-tlsecccurve).
+_DISABLE_CMDLET = re.compile(r"^\s*Disable-Tls(?:CipherSuite|EccCurve)\b", re.IGNORECASE)
+
+
 def _switched_off(code: str, position: int) -> bool:
-    m = _SWITCH_SET_OFF.match(code)
+    m = _SWITCH_SET_OFF.match(code) or _SWITCH_ECHOED_OFF.match(code)
     if not m or position >= m.end(1) or not _SWITCH_NAME.search(m.group(1)):
         return False
     return m.group(2).lower() != "n" or m.group(1).startswith("CONFIG_")
@@ -2763,6 +2766,8 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     if in_denial_block or _line_fact(0, searchable, _has_denial_word):
         return True
     if _switched_off(searchable, position):
+        return True
+    if _DISABLE_CMDLET.match(searchable):
         return True
     # Work in entries, not characters. A hyphen inside a name belongs to it --
     # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
@@ -4377,6 +4382,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # A pipeline also names algorithms (`openssl req -newkey rsa:2048`).
         source_findings.extend(
             scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot))
+        _embedded_pem(path, rel_path, raw, source_findings, [], material_problems)
     elif is_iac_file(path, repo_path, lines):
         files_scanned["iac"] += 1
         algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
@@ -4395,7 +4401,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # Uses reached through an alias, folded literals or another file's constant.
         source_findings.extend(indirection.resolve(path, rel_path, lines, found,
                                                    repo_path, scan_source_file))
-        embedded_key_findings.extend(scan_embedded_keys(rel_path, lines))
+        source_keys = scan_embedded_keys(rel_path, lines)
+        _embedded_pem(path, rel_path, raw, source_findings, source_keys, material_problems)
+        embedded_key_findings.extend(source_keys)
         # A release script signs the same way a pipeline does, and the pipeline
         # often only calls it (ZA-OPRAVYANE row 34).
         if path.suffix.lower() == ".sh":
@@ -4417,6 +4425,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _beside_in_block(src, lines)
         if path.suffix.lower() in (".yaml", ".yml"):
             src.extend(fabric_bccsp(rel_path, lines))
+        _schannel_disabled(src, lines)
+        src = _jwk_sizes(src, lines)
         source_findings.extend(src)
         # An IKE configuration carrying a post-quantum algorithm: name its
         # fragmentation setting (see ike.py).
@@ -4441,6 +4451,78 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _merge(iac_findings, algo_findings, already=src)
         _embedded_pem(path, rel_path, raw, source_findings, key_findings, material_problems)
         embedded_key_findings.extend(key_findings)
+        material_problems.extend(_device_grammar(rel_path, lines))
+
+
+# Row 364: a SCHANNEL key whose "Enabled" value is 0 turns the cipher, hash, key exchange or
+# protocol it names off. Microsoft Security Advisory 2868725 disables RC4 by setting `Enabled`
+# to 0 under `SCHANNEL\Ciphers\RC4 128/128` (https://support.microsoft.com/en-us/kb/2868725;
+# KB 245030, https://support.microsoft.com/kb/245030); for protocols, "change the DWORD
+# registry value of Enabled to 0" (https://learn.microsoft.com/en-us/windows-server/security/tls/tls-registry-settings).
+_SCHANNEL_KEY = re.compile(
+    r"^\s*\[-?HKEY_[^\]]*\\SCHANNEL\\(?:Ciphers|Hashes|KeyExchangeAlgorithms|Protocols)\\[^\]]+\]",
+    re.IGNORECASE)
+_ENABLED_OFF = re.compile(r'^\s*"?Enabled"?\s*=\s*(?:dword:)?0+\s*$', re.IGNORECASE)
+
+
+def _schannel_disabled(found: list[dict[str, Any]], lines: list[str]) -> None:
+    """The names on a SCHANNEL key's header line are a ban when the key sets Enabled to 0."""
+    off: set[int] = set()
+    header = None
+    for number, line in enumerate(lines, 1):
+        if line.lstrip().startswith("["):
+            header = number if _SCHANNEL_KEY.match(line) else None
+        elif header is not None and _ENABLED_OFF.match(line):
+            off.add(header)
+    for item in found:
+        if item.get("line") in off and item.get("evidence_kind") != "comment":
+            item["evidence_kind"] = "ban"
+
+
+# Row 331: in a JWK the size is the modulus, "The "n" (modulus) parameter contains the modulus
+# value for the RSA public key" (RFC 7518 §6.3.1.1, https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1.1),
+# base64url-encoded; `kid` "is a hint indicating which specific key owner wishes to use"
+# (RFC 7517 §4.5, https://www.rfc-editor.org/rfc/rfc7517#section-4.5), a free label. A `kid`
+# of "rsa4096" on a 1024-bit key gave RSA 4096, high.
+_JWK_KID = re.compile(r'^\s*"kid"\s*:\s*"[^"]*"\s*,?\s*$')
+_JWK_KTY_RSA = re.compile(r'"kty"\s*:\s*"RSA"')
+_JWK_N = re.compile(r'"n"\s*:\s*"([A-Za-z0-9_-]{16,})"')
+
+
+def _jwk_sizes(found: list[dict[str, Any]], lines: list[str]) -> list[dict[str, Any]]:
+    """Drop what a `kid` label named; give an RSA JWK's `kty` row the size of its `n`."""
+    import base64
+    kid_lines = {n for n, line in enumerate(lines, 1) if _JWK_KID.match(line)}
+    found = [f for f in found if f.get("line") not in kid_lines]
+    sizes: dict[int, int] = {}
+    kty = None
+    for number, line in enumerate(lines, 1):
+        if _JWK_KTY_RSA.search(line):
+            kty = number
+        modulus = _JWK_N.search(line)
+        if modulus and kty is not None:
+            body = modulus.group(1)
+            try:
+                value = base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
+            except (ValueError, TypeError):
+                value = b""
+            if value:
+                sizes[kty] = int.from_bytes(value, "big").bit_length()
+            kty = None
+        if line.strip().startswith("}"):
+            kty = None
+    for f in found:
+        if f.get("line") in sizes and f.get("algorithm") == "RSA":
+            f["key_size"] = sizes[f["line"]]
+    return found
+
+
+def _device_grammar(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """Rows 229 and 333: a FortiOS, Cisco IOS or Junos configuration is read in part."""
+    found = grammar.device_grammar(lines)
+    if found is None:
+        return []
+    return [{"path": rel_path, "line": found[0], "label": found[1], "reason": grammar.REASON}]
 
 
 def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[dict[str, Any]],
@@ -4448,8 +4530,11 @@ def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[d
                   material_problems: list[dict[str, Any]]) -> None:
     """Fix list, 04.11.2026: a certificate in a JSON string (`"pem": "-----BEGIN ...\\n..."`)
     or an indented YAML block scalar was read as text and gave nothing; a key there gave
-    "Embedded private key material" without its family. JSON and YAML only."""
-    if path.suffix.lower() not in (".json", ".yaml", ".yml") or b"-----BEGIN" not in raw:
+    "Embedded private key material" without its family. Rows 224 and 301: the same in any
+    file read as text -- a FortiOS `set certificate "-----BEGIN ...`, a C# raw or verbatim
+    string, a Go raw string constant. A block that does not parse is named, never silent;
+    row 230: a key whose body did not parse says so rather than "key material parsed"."""
+    if b"-----BEGIN" not in raw:
         return
     rows, keys, problems = embedded_material(rel_path, raw)
     for row in rows:
@@ -4457,7 +4542,7 @@ def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[d
     source_findings.extend(rows)
     for item in key_findings:
         fields = keys.get(item.get("line"))
-        if fields and "key_algorithm" in fields:
+        if fields and ("key_algorithm" in fields or "key_unread" in fields):
             item.update(fields)
     material_problems.extend(problems)
 

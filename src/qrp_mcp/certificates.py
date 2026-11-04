@@ -229,6 +229,35 @@ def _point_markers(curve: str) -> list[bytes]:
     return markers
 
 
+def decode_text(raw: bytes) -> str:
+    """Bytes to text, with the encodings a repository actually contains.
+
+    Row 362: a PEM certificate saved by PowerShell is UTF-16 LE with a byte-order mark --
+    "Out-File and the redirection operators > and >> create UTF-16LE"
+    (https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_character_encoding?view=powershell-5.1)
+    -- and read as UTF-8 it held no block. Row 361: .NET writes UTF-16 without one -- "The
+    GetBytes method does not prepend a preamble"
+    (https://learn.microsoft.com/en-us/dotnet/api/system.text.unicodeencoding.getbytes).
+    UTF-8 text holds no NUL byte, so NULs on one side of every pair and never on the other
+    are UTF-16. Text outside ASCII (Cyrillic puts 0x04 there) leaves fewer of them than ASCII
+    does: 26% of the pairs in the reported file with Bulgarian comments, so the share asked
+    is 10%, not 90% (ZA-OPRAVYANE row 61 was ASCII only). NUL never on the other side is
+    what tells it from binary content."""
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16", errors="ignore")
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raw = raw[3:]
+    head = raw[:4096]
+    pairs = len(head) // 2
+    if pairs >= 4:
+        odd, even = head[1::2].count(0), head[0::2].count(0)
+        if odd >= 0.1 * pairs and even == 0:
+            return raw.decode("utf-16-le", errors="ignore")
+        if even >= 0.1 * pairs and odd == 0:
+            return raw.decode("utf-16-be", errors="ignore")
+    return raw.decode("utf-8", errors="ignore")
+
+
 def small_scalar_keys(rel_path: str, raw: bytes,
                       checked: list[str] | None = None) -> list[dict[str, Any]]:
     """EC public points in this file that equal k*G for k <= SMALL_SCALAR_BOUND.
@@ -237,7 +266,7 @@ def small_scalar_keys(rel_path: str, raw: bytes,
     key inside an encrypted container and a raw point with no marker are not checked.
     `checked` gets this path once per point compared, so the bound can be stated where
     nothing was found (ZA-OPRAVYANE row 154)."""
-    text = raw.decode("utf-8", errors="replace")
+    text = decode_text(raw)
     blobs: list[tuple[bytes, int]] = []
     for match in _PEM_BLOCK.finditer(text):
         try:
@@ -450,6 +479,11 @@ UNPARSED_REASONS = {
     "not_parsed_as_key": "a private-key block whose body did not parse as a key",
     "password_protected": "encrypted under a password, or damaged: it did not open without one",
     "format_not_parsed": "a format `cryptography` does not read (a Java keystore)",
+    # Rows 229 and 333; see grammar.py.
+    "grammar_not_parsed": ("a device configuration recognised by its form (FortiOS, Cisco IOS, "
+                           "Junos), read by the words it names; its sections and values -- "
+                           "group numbers, the defaults a backup leaves out, which proposal a "
+                           "tunnel uses -- are not parsed"),
 }
 
 
@@ -680,9 +714,15 @@ def _load_private_key(pem: bytes) -> dict[str, Any]:
     return _key_fields(_key_info(key))
 
 
+# Base64, padding, and what RFC 1421 headers carry (`Proc-Type: 4,ENCRYPTED`).
+_NOT_A_BODY = re.compile(r"[^A-Za-z0-9+/=:,\-]")
+
+
 def _bare_body(body: str) -> str:
-    """A PEM body without its line breaks, whether real, JSON-escaped (`\\n`) or indented."""
-    return re.sub(r"\\[nr]|\s", "", body)
+    """A PEM body without its line breaks, whether real, JSON-escaped (`\\n`) or indented,
+    and without the joins of a string concatenated in source (`"MIIB..." +\n "AgIU..."`):
+    `+` is a base64 letter, so a join left in would corrupt the body (row 301)."""
+    return re.sub(r"[\"']\s*\+\s*[\"']|\\[nr]|\s", "", body)
 
 
 def embedded_material(rel_path: str, raw: bytes) -> tuple[list[dict[str, Any]],
@@ -721,10 +761,14 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
     def problem(line: int, label: str, reason: str) -> None:
         problems.append({"path": rel_path, "line": line, "label": label, "reason": reason})
 
-    text = raw.decode("utf-8", errors="replace")
+    text = decode_text(raw)
     blocks = list(_PEM_BLOCK.finditer(text))
     for n, match in enumerate(blocks):
         label = match.group(1).strip()
+        if _NOT_A_BODY.search(_bare_body(match.group(2))):
+            # The two markers as separate strings in code (`startswith("-----BEGIN ...")` and
+            # `endswith("-----END ...")`): what lies between is code, not a block (row 301).
+            continue
         line = text.count("\n", 0, match.start()) + 1
         if label in _CERTIFICATE_LABELS or label == "PKCS7":
             try:
@@ -881,7 +925,7 @@ def scan_certificate_file(path: Path, rel_path: str,
     blobs: list[bytes] = []
     # The blobs that are an `RSA PUBLIC KEY` block, read as a bare RSAPublicKey.
     pkcs1_public: set[int] = set()
-    text = raw.decode("utf-8", errors="replace")
+    text = decode_text(raw)
     # What `cryptography` read (release C). A block it parsed as certificates is reported
     # from the parse, at its own line, and kept out of the identifier walk below.
     material = _material_once(rel_path, raw)

@@ -592,11 +592,15 @@ def findings_fingerprint(result: dict[str, Any]) -> dict[str, Any]:
 
     findings = sorted([f.get("algorithm_family"), f.get("raw_value"), f.get("classification"),
                        f.get("severity")] for f in result["findings"])
+    # None before any value, so a row with no size can share its place with one that has a
+    # size (a certificate decoded on a line that also names the family). Where nothing was
+    # None the order is the plain one, and so is the fingerprint.
     occurrences = sorted(
-        [category, item.get("path"), item.get("line"), family(item), item.get("role"),
-         item.get("key_size")]
-        for category, items in result["evidence"].items() for item in items
-        if isinstance(item, dict))
+        ([category, item.get("path"), item.get("line"), family(item), item.get("role"),
+          item.get("key_size")]
+         for category, items in result["evidence"].items() for item in items
+         if isinstance(item, dict)),
+        key=lambda row: [(0,) if v is None else (1, v) for v in row])
     material = json.dumps({"findings": findings, "evidence": occurrences}, sort_keys=True,
                           separators=(",", ":"), ensure_ascii=False, default=str)
     return {"sha256": hashlib.sha256(material.encode("utf-8", "surrogatepass")).hexdigest(),

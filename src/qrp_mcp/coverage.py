@@ -826,6 +826,17 @@ def _verdict(block: dict[str, Any]) -> str:
     if not block["accounts_for_every_file"]:
         return (f"This scan cannot account for every file: {scope['files_present']} were "
                 f"present and the reasons given do not add up to them.")
+    # Rows 229, 333, 362: a file opened and read only in part -- a block that did not parse,
+    # a device grammar matched by its words, a claimed file that gave nothing decodable --
+    # is not a file "read" without qualification.
+    partly = sorted({i.get("path") for i in (block.get("examined_partly") or {}).get("items", [])}
+                    | set((block.get("examined_without_result") or {}).get("paths", [])))
+    if partly:
+        some = (f"{'was' if len(partly) == 1 else 'were'} read only in part or gave nothing "
+                f"it could decode, {'named' if len(partly) == 1 else 'each named'} with a reason")
+        if scope["files_not_examined"] == 0:
+            return (f"This scan opened every one of the {scope['files_present']} files it was "
+                    f"given; {len(partly)} of them {some}.")
     if scope["files_not_examined"] == 0:
         return (f"This scan read every one of the {scope['files_present']} files it was "
                 f"given.")
@@ -854,4 +865,5 @@ def _verdict(block: dict[str, Any]) -> str:
     remaining = scope["files_not_examined"]
     tail = "is listed with a reason" if remaining == 1 else "are listed with a reason each"
     return (f"This scan read {scope['files_examined']} of {scope['files_present']} files "
-            f"({scope['coverage_pct']}%); the remaining {remaining}{clause} {tail}.")
+            f"({scope['coverage_pct']}%); the remaining {remaining}{clause} {tail}"
+            + (f"; of those read, {len(partly)} {some}." if partly else "."))
