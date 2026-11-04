@@ -2695,6 +2695,30 @@ def _opens_a_denial_block(line: str) -> bool:
                 and not _CONDITION_OPENER.match(stripped))
 
 
+# ZA-OPRAVYANE rows 203, 196 (b): a switch set off names the algorithm it would turn on --
+# `USE_RSA = False`, Kconfig `CONFIG_ECDSA=n` -- and was counted as a use. The name has to be a
+# switch (Kconfig's CONFIG_, or a use/enable/with/allow/support/have word), the value off, and
+# nothing else on the line; `n` only for Kconfig.
+_SWITCH_SET_OFF = re.compile(
+    r"^\s*(?:export\s+)?([A-Za-z_][\w.-]*)\s*[:=]\s*[\"']?(false|no|off|disabled|n)[\"']?"
+    r"\s*[,;]?\s*$", re.IGNORECASE)
+_SWITCH_NAME = re.compile(
+    r"^CONFIG_|(?:^|[_.-])(?:use|enable|enabled|with|allow|allowed|support|supported|have)"
+    r"(?:[_.-]|$)", re.IGNORECASE)
+
+
+def _switched_off(code: str, position: int) -> bool:
+    m = _SWITCH_SET_OFF.match(code)
+    if not m or position >= m.end(1) or not _SWITCH_NAME.search(m.group(1)):
+        return False
+    return m.group(2).lower() != "n" or m.group(1).startswith("CONFIG_")
+
+
+# Row 203: a list whose name says LEGACY (`LEGACY_ALGS = ["RSA-PSS", "DSA"]`) is a list of
+# names kept apart from what runs, not a use: an identifier row, low, as a name is.
+_LEGACY_LIST = re.compile(r"^\s*[\w.]*(?i:legacy)\w*\s*[:=]\s*[\[({]")
+
+
 def _has_denial_word(text: str) -> bool:
     return bool(_DENIAL_WORDS.search(text))
 
@@ -2726,6 +2750,8 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     """
     searchable = line if code is None else code
     if in_denial_block or _line_fact(0, searchable, _has_denial_word):
+        return True
+    if _switched_off(searchable, position):
         return True
     # Work in entries, not characters. A hyphen inside a name belongs to it --
     # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
@@ -3167,6 +3193,8 @@ def scan_source_file(path: Path, rel_path: str,
             spans = spans + doc_spans
         code = _code_only(line, spans)
         kind = _evidence_kind(line, was_inside, code)
+        if kind == "declaration" and _LEGACY_LIST.match(code):
+            kind = "identifier"
         if (kind == "call" and ext == ".go" and _GO_SIGNATURE.match(code)
                 and not _GO_BODY_CODE.search(code)):
             kind = "reference"
