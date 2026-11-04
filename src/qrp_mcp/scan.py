@@ -216,7 +216,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             "ci_filenames": sorted(detectors.CI_CONFIG_FILENAMES),
             # Read as bytes rather than lines, and missing from this list while the
             # scan was reporting findings from them.
-            "certificate": sorted(certificates.CERTIFICATE_EXTENSIONS | {".snk"}),
+            "certificate": sorted(certificates.CERTIFICATE_EXTENSIONS | {".snk"}
+                                  | detectors.openpgp.KEY_EXTENSIONS),
+            "openpgp_key_filenames": ["KEYS"],
             # Read only when the file names an OPC UA SecurityPolicy URI; otherwise
             # counted under type_not_claimed like any other unclaimed file.
             "config_when_naming_opcua_security_policy": sorted(opcua.SNIFF_EXTENSIONS),
