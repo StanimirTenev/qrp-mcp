@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from . import __version__, closure, config, coverage, cyclonedx, jsonout, mandates, profiles, sarif
+from . import __version__, closure, config, control, coverage, cyclonedx, jsonout, mandates, profiles, sarif
 from . import baseline as baseline_mod
 from .classifier import known_algorithms
 from .scan import scan_directory
@@ -288,6 +288,41 @@ def prove_closure(
     return closure.prove_closure(_load_result(before), _load_result(after))
 
 
+@mcp.tool(annotations=_READ_ONLY)
+def run_self_seeded_control(
+    path: Annotated[
+        str,
+        Field(description="Directory whose copy is planted and scanned, same argument as "
+                          "`scan_repo`. The directory itself is not written to."),
+    ],
+    seed: Annotated[
+        int,
+        Field(description="Chooses where each planted line goes. The same seed on the same "
+                          "tree plants the same lines at the same places."),
+    ] = 1,
+) -> dict[str, Any]:
+    """Plant known lines into a temporary copy of a directory, scan the copy, and say what the
+    scan did with each: robustness on known patterns.
+
+    27 cryptographic uses in 9 styles (direct calls, aliased names, names built from
+    pieces, calls split over lines, shell commands in strings, cert-manager, Terraform,
+    Java properties, UTF-16 without a byte-order mark) and 18 lines that name an algorithm
+    without using it (switched-off flags, deny lists, log strings, variable names,
+    comments, a JWKS key label, an sshd_config removal list) per tree with one language.
+    Returns `self_seeded_control` -- counts by style, by decoy class and by confidence,
+    the seed, the harness digest -- and `items`, where each line went and its outcome.
+
+    Behaviour beyond the annotations: it writes the copy to a temporary directory and
+    removes it afterwards; nothing in `path` changes and nothing leaves the machine.
+
+    Use it to learn which styles this instrument's silence may be relied on in this tree.
+    Do not use it to inventory the tree -- that is `scan_repo` -- and do not read its counts
+    as a statement about the tree's own cryptography: the denominator is what was planted,
+    and the figure never makes `claims.control.held` true.
+    """
+    return control.run(path, seed)
+
+
 def _load_result(path: str) -> dict[str, Any]:
     p = Path(path).expanduser()
     if not p.is_file():
@@ -435,6 +470,10 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
         p.add_argument("--as-of", type=date.fromisoformat, metavar="YYYY-MM-DD", default=None,
                        help="with --mandate: the date the deadlines are counted from "
                             "(default: today)")
+    p.add_argument("--control-seed", type=int, metavar="N", default=None,
+                   help="also run `qrp-mcp control PATH --seed N` and carry its block as "
+                        "coverage.claims.self_seeded_control (robustness on known patterns; "
+                        "it feeds nothing else)")
     p.add_argument("--config", metavar="FILE",
                    help=f"read settings from FILE instead of PATH/{config.FILENAME}")
     p.add_argument("--no-config", action="store_true",
@@ -490,6 +529,9 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
                                 use_baseline=write_baseline is None)
     except ValueError as err:
         p.error(str(err))
+    if a.control_seed is not None:
+        result["coverage"]["claims"]["self_seeded_control"] = control.run(
+            a.path, a.control_seed)["self_seeded_control"]
     if write_baseline is not None:
         data = (json.dumps(baseline_mod.document(result), indent=2, ensure_ascii=False)
                 + "\n").encode()
@@ -543,6 +585,31 @@ def _write(result: dict[str, Any], out_path: Path | None, label: str,
     return 0
 
 
+def control_to_file(argv: list[str]) -> int:
+    """`qrp-mcp control PATH --seed N --out FILE`: the run_self_seeded_control result as a
+    file. The tree is copied to a temporary directory, planted there, scanned and scored;
+    the tree itself is not written to."""
+    p = argparse.ArgumentParser(
+        prog="qrp-mcp control",
+        description="Plant known cryptographic uses and decoys into a temporary copy of a "
+                    "directory, scan the copy with this instrument, and write what it did "
+                    "with each planted line: robustness on known patterns. Nothing is sent "
+                    "anywhere.")
+    p.add_argument("path", help="directory to copy and plant into (not itself written to)")
+    p.add_argument("--seed", type=int, required=True, metavar="N",
+                   help="where each line goes; the same seed on the same tree plants the "
+                        "same lines at the same places")
+    p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
+    a = p.parse_args(argv)
+    sys.stderr.reconfigure(errors="backslashreplace")
+    if not Path(a.path).expanduser().is_dir():
+        p.error(f"not a directory: {a.path}")
+    out_path = Path(a.out).expanduser() if a.out else None
+    if out_path is not None and not out_path.resolve().parent.is_dir():
+        p.error(f"the folder for --out does not exist: {out_path.parent}")
+    return _write(control.run(a.path, a.seed), out_path, "control")
+
+
 def closure_to_file(argv: list[str]) -> int:
     """`qrp-mcp closure BEFORE AFTER --out FILE`: the prove_closure verdict as a file.
 
@@ -581,6 +648,7 @@ USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MC
                     [--format json|sarif] [--mandate cnsa-2.0|nist-ir-8547]
                     [--lead-months N] [--min-coverage PERCENT] [--as-of YYYY-MM-DD]
                     [--config FILE | --no-config] [--baseline FILE] [--write-baseline FILE]
+                    [--control-seed N]
                                scan a directory and write the result as JSON or SARIF;
                                exit 1 when a --mandate deadline has passed or falls
                                within --lead-months, or coverage is below --min-coverage
@@ -593,6 +661,10 @@ USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MC
        in a comment; without a reason it does not apply. Suppressed rows are listed.
        qrp-mcp closure BEFORE AFTER [--out FILE]
                                compare two saved scans and write what a change closed
+       qrp-mcp control PATH --seed N [--out FILE]
+                               plant known lines into a temporary copy, scan it, and
+                               write what the scan did with each (robustness on known
+                               patterns); `scan --control-seed N` carries the same block
        qrp-mcp --version
 """
 
@@ -608,6 +680,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(scan_to_file(argv[1:], cbom=True))
     if argv[0] == "closure":
         raise SystemExit(closure_to_file(argv[1:]))
+    if argv[0] == "control":
+        raise SystemExit(control_to_file(argv[1:]))
     if argv[0] in ("-h", "--help", "help"):
         print(USAGE, end="")
         raise SystemExit(0)

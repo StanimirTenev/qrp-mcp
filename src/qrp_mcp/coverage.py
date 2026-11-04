@@ -226,11 +226,16 @@ def _claims(control: dict[str, Any] | None) -> dict[str, Any]:
     if control is None:
         control = {"held": False, "reason": "none_held",
                    "meaning": CONTROL_ABSENT["none_held"]}
+    from .control import not_run
     return {
         "axis": "reached",
         "meaning": AXES["reached"],
         "second_axis_not_claimed": AXES["answered"],
         "control": control,
+        # A different kind of claim under its own key (row 433): robustness on known
+        # patterns, from lines the instrument's own harness planted. Not independent, so
+        # it never becomes `control` above and never feeds the CBOM's aggregate.
+        "self_seeded_control": not_run(),
     }
 
 
