@@ -1,0 +1,21 @@
+peer:
+  id: peer0.org1.example.com
+  listenAddress: 0.0.0.0:7051
+  tls:
+    enabled: true
+    clientAuthRequired: true
+    cert:
+      file: tls/server.crt
+    key:
+      file: tls/server.key
+    rootcert:
+      file: tls/ca.crt
+  BCCSP:
+    Default: SW
+    SW:
+      Hash: SHA2
+      Security: 256
+      FileKeyStore:
+        KeyStore:
+  mspConfigPath: msp
+  localMspId: Org1MSP

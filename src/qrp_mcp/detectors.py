@@ -3737,6 +3737,65 @@ def _iac_key_use(lines: list[str], index: int) -> str | None:
     return None
 
 
+# Hyperledger Fabric's BCCSP block in core.yaml / orderer.yaml (fix list, 04.11.2026): the
+# provider signs with ECDSA on the curve its `Security` level selects -- bccsp/sw/conf.go
+# setSecurityLevelSHA2/SHA3 at v2.5.9: 256 -> elliptic.P256(), 384 -> elliptic.P384(); any
+# other level is "not supported". PKCS11 does the same inside the HSM (bccsp/pkcs11/pkcs11.go
+# curveForSecurityLevel; the Fabric 2.5 HSM guide: "your private keys need to be generated and
+# stored inside the HSM"). Read only as an indented YAML block under a `BCCSP:` key.
+_BCCSP = re.compile(r"^(\s*)BCCSP\s*:\s*(?:#.*)?$", re.IGNORECASE)
+_YAML_KEY = re.compile(r"^(\s*)([A-Za-z0-9_]+)\s*:\s*([^#]*?)\s*(?:#.*)?$")
+_BCCSP_PROVIDERS = {
+    "SW": "Hyperledger Fabric BCCSP software provider: ECDSA keys in the node's keystore, "
+          "for signing and verification, on the curve of its Security level",
+    "PKCS11": "Hyperledger Fabric BCCSP PKCS#11 provider: ECDSA keys generated and held in "
+              "the HSM, for signing and verification, on the curve of its Security level",
+}
+
+
+def fabric_bccsp(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for i, line in enumerate(lines):
+        m = _BCCSP.match(line)
+        if not m:
+            continue
+        indent = len(m.group(1))
+        block: list[tuple[int, int, str, str]] = []
+        for j in range(i + 1, len(lines)):
+            text = lines[j]
+            if not text.strip() or text.lstrip().startswith("#"):
+                continue
+            k = _YAML_KEY.match(text)
+            if not k or len(k.group(1)) <= indent:
+                break
+            block.append((j, len(k.group(1)), k.group(2), k.group(3)))
+        defaults = [(j, d, v) for j, d, key, v in block if key.lower() == "default"]
+        if not defaults:
+            continue
+        at, depth, provider = defaults[0]
+        provider = provider.strip("'\"").upper()
+        if provider not in _BCCSP_PROVIDERS:
+            continue
+        security = None
+        inside = False
+        for j, d, key, value in block:
+            if d == depth:
+                inside = key.upper() == provider
+            elif inside and key.lower() == "security" and value.strip("'\"").isdigit():
+                security = int(value.strip("'\""))
+        if security not in (256, 384):
+            continue
+        out.append({
+            "path": rel_path, "line": at + 1, "algorithm": "ECDSA",
+            "description": _BCCSP_PROVIDERS[provider],
+            "excerpt": lines[at].strip()[:200], "evidence_kind": "declaration",
+            "key_size": security, "curve": f"P-{security}",
+            "in_test_code": in_test_code(rel_path),
+            **({"key_held": "hsm"} if provider == "PKCS11" else {}),
+        })
+    return out
+
+
 def _beside_in_block(items: list[dict[str, Any]], lines: list[str]) -> None:
     """Rows 201, 209, 211: the size and the use set beside the algorithm in an IaC block, on
     the rows the source rules made there (`key_type = "RSA"`), which had neither."""
@@ -4354,6 +4413,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # The size and use beside the algorithm in its block, as in IaC: Fabric CA's
         # `keyrequest`, cfssl's `"key": {"algo", "size"}` (fix list, Fabric CA keyrequest).
         _beside_in_block(src, lines)
+        if path.suffix.lower() in (".yaml", ".yml"):
+            src.extend(fabric_bccsp(rel_path, lines))
         source_findings.extend(src)
         # An IKE configuration carrying a post-quantum algorithm: name its
         # fragmentation setting (see ike.py).

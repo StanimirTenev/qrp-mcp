@@ -1,0 +1,9 @@
+peer:
+  BCCSP:
+    Default: PKCS11
+    PKCS11:
+      Library: /usr/lib/softhsm/libsofthsm2.so
+      Label: fabric
+      Pin: 71811222
+      Hash: SHA2
+      Security: 256

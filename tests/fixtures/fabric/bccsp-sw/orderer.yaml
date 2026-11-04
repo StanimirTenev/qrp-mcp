@@ -1,0 +1,20 @@
+General:
+  ListenAddress: 127.0.0.1
+  ListenPort: 7050
+  TLS:
+    Enabled: true
+    PrivateKey: tls/server.key
+    Certificate: tls/server.crt
+    RootCAs:
+      - tls/ca.crt
+    ClientAuthRequired: false
+  Cluster:
+    ClientCertificate: tls/server.crt
+    ClientPrivateKey: tls/server.key
+  BCCSP:
+    Default: SW
+    SW:
+      Hash: SHA2
+      Security: 384
+  LocalMSPDir: msp
+  LocalMSPID: OrdererMSP
