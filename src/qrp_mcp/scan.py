@@ -219,6 +219,8 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             "certificate": sorted(certificates.CERTIFICATE_EXTENSIONS | {".snk"}
                                   | detectors.openpgp.KEY_EXTENSIONS),
             "openpgp_key_filenames": ["KEYS"],
+            # Apple property lists, XML or binary (row 306).
+            "plist": [".plist"],
             # Read only when the file names an OPC UA SecurityPolicy URI; otherwise
             # counted under type_not_claimed like any other unclaimed file.
             "config_when_naming_opcua_security_policy": sorted(opcua.SNIFF_EXTENSIONS),

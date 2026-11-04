@@ -21,7 +21,7 @@ from . import _warm
 _warm.start_regex()
 
 from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirection, linegate,
-               oids, openpgp, opcua, registry, snk, suppression, switches, wireguard)
+               oids, openpgp, opcua, plist, registry, snk, suppression, switches, wireguard)
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
@@ -4275,7 +4275,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
                or is_certificate_file(path) or is_manifest(path)
                or path.suffix.lower() == ".snk" or path.suffix.lower() in openpgp.KEY_EXTENSIONS
-               or path.name == "KEYS")
+               or path.name == "KEYS" or path.suffix.lower() == ".plist")
     if template and not claimed and path.suffix.lower() not in TEMPLATE_DOCUMENTS:
         # Rendered to a name no type claims (`realm.provider.j2`): configuration, as
         # what Ansible and Salt render almost always is. Documentation stays unclaimed.
@@ -4447,6 +4447,18 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
         if not algo_findings:
             undecoded.append(rel_path)
+    elif path.suffix.lower() == ".plist":
+        # Apple property lists, XML or binary (plist.py; row 306).
+        files_scanned["config"] += 1
+        found = plist.scan(rel_path, raw, lines if raw[:8] != b"bplist00" else [])
+        if found is None:
+            undecoded.append(rel_path)
+        else:
+            for item in found["source"]:
+                item["in_test_code"] = in_test_code(rel_path)
+            source_findings.extend(found["source"])
+            embedded_key_findings.extend(found["keys"])
+            protocol_findings.extend(found["protocols"])
     elif path.suffix.lower() == ".snk":
         # A .NET strong-name key, read from its bytes (snk.py; row 311).
         files_scanned["certificate"] += 1
