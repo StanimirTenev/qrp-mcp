@@ -48,11 +48,15 @@ def test_secret_key_export(tmp_path):
     home = tmp_path / "gnupg"
     home.mkdir(mode=0o700)
     env = {"GNUPGHOME": str(home), "PATH": "/usr/bin:/bin"}
-    subprocess.run(["gpg", "--batch", "--passphrase", "", "--quick-gen-key", "t@example.org",
-                    "rsa3072", "sign", "never"], env=env, check=True, capture_output=True)
-    out = subprocess.run(["gpg", "--batch", "--pinentry-mode", "loopback", "--passphrase", "",
-                          "--armor", "--export-secret-keys", "t@example.org"],
-                         env=env, check=True, capture_output=True).stdout
+    try:
+        subprocess.run(["gpg", "--batch", "--passphrase", "", "--quick-gen-key", "t@example.org",
+                        "rsa3072", "sign", "never"], env=env, check=True, capture_output=True)
+        out = subprocess.run(["gpg", "--batch", "--pinentry-mode", "loopback", "--passphrase",
+                              "", "--armor", "--export-secret-keys", "t@example.org"],
+                             env=env, check=True, capture_output=True).stdout
+    finally:
+        # The agent gpg started for this home must not outlive the test.
+        subprocess.run(["gpgconf", "--kill", "gpg-agent"], env=env, capture_output=True)
     scan_dir = tmp_path / "repo"
     scan_dir.mkdir()
     (scan_dir / "secret.asc").write_bytes(out)

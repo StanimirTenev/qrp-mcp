@@ -1106,7 +1106,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "cryptoProperties": {"assetType": "algorithm",
                                  "algorithmProperties": {"primitive": "pke"}},
             "properties": [
-                {"name": f"{NS}basis", "value": "configured_cipher_suite"},
+                # A FortiOS switch or firmware default enables the suites without naming
+                # them (batch 0.42.0): its basis is said, not folded into a cipher suite's.
+                {"name": f"{NS}basis", "value": ", ".join(sorted(
+                    {g.get("basis", "configured_cipher_suite") for g in static_rsa}))},
                 {"name": f"{NS}family", "value": "RSA"},
                 {"name": f"{NS}key_exchange", "value": "RSA"},
                 {"name": f"{NS}suites", "value": ", ".join(suites)},
