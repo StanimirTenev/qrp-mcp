@@ -86,7 +86,10 @@ CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
                      ".hcl", ".json",
                      # A DNS zone file: its DNSKEY, DS and RRSIG records name the
                      # algorithm the zone is signed with by number (see dnssec.py).
-                     ".zone"}
+                     ".zone",
+                     # IBM MQ's command scripts: a channel's SSLCIPH names its CipherSpec,
+                     # an IANA suite name (ZA-OPRAVYANE row 202).
+                     ".mqsc"}
 
 # The same files that carry no extension at all.
 CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
