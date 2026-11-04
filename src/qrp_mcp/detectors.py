@@ -2781,6 +2781,44 @@ def _go_raw_spans(line: str, inside: bool,
     return spans, False
 
 
+# Row 423: a string handed to a log or print call is text whatever its words -- `log::info!(
+# "Ed25519 key expires soon")`, ``console.info(`ECDSA ... ${t}`)`` were calls at high. The call
+# names the logger; the strings after it on the line, template literals included, are what it
+# prints. `fmt.Sprintf` builds a string that may be used, so it is not one of them.
+_LOG_CALL = re.compile(
+    r"(?<![\w.$])(?:log|logger|logging|LOG|LOGGER|Log|Logger|console|tracing|slog|klog|glog|"
+    r"self\.log(?:ger)?|this\.log(?:ger)?)\s*(?:\.|::|->)\s*\w+\s*!?\s*\(|"
+    r"\$\w*[Ll]og\w*\s*->\s*\w+\s*\(|"
+    r"(?<![\w.])(?:println|eprintln|print|eprint|info|warn|error|debug|trace|panic)!\s*\(|"
+    r"(?<![\w.])fmt\.(?:Print|Println|Printf|Fprint|Fprintln|Fprintf|Errorf)\s*\(|"
+    r"(?<![\w.])System\.(?:out|err)\.print\w*\s*\(|(?<![\w.])print\s*\(")
+_TEMPLATE_LITERAL = re.compile(r"`[^`]*`")
+
+
+def _logged_spans(code: str) -> list[tuple[int, int]]:
+    """The string literals that are arguments of a log or print call on this line -- its own
+    arguments, not those of a call nested in it: `console.log(generateKeyPairSync('rsa'))`
+    still generates a key."""
+    call = _LOG_CALL.search(code)
+    if not call:
+        return []
+    literals = sorted(m.span() for pattern in (_STRING_LITERAL, _TEMPLATE_LITERAL)
+                      for m in pattern.finditer(code, call.end()))
+    out: list[tuple[int, int]] = []
+    depth, at = 0, call.end()
+    for start, end in literals:
+        if start < at:
+            continue  # inside a literal already taken
+        between = code[at:start]
+        depth += between.count("(") - between.count(")")
+        if depth < 0:
+            break
+        if depth == 0:
+            out.append((start, end))
+        at = end
+    return out
+
+
 def _prose_spans(code: str) -> list[tuple[int, int]]:
     "String literals on this line whose text is a sentence."
     spans: list[tuple[int, int]] = []
@@ -3487,8 +3525,9 @@ def scan_source_file(path: Path, rel_path: str,
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
         first_on_line = len(findings)
-        prose = ((_prose_spans(code) + (_message_spans(code) if ext in _DOCSTRING_EXT else []))
-                 if ('"' in code or "'" in code) else [])
+        prose = ((_prose_spans(code) + (_message_spans(code) if ext in _DOCSTRING_EXT else [])
+                  + _logged_spans(code))
+                 if ('"' in code or "'" in code or "`" in code) else [])
         # The finding a row 136-143 pattern made, with where it matched (see components below).
         by_pattern: dict[str, tuple[dict[str, Any], list[tuple[int, int]]]] = {}
         experimental: list[tuple[int, int]] = []
