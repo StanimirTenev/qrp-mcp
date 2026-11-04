@@ -1838,9 +1838,10 @@ def _suite_table_entry(line: str) -> list[tuple[str, int]]:
 # --- key sizes named on the same line as the algorithm ---
 _KEY_SIZE = re.compile(
     r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|"
-    r"(?<![A-Za-z])rsa[:\-_]?(\d{3,5})(?![0-9])|\bRSA_(\d{3,5})\b|"
-    # Rows 205, 196 (a): Kconfig `..._RSA_LEN=2048`; Yocto's `FIT_SIGN_ALG = "rsa2048"` (above).
-    r"(?<![A-Za-z])rsa_(?:len|bits|size)\s*=\s*(\d{3,5})\b|"
+    r"(?<![A-Za-z])rsa[:\-_](\d{3,5})(?![0-9])|\bRSA_(\d{3,5})\b|"
+    # Rows 205, 196 (a): Kconfig `..._RSA_LEN=2048`; Yocto's `FIT_SIGN_ALG = "rsa2048"`, only as
+    # a whole quoted value (`rsa512_key.pem` is a fixture's file name, as for the key specs).
+    r"(?<![A-Za-z])rsa_(?:len|bits|size)\s*=\s*(\d{3,5})\b|[\"'](?i:rsa)(\d{3,5})[\"']|"
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
     r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
