@@ -499,6 +499,7 @@ def build(
         "items": problems,
         "reasons": {r: UNPARSED_REASONS[r] for r in sorted({p["reason"] for p in problems})},
     }
+    partly = _read_in_part(problems, undecoded)
     dirs_not_entered = scan_result.get("unreadable_directories", [])
     links = scan_result.get("symlinks_not_followed", [])
     # A linked directory was not entered, so how many files it holds is
@@ -574,6 +575,13 @@ def build(
             "files_examined": examined,
             "files_not_examined": present - examined,
             "coverage_pct": round(100 * examined / present, 2) if present else None,
+            # Stanimir's decision, 04.11.2026: a file read only in part (examined_partly) or
+            # read and decoded to nothing (examined_without_result) is counted separately.
+            # coverage_pct stays files opened / files given, so --min-coverage is unchanged;
+            # read_in_full_pct is the files read in full / files given.
+            "read_in_part": len(partly),
+            "read_in_full_pct": (round(100 * (examined - len(partly)) / present, 2)
+                                 if present else None),
         },
         # Every figure above is a reading claim. Said here rather than left to be
         # inferred: a correct number invites the stronger reading, and nothing in
@@ -787,6 +795,11 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _read_in_part(problems: list[dict[str, Any]], undecoded: list[str]) -> list[str]:
+    """The files read only in part or decoded to nothing, each once (rows 229, 333, 362)."""
+    return sorted({p.get("path") for p in problems} | set(undecoded))
+
+
 def verdict_line(block: dict[str, Any]) -> str:
     """The verdict, and what the directory exclusions removed before counting.
 
@@ -829,11 +842,14 @@ def _verdict(block: dict[str, Any]) -> str:
     # Rows 229, 333, 362: a file opened and read only in part -- a block that did not parse,
     # a device grammar matched by its words, a claimed file that gave nothing decodable --
     # is not a file "read" without qualification.
-    partly = sorted({i.get("path") for i in (block.get("examined_partly") or {}).get("items", [])}
-                    | set((block.get("examined_without_result") or {}).get("paths", [])))
+    partly = _read_in_part((block.get("examined_partly") or {}).get("items", []),
+                           (block.get("examined_without_result") or {}).get("paths", []))
     if partly:
+        # Both figures named, so the opened share cannot be read as the share read in full.
+        full = scope.get("read_in_full_pct")
         some = (f"{'was' if len(partly) == 1 else 'were'} read only in part or gave nothing "
-                f"it could decode, {'named' if len(partly) == 1 else 'each named'} with a reason")
+                f"it could decode, {'named' if len(partly) == 1 else 'each named'} with a reason"
+                + (f" ({full}% of the files given were read in full)" if full is not None else ""))
         if scope["files_not_examined"] == 0:
             return (f"This scan opened every one of the {scope['files_present']} files it was "
                     f"given; {len(partly)} of them {some}.")

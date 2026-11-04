@@ -131,7 +131,9 @@ def build(result: dict[str, Any], keys: dict[int, str]) -> dict[str, Any]:
         "results": results,
         "properties": {
             "coverage": {k: scope[k] for k in ("files_present", "files_examined",
-                                               "files_not_examined", "coverage_pct")},
+                                               "files_not_examined", "coverage_pct")}
+                         | {k: scope[k] for k in ("read_in_part", "read_in_full_pct")
+                                           if k in scope},
             "verdict": result.get("verdict"),
             "accounts_for_every_file": cov.get("accounts_for_every_file"),
             "suppressed": (cov.get("suppressed") or {}).get("count", 0),

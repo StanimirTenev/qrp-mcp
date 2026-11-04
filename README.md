@@ -1154,6 +1154,9 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
   configuration (`crypto ikev2|isakmp|ipsec|map`) and a Junos configuration (`[edit security
   ike|ipsec]`) are named in `examined_partly` with the reason `grammar_not_parsed`.
   `coverage_pct` is not changed: it is a reading claim, and the file was read.
+  Decision (Stanimir, 04.11.2026): partly read is counted separately. `coverage.scope` carries
+  `read_in_part` and `read_in_full_pct` beside `coverage_pct`, the verdict names both, and the
+  CBOM and SARIF carry them; `--min-coverage` still measures files opened.
 - **PEM inside any text file.** A certificate in a FortiOS `set certificate "..."`, a C# raw or
   verbatim string, a Go raw string, or source concatenated with `+` is parsed, as JSON and YAML
   already were; a block that does not parse is named in `examined_partly`. A private-key block

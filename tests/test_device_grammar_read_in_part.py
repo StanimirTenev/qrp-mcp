@@ -37,7 +37,8 @@ def test_fortios_backup_is_read_in_part(tmp_path):
     assert "grammar_not_parsed" in result["coverage"]["examined_partly"]["reasons"]
     assert result["verdict"] == ("This scan opened every one of the 1 files it was given; 1 of "
                                  "them was read only in part or gave nothing it could decode, "
-                                 "named with a reason.")
+                                 "named with a reason (0.0% of the files given were read in "
+                                 "full).")
     assert result["coverage"]["scope"]["coverage_pct"] == 100.0
 
 
@@ -67,4 +68,4 @@ def test_partly_read_is_named_when_some_files_were_not_read(tmp_path):
     (tmp_path / "notes.docx").write_bytes(b"x")
     assert scan_directory(tmp_path)["verdict"].endswith(
         "; of those read, 1 was read only in part or gave nothing it could decode, named "
-        "with a reason.")
+        "with a reason (0.0% of the files given were read in full).")
