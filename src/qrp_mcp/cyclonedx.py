@@ -385,6 +385,11 @@ def _flatten(value: Any, path: str = "") -> list[tuple[str, str]]:
     return [(path, str(value))]
 
 
+def _target_name(coverage: dict[str, Any]) -> str:
+    target = str(coverage["corpus"]["target"]).replace("\\", "/").rstrip("/")
+    return target.rsplit("/", 1)[-1] or target
+
+
 def _serial(coverage: dict[str, Any], findings_digest: str = "") -> str:
     """A serial number that is a function of the run, not of the moment.
 
@@ -397,8 +402,9 @@ def _serial(coverage: dict[str, Any], findings_digest: str = "") -> str:
     instrument = coverage["instrument"]
     corpus_pin = corpus.get("pinned_at") or {}
     tool_pin = instrument.get("source_commit") or {}
+    # Not the target path (row 430): one commit scanned at two places, or on two machines,
+    # is one document. The commit, the instrument and the findings say what it is.
     seed = "|".join([
-        corpus["target"],
         str(corpus_pin.get("commit") or corpus_pin.get("reason") or ""),
         instrument["version"],
         str(tool_pin.get("commit") or tool_pin.get("reason") or ""),
@@ -1375,10 +1381,14 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                 **({"properties": [{"name": f"{NS}revision", "value": instrument["revision"]}]}
                    if instrument.get("revision") else {}),
             }]},
+            # Named by the directory's own name, not its absolute path (row 430); the commit,
+            # where there is one, is its version.
             "component": {
                 "type": "application",
-                "bom-ref": _ref("target", coverage["corpus"]["target"]),
-                "name": coverage["corpus"]["target"],
+                "bom-ref": _ref("target", _target_name(coverage)),
+                "name": _target_name(coverage),
+                **({"version": (coverage["corpus"].get("pinned_at") or {})["commit"]}
+                   if (coverage["corpus"].get("pinned_at") or {}).get("commit") else {}),
             },
         },
         "components": components + evidence_files,
