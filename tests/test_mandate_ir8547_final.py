@@ -94,16 +94,17 @@ def test_fallback_group_beside_the_hybrid_keeps_its_dates(tmp_path):
 
 
 def test_block_names_the_date_the_gate_counts(tmp_path):
+    # Row 160, from 0.41.0: the gate counts the deprecation, the date next_deadline gives.
     r, failed = _scan(tmp_path, {"keys.py": KEYS}, lead=60, day=date(2026, 10, 28))
     block = r["mandates"]["nist-ir-8547"]
     assert block["next_deadline"] == "2030-12-31"
-    assert block["gate_counts"] == "disallowed_after"
-    assert block["next_gate_deadline"] == "2035-12-31"
-    assert block["gate"] == "pass" and not failed
+    assert block["gate_counts"] == "deprecated_after"
+    assert block["next_gate_deadline"] == "2030-12-31"
+    assert block["gate"] == "fail" and failed
 
 
-@pytest.mark.parametrize("lead, gate", [(110, "pass"), (111, "fail")])
-def test_gate_still_counts_disallowance(tmp_path, lead, gate):
-    # 2026-10-30 + 110 months = 2035-12-30 (before 2035-12-31); + 111 months reaches it.
+@pytest.mark.parametrize("lead, gate", [(50, "pass"), (51, "fail")])
+def test_gate_counts_the_deprecation(tmp_path, lead, gate):
+    # 2026-10-30 + 50 months = 2030-12-30 (before 2030-12-31); + 51 months passes it.
     r, failed = _scan(tmp_path, {"keys.py": KEYS}, lead=lead)
     assert r["mandates"]["nist-ir-8547"]["gate"] == gate and failed == (gate == "fail")

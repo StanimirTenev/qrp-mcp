@@ -18,10 +18,11 @@ and it is not HNDL-exposed. A classical group offered on its own in the same lis
 (`X25519MLKEM768:X25519`) is its own `tls_groups` row and keeps its dates.
 
 The gate: `lead_months` given, the run fails when any occurrence's deadline falls within that
-many months of the date; a deadline already passed fails without it. The deadline the gate
-counts is the clause's `deadline` -- the disallowance for NIST IR 8547 -- and the block says so
-(`gate_counts`, `next_gate_deadline`) beside `next_deadline`, the earliest date of any clause,
-a deprecation included (row 160: the two disagreed and nothing said which the gate used). An occurrence the owner
+many months of the date; a deadline already passed fails without it. For NIST IR 8547 the date
+the gate counts is the deprecation (2030), from 0.41.0; it counted the disallowance (2035)
+while `next_deadline` said 2030 (row 160). The block says which (`gate_counts`,
+`next_gate_deadline`). A gate that would pass while files went unread reads `not_established`
+with the count (row 204); the exit code is that of a pass. An occurrence the owner
 suppressed is not in `evidence` and does not count; one in the baseline is listed and does not
 trip it either -- a baseline is the owner's statement that it is known. Comments and bans are
 not uses and get no clause; nor do identifier rows, which never move the headline either.
@@ -224,7 +225,7 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             "in_scope": 0, "not_in_scope": 0, "hndl_exposed": 0, "hndl_not_determined": 0,
             "within_lead": 0,
             "by_status": {}, "next_deadline": None, "gate": "pass",
-            "gate_counts": "deadline" if name == "cnsa-2.0" else "disallowed_after",
+            "gate_counts": "deadline" if name == "cnsa-2.0" else "deprecated_after",
             "next_gate_deadline": None,
         }
         if name == "cnsa-2.0":
@@ -282,9 +283,12 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                 block["in_scope"] += 1
                 block["by_status"][clause["status"]] = block["by_status"].get(
                     clause["status"], 0) + 1
-                if block["next_gate_deadline"] is None or clause["deadline"] < block[
+                # Row 160: the gate counts the date the headline gives, the deprecation for
+                # NIST IR 8547 (2030), not the disallowance five years later.
+                gate_date = clause.get("deprecated_after") or clause["deadline"]
+                if block["next_gate_deadline"] is None or gate_date < block[
                         "next_gate_deadline"]:
-                    block["next_gate_deadline"] = clause["deadline"]
+                    block["next_gate_deadline"] = gate_date
                 upcoming = [d for d in (clause.get("deprecated_after"), clause["deadline"])
                             if d and date.fromisoformat(d) >= day]
                 if upcoming and (block["next_deadline"] is None
@@ -294,7 +298,7 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                     block["hndl_exposed"] += 1
                 elif role == "undetermined":
                     block["hndl_not_determined"] += 1
-                if date.fromisoformat(clause["deadline"]) <= horizon:
+                if date.fromisoformat(gate_date) <= horizon:
                     block["within_lead"] += 1
                     if item.get("baseline_state") != "baselined":
                         block["gate"] = "fail"
@@ -305,5 +309,25 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                 item["hndl_exposed"] = (False if composite else
                                         True if role == "key_establishment" else
                                         "not determined" if role == "undetermined" else False)
+    # Row 204: a pass over files the scan did not read is a pass over the files it read. Said
+    # in the gate's word; the exit code is the same as for a pass.
+    unread = _unread(result)
+    if unread:
+        for block in blocks.values():
+            if block["gate"] == "pass":
+                block["gate"] = "not_established"
+                block["gate_not_established_because"] = unread
     result["mandates"] = blocks
     return failed
+
+
+def _unread(result: dict[str, Any]) -> str | None:
+    scope = (result.get("coverage") or {}).get("scope") or {}
+    reports = sum(r["count"] for r in (result.get("coverage") or {}).get("not_examined") or []
+                  if r.get("reason") == "report_document")
+    unread = (scope.get("files_not_examined") or 0) - reports
+    if unread <= 0:
+        return None
+    return (f"{unread} of {scope.get('files_present')} files were not read "
+            f"(coverage.not_examined): no deadline falls within the lead in the files read, "
+            f"and the files not read were not judged")
