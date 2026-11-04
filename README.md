@@ -1143,6 +1143,40 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
+**From 0.42.0** (core rows of the fix list; another part of the batch adds file formats). Each was
+reproduced as a failing test before the fix, and each fix was reverted once to see its test fail.
+
+- **A file read only in part is not called read.** The verdict said "This scan read every one of
+  the N files" beside a certificate block that did not parse or a device configuration read by
+  its words. It now says "This scan opened every one of the N files it was given; K of them were
+  read only in part or gave nothing it could decode, each named with a reason" (and "; of those
+  read, K ..." after "read X of Y"). A FortiOS backup (`#config-version=`), a Cisco IOS
+  configuration (`crypto ikev2|isakmp|ipsec|map`) and a Junos configuration (`[edit security
+  ike|ipsec]`) are named in `examined_partly` with the reason `grammar_not_parsed`.
+  `coverage_pct` is not changed: it is a reading claim, and the file was read.
+- **PEM inside any text file.** A certificate in a FortiOS `set certificate "..."`, a C# raw or
+  verbatim string, a Go raw string, or source concatenated with `+` is parsed, as JSON and YAML
+  already were; a block that does not parse is named in `examined_partly`. A private-key block
+  whose body is not a key says `key_unread` (medium), never "key material parsed".
+- **`weak_key` is `null` when no size was read** for a family with a size table (RSA, DSA, DH,
+  the EC families), with "not established" in the reason. It was `false`: "not weak" about a key
+  whose size the scan never saw. `weak_count` and severity are unchanged.
+- **Sizes read from the key-generation argument**: Node and WebCrypto `modulusLength`, PHP
+  `private_key_bits`, Ruby `PKey::RSA|DSA|DH.new|generate(N)`, pycryptodome `generate(N)`,
+  OpenSSL 3 `EVP_RSA_gen`, `EVP_PKEY_Q_keygen`, `set_rsa_keygen_bits`, Java
+  `RSAKeyGenParameterSpec`, Rust `Rsa::generate` and `RsaPrivateKey::new`, wolfSSL
+  `wc_MakeRsaKey`, IKE `modpN` (the smallest group offered on the line), and an RSA JWK's `n`
+  (a `kid` label names nothing). Not yet: a size on another line than the family.
+- **Switched off is not a use**: `echo "USE_ML_KEM_768=false" >> ...`, a SCHANNEL key with
+  `"Enabled"=dword:00000000`, `Disable-TlsCipherSuite`, `Disable-TlsEccCurve` are bans, and no
+  longer raise readiness.
+- **Round-3 schemes by their libraries' names** are their own families, `superseded`: Bouncy
+  Castle's `crystals.dilithium` classes ("Dilithium round 3") and liboqs's `OQS_SIG_alg_sphincs_*`
+  ("SPHINCS+ round 3"). They were ML-DSA and SLH-DSA, `pqc_ready`.
+- **Misreads**: `createECDH('secp256k1')` is ECDH, not ECDSA; camelCase `RsaSha256` is not a
+  DNSSEC algorithm; UTF-16 is read with or without a byte-order mark (Cyrillic comments, a PEM
+  saved by PowerShell `Out-File`).
+
 **From 0.41.0**, a batch of the fix list (rows 160, 196, 200–206, 208–211, and six rows from a
 comparison with another scanner on Hyperledger Fabric). Most were places where the output said more
 than the scan had seen. Each was reproduced as a failing test before the fix, and each fix was
