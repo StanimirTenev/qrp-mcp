@@ -25,6 +25,27 @@ import re
 
 REASON = "grammar_not_parsed"  # its meaning is in certificates.UNPARSED_REASONS
 
+# What of each grammar is read, and what is not (row 229/333 re-checked after rows 225-228,
+# 334). Each "read" names a rule in ike.py, switches.py or fortios.py.
+READ_IN_PART = {
+    "FortiOS configuration": (
+        "the words it names; `set dhgrp` and `set addke1`-`addke7` group numbers; "
+        "`strong-crypto`, `ssl-static-key-ciphers` and the TLS version settings; the "
+        "firmware defaults of `ssl-static-key-ciphers`, SSL VPN `ssl-min-proto-ver`/"
+        "`ssl-max-proto-ver` and phase1 `dhgrp` where a section leaves them out",
+        "which proposal or phase1 a tunnel uses; every other default the backup leaves out "
+        "(listed as not evaluated); the sections as a whole"),
+    "Cisco IOS configuration": (
+        "the words it names; `group` numbers in a `crypto ikev2 proposal`; "
+        "`authentication remote|local rsa-sig` in a `crypto ikev2 profile`",
+        "`crypto isakmp policy` groups (IKEv1); which proposal, profile or crypto map a "
+        "tunnel uses; defaults the configuration leaves out"),
+    "Junos configuration": (
+        "the words it names; `dh-group groupN` and PFS `keys groupN`; "
+        "`authentication-method` signatures",
+        "which proposal or policy a gateway uses; defaults the configuration leaves out"),
+}
+
 _CISCO = re.compile(r"crypto (?:ikev2|isakmp|ipsec|map) \S")
 _JUNOS_SET = re.compile(r"set security (?:ike|ipsec) \S")
 _JUNOS_BLOCK = re.compile(r"\s+(?:ike|ipsec) \{\s*$")

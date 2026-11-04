@@ -481,9 +481,9 @@ UNPARSED_REASONS = {
     "format_not_parsed": "a format `cryptography` does not read (a Java keystore)",
     # Rows 229 and 333; see grammar.py.
     "grammar_not_parsed": ("a device configuration recognised by its form (FortiOS, Cisco IOS, "
-                           "Junos), read by the words it names; its sections and values -- "
-                           "group numbers, the defaults a backup leaves out, which proposal a "
-                           "tunnel uses -- are not parsed"),
+                           "Junos), read by the words it names and by some of its settings; "
+                           "each entry says in `read` which, and in `not_read` what is not "
+                           "parsed, such as which proposal a tunnel uses"),
 }
 
 

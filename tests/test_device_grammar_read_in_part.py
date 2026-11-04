@@ -69,3 +69,26 @@ def test_partly_read_is_named_when_some_files_were_not_read(tmp_path):
     assert scan_directory(tmp_path)["verdict"].endswith(
         "; of those read, 1 was read only in part or gave nothing it could decode, named "
         "with a reason (0.0% of the files given were read in full).")
+
+
+def test_each_entry_says_what_was_read_and_what_was_not(tmp_path):
+    """After the formats batch (rows 225-228, 334) part of each grammar is read: FortiOS
+    `set dhgrp` and three firmware defaults, Cisco IOS XE `group` in a `crypto ikev2 proposal`,
+    Junos `dh-group`. The meaning said "group numbers ... are not parsed", which was no longer
+    true; each entry now says what was read and what was not."""
+    from qrp_mcp.scan import scan_directory
+    (tmp_path / "fw.conf").write_text(
+        "#config-version=FGT60F-7.6.6-FW-build3652-251020:opmode=0:vdom=0:user=admin\n"
+        "config vpn ipsec phase1-interface\n    edit \"t1\"\n        set dhgrp 14 5\n"
+        "    next\nend\n")
+    (tmp_path / "router.cfg").write_text("crypto ikev2 proposal P1\n group 14\n")
+    (tmp_path / "srx.conf").write_text("set security ike proposal p1 dh-group group14\n")
+    result = scan_directory(tmp_path)
+    block = result["coverage"]["examined_partly"]
+    items = {i["path"]: i for i in block["items"]}
+    assert "set dhgrp" in items["fw.conf"]["read"]
+    assert "which proposal" in items["fw.conf"]["not_read"]
+    assert "crypto ikev2 proposal" in items["router.cfg"]["read"]
+    assert "crypto isakmp policy" in items["router.cfg"]["not_read"]
+    assert "dh-group" in items["srx.conf"]["read"]
+    assert "group numbers" not in block["reasons"]["grammar_not_parsed"]

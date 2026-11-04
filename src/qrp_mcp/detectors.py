@@ -4945,7 +4945,9 @@ def _device_grammar(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     found = grammar.device_grammar(lines)
     if found is None:
         return []
-    return [{"path": rel_path, "line": found[0], "label": found[1], "reason": grammar.REASON}]
+    read, not_read = grammar.READ_IN_PART[found[1]]
+    return [{"path": rel_path, "line": found[0], "label": found[1], "reason": grammar.REASON,
+             "read": read, "not_read": not_read}]
 
 
 def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[dict[str, Any]],
