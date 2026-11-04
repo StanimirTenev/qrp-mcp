@@ -1179,6 +1179,10 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
   `CipherMode.ECB` and `EncryptEcb`/`DecryptEcb` on an object named for AES. A SignTool step's
   `/fd` is its `digest_algorithm`, and a `.ps1`/`.psm1` script's signing steps are listed as a
   `.sh` script's were.
+- **Static RSA key exchange in cipher lists set from code**: `SSL_CTX_set_cipher_list`,
+  `SSL_CTX_set_strict_cipher_list`, `wolfSSL_CTX_set_cipher_list`, Java
+  `SSLParameters.setCipherSuites`, Node's `ciphers:` option and Ruby's `ctx.ciphers =` are cipher
+  settings, as Python's `set_ciphers` already was; `AES128-SHA` there is `static_rsa_kex`.
 - **A TLS method function pins its version**: OpenSSL `TLSv1_method()` / `TLSv1_1_client_method()`
   / `SSLv3_method()`, Node `secureProtocol: 'TLSv1_method'`, wolfSSL `wolfTLSv1_client_method()`
   are `protocols` rows, deprecated where the version is. `TLS_method` and `SSLv23_method` pin

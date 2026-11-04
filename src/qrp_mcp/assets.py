@@ -1161,7 +1161,12 @@ _TLS_CIPHER_SETTING = re.compile(
     r"(?:ssl_conf_command|SSLOpenSSLConfCmd)\s+(?:CipherString|Ciphersuites)\b|"
     r"^\s*(?:CipherString|Ciphersuites)\s*=|"
     r"\bset_cipher_list\b|\bset_ciphersuites\b|\bset_ciphers\b|"
-    r"\bcipher_suites\s*[:=]|\bCipherSuites\s*[:=]|\bsetEnabledCipherSuites\b",
+    r"\bcipher_suites\s*[:=]|\bCipherSuites\s*[:=]|\bsetEnabledCipherSuites\b|"
+    # Rows 403, 404: OpenSSL's and wolfSSL's C calls (`SSL_CTX_set_cipher_list`: the `_`
+    # before `set_` is a word character), Java's SSLParameters.setCipherSuites, Node's
+    # `ciphers:` option and Ruby's `ctx.ciphers =`.
+    r"_set_(?:strict_)?cipher_list\b|\bsetCipherSuites\b|\bciphers\s*:\s*[\"'`]|"
+    r"\.ciphers\s*=(?!=)",
     re.IGNORECASE)
 _HAPROXY_CIPHERS = re.compile(r"(?<=\s)ciphers(?:uites)?(?=\s)")
 
