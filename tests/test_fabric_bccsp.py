@@ -1,6 +1,6 @@
 """Fix list, Fabric BCCSP (entered 04.11.2026 from an internal comparison). Inputs: core.yaml
-and orderer.yaml written for the comparison, and the peer core.yaml of Hyperledger Fabric's
-test network (fabric-samples, Apache-2.0).
+and orderer.yaml written for the comparison, and the BCCSP block of the peer core.yaml of
+Hyperledger Fabric's test network (fabric-samples, Apache-2.0).
 
 `BCCSP: Default: SW` with `SW: Security: 256|384` gave no evidence at all. Fabric's software
 provider signs with ECDSA on P-256 or P-384 by that level (bccsp/sw/conf.go at v2.5.9), and
