@@ -144,6 +144,10 @@ _KEY_ESTABLISHMENT = re.compile(
     r"|->group\[|(?<![a-z_])groups\[|namedgroup|supported_groups|negotiated_curve|kex_params"
     r"|(?<![a-z])derive|key.?(agreement|exchange|transport)|tls_rsa_with|(?<![a-z])krsa(?![a-z])"
     r"|1\.2\.840\.113549\.1\.1\.7(?![0-9])"
+    # Row 312: a JCA Cipher with an RSA transformation encrypts, "The RSA encryption algorithm
+    # as defined in PKCS #1" (https://docs.oracle.com/en/java/javase/21/docs/specs/security/standard-names.html):
+    # it transports a key.
+    r"|cipher\.getinstance\(\s*[\"']rsa[/\"']"
     # An OpenSSL suite name with no key-exchange prefix (RC4-SHA, AES128-GCM-SHA256)
     # is RSA key transport. Found in a cipher list the first draft called signature.
     r"|(?<![a-z0-9_-])(aes\d*|camellia\d*|des-cbc3|rc4|seed|idea)-(gcm-)?(sha|md5)")

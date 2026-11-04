@@ -1,0 +1,37 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "rsa4096",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "vsqECLni5mXdkp7PIneCqbtEro0EMKaKX2TkgXex4cXBvz5pGkewHKdCrt7CrITLL4J3jCS1QxpS1acsQiw741zG9InnOXHzwoqNzlqIDXptJpRLvQUKjvfP2XwYYbgGw_QvuA3xPji0ZEhVwciKu2liibSyvovCPPReXrGBtos",
+      "e": "AQAB"
+    },
+    {
+      "kty": "RSA",
+      "kid": "signing-2026",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "vVTfwwSpP8EzdYxMZSEgxBbil8oD7NrimESbPEFfUeeooHQ0UKfQhG3B65tH97TAcHTVA3LBxEWhiGdYru2UYZa66Ngl76EysjFmTvaWDHZoenIMu_YL6d5jcgmVnj2m6KFU2zj41Yw0pfLXJDXMw0Pp0Cdys_tPYQVs8amkQskh3S3-sb1ORvWYJhz3haWI6RKc5WDipLVrWDtFFeI7qy1K8CeFeYaEty4rZR6rJnSRqeni2LPfgXUiycVM3sLQlH5AOjuJYJtXsN6yHvViFDvB95aMrtZ6Rp9qr62_UPC_PCqrKni83V-7hldZk_0GtKLpWbnJ6otkmWsCeK3sXw",
+      "e": "AQAB"
+    },
+    {
+      "kty": "EC",
+      "kid": "ec1",
+      "use": "sig",
+      "alg": "ES256",
+      "crv": "P-256",
+      "x": "D6MWbulz0fqqydUZDW3hT3kmYf0lJvhVFiDSnpyzX9I",
+      "y": "C9FShJXEh2lPfWAWRaBm9ygBzZpgZNPVGQPoSXHvu0g"
+    },
+    {
+      "kty": "OKP",
+      "kid": "ed1",
+      "use": "sig",
+      "alg": "EdDSA",
+      "crv": "Ed25519",
+      "x": "Sq4qDZfbo0Zg9wgRcyMya2mpJkuXMd714e4oDJuFnaY"
+    }
+  ]
+}

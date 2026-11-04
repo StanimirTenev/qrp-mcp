@@ -430,6 +430,65 @@ def pinned_versions(path: Path, lines: list[str]) -> list[tuple[str, str, str, i
     return out
 
 
+# --- crypto libraries a Dockerfile installs from the system package manager (row 223) ------
+#
+# `apt-get install -y openssl=3.0.15-1~deb12u1 libssl3=...` was read and gave nothing: the
+# system OpenSSL was not in the inventory. The families are the ones the table above gives the
+# same library's bindings (`openssl` in cargo, `libsodium-wrappers` in npm).
+_OS_INSTALL = re.compile(r"\b(?:(apt-get|apt)\s+(?:-\S+\s+)*install|(apk)\s+(?:-\S+\s+)*add|"
+                         r"(dnf|yum|microdnf)\s+(?:-\S+\s+)*install)\b(?P<rest>[^&;|]*)")
+_OS_ECOSYSTEM = {"apt-get": "deb", "apt": "deb", "apk": "apk", "dnf": "rpm", "yum": "rpm",
+                 "microdnf": "rpm"}
+_OS_CRYPTO_PACKAGES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
+    (re.compile(r"(?:openssl|openssl-libs|openssl-dev(?:el)?|libssl[\d.]*(?:-dev)?|libcrypto[\d.]*)"),
+     ("RSA", "ECDSA")),
+    (re.compile(r"(?:gnutls|gnutls-utils|libgnutls[\w.-]*)"), ("RSA", "ECDSA")),
+    (re.compile(r"(?:nss|libnss3(?:-dev)?)"), ("RSA", "ECDSA")),
+    (re.compile(r"(?:libsodium[\w.-]*)"), ("EdDSA", "X25519")),
+)
+
+
+def os_packages(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """Crypto libraries a Dockerfile's `RUN` installs, as declared dependencies."""
+    out: list[dict[str, Any]] = []
+    # A list continued with `\` on the next lines: (line, text, tool) still to read.
+    carry: tuple[str, str] | None = None
+    for number, text in enumerate(lines, 1):
+        if text.lstrip().startswith("#"):
+            continue
+        spans: list[tuple[str, str, bool]] = []
+        if carry is not None:
+            rest = re.split(r"&&|;|\|", text, maxsplit=1)
+            spans.append((carry[0], rest[0], len(rest) == 1))
+        for match in _OS_INSTALL.finditer(text):
+            tool = match.group(1) or match.group(2) or match.group(3)
+            ended = text[match.end():].lstrip().startswith(("&", ";", "|"))
+            spans.append((tool, match.group("rest"), not ended))
+        carry = None
+        for tool, rest, open_end in spans:
+            if open_end and text.rstrip().endswith("\\"):
+                carry = (tool, "")
+            ecosystem = _OS_ECOSYSTEM[tool]
+            for token in rest.replace("\\", " ").split():
+                if token.startswith("-"):
+                    continue
+                name, _, version = token.partition("=")
+                families = next((f for pattern, f in _OS_CRYPTO_PACKAGES
+                                 if pattern.fullmatch(name)), None)
+                if not families:
+                    continue
+                item = {"path": rel_path, "line": number, "package": name,
+                        "ecosystem": ecosystem, "families": list(families),
+                        "basis": "os_package",
+                        "description": (f"{name} is installed by {tool} here; it implements "
+                                        f"{', '.join(families)}. Declared, not observed: "
+                                        f"nothing here says a line of code calls it.")}
+                if version and ecosystem in {"deb", "apk"}:
+                    item["version"] = version
+                out.append(item)
+    return out
+
+
 def is_manifest(path: Path) -> bool:
     return (path.name in MANIFEST_FILENAMES
             or path.name in _NUGET_FILENAMES
@@ -684,6 +743,12 @@ _SSH_KEY_LINE = re.compile(
 _VERSION_MACRO = re.compile(r"(?<![A-Za-z0-9_])(SSL[23]|TLS1(?:_[0-3])?)_VERSION(?![A-Za-z0-9_])")
 
 _DEPRECATED_TLS = {"SSLv2", "SSLv3", "TLSv1.0", "TLSv1.1"}
+
+# Rows 405, 407, 410: a method function pins one version -- OpenSSL's `TLSv1_method()` (and
+# `_client`/`_server`), Node's `secureProtocol: 'TLSv1_method'`, wolfSSL's
+# `wolfTLSv1_client_method()`. The version-flexible TLS_method and SSLv23_method do not.
+_METHOD_FUNCTION = re.compile(
+    r"(?<![A-Za-z0-9_])(?:wolf)?(SSLv3|TLSv1(?:_[123])?)_(?:client_|server_)?method(?![A-Za-z0-9_])")
 
 # `SSLProtocol all` or `+all`, but not `-all`, as Apache writes the directive.
 _SSL_PROTOCOL_ALL = re.compile(r"^\s*SSLProtocol\s+(?:.*\s)?\+?all(?:\s|$)",
@@ -947,6 +1012,21 @@ def scan_protocols(line: str) -> list[dict[str, Any]]:
             "description": (f"{name} is named here. Which algorithms it negotiates "
                             f"is not stated by the version."),
         })
+    for method in _METHOD_FUNCTION.finditer(line):
+        raw = method.group(1)
+        name = "SSLv3" if raw == "SSLv3" else f"TLSv1.{raw[6] if len(raw) > 5 else 0}"
+        if (name, False) in seen:
+            continue
+        seen.add((name, False))
+        out.append({
+            "protocol": "tls",
+            "version": name,
+            "banned": False,
+            "basis": "configured_protocol",
+            "deprecated": name in _DEPRECATED_TLS,
+            "description": (f"{name} only, by the method {method.group(0)}. Which algorithms "
+                            f"it negotiates is not stated by the version."),
+        })
     if _TLS_CONTEXT.search(line):
         for match in _TLS_VERSION.finditer(line):
             name = _tls_version_name(match)
@@ -1081,7 +1161,12 @@ _TLS_CIPHER_SETTING = re.compile(
     r"(?:ssl_conf_command|SSLOpenSSLConfCmd)\s+(?:CipherString|Ciphersuites)\b|"
     r"^\s*(?:CipherString|Ciphersuites)\s*=|"
     r"\bset_cipher_list\b|\bset_ciphersuites\b|\bset_ciphers\b|"
-    r"\bcipher_suites\s*[:=]|\bCipherSuites\s*[:=]|\bsetEnabledCipherSuites\b",
+    r"\bcipher_suites\s*[:=]|\bCipherSuites\s*[:=]|\bsetEnabledCipherSuites\b|"
+    # Rows 403, 404: OpenSSL's and wolfSSL's C calls (`SSL_CTX_set_cipher_list`: the `_`
+    # before `set_` is a word character), Java's SSLParameters.setCipherSuites, Node's
+    # `ciphers:` option and Ruby's `ctx.ciphers =`.
+    r"_set_(?:strict_)?cipher_list\b|\bsetCipherSuites\b|\bciphers\s*:\s*[\"'`]|"
+    r"\.ciphers\s*=(?!=)",
     re.IGNORECASE)
 _HAPROXY_CIPHERS = re.compile(r"(?<=\s)ciphers(?:uites)?(?=\s)")
 

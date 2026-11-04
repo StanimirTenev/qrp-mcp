@@ -114,6 +114,11 @@ def build(result: dict[str, Any], keys: dict[int, str]) -> dict[str, Any]:
                              f"line {marker['line']} not applied: {marker['why']}")
         note["locations"] = [_location(marker["path"], marker["line"])]
         notes.append(note)
+    for marker in (result.get("suppressed") or {}).get("markers_flagged") or []:
+        note = _notification("marker_flagged", f"{marker['form']} {marker['family']} at "
+                             f"line {marker['line']}: {marker['why']}", level="note")
+        note["locations"] = [_location(marker["path"], marker["line"])]
+        notes.append(note)
 
     scope = cov["scope"]
     run: dict[str, Any] = {
@@ -131,7 +136,9 @@ def build(result: dict[str, Any], keys: dict[int, str]) -> dict[str, Any]:
         "results": results,
         "properties": {
             "coverage": {k: scope[k] for k in ("files_present", "files_examined",
-                                               "files_not_examined", "coverage_pct")},
+                                               "files_not_examined", "coverage_pct")}
+                         | {k: scope[k] for k in ("read_in_part", "read_in_full_pct")
+                                           if k in scope},
             "verdict": result.get("verdict"),
             "accounts_for_every_file": cov.get("accounts_for_every_file"),
             "suppressed": (cov.get("suppressed") or {}).get("count", 0),

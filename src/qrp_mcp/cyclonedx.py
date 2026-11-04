@@ -1285,7 +1285,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "name": package,
             **({"version": versions[0]} if len(versions) == 1 else {}),
             "properties": [
-                {"name": f"{NS}basis", "value": "declared_dependency"},
+                {"name": f"{NS}basis", "value": group[0].get("basis", "declared_dependency")},
                 {"name": f"{NS}ecosystem", "value": ecosystem},
                 {"name": f"{NS}implements", "value": ", ".join(families)},
                 *([{"name": f"{NS}versions_pinned", "value": ", ".join(versions)}]

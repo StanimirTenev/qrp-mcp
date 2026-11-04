@@ -45,4 +45,5 @@ def test_issuer_signature_is_another_key(tmp_path):
     issuer = ec.generate_private_key(ec.SECP384R1())
     f = _findings(tmp_path, _cert(weak, issuer, "Weak leaf", "Strong CA"))
     assert f["EC"]["weak_key"] is True
-    assert f["ECDSA"]["weak_key"] is False
+    # The issuer's key size is not in the leaf: not established (row 391), and not weak.
+    assert f["ECDSA"]["weak_key"] is None

@@ -499,11 +499,14 @@ def build(
         "items": problems,
         "reasons": {r: UNPARSED_REASONS[r] for r in sorted({p["reason"] for p in problems})},
     }
+    partly = _read_in_part(problems, undecoded)
     dirs_not_entered = scan_result.get("unreadable_directories", [])
     links = scan_result.get("symlinks_not_followed", [])
     # A linked directory was not entered, so how many files it holds is
     # unknown -- the same state as one that could not be read.
     linked_dirs = [e for e in links if e.get("kind") == "directory"]
+    # Row 389: one that points into the scanned tree hides no file.
+    hiding_dirs = [e for e in linked_dirs if not e.get("points_into_tree")]
 
     excluded = scan_result.get("files_excluded_by_dir", {})
     pin = _tool_pin()
@@ -574,6 +577,13 @@ def build(
             "files_examined": examined,
             "files_not_examined": present - examined,
             "coverage_pct": round(100 * examined / present, 2) if present else None,
+            # Stanimir's decision, 04.11.2026: a file read only in part (examined_partly) or
+            # read and decoded to nothing (examined_without_result) is counted separately.
+            # coverage_pct stays files opened / files given, so --min-coverage is unchanged;
+            # read_in_full_pct is the files read in full / files given.
+            "read_in_part": len(partly),
+            "read_in_full_pct": (round(100 * (examined - len(partly)) / present, 2)
+                                 if present else None),
         },
         # Every figure above is a reading claim. Said here rather than left to be
         # inferred: a correct number invites the stronger reading, and nothing in
@@ -592,6 +602,7 @@ def build(
             "count": len(links),
             "files": len(links) - len(linked_dirs),
             "directories": len(linked_dirs),
+            "directories_into_tree": len(linked_dirs) - len(hiding_dirs),
             "paths": links,
         },
         # Directories the walk could not enter. Their files are not in any count
@@ -606,7 +617,7 @@ def build(
         # from the walk. Asserted in the output rather than in a test, so a reader
         # can check it without trusting us.
         "accounts_for_every_file": (accounted == present and not dirs_not_entered
-                                    and not linked_dirs),
+                                    and not hiding_dirs),
     }
 
 
@@ -787,6 +798,11 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _read_in_part(problems: list[dict[str, Any]], undecoded: list[str]) -> list[str]:
+    """The files read only in part or decoded to nothing, each once (rows 229, 333, 362)."""
+    return sorted({p.get("path") for p in problems} | set(undecoded))
+
+
 def verdict_line(block: dict[str, Any]) -> str:
     """The verdict, and what the directory exclusions removed before counting.
 
@@ -797,9 +813,14 @@ def verdict_line(block: dict[str, Any]) -> str:
                 .get("by_directory") or {})
     named = sorted(((n, d) for d, n in excluded.items() if d != ".git" and n),
                    key=lambda nd: (-nd[0], nd[1]))
+    into = [e for e in (block.get("symlinks_not_followed") or {}).get("paths") or []
+            if e.get("points_into_tree")]
+    said = _verdict(block) + "".join(
+        f" {e['path']} points into the scanned tree ({e['target'].rstrip('/')}/), which was "
+        f"walked." for e in into)
     if not named:
-        return _verdict(block)
-    return (_verdict(block) + " Left out before counting, by directory name: "
+        return said
+    return (said + " Left out before counting, by directory name: "
             + ", ".join(f"{n} file{'' if n == 1 else 's'} in {d}/" for n, d in named) + ".")
 
 
@@ -816,7 +837,8 @@ def _verdict(block: dict[str, Any]) -> str:
         return (f"This scan cannot account for every file: {hidden} "
                 f"director{'y' if hidden == 1 else 'ies'} could not be entered, so the "
                 f"{scope['files_present']} files counted are not all there were.")
-    linked_dirs = (block.get("symlinks_not_followed") or {}).get("directories", 0)
+    links = block.get("symlinks_not_followed") or {}
+    linked_dirs = links.get("directories", 0) - links.get("directories_into_tree", 0)
     if linked_dirs:
         subject = ("1 linked directory was" if linked_dirs == 1
                    else f"{linked_dirs} linked directories were")
@@ -826,6 +848,20 @@ def _verdict(block: dict[str, Any]) -> str:
     if not block["accounts_for_every_file"]:
         return (f"This scan cannot account for every file: {scope['files_present']} were "
                 f"present and the reasons given do not add up to them.")
+    # Rows 229, 333, 362: a file opened and read only in part -- a block that did not parse,
+    # a device grammar matched by its words, a claimed file that gave nothing decodable --
+    # is not a file "read" without qualification.
+    partly = _read_in_part((block.get("examined_partly") or {}).get("items", []),
+                           (block.get("examined_without_result") or {}).get("paths", []))
+    if partly:
+        # Both figures named, so the opened share cannot be read as the share read in full.
+        full = scope.get("read_in_full_pct")
+        some = (f"{'was' if len(partly) == 1 else 'were'} read only in part or gave nothing "
+                f"it could decode, {'named' if len(partly) == 1 else 'each named'} with a reason"
+                + (f" ({full}% of the files given were read in full)" if full is not None else ""))
+        if scope["files_not_examined"] == 0:
+            return (f"This scan opened every one of the {scope['files_present']} files it was "
+                    f"given; {len(partly)} of them {some}.")
     if scope["files_not_examined"] == 0:
         return (f"This scan read every one of the {scope['files_present']} files it was "
                 f"given.")
@@ -854,4 +890,5 @@ def _verdict(block: dict[str, Any]) -> str:
     remaining = scope["files_not_examined"]
     tail = "is listed with a reason" if remaining == 1 else "are listed with a reason each"
     return (f"This scan read {scope['files_examined']} of {scope['files_present']} files "
-            f"({scope['coverage_pct']}%); the remaining {remaining}{clause} {tail}.")
+            f"({scope['coverage_pct']}%); the remaining {remaining}{clause} {tail}"
+            + (f"; of those read, {len(partly)} {some}." if partly else "."))

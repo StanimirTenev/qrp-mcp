@@ -22,15 +22,17 @@ _warm.start_regex()
 
 from . import (aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, registry,
                suppression)
+from . import grammar
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
+                     os_packages,
                      dockerfile_pins, library_support, names_none_of, pinned_versions,
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
-from .certificates import (embedded_material, is_certificate_file, is_undecoded, key_in_source,
+from .certificates import (decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
                            looks_like_key_file, scan_certificate_file, small_scalar_keys,
                            unparsed_material, SMALL_SCALAR_BOUND)
 
@@ -172,6 +174,12 @@ def in_test_code(rel_path: str) -> bool:
 # Description of the rule for "kyber" with no identifier around it.
 EXPERIMENTAL_SSH_MLDSA = ("OpenSSH 10.4 experimental ML-DSA-44-Ed25519 key type "
                           "(@openssh.com), not the one 10.6 enabled")
+_CREATE_ECDH = re.compile(r"\bcreateECDH\(\s*[\"'`]$")
+# Rows 415, 416: the round-3 submissions under their own library names. ML-DSA and SLH-DSA skip
+# the matches inside these, as they do inside the experimental SSH key type.
+PRE_STANDARD_DILITHIUM = ("round-3 CRYSTALS-Dilithium by a Bouncy Castle class or package "
+                          "(crystals.dilithium), not FIPS 204 ML-DSA")
+PRE_STANDARD_SPHINCS = "round-3 SPHINCS+ by a liboqs or Bouncy Castle name, not FIPS 205 SLH-DSA"
 KYBER_BY_NAME_ONLY = "Kyber named without an identifier (round-3 Kyber, or an old name for ML-KEM)"
 # Read in .rs files only (scan_source_file): elsewhere `rsa_` and `_dsa_` are too often a
 # variable's word for a value it does not hold.
@@ -184,6 +192,7 @@ SSH_RSA_KEY_FILE = "RSA named by an SSH key file name (ssh_host_rsa_key, id_rsa)
 SSH_DSA_KEY_FILE = "DSA named by an SSH key file name (ssh_host_dsa_key, id_dsa)"
 CONFIG_ONLY = frozenset({SSH_RSA_KEY_FILE, SSH_DSA_KEY_FILE})
 
+SHA1_COMPOUND_NAME = "SHA-1 named in a compound name"
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
         r"Crypto\.PublicKey\.RSA|Crypto\.PublicKey\s+import\s+RSA|"
@@ -290,9 +299,22 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z0-9])ECDSAP256SHA256(?![A-Za-z0-9])", re.IGNORECASE)),
     ("ECDSA", "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)", re.compile(
         r"(?<![A-Za-z0-9])ECDSAP384SHA384(?![A-Za-z0-9])", re.IGNORECASE)),
+    # Row 344: OpenSSL's signature-algorithm pairs, "algorithm+hash"
+    # (https://docs.openssl.org/3.0/man3/SSL_CONF_cmd/, SignatureAlgorithms); mod_ssl's own
+    # example is `SSLOpenSSLConfCmd SignatureAlgorithms RSA+SHA384:ECDSA+SHA256`
+    # (https://httpd.apache.org/docs/2.4/mod/mod_ssl.html#sslopensslconfcmd).
+    ("RSA", "RSA named in a signature-algorithm pair (RSA+SHA...)", re.compile(
+        r"(?<![A-Za-z0-9])RSA(?:-PSS)?\+SHA(?:1|224|256|384|512)(?![A-Za-z0-9])")),
+    ("DSA", "DSA named in a signature-algorithm pair (DSA+SHA...)", re.compile(
+        r"(?<![A-Za-z0-9])DSA\+SHA(?:1|224|256|384|512)(?![A-Za-z0-9])")),
+    ("SHA1", "SHA-1 named in a signature-algorithm pair (...+SHA1)", re.compile(
+        r"(?<![A-Za-z0-9])(?:RSA|RSA-PSS|DSA|ECDSA)\+SHA1(?![A-Za-z0-9])")),
+    # Row 307: the mnemonic in upper case (IANA) or lower case (BIND's `algorithm rsasha256`),
+    # never camelCase: `SecurityAlgorithms.RsaSha256` is the JOSE RS256 constant and `struct
+    # RsaSha256` a type, neither DNSSEC.
     ("RSA", "RSA named by a DNSSEC algorithm (1, 5, 7, 8 or 10)", re.compile(
-        r"(?<![A-Za-z0-9])(?:RSAMD5|RSASHA1(?:-NSEC3-SHA1)?|RSASHA256|RSASHA512)(?![A-Za-z0-9])",
-        re.IGNORECASE)),
+        r"(?<![A-Za-z0-9])(?:RSAMD5|RSASHA1(?:-NSEC3-SHA1)?|RSASHA256|RSASHA512|"
+        r"rsamd5|rsasha1(?:-nsec3-sha1)?|rsasha256|rsasha512)(?![A-Za-z0-9])")),
     ("DSA", "DSA named by a DNSSEC algorithm (6, DSA-NSEC3-SHA1)", re.compile(
         r"(?<![A-Za-z0-9])DSA-NSEC3-SHA1(?![A-Za-z0-9])", re.IGNORECASE)),
     ("ECDSA", "ECDSA usage", re.compile(
@@ -355,6 +377,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # Ruby, the Rust openssl crate, and BouncyCastle -- the vocabulary a rival
         # reads and this scanner did not. Fix #9 of the September comparison.
         r"\bdh\.compute_key\b|\bDh::generate_params\b|\bDh::from_params\b|"
+        r"OpenSSL::PKey::DH\b|"                                # Ruby, row 412
         r"\bDHBasicAgreement\b|\bDHKeyPairGenerator\b|\bDHParametersGenerator\b|"
         # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
         # finite-field Diffie-Hellman.
@@ -581,8 +604,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     )),
     # Blockchain / wallet signing. These map onto the same classical primitives -- a
     # secp256k1 signature is ECDSA, and Shor breaks it like any other elliptic curve.
+    # Not Node's `crypto.createECDH('secp256k1')`: "Creates an Elliptic Curve Diffie-Hellman
+    # (ECDH) key exchange object" (https://nodejs.org/api/crypto.html), no signature (row 413).
     ("ECDSA", "secp256k1 (ECDSA) usage", re.compile(
-        r"secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
+        r"(?<!createECDH\(.)secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
         r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|\bweb3\b|"
         # Whole method names: `personal_signature` is a form field, not the JSON-RPC
         # call (ZA-OPRAVYANE row 78).
@@ -686,7 +711,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # does not share: crypto_sign_keypair, crypto_sign_open and the *BYTES constants
         # are also every post-quantum reference implementation's.
         r"\bcrypto_sign_(?:detached|verify_detached|seed_keypair|init|update|"
-        r"final_create|final_verify|state|statebytes)\b|\bnacl\.signing\b",
+        r"final_create|final_verify|state|statebytes)\b|\bnacl\.signing\b|"
+        # Row 402: PyNaCl's binding of the default key pair, named through its module.
+        r"\bnacl\.bindings\.crypto_sign_(?:seed_)?keypair\b",
         re.IGNORECASE,
     )),
     ("Schnorr", "Schnorr signature usage", re.compile(
@@ -1030,13 +1057,41 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # other than with/and/kdf. Joined on at least one side (`_`, `-`, `.`, `/`, `=`, a glued
     # word, a capital) or quoted alone: "legacy SHA1 path removed" is prose, not a name (the
     # A-C negative control). Bare `SHA` only glued to `with` or `/` and a signature.
-    ("SHA1", "SHA-1 named in a compound name", re.compile(
+    ("SHA1", SHA1_COMPOUND_NAME, re.compile(
         r"(?:(?<=[_./=-])|(?<=[Ww][Ii][Tt][Hh])|(?<=[Aa][Nn][Dd])|(?<=[Hh][Mm][Aa][Cc])|"
         r"(?<=[Mm][Dd]5)|(?<=[Mm][Gg][Ff]1))(?i:sha[-_]?1)(?:(?![0-9a-z])|(?=with|and|kdf|ckdf))|"
         r"(?<![A-Za-z0-9])(?i:sha[-_]?1)(?=[_(-]|[A-Z]|with|and|kdf|ckdf)|"
         r"(?<=[\"'])(?i:sha-?1)(?=[\"'])|"
         r"(?<=[a-z])Sha1(?![0-9a-z])|(?<=[0-9])SHA1(?![0-9a-z])|"   # DH14SHA1, MD5SHA1
         r"(?<![A-Za-z0-9])SHA(?=(?:with|WITH|With)(?:RSA|DSA|ECDSA)|/(?:RSA|DSA|ECDSA)\b)")),
+    # Row 377 (W1): a CNG algorithm identifier string, plain, wide (`L"MD5"`) or `TEXT("...")`,
+    # as BCryptOpenAlgorithmProvider's second argument (Learn, "CNG Algorithm Identifiers").
+    *[(family, f"{family} named by its CNG algorithm identifier string", re.compile(
+        r"\bBCryptOpenAlgorithmProvider\s*\([^,]*,\s*(?:L|u|TEXT\(\s*|_T\(\s*)?\"(?:"
+        + ids + r")\"")) for family, ids in (
+        ("RSA", "RSA|RSA_SIGN"), ("DSA", "DSA"), ("DH", "DH"),
+        ("ECDSA", "ECDSA|ECDSA_P256|ECDSA_P384|ECDSA_P521"),
+        ("ECDH", "ECDH|ECDH_P256|ECDH_P384|ECDH_P521"),
+        ("MD5", "MD5"), ("MD4", "MD4"), ("MD2", "MD2"), ("SHA1", "SHA1"),
+        ("3DES", "3DES|3DES_112"), ("DES", "DES|DESX"), ("RC4", "RC4"), ("RC2", "RC2"))],
+    # Rows 379, 382, 383 (W1): the digest a Windows certificate, signing or hashing tool is
+    # told to use -- New-SelfSignedCertificate -HashAlgorithm, signtool /fd and /td,
+    # certutil -hashfile FILE ALG, makecert -a.
+    *[(family, f"{family} named as the digest of a Windows signing or hashing tool",
+       re.compile(
+           r"\bNew-SelfSignedCertificate\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
+           r"\bsigntool(?:\.exe)?\s+sign\b[^\n]*\s/[ft]d\s+\"?" + name + r"\b|"
+           r"\bcertutil(?:\.exe)?\s+-hashfile\s+\S+\s+" + name + r"\b|"
+           r"\bmakecert(?:\.exe)?\b[^\n]*\s-a\s+" + name + r"\b", re.IGNORECASE))
+      for family, name in (("SHA1", "sha-?1"), ("MD5", "md5"))],
+    # Row 380: Rfc2898DeriveBytes without a HashAlgorithmName defaults to SHA-1 (SYSLIB0041).
+    ("SHA1", "SHA-1 as the default hash of Rfc2898DeriveBytes (no HashAlgorithmName given)",
+     re.compile(r"\bnew\s+Rfc2898DeriveBytes\s*\((?!.*HashAlgorithmName)(?=.*\)\s*;)")),
+    # Row 381: .NET's ECB mode, where the object is named for AES (minimum: its type is
+    # usually declared on another line).
+    ("AES-ECB", "AES in ECB mode (.NET CipherMode.ECB or EncryptEcb)", re.compile(
+        r"\b\w*aes\w*\.Mode\s*=\s*CipherMode\.ECB\b|\b\w*aes\w*\.(?:En|De)cryptEcb\s*\(",
+        re.IGNORECASE)),
     # X448 and Ed25519 inside a camel-case name (wolfSSL's SetX448KeyGenCb, libgcrypt-style
     # HpkeDhKemX448Sha512), and libsodium's old batch Ed25519 signature.
     ("X448", "X448 named in a camel-case name", re.compile(r"(?<=[a-z])X448(?=[A-Z_])")),
@@ -1142,6 +1197,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # ML-DSA, which then skips the matches inside it (scan_source_file).
     ("ML-DSA-44-Ed25519 experimental", EXPERIMENTAL_SSH_MLDSA, re.compile(
         r"(?<![A-Za-z])ssh-mldsa44-ed25519@openssh\.com", re.IGNORECASE)),
+    ("Dilithium round 3", PRE_STANDARD_DILITHIUM, re.compile(
+        r"\bcrystals\.dilithium\b|\bDilithium(?:KeyPairGenerator|Signer|KeyGenerationParameters|"
+        r"PrivateKeyParameters|PublicKeyParameters|Parameters)\b")),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
         # CIRCL's eddilithium2/3 hybrids carry Dilithium after "ed" (row 77).
         r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])(?:ed)?dilithium|pqcrystals[-_]?dilithium",
@@ -1153,6 +1211,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
      re.compile(r"(?<![A-Za-z])eddilithium2(?![0-9])", re.IGNORECASE)),
     ("Ed448", "Ed448 half of the Ed448-Dilithium3 hybrid (CIRCL eddilithium3)",
      re.compile(r"(?<![A-Za-z])eddilithium3(?![0-9])", re.IGNORECASE)),
+    ("SPHINCS+ round 3", PRE_STANDARD_SPHINCS, re.compile(
+        r"\bOQS_SIG_alg_sphincs_\w+|\bcrypto\.sphincsplus\b|"
+        r"\bSPHINCSPlus(?:Signer|KeyPairGenerator|KeyGenerationParameters|PrivateKeyParameters|"
+        r"PublicKeyParameters)\b")),
     ("SLH-DSA", "SLH-DSA (SPHINCS+) usage", re.compile(
         r"(?<![A-Za-z])slh[-_]?dsa|(?<![A-Za-z])sphincs", re.IGNORECASE,
     )),
@@ -1509,6 +1571,17 @@ def _a_pattern_matches(line: str, allowed: frozenset[int] | None = None) -> bool
             return True
     return False
 
+def _names_an_assigned_variable(line: str, match: re.Match) -> bool:
+    """The match is a piece of a word that is assigned to: `implicitSha1 = ...`."""
+    start, end = match.start(), match.end()
+    while start > 0 and (line[start - 1].isalnum() or line[start - 1] == "_"):
+        start -= 1
+    while end < len(line) and (line[end].isalnum() or line[end] == "_"):
+        end += 1
+    return start < match.start() or end > match.end() \
+        if re.match(r"\s*=(?!=)", line[end:]) else False
+
+
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(r"\bgpg\s+(--detach-sign|--sign|-s)\b")),
@@ -1516,7 +1589,8 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("cosign_sign", re.compile(r"\bcosign\s+sign\b")),
     ("signtool_sign", re.compile(r"\bsigntool\s+sign\b", re.IGNORECASE)),
     ("jarsigner", re.compile(r"\bjarsigner\b")),
-    ("codesign", re.compile(r"\bcodesign\b")),
+    # Row 367: the command, followed by an option -- not `/f codesign.pfx`.
+    ("codesign", re.compile(r"(?:^|[\s;&|(/\"'])codesign\s+-")),
     # Secure Boot, kernel modules and IMA/EVM (ZA-OPRAVYANE row 34), from each tool's
     # manual: sbsign(1), pesign(1) `-s`/`--sign`, kmodsign(1), evmctl(1) `sign`,
     # `ima_sign`, `sign_hash`, and the kernel's scripts/sign-file (module-signing.rst).
@@ -1836,6 +1910,9 @@ def _suite_table_entry(line: str) -> list[tuple[str, int]]:
 
 
 # --- key sizes named on the same line as the algorithm ---
+# Node's and WebCrypto's `modulusLength: 2048`, PHP's `"private_key_bits" => 2048` (rows 392,
+# 396, 398): an option that is the size and names no family.
+_SIZE_OPTIONS = r"\bmodulusLength\s*:\s*(\d{3,5})\b|[\"']private_key_bits[\"']\s*=>\s*(\d{3,5})\b"
 _KEY_SIZE = re.compile(
     r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|"
     r"(?<![A-Za-z])rsa[:\-_](\d{3,5})(?![0-9])|\bRSA_(\d{3,5})\b|"
@@ -1845,23 +1922,46 @@ _KEY_SIZE = re.compile(
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
     r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
-    r"EVP_PKEY_Q_keygen\([^)]*?(\d{3,5})\s*\)|"
+    r"EVP_PKEY_Q_keygen\((?:[^)]|\(size_t\))*?(\d{3,5})\s*\)|"
     # DNSSEC: BIND's `algorithm rsasha256 2048` and `dnssec-keygen -a RSASHA256 -b 2048`.
     r"\balgorithm\s+rsa\w*\s+(\d{3,5})\b|\bdnssec-keygen\b[^\n]*?\s-b\s+(\d{3,5})\b|"
     # Release 3d: certbot's `rsa-key-size = 4096` / `--rsa-key-size 4096` / `rsa_key_size`,
     # Java's `KeyPairGenerator.initialize(2048)`.
-    r"\brsa[-_]key[-_]size[\"'\]]*\s*[=:,]?\s*[\"']?(\d{3,5})|\.initialize\(\s*(\d{3,5})\b",
+    r"\brsa[-_]key[-_]size[\"'\]]*\s*[=:,]?\s*[\"']?(\d{3,5})|(?:\.|\b)initialize\(\s*(\d{3,5})\b|"
+    # Rows 392-400 (W2): the size argument of each library's key generation, on its line.
+    r"\bRSA\.(?:new|generate)\(\s*(\d{3,5})\b|\bRsa::generate\(\s*(\d{3,5})\b|"
+    r"\bRsaPrivateKey::new\([^,]*,\s*(\d{3,5})\b|\bwc_MakeRsaKey\([^,]*,\s*(\d{3,5})\b|"
+    r"\bEVP_RSA_gen\(\s*(\d{3,5})\b|set_rsa_keygen_bits\([^,]*,\s*(\d{3,5})\b|"
+    r"RSAKeyGenParameterSpec\(\s*(\d{3,5})\b|"
+    # Rows 369, 370, 374 (W1): .NET `RSA.Create(1024)`, `new RSACryptoServiceProvider(512)`,
+    # `new RSACng(3072)`; PowerShell `New-SelfSignedCertificate ... -KeyLength 1024`.
+    r"\bRSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:RSACryptoServiceProvider|RSACng)\(\s*(\d{3,5})\s*\)|"
+    r"\bNew-SelfSignedCertificate\b[^\n]*?\s-KeyLength\s+(\d{3,5})\b|" + _SIZE_OPTIONS,
     re.IGNORECASE)
 # The same for DSA and DH (release 3d): only the forms that name no algorithm themselves.
 _KEY_SIZE_GENERIC = re.compile(
-    r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|\.initialize\(\s*(\d{3,5})\b",
+    r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|(?:\.|\b)initialize\(\s*(\d{3,5})\b|"
+    r"\b(?:DSA|DH)\.(?:new|generate)\(\s*(\d{3,5})\b|\bcreateDiffieHellman\(\s*(\d{3,5})\b|"
+    r"set_dsa_paramgen_bits\([^,]*,\s*(\d{3,5})\b|set_dh_paramgen_prime_len\([^,]*,\s*(\d{3,5})\b|"
+    r"\bDSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:DSACryptoServiceProvider|DSACng)\(\s*(\d{3,5})\s*\)|"
+    + _SIZE_OPTIONS,
     re.IGNORECASE)
+
+
+_MODP_GROUP = re.compile(r"(?<![A-Za-z])modp(\d{3,5})(?![0-9])", re.IGNORECASE)
 
 
 def key_size_on_line(line: str, family: str = "RSA") -> int | None:
     """The key size named on this line, if any: RSA (where a size below the minimum is itself
     the finding), DSA and DH. Only a modulus size a key can have (registry._SIZES):
     `CKM_RSA_9796` is ISO/IEC 9796 padding, not a 9796-bit key (release 3d)."""
+    if family == "DH" and "modp" in line.lower():
+        # Row 310: an IKE proposal's `modp2048` is the MODP group's size in bits (Libreswan
+        # ipsec.conf(5): "modp2048 (DH14)", "the very weak modp1024 (DH2)"; RFC 3526). A line
+        # that offers several groups is as weak as the smallest it offers.
+        offered = [int(n) for n in _MODP_GROUP.findall(line) if int(n) in registry._SIZES]
+        if offered:
+            return min(offered)
     for m in (_KEY_SIZE if family == "RSA" else _KEY_SIZE_GENERIC).finditer(line):
         for group in m.groups():
             if group and int(group) in registry._SIZES:
@@ -1950,8 +2050,11 @@ def _link_target(repo_path: Path, rel: str) -> str:
         resolved = (repo_path / rel).resolve(strict=False)
         inside = resolved.relative_to(repo_path.resolve(strict=False))
     except (OSError, ValueError, RuntimeError):
-        return "outside the scanned directory"
+        return _OUTSIDE_ROOT
     return display_path(inside.as_posix())
+
+
+_OUTSIDE_ROOT = "outside the scanned directory"
 
 
 def _is_link(path: Path) -> bool:
@@ -2226,22 +2329,8 @@ def _opened_within(descriptor: int, root: Path) -> bool:
 
 
 def _decode(raw: bytes) -> list[str]:
-    """Bytes to lines, with the encodings a repository actually contains."""
-    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
-        return raw.decode("utf-16", errors="ignore").splitlines()
-    if raw.startswith(b"\xef\xbb\xbf"):
-        raw = raw[3:]
-    # UTF-16 without a byte-order mark: ASCII text puts a NUL in every pair, on the same
-    # side. Decoded as UTF-8 it read as clean and was counted as read (ZA-OPRAVYANE row 61).
-    head = raw[:4096]
-    pairs = len(head) // 2
-    if pairs >= 4:
-        odd, even = head[1::2].count(0), head[0::2].count(0)
-        if odd >= 0.9 * pairs and even == 0:
-            return raw.decode("utf-16-le", errors="ignore").splitlines()
-        if even >= 0.9 * pairs and odd == 0:
-            return raw.decode("utf-16-be", errors="ignore").splitlines()
-    return raw.decode("utf-8", errors="ignore").splitlines()
+    """Bytes to lines, with the encodings a repository actually contains (decode_text)."""
+    return decode_text(raw).splitlines()
 
 
 def _read_lines(path: Path) -> list[str] | None:
@@ -2718,8 +2807,24 @@ _SWITCH_NAME = re.compile(
     r"(?:[_.-]|$)", re.IGNORECASE)
 
 
+# Row 302: the same switch written into a file by a build script, `echo "USE_ML_KEM_768=false"
+# >> Makefile.inc.local` (Libreswan's mk/config.mk reads USE_* as make variables). The echo, the
+# assignment, an optional redirection, and nothing else.
+_SWITCH_ECHOED_OFF = re.compile(
+    r"^\s*(?:echo|printf)\s+(?:-\w+\s+)?[\"']?([A-Za-z_][\w.-]*)\s*=\s*(false|no|off|disabled|n)"
+    r"[\"']?\s*(?:>>?\s*\S+)?\s*;?\s*$", re.IGNORECASE)
+
+
+# Rows 365, 366: the Windows TLS cmdlets that remove a suite or a curve from the list.
+# "The Disable-TlsCipherSuite cmdlet disables a cipher suite"
+# (https://learn.microsoft.com/en-us/powershell/module/tls/disable-tlsciphersuite);
+# Disable-TlsEccCurve: "Specifies the name of the ECC curve to disable"
+# (https://learn.microsoft.com/en-us/powershell/module/tls/disable-tlsecccurve).
+_DISABLE_CMDLET = re.compile(r"^\s*Disable-Tls(?:CipherSuite|EccCurve)\b", re.IGNORECASE)
+
+
 def _switched_off(code: str, position: int) -> bool:
-    m = _SWITCH_SET_OFF.match(code)
+    m = _SWITCH_SET_OFF.match(code) or _SWITCH_ECHOED_OFF.match(code)
     if not m or position >= m.end(1) or not _SWITCH_NAME.search(m.group(1)):
         return False
     return m.group(2).lower() != "n" or m.group(1).startswith("CONFIG_")
@@ -2763,6 +2868,8 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     if in_denial_block or _line_fact(0, searchable, _has_denial_word):
         return True
     if _switched_off(searchable, position):
+        return True
+    if _DISABLE_CMDLET.match(searchable):
         return True
     # Work in entries, not characters. A hyphen inside a name belongs to it --
     # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
@@ -3252,10 +3359,12 @@ def scan_source_file(path: Path, rel_path: str,
             # judging the line by its first match would throw the real use away
             # along with the exclusion.
             matches = [m for m in pattern.finditer(searched) if not _in_blob(m.start(), blobs)]
-            if description == EXPERIMENTAL_SSH_MLDSA:
-                experimental = [(m.start(), m.end()) for m in matches]
-            elif algorithm == "ML-DSA":
-                # The experimental key type's own "mldsa" is not a second, standard key.
+            if description in (EXPERIMENTAL_SSH_MLDSA, PRE_STANDARD_DILITHIUM,
+                               PRE_STANDARD_SPHINCS):
+                experimental += [(m.start(), m.end()) for m in matches]
+            elif algorithm in ("ML-DSA", "SLH-DSA"):
+                # The experimental key type's own "mldsa", and the round-3 names' own
+                # "dilithium" and "sphincs", are not a second, standard key.
                 matches = [m for m in matches
                            if not any(s <= m.start() < e for s, e in experimental)]
             if not matches:
@@ -3276,6 +3385,11 @@ def scan_source_file(path: Path, rel_path: str,
                 evidence = "ban"
             elif in_comment:
                 evidence = "comment"
+            elif (description == SHA1_COMPOUND_NAME
+                  and all(_names_an_assigned_variable(searched, m) for m in matches)):
+                # Row 368: `implicitSha1 = new Rfc2898DeriveBytes(..., SHA256)` -- the name
+                # the result is stored under, not what the call does.
+                evidence = "identifier"
             else:
                 evidence = kind
             item = {
@@ -3308,6 +3422,10 @@ def scan_source_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
                 "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
             })
+            # Row 394: `EVP_PKEY_Q_keygen(NULL, NULL, "RSA", (size_t)3072)`.
+            size = key_size_on_line(line, family) if family in ("RSA", "DSA", "DH") else None
+            if size:
+                findings[-1]["key_size"] = size
 
         for family, pos, name in scan_cose_algorithms(line):
             if family in seen_on_line or _in_blob(pos, blobs):
@@ -3505,6 +3623,11 @@ def scan_source_file(path: Path, rel_path: str,
         for family, pos, said, params in registry.scan(searched):
             if _in_blob(pos, blobs):
                 continue
+            if family == "ECDSA" and _CREATE_ECDH.search(searched[max(0, pos - 16):pos]):
+                # Row 413: the curve of an ECDH object, not a signature; its size goes to ECDH.
+                if "ECDH" in on_line and params and "key_size" not in on_line["ECDH"]:
+                    on_line["ECDH"].update(params)
+                continue
             if family in seen_on_line:
                 held = on_line.get(family)
                 if (held is not None and params and "key_size" not in held
@@ -3663,6 +3786,9 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
             step["signing_key"] = {"path": posixpath.normpath(written), "in_tree": False}
 
 
+_SIGNTOOL_DIGEST = re.compile(r"\s/fd\s+\"?([A-Za-z0-9-]+)")
+
+
 def scan_ci_file(path: Path, rel_path: str,
                  lines: list[str] | None = None) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
@@ -3676,6 +3802,11 @@ def scan_ci_file(path: Path, rel_path: str,
                     "command_type": command_type,
                     "excerpt": line.strip()[:200],
                 })
+                # Row 382: signtool's file digest, `/fd SHA1`.
+                digest = (_SIGNTOOL_DIGEST.search(line) if command_type == "signtool_sign"
+                          else None)
+                if digest:
+                    findings[-1]["digest_algorithm"] = digest.group(1).upper()
     return findings
 
 
@@ -4061,8 +4192,11 @@ def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
 # The NIST prime curves by their SEC 2, ANSI X9.62 and NIST spellings (SEC 2 v2.0 Table 1:
 # secp256r1 = prime256v1 = P-256). An EC row whose line names exactly one of them carries it as
 # `curve`, which the CBOM's algorithmProperties.curve takes (ZA-OPRAVYANE row 129).
+# Rows 310, 345: IKE's `ecp256`/`ecp384`/`ecp521` are the same curves, groups 19-21 (RFC 5903,
+# https://www.rfc-editor.org/rfc/rfc5903#section-3).
 _NIST_CURVE = re.compile(
-    r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))(?![0-9])",
+    r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))(?![0-9])|"
+    r"(?<![A-Za-z])ecp(256|384|521)(?![0-9])",
     re.IGNORECASE)
 
 
@@ -4330,6 +4464,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     elif re.match(r"(?:Dockerfile|Containerfile)(?:[-.].*)?$|.*\.(?:Dockerfile|Containerfile)$",
                   path.name):
         pinned_images.extend(dockerfile_pins(rel_path, lines))
+        dependency_findings.extend(os_packages(rel_path, lines))
     if b"age1" in raw or b"-----BEGIN" in raw:
         at_rest_findings, at_rest_assets = scan_encrypted_at_rest(rel_path, lines)
         for item in at_rest_findings:
@@ -4377,6 +4512,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # A pipeline also names algorithms (`openssl req -newkey rsa:2048`).
         source_findings.extend(
             scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot))
+        _embedded_pem(path, rel_path, raw, source_findings, [], material_problems)
     elif is_iac_file(path, repo_path, lines):
         files_scanned["iac"] += 1
         algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
@@ -4395,10 +4531,13 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # Uses reached through an alias, folded literals or another file's constant.
         source_findings.extend(indirection.resolve(path, rel_path, lines, found,
                                                    repo_path, scan_source_file))
-        embedded_key_findings.extend(scan_embedded_keys(rel_path, lines))
+        source_keys = scan_embedded_keys(rel_path, lines)
+        _embedded_pem(path, rel_path, raw, source_findings, source_keys, material_problems)
+        embedded_key_findings.extend(source_keys)
         # A release script signs the same way a pipeline does, and the pipeline
         # often only calls it (ZA-OPRAVYANE row 34).
-        if path.suffix.lower() == ".sh":
+        # Row 383: a PowerShell script too.
+        if path.suffix.lower() in (".sh", ".ps1", ".psm1"):
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
     else:
         # Configuration: the extensions above, and any YAML that is not a
@@ -4417,6 +4556,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _beside_in_block(src, lines)
         if path.suffix.lower() in (".yaml", ".yml"):
             src.extend(fabric_bccsp(rel_path, lines))
+        _schannel_disabled(src, lines)
+        src = _jwk_sizes(src, lines)
+        _ssh_public_keys(src, lines)
         source_findings.extend(src)
         # An IKE configuration carrying a post-quantum algorithm: name its
         # fragmentation setting (see ike.py).
@@ -4441,6 +4583,123 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _merge(iac_findings, algo_findings, already=src)
         _embedded_pem(path, rel_path, raw, source_findings, key_findings, material_problems)
         embedded_key_findings.extend(key_findings)
+        material_problems.extend(_device_grammar(rel_path, lines))
+
+
+# Row 364: a SCHANNEL key whose "Enabled" value is 0 turns the cipher, hash, key exchange or
+# protocol it names off. Microsoft Security Advisory 2868725 disables RC4 by setting `Enabled`
+# to 0 under `SCHANNEL\Ciphers\RC4 128/128` (https://support.microsoft.com/en-us/kb/2868725;
+# KB 245030, https://support.microsoft.com/kb/245030); for protocols, "change the DWORD
+# registry value of Enabled to 0" (https://learn.microsoft.com/en-us/windows-server/security/tls/tls-registry-settings).
+_SCHANNEL_KEY = re.compile(
+    r"^\s*\[-?HKEY_[^\]]*\\SCHANNEL\\(?:Ciphers|Hashes|KeyExchangeAlgorithms|Protocols)\\[^\]]+\]",
+    re.IGNORECASE)
+_ENABLED_OFF = re.compile(r'^\s*"?Enabled"?\s*=\s*(?:dword:)?0+\s*$', re.IGNORECASE)
+
+
+def _schannel_disabled(found: list[dict[str, Any]], lines: list[str]) -> None:
+    """The names on a SCHANNEL key's header line are a ban when the key sets Enabled to 0."""
+    off: set[int] = set()
+    header = None
+    for number, line in enumerate(lines, 1):
+        if line.lstrip().startswith("["):
+            header = number if _SCHANNEL_KEY.match(line) else None
+        elif header is not None and _ENABLED_OFF.match(line):
+            off.add(header)
+    for item in found:
+        if item.get("line") in off and item.get("evidence_kind") != "comment":
+            item["evidence_kind"] = "ban"
+
+
+# Row 331: in a JWK the size is the modulus, "The "n" (modulus) parameter contains the modulus
+# value for the RSA public key" (RFC 7518 §6.3.1.1, https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1.1),
+# base64url-encoded; `kid` "is a hint indicating which specific key owner wishes to use"
+# (RFC 7517 §4.5, https://www.rfc-editor.org/rfc/rfc7517#section-4.5), a free label. A `kid`
+# of "rsa4096" on a 1024-bit key gave RSA 4096, high.
+_JWK_KID = re.compile(r'^\s*"kid"\s*:\s*"[^"]*"\s*,?\s*$')
+_JWK_KTY_RSA = re.compile(r'"kty"\s*:\s*"RSA"')
+_JWK_N = re.compile(r'"n"\s*:\s*"([A-Za-z0-9_-]{16,})"')
+
+
+def _jwk_sizes(found: list[dict[str, Any]], lines: list[str]) -> list[dict[str, Any]]:
+    """Drop what a `kid` label named; give an RSA JWK's `kty` row the size of its `n`."""
+    import base64
+    kid_lines = {n for n, line in enumerate(lines, 1) if _JWK_KID.match(line)}
+    found = [f for f in found if f.get("line") not in kid_lines]
+    sizes: dict[int, int] = {}
+    kty = None
+    for number, line in enumerate(lines, 1):
+        if _JWK_KTY_RSA.search(line):
+            kty = number
+        modulus = _JWK_N.search(line)
+        if modulus and kty is not None:
+            body = modulus.group(1)
+            try:
+                value = base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
+            except (ValueError, TypeError):
+                value = b""
+            if value:
+                sizes[kty] = int.from_bytes(value, "big").bit_length()
+            kty = None
+        if line.strip().startswith("}"):
+            kty = None
+    for f in found:
+        if f.get("line") in sizes and f.get("algorithm") == "RSA":
+            f["key_size"] = sizes[f["line"]]
+    return found
+
+
+# Row 338: an `ssh-rsa` public key carries its modulus: "string "ssh-rsa", mpint e, mpint n"
+# (RFC 4253 §6.6, https://www.rfc-editor.org/rfc/rfc4253#section-6.6). Row 353: "Revoked keys are
+# specified by including the "@revoked" marker ... Revoked keys are never accepted" (sshd(8),
+# https://man.openbsd.org/sshd.8#SSH_KNOWN_HOSTS_FILE_FORMAT): a ban, not a key in use.
+_SSH_RSA_BLOB = re.compile(r"(?<![\w-])ssh-rsa\s+(AAAAB3NzaC1yc2E[A-Za-z0-9+/]*={0,2})(?![A-Za-z0-9+/=])")
+
+
+def _ssh_rsa_bits(blob: str) -> int | None:
+    import base64
+    try:
+        data = base64.b64decode(blob, validate=True)
+    except (ValueError, TypeError):
+        return None
+    fields, at = [], 0
+    while at + 4 <= len(data) and len(fields) < 3:
+        size = int.from_bytes(data[at:at + 4], "big")
+        fields.append(data[at + 4:at + 4 + size])
+        at += 4 + size
+    if len(fields) < 3 or fields[0] != b"ssh-rsa" or at > len(data):
+        return None
+    bits = int.from_bytes(fields[2], "big").bit_length()
+    return bits or None
+
+
+def _ssh_public_keys(found: list[dict[str, Any]], lines: list[str]) -> None:
+    sizes: dict[int, int] = {}
+    revoked: set[int] = set()
+    for number, line in enumerate(lines, 1):
+        if "ssh-" not in line and "ecdsa-" not in line:
+            continue
+        if line.lstrip().startswith("@revoked"):
+            revoked.add(number)
+        match = _SSH_RSA_BLOB.search(line)
+        if match:
+            bits = _ssh_rsa_bits(match.group(1))
+            if bits:
+                sizes[number] = bits
+    for item in found:
+        line = item.get("line")
+        if line in sizes and item.get("algorithm") == "RSA":
+            item["key_size"] = sizes[line]
+        if line in revoked and item.get("evidence_kind") != "comment":
+            item["evidence_kind"] = "ban"
+
+
+def _device_grammar(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    """Rows 229 and 333: a FortiOS, Cisco IOS or Junos configuration is read in part."""
+    found = grammar.device_grammar(lines)
+    if found is None:
+        return []
+    return [{"path": rel_path, "line": found[0], "label": found[1], "reason": grammar.REASON}]
 
 
 def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[dict[str, Any]],
@@ -4448,8 +4707,11 @@ def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[d
                   material_problems: list[dict[str, Any]]) -> None:
     """Fix list, 04.11.2026: a certificate in a JSON string (`"pem": "-----BEGIN ...\\n..."`)
     or an indented YAML block scalar was read as text and gave nothing; a key there gave
-    "Embedded private key material" without its family. JSON and YAML only."""
-    if path.suffix.lower() not in (".json", ".yaml", ".yml") or b"-----BEGIN" not in raw:
+    "Embedded private key material" without its family. Rows 224 and 301: the same in any
+    file read as text -- a FortiOS `set certificate "-----BEGIN ...`, a C# raw or verbatim
+    string, a Go raw string constant. A block that does not parse is named, never silent;
+    row 230: a key whose body did not parse says so rather than "key material parsed"."""
+    if b"-----BEGIN" not in raw:
         return
     rows, keys, problems = embedded_material(rel_path, raw)
     for row in rows:
@@ -4457,7 +4719,7 @@ def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[d
     source_findings.extend(rows)
     for item in key_findings:
         fields = keys.get(item.get("line"))
-        if fields and "key_algorithm" in fields:
+        if fields and ("key_algorithm" in fields or "key_unread" in fields):
             item.update(fields)
     material_problems.extend(problems)
 
@@ -4703,12 +4965,17 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             if not is_dir:
                 files_present += 1
                 present_kinds["(symlink)"] = present_kinds.get("(symlink)", 0) + 1
+            target = _link_target(repo_path, rel)
             symlinks.append({
                 "path": rel + ("/" if is_dir else ""),
                 "kind": "directory" if is_dir else "file",
-                "target": _link_target(repo_path, rel),
+                "target": target,
                 "reason": "symlink_not_followed",
             })
+            # Row 389: a directory link whose target is inside the root hides nothing; the
+            # walk enters that directory under its own name.
+            if is_dir and target != _OUTSIDE_ROOT:
+                symlinks[-1]["points_into_tree"] = True
         else:
             unreadable_dirs.append(rel + "/")
         content_parts.append(f"{rel}\0{kind}")

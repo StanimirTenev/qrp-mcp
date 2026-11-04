@@ -1143,6 +1143,83 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
+**From 0.42.0** (core rows of the fix list; another part of the batch adds file formats). Each was
+reproduced as a failing test before the fix, and each fix was reverted once to see its test fail.
+
+- **A file read only in part is not called read.** The verdict said "This scan read every one of
+  the N files" beside a certificate block that did not parse or a device configuration read by
+  its words. It now says "This scan opened every one of the N files it was given; K of them were
+  read only in part or gave nothing it could decode, each named with a reason" (and "; of those
+  read, K ..." after "read X of Y"). A FortiOS backup (`#config-version=`), a Cisco IOS
+  configuration (`crypto ikev2|isakmp|ipsec|map`) and a Junos configuration (`[edit security
+  ike|ipsec]`) are named in `examined_partly` with the reason `grammar_not_parsed`.
+  `coverage_pct` is not changed: it is a reading claim, and the file was read.
+  Decision (Stanimir, 04.11.2026): partly read is counted separately. `coverage.scope` carries
+  `read_in_part` and `read_in_full_pct` beside `coverage_pct`, the verdict names both, and the
+  CBOM and SARIF carry them; `--min-coverage` still measures files opened.
+- **PEM inside any text file.** A certificate in a FortiOS `set certificate "..."`, a C# raw or
+  verbatim string, a Go raw string, or source concatenated with `+` is parsed, as JSON and YAML
+  already were; a block that does not parse is named in `examined_partly`. A private-key block
+  whose body is not a key says `key_unread` (medium), never "key material parsed".
+- **`weak_key` is `null` when no size was read** for a family with a size table (RSA, DSA, DH,
+  the EC families), with "not established" in the reason. It was `false`: "not weak" about a key
+  whose size the scan never saw. `weak_count` and severity are unchanged.
+- **Sizes read from the key-generation argument**: Node and WebCrypto `modulusLength`, PHP
+  `private_key_bits`, Ruby `PKey::RSA|DSA|DH.new|generate(N)`, pycryptodome `generate(N)`,
+  OpenSSL 3 `EVP_RSA_gen`, `EVP_PKEY_Q_keygen`, `set_rsa_keygen_bits`, Java
+  `RSAKeyGenParameterSpec`, Rust `Rsa::generate` and `RsaPrivateKey::new`, wolfSSL
+  `wc_MakeRsaKey`, IKE `modpN` (the smallest group offered on the line), and an RSA JWK's `n`
+  (a `kid` label names nothing), .NET `RSA.Create(N)`, `RSACryptoServiceProvider(N)`,
+  `RSACng(N)`, `DSA.Create(N)`, and PowerShell `New-SelfSignedCertificate -KeyLength N`. Not
+  yet: a size on another line than the family.
+- **Windows names that gave nothing**: a CNG identifier string as `BCryptOpenAlgorithmProvider`'s
+  algorithm (`L"MD5"`, `TEXT("RSA")`); the digest of `New-SelfSignedCertificate -HashAlgorithm`,
+  `signtool sign /fd|/td`, `certutil -hashfile FILE ALG` and `makecert -a` (SHA-1, MD5);
+  `new Rfc2898DeriveBytes(...)` without a `HashAlgorithmName`, which defaults to SHA-1;
+  `CipherMode.ECB` and `EncryptEcb`/`DecryptEcb` on an object named for AES. A SignTool step's
+  `/fd` is its `digest_algorithm`, and a `.ps1`/`.psm1` script's signing steps are listed as a
+  `.sh` script's were.
+- **Static RSA key exchange in cipher lists set from code**: `SSL_CTX_set_cipher_list`,
+  `SSL_CTX_set_strict_cipher_list`, `wolfSSL_CTX_set_cipher_list`, Java
+  `SSLParameters.setCipherSuites`, Node's `ciphers:` option and Ruby's `ctx.ciphers =` are cipher
+  settings, as Python's `set_ciphers` already was; `AES128-SHA` there is `static_rsa_kex`.
+- **A TLS method function pins its version**: OpenSSL `TLSv1_method()` / `TLSv1_1_client_method()`
+  / `SSLv3_method()`, Node `secureProtocol: 'TLSv1_method'`, wolfSSL `wolfTLSv1_client_method()`
+  are `protocols` rows, deprecated where the version is. `TLS_method` and `SSLv23_method` pin
+  nothing. Also: PyNaCl `nacl.bindings.crypto_sign_keypair()` is Ed25519, and Ruby
+  `OpenSSL::PKey::DH.new|generate(N)` is DH with its size.
+- **A linked directory that points into the scanned tree** no longer stops the verdict from
+  accounting for every file: the walk entered its target under its own name, and the verdict
+  says so ("alias/ points into the scanned tree (real/), which was walked"). A link outside the
+  root still does.
+- **Misread names**: `signtool sign /f codesign.pfx` is one SignTool step, not also Apple's
+  `codesign` (the command is now the word followed by an option); a variable named
+  `implicitSha1 = ...` is an `identifier`, not a SHA-1 call.
+- **Switched off is not a use**: `echo "USE_ML_KEM_768=false" >> ...`, a SCHANNEL key with
+  `"Enabled"=dword:00000000`, `Disable-TlsCipherSuite`, `Disable-TlsEccCurve` are bans, and no
+  longer raise readiness.
+- **Round-3 schemes by their libraries' names** are their own families, `superseded`: Bouncy
+  Castle's `crystals.dilithium` classes ("Dilithium round 3") and liboqs's `OQS_SIG_alg_sphincs_*`
+  ("SPHINCS+ round 3"). They were ML-DSA and SLH-DSA, `pqc_ready`.
+- **A suppression can expire.** `qrp:ignore-next-line RSA until=2027-06-30 owner=j.doe <reason>`:
+  `until=` and `owner=` may stand anywhere after the family. Through that day the marker
+  suppresses and the suppression carries both; after it the occurrence is back in `evidence` and
+  the marker is in `markers_not_applied` with "expired on <date>" (a SARIF notification on its
+  line). A `until=` that is not a date does not apply. A reason that calls itself temporary
+  ("temporary", "for now", "interim") with no date still applies and is listed in
+  `markers_flagged`: it cannot expire. The date is compared with the day the scan runs.
+- **Closure: a family that stays in the file is changed, not closed.** A verifier that keeps an
+  Ed25519 branch beside the new ML-DSA one was "2 closed" with Ed25519 [2, 2] per family. An
+  occurrence that left a file in which the second run finds its family again is now paired with
+  that occurrence under `changed`, and the statement ends with the families not down to 0.
+- **Crypto libraries a Dockerfile installs** with `apt-get|apt install`, `apk add` or
+  `dnf|yum|microdnf install` (OpenSSL/libssl, GnuTLS, NSS, libsodium) are `dependencies` with
+  `basis: os_package`, and the version apt or apk pins with `=`. Declared, not observed. They
+  were read and gave nothing.
+- **Misreads**: `createECDH('secp256k1')` is ECDH, not ECDSA; camelCase `RsaSha256` is not a
+  DNSSEC algorithm; UTF-16 is read with or without a byte-order mark (Cyrillic comments, a PEM
+  saved by PowerShell `Out-File`).
+
 **From 0.41.0**, a batch of the fix list (rows 160, 196, 200–206, 208–211, and six rows from a
 comparison with another scanner on Hyperledger Fabric). Most were places where the output said more
 than the scan had seen. Each was reproduced as a failing test before the fix, and each fix was
@@ -1510,7 +1587,8 @@ answers in two steps:
    compared, **nothing is reported as closed**, the reasons are listed, and the repair is named:
    scan the first commit again with the instrument that did the second.
 2. **Only then, occurrence by occurrence, without line numbers:** `closed`, still open (and how
-   many only moved lines), `relocated` to another path (a rename is not a fix), moved into or
+   many only moved lines), `relocated` to another path (a rename is not a fix), `changed` (gone
+   from a file in which the second run finds the same family again: not closed), moved into or
    out of test code (neither is a fix), `new`, `unverifiable` — in a file the second run did
    not read — and `removed`: the whole file is gone from the second tree. A deleted file does
    remove its code, but it is also the cheapest way to make a finding disappear, so it is named
