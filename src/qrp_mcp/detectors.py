@@ -1309,7 +1309,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"[\"']RSA_(?:SIGN_(?:PSS|PKCS1|RAW_PKCS1)|DECRYPT_OAEP)_(?:2048|3072|4096)\w*[\"']|"
         # AWS KMS EncryptionAlgorithmSpec, RSA key transport (ZA-OPRAVYANE row 208).
         r"\bEncryptionAlgorithmSpec\.RSAES_OAEP_SHA_(?:1|256)\b|[\"']RSAES_OAEP_SHA_(?:1|256)[\"']|"
-        r"(?i:\b(?:key_?algo|algo)[\"']?\s*[:=]\s*[\"']rsa[\"'])|\bAlg(?:RS|PS)(?:1|256|384|512)\b")),
+        r"(?i:\b(?:key_?algo|algo)[\"']?\s*[:=]\s*[\"']rsa[\"'])|\bAlg(?:RS|PS)(?:1|256|384|512)\b|"
+        # Fabric CA's YAML `keyrequest: algo: rsa`, unquoted (fix list, 04.11.2026).
+        r"(?i:^\s*algo\s*:\s*rsa\s*(?:#.*)?$)")),
     ("DSA", "DSA named by an XML-DSig URI or a library constant (release 3e)", re.compile(
         r"(?i:xmldsig(?:11)?#dsa-|xmldsig#DSAKeyValue)|\bSIG_DSA_\w+|\bSignatureMethod\.DSA_\w+|"
         r"\bTransformDsa\w*|\bcrypto\.TYPE_DSA\b")),
@@ -3704,7 +3706,9 @@ def _in_block(lines: list[str], index: int, pattern: re.Pattern[str]) -> re.Matc
             text = lines[j]
             if text.strip():
                 here = len(text) - len(text.lstrip())
-                if here < indent or text.strip() in ("}", "{"):
+                # An INI section header ends the section the algorithm is in.
+                if here < indent or text.strip() in ("}", "{") or (
+                        text.lstrip().startswith("[") and text.rstrip().endswith("]")):
                     break
                 if here == indent:
                     m = pattern.match(text)
@@ -3740,9 +3744,16 @@ def _beside_in_block(items: list[dict[str, Any]], lines: list[str]) -> None:
         index = item["line"] - 1
         if not 0 <= index < len(lines):
             continue
-        if item.get("algorithm") in ("RSA", "DSA", "DH", "EC") and not item.get("key_size"):
+        if (item.get("algorithm") in ("RSA", "DSA", "DH", "EC", "ECDSA")
+                and not item.get("key_size")):
             size = _iac_key_size(lines, index)
-            if size is not None and (item["algorithm"] != "EC" or size in (224, 256, 384, 521)):
+            if size is not None and item["algorithm"] in ("EC", "ECDSA"):
+                # Fabric CA's and cfssl's `size: 256` under `algo: ecdsa` is the curve
+                # (P-256, P-384, P-521); any other number is not taken.
+                if size in (256, 384, 521):
+                    item["key_size"] = size
+                    item.setdefault("curve", f"P-{size}")
+            elif size is not None:
                 item["key_size"] = size
         if item.get("algorithm") in ("RSA", "EC") and "key_use_in_block" not in item:
             use = _iac_key_use(lines, index)
@@ -4340,6 +4351,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # infrastructure.
         files_scanned["config"] += 1
         src = scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot)
+        # The size and use beside the algorithm in its block, as in IaC: Fabric CA's
+        # `keyrequest`, cfssl's `"key": {"algo", "size"}` (fix list, Fabric CA keyrequest).
+        _beside_in_block(src, lines)
         source_findings.extend(src)
         # An IKE configuration carrying a post-quantum algorithm: name its
         # fragmentation setting (see ike.py).

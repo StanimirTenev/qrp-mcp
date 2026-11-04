@@ -1,0 +1,7 @@
+csr:
+  cn: ca.org1.example.com
+  keyrequest:
+    algo: ecdsa
+    size: 256
+  ca:
+    expiry: 131400h

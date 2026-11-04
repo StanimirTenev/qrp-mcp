@@ -1,0 +1,4 @@
+csr:
+  keyrequest:
+    algo: rsa
+    size: 2048
