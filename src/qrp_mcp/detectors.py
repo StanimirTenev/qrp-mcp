@@ -62,6 +62,13 @@ SOURCE_EXTENSIONS = {
     # React's JSX and TSX: a WebCrypto call in a component was "type not claimed"
     # (ZA-OPRAVYANE row 96), though the comment rules already knew both.
     ".jsx", ".tsx",
+    # Batch 0.42.0 (ZA-OPRAVYANE rows 308, 387, 388), measured on real trees where each was
+    # "type not claimed": the other shells' spellings and Windows batch files carry the
+    # same `openssl genrsa` and `signtool` lines as .sh; Visual Basic and F# call the same
+    # System.Security.Cryptography APIs as C#; a PowerShell data file (.psd1) is
+    # PowerShell syntax. Limits: VB's `'` comment and batch `::` are not told from code
+    # (`REM` is, by _COMMENT_LINE).
+    ".bash", ".zsh", ".ksh", ".bat", ".cmd", ".vb", ".fs", ".fsx", ".psd1",
 }
 
 EXCLUDED_DIRS = {
@@ -89,7 +96,24 @@ CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
                      ".zone",
                      # IBM MQ's command scripts: a channel's SSLCIPH names its CipherSpec,
                      # an IANA suite name (ZA-OPRAVYANE row 202).
-                     ".mqsc"}
+                     ".mqsc",
+                     # Batch 0.42.0: make fragments (`.mk`, row 308), the registry exports
+                     # that carry SCHANNEL and cipher-order policy (`.reg`, row 386), and
+                     # Windows build and request files whose lines name algorithms and
+                     # signing steps: certreq `.inf`, MSBuild `.vcxproj`/`.props`/
+                     # `.targets`, WiX `.wxs` (row 387).
+                     ".mk", ".reg", ".inf", ".vcxproj", ".props", ".targets", ".wxs"}
+
+# .NET's configuration files, by name: web.config, app.config, machine.config, IIS's
+# applicationHost.config, and their transforms (Web.Release.config). Not every `.config`:
+# packages.config and nuget.config are manifests (row 386).
+DOTNET_CONFIG_NAME = re.compile(r"^(?:web|app|machine|applicationhost)(?:\.[\w-]+)?\.config$",
+                                re.IGNORECASE)
+
+# Scripts and build files read for signing commands as a pipeline is (ZA-OPRAVYANE rows 34,
+# 308, 387).
+SIGNING_SCRIPT_EXTENSIONS = {".sh", ".bash", ".zsh", ".ksh", ".bat", ".cmd",
+                             ".csproj", ".vcxproj", ".props", ".targets", ".mk"}
 
 # The same files that carry no extension at all.
 CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
@@ -2085,7 +2109,8 @@ def is_config_file(path: Path) -> bool:
     """A configuration file, by extension or by one of the extensionless names."""
     return (path.suffix.lower() in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
             or bool(CONFIG_FILENAME_PATTERN.match(path.name))
-            or (not path.suffix and path.parent.name in CONFIG_DIRECTORIES))
+            or (not path.suffix and path.parent.name in CONFIG_DIRECTORIES)
+            or bool(DOTNET_CONFIG_NAME.match(path.name)))
 
 
 # Returned when the platform cannot open relative to a directory descriptor, to
@@ -2354,7 +2379,7 @@ _SLASH_COMMENT_EXT = {
     ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".cs", ".java", ".js",
     ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".go", ".rs", ".swift", ".kt",
     ".kts", ".scala", ".sc", ".php", ".m", ".mm", ".groovy", ".dart", ".proto",
-    ".json5",
+    ".json5", ".fs", ".fsx",
 }
 _HASH_COMMENT_EXT = {
     ".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".pm", ".ps1", ".psm1",
@@ -4398,7 +4423,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         embedded_key_findings.extend(scan_embedded_keys(rel_path, lines))
         # A release script signs the same way a pipeline does, and the pipeline
         # often only calls it (ZA-OPRAVYANE row 34).
-        if path.suffix.lower() == ".sh":
+        if path.suffix.lower() in SIGNING_SCRIPT_EXTENSIONS:
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
     else:
         # Configuration: the extensions above, and any YAML that is not a
@@ -4430,6 +4455,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             protocol_findings.append(asset)
         if path.suffix.lower() == ".cnf":
             fips_findings.extend(scan_openssl_fips(rel_path, lines))
+        if path.suffix.lower() in SIGNING_SCRIPT_EXTENSIONS:
+            ci_findings.extend(scan_ci_file(path, rel_path, lines))
         # HAProxy listeners and unverified backends (HAProxy, nginx): see
         # assets.scan_tls_listeners.
         protocol_findings.extend(scan_tls_listeners(rel_path, lines))

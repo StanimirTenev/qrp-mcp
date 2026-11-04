@@ -124,6 +124,14 @@ DEPENDENCY_FAMILIES: dict[str, dict[str, tuple[str, ...]]] = {
         "rbnacl": ("X25519", "EdDSA"),
         "ed25519": ("EdDSA",),
     },
+    # Row 313. JOSESwift's README lists RS*/PS*, ES* and RSA1_5/RSA-OAEP/ECDH-ES as supported
+    # (https://github.com/airsidemobile/JOSESwift, read 04.11.2026).
+    "cocoapods": {
+        "JOSESwift": ("RSA", "ECDSA", "ECDH"),
+    },
+    "swiftpm": {
+        "joseswift": ("RSA", "ECDSA", "ECDH"),
+    },
     "nuget": {
         "BouncyCastle.Cryptography": ("RSA", "ECDSA", "ECDH", "DSA"),
         "Portable.BouncyCastle": ("RSA", "ECDSA", "ECDH", "DSA"),
@@ -173,6 +181,17 @@ MANIFEST_FILENAMES: dict[str, str] = {
 
 # NuGet has no fixed filename: the project file is named after the project.
 _NUGET_SUFFIXES = (".csproj", ".vbproj", ".fsproj")
+# Row 313: manifests named after the project too. A Gradle script of any name
+# (`samples-demo.gradle`, `settings.gradle`) is read as build.gradle is; a gem's
+# `.gemspec` (`add_dependency`), a CocoaPods `.podspec` (`s.dependency`) and SwiftPM's
+# Package.resolved (`pins[].identity`, v2/v3; `object.pins[].package`, v1).
+_SUFFIX_ECOSYSTEMS = {".gradle": "maven", ".gemspec": "rubygems",
+                      ".podspec": "cocoapods"}
+_RESOLVED_NAMES = {"Package.resolved": "swiftpm"}
+_GEMSPEC_DEP = re.compile(
+    r"""^\s*\w+\.add_(?:runtime_|development_)?dependency\s*\(?\s*['"]([^'"]+)['"]""")
+_PODSPEC_DEP = re.compile(r"^\s*\w+(?:\.(?:ios|osx|macos|tvos|watchos|visionos))?"
+                          r"""\.dependency\s*\(?\s*['"]([^'"/]+)""")
 _NUGET_FILENAMES = {"packages.config", "Directory.Packages.props"}
 
 # A dependency is read from the structure of the manifest, never from the text
@@ -293,6 +312,19 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
     if ecosystem == "nuget":
         return [(m.group(1), n) for n, text in enumerate(lines, 1)
                 for m in _NUGET_PACKAGE.finditer(text)]
+    if ecosystem == "swiftpm":
+        try:
+            data = json.loads("\n".join(lines))
+        except (ValueError, TypeError):
+            return []
+        pins = (data.get("pins") or (data.get("object") or {}).get("pins") or []
+                if isinstance(data, dict) else [])
+        for pin in pins if isinstance(pins, list) else []:
+            package = pin.get("identity") or pin.get("package") if isinstance(pin, dict) else None
+            if isinstance(package, str):
+                line = next((n for n, text in enumerate(lines, 1) if f'"{package}"' in text), 1)
+                out.append((package.lower(), line))
+        return out
     inside_cargo_deps = False
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
@@ -320,8 +352,12 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
             pattern = _MAVEN_ARTIFACT if name == "pom.xml" else _GRADLE_DEP
             for match in pattern.finditer(text):
                 out.append((match.group(1), number))
+        elif ecosystem == "cocoapods":
+            match = _PODSPEC_DEP.match(text)
+            if match:
+                out.append((match.group(1), number))
         elif ecosystem == "rubygems":
-            match = _GEM.match(text)
+            match = (_GEMSPEC_DEP if name.endswith(".gemspec") else _GEM).match(text)
             if match:
                 out.append((match.group(1), number))
     return out
@@ -430,16 +466,24 @@ def pinned_versions(path: Path, lines: list[str]) -> list[tuple[str, str, str, i
     return out
 
 
+def _suffix_ecosystem(path: Path) -> str | None:
+    if path.name.endswith(".gradle.kts"):
+        return "maven"
+    return _SUFFIX_ECOSYSTEMS.get(path.suffix)
+
+
 def is_manifest(path: Path) -> bool:
     return (path.name in MANIFEST_FILENAMES
             or path.name in _NUGET_FILENAMES
-            or path.suffix in _NUGET_SUFFIXES)
+            or path.suffix in _NUGET_SUFFIXES
+            or path.name in _RESOLVED_NAMES or _suffix_ecosystem(path) is not None)
 
 
 def _ecosystem_of(path: Path) -> str | None:
     if path.name in _NUGET_FILENAMES or path.suffix in _NUGET_SUFFIXES:
         return "nuget"
-    return MANIFEST_FILENAMES.get(path.name)
+    return (MANIFEST_FILENAMES.get(path.name) or _RESOLVED_NAMES.get(path.name)
+            or _suffix_ecosystem(path))
 
 
 def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str, Any]]:

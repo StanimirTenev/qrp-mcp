@@ -204,7 +204,8 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             "iac": sorted(detectors.IAC_EXTENSIONS),
             "config": sorted(detectors.CONFIG_EXTENSIONS),
             "config_filenames": sorted(detectors.CONFIG_FILENAMES),
-            "config_filename_pattern": [detectors.CONFIG_FILENAME_PATTERN.pattern],
+            "config_filename_pattern": [detectors.CONFIG_FILENAME_PATTERN.pattern,
+                                        detectors.DOTNET_CONFIG_NAME.pattern],
             "config_extensionless_in_directories": sorted(detectors.CONFIG_DIRECTORIES),
             # Read for owners only (ZA-OPRAVYANE row 94), never matched for algorithms.
             "codeowners": list(detectors.CODEOWNERS_LOCATIONS),
@@ -218,8 +219,10 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             # Read by the scan and missing here until a CAP-1 examiner counted 44 such
             # files in certbot as examined outside the declared types (13.10.2026).
             "yaml": [".yaml", ".yml"],
-            "manifest": sorted(assets._NUGET_SUFFIXES),
-            "manifest_filenames": sorted(set(assets.MANIFEST_FILENAMES) | assets._NUGET_FILENAMES),
+            "manifest": sorted(set(assets._NUGET_SUFFIXES) | set(assets._SUFFIX_ECOSYSTEMS)
+                               | {".gradle.kts"}),
+            "manifest_filenames": sorted(set(assets.MANIFEST_FILENAMES) | assets._NUGET_FILENAMES
+                                         | set(assets._RESOLVED_NAMES)),
             # Read as the file they render (kragg-3); a template rendering documentation
             # (detectors.TEMPLATE_DOCUMENTS: .md, .rst, ...) is not claimed.
             "jinja_template": list(detectors.TEMPLATE_SUFFIXES),
