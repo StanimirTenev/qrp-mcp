@@ -114,6 +114,11 @@ def build(result: dict[str, Any], keys: dict[int, str]) -> dict[str, Any]:
                              f"line {marker['line']} not applied: {marker['why']}")
         note["locations"] = [_location(marker["path"], marker["line"])]
         notes.append(note)
+    for marker in (result.get("suppressed") or {}).get("markers_flagged") or []:
+        note = _notification("marker_flagged", f"{marker['form']} {marker['family']} at "
+                             f"line {marker['line']}: {marker['why']}", level="note")
+        note["locations"] = [_location(marker["path"], marker["line"])]
+        notes.append(note)
 
     scope = cov["scope"]
     run: dict[str, Any] = {

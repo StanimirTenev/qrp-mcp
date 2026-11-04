@@ -1176,6 +1176,13 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
 - **Round-3 schemes by their libraries' names** are their own families, `superseded`: Bouncy
   Castle's `crystals.dilithium` classes ("Dilithium round 3") and liboqs's `OQS_SIG_alg_sphincs_*`
   ("SPHINCS+ round 3"). They were ML-DSA and SLH-DSA, `pqc_ready`.
+- **A suppression can expire.** `qrp:ignore-next-line RSA until=2027-06-30 owner=j.doe <reason>`:
+  `until=` and `owner=` may stand anywhere after the family. Through that day the marker
+  suppresses and the suppression carries both; after it the occurrence is back in `evidence` and
+  the marker is in `markers_not_applied` with "expired on <date>" (a SARIF notification on its
+  line). A `until=` that is not a date does not apply. A reason that calls itself temporary
+  ("temporary", "for now", "interim") with no date still applies and is listed in
+  `markers_flagged`: it cannot expire. The date is compared with the day the scan runs.
 - **Misreads**: `createECDH('secp256k1')` is ECDH, not ECDSA; camelCase `RsaSha256` is not a
   DNSSEC algorithm; UTF-16 is read with or without a byte-order mark (Cyrillic comments, a PEM
   saved by PowerShell `Out-File`).
