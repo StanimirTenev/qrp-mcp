@@ -42,9 +42,12 @@ activates the FIPS provider for a component whose provider is OpenSSL 3. A DNS s
 carries `qrp:udp_setting`, `qrp:udp_size` and, for BIND's default, `qrp:default_applied`; a weak
 EC key is a `related-crypto-material` component with `qrp:curve`, `qrp:scalar` and `qrp:bound`.
 
-Output is deterministic where it matters. The serial number is derived from the target, the two
-pins and a digest of what was found, so the same code over the same corpus that finds the same
-things gets the same serial, and a different result gets a different one. The whole CBOM is
+Output is deterministic where it matters. The serial number is derived from the two pins and a
+digest of what was found, so the same code over the same corpus that finds the same things gets
+the same serial, and a different result gets a different one. From 0.43.0 the target path is not
+part of it, and `metadata.component` is named by the directory's own name with the commit as its
+`version`: one commit scanned at two places, or on two machines, is one document. Each evidence
+file carries `qrp:sha256_crlf_as_lf` beside its raw hash, the same for a CRLF and an LF checkout. The whole CBOM is
 byte-identical across two runs over one unchanged tree: the timestamp is the tree's commit time
 (or `SOURCE_DATE_EPOCH`, or absent when neither exists), and the read window stays in the scan
 result's `coverage.window`, named in the CBOM rather than carried.

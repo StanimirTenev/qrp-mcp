@@ -204,8 +204,8 @@ def export_cbom(
     `additionalProperties: false` and the format has no field for it. That is the point
     of emitting it this way rather than a limitation to work around.
 
-    The serial number is derived from the target, the two pins and a digest of the
-    findings, so two runs of the same code over the same corpus that find the same things
+    The serial number is derived from the two pins and a digest of the findings, not
+    from where the tree sits, so two runs of the same code over the same corpus that find the same things
     share it and a different result does not. The timestamp is the tree's commit time
     (or SOURCE_DATE_EPOCH), so two runs over one unchanged tree give the same bytes; the
     read window stays in the scan result.

@@ -168,6 +168,16 @@ def test_it_never_licenses_complete_and_never_holds_the_control(tmp_path):
     props = {p["name"]: p["value"] for p in document["properties"]}
     assert props["qrp:coverage:claims:control:held"] == "false"
     assert props["qrp:coverage:claims:self_seeded_control:ran"] == "true"
+    # The document that carries the block is still a valid CycloneDX 1.6 BOM.
+    jsonschema = pytest.importorskip("jsonschema")
+    schemas = Path(__file__).parent / "schema"
+    schema = json.loads((schemas / "bom-1.6.schema.json").read_text())
+    store = {"http://cyclonedx.org/schema/spdx.SNAPSHOT.schema.json":
+             json.loads((schemas / "spdx.schema.json").read_text()),
+             "http://cyclonedx.org/schema/jsf-0.82.SNAPSHOT.schema.json":
+             json.loads((schemas / "jsf-0.82.schema.json").read_text())}
+    jsonschema.Draft7Validator(schema, resolver=jsonschema.RefResolver.from_schema(
+        schema, store=store)).validate(document)
 
 
 def test_the_command_writes_the_block_and_leaves_the_tree_alone(tmp_path):
