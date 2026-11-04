@@ -296,7 +296,17 @@ PROVIDER_VALIDATION = (
     "the CMVP list for the version actually deployed")
 
 
-def _primitive(family: str) -> str:
+def _primitive(family: str, items: list[dict[str, Any]] | None = None) -> str:
+    # ZA-OPRAVYANE row P6 (04.11.2026): an EC key from certificates and ECDSA code was `pke`
+    # while every occurrence said `role: signature`. RSA and EC follow the roles their
+    # occurrences show; undetermined or mixed, EC is `unknown` and RSA keeps `pke`.
+    if family in ("RSA", "EC") and items is not None:
+        roles = {i.get("role") for i in items}
+        if roles == {"signature"}:
+            return "signature"
+        if roles == {"key_establishment"}:
+            return "pke" if family == "RSA" else "key-agree"
+        return "pke" if family == "RSA" else "unknown"
     if family in _PRIMITIVE_BY_FAMILY:
         return _PRIMITIVE_BY_FAMILY[family]
     if family in _KEM_FAMILIES:
@@ -775,7 +785,7 @@ def _parameter_components(family: str, finding: dict[str, Any],
     for label in sorted(by_parameter, key=order):
         fields, items = by_parameter[label]
         sizes = [fields["key_size"]] if "key_size" in fields else []
-        m4, oid, _ = _m4_fields(family, _primitive(family), sizes, items)
+        m4, oid, _ = _m4_fields(family, _primitive(family, items), sizes, items)
         identifier = fields.get("parameter_set") or (str(fields["key_size"]) if sizes else None)
         name = f"{family}-{label}"
         component: dict[str, Any] = {
@@ -785,7 +795,7 @@ def _parameter_components(family: str, finding: dict[str, Any],
             "cryptoProperties": {
                 "assetType": "algorithm",
                 "algorithmProperties": {
-                    "primitive": _primitive(family),
+                    "primitive": _primitive(family, items),
                     **({"parameterSetIdentifier": identifier} if identifier else {}),
                     **m4,
                 },
@@ -859,7 +869,8 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             in_use = [item for item in in_use if id(item) not in routed]
         family_sizes = ([_FIXED_SIZE[family]] if family in _FIXED_SIZE else
                         [] if by_parameter else observed_sizes.get(family, []))
-        m4, oid, several_sets = _m4_fields(family, _primitive(family), family_sizes, in_use)
+        m4, oid, several_sets = _m4_fields(family, _primitive(family, in_use), family_sizes,
+                                           in_use)
         component: dict[str, Any] = {
             "type": "cryptographic-asset",
             "bom-ref": _ref("crypto", family),
@@ -867,7 +878,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "cryptoProperties": {
                 "assetType": "algorithm",
                 "algorithmProperties": {
-                    "primitive": _primitive(family),
+                    "primitive": _primitive(family, in_use),
                     # The schema's own example for this field is the key length:
                     # "in AES128, '128' identifies the key length in bits".
                     #
