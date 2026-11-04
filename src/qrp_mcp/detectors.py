@@ -21,7 +21,7 @@ from . import _warm
 _warm.start_regex()
 
 from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirection, linegate,
-               oids, opcua, registry, snk, suppression, switches)
+               oids, opcua, registry, snk, suppression, switches, wireguard)
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
@@ -4519,6 +4519,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                  "key_algorithm": row["algorithm"],
                  **({"key_size": row["key_size"]} if "key_size" in row else {})}
                 for row in private_rows)
+        wg_rows, wg_keys = wireguard.scan(lines)
+        ike_rows += wg_rows
+        embedded_key_findings.extend({**k, "path": rel_path} for k in wg_keys)
         for item in src:
             if item["algorithm"] == "RSA" and item.get("key_size") in (None, "undetermined"):
                 bits = dnssec.rsa_dnskey_bits(lines[item["line"] - 1])
