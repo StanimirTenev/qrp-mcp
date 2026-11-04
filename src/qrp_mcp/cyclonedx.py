@@ -1322,6 +1322,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # component named exactly as the occurrence's location carries the schema's own
     # `hashes`. Not inventory: left out of the composition below.
     digests: dict[str, str] = scan_result.get("evidence_file_sha256") or {}
+    folded: dict[str, str] = scan_result.get("evidence_file_sha256_crlf_as_lf") or {}
     cited = sorted({o["location"] for c in components
                     for o in c.get("evidence", {}).get("occurrences", [])
                     if o.get("location") in digests})
@@ -1330,7 +1331,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         "bom-ref": f"file:{path}",
         "name": path,
         "hashes": [{"alg": "SHA-256", "content": digests[path]}],
-        "properties": [{"name": f"{NS}basis", "value": "evidence_file"}],
+        "properties": [{"name": f"{NS}basis", "value": "evidence_file"}] + (
+            # Row 429: the same across a CRLF and an LF checkout of one commit.
+            [{"name": f"{NS}sha256_crlf_as_lf", "value": folded[path]}] if path in folded else []),
     } for path in cited]
     _confidence_properties(components, scan_result, family_of, family_by_ref)
 

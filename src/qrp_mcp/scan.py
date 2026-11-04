@@ -349,6 +349,10 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         # The SHA-256 of every file the evidence cites, as it was read (release A): what
         # lets a third party re-locate a finding and tell a moved line from another file.
         "evidence_file_sha256": _cited_digests(scan_result),
+        # The same files, hashed with every CRLF folded to LF (row 429): equal for one commit
+        # checked out on Windows and on Linux, which the raw digest above is not. The raw one
+        # stays the integrity of the bytes that were read.
+        "evidence_file_sha256_crlf_as_lf": _cited_digests(scan_result, "file_digests_lf"),
     }
 
     _profile_parameter_sets(result, profile)
@@ -623,8 +627,8 @@ def findings_fingerprint(result: dict[str, Any]) -> dict[str, Any]:
                         "read times change")}
 
 
-def _cited_digests(scan_result: dict[str, Any]) -> dict[str, str]:
-    digests = scan_result.get("file_digests") or {}
+def _cited_digests(scan_result: dict[str, Any], key: str = "file_digests") -> dict[str, str]:
+    digests = scan_result.get(key) or {}
     cited = {item["path"] for key, items in scan_result.items()
              if key.endswith("_findings") and isinstance(items, list)
              for item in items if isinstance(item, dict) and isinstance(item.get("path"), str)}

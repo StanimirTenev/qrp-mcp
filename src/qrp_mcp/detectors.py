@@ -4515,7 +4515,7 @@ _READING_LISTS = (
     "pins", "property_reads", "skipped_files", "left_out", "files_read", "markers",
     "excluded_by_config", "material_problems", "runtime_choices", "ec_points_checked",)
 _READING_COUNTS = ("files_scanned", "skipped_kinds", "present_kinds")
-_READING_MAPS = ("key_files", "file_digests", "codeowners")
+_READING_MAPS = ("key_files", "file_digests", "codeowners", "file_digests_lf")
 _READING_LIST_MAPS = ("property_values",)
 _READING = _READING_LISTS + _READING_COUNTS + _READING_MAPS + _READING_LIST_MAPS
 
@@ -4531,7 +4531,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads, skipped_files,
      left_out, files_read, markers, excluded_by_config, material_problems, runtime_choices_found,
      ec_points_checked, files_scanned, skipped_kinds, present_kinds, key_files, file_digests, codeowners,
-     property_values) = (r[name] for name in _READING)
+     file_digests_lf, property_values) = (r[name] for name in _READING)
     # A walked file is not a link, so it can only resolve to an excluded path of its own
     # name: the name is asked first, and the path resolved only then (release 3c).
     if resolved_exclude and path.name in {p.name for p in resolved_exclude}:
@@ -4640,6 +4640,11 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     digest = hashlib.sha256(raw).hexdigest()
     content_parts.append(rel_path + "\0" + digest)
     file_digests[rel_path] = digest
+    # Row 429: the same file checked out with CRLF on one machine and LF on another has two
+    # raw digests. This one is over the bytes with every CRLF folded to LF, so it is the same
+    # on both; a file without a CR is its raw digest.
+    file_digests_lf[rel_path] = (hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+                                 if b"\r\n" in raw else digest)
     report = report_document(raw)
     if report:
         # Named under its own reason in the coverage block (row 144), never matched.
@@ -5297,6 +5302,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     # The SHA-256 of each file read, by path: the per-file part of content_parts, kept so
     # the CBOM can bind each cited file to the bytes that were read (release A).
     file_digests: dict[str, str] = {}
+    file_digests_lf: dict[str, str] = {}
     # CODEOWNERS files read, by location (see CODEOWNERS_LOCATIONS).
     codeowners: dict[str, list[str]] = {}
     resolved_exclude: set[Path] = set()
@@ -5320,7 +5326,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         skipped_files, left_out, files_read, markers, excluded_by_config, material_problems,
         runtime_choices_found, ec_points_checked, files_scanned, skipped_kinds, present_kinds,
         key_files,
-        file_digests, codeowners, property_values)))
+        file_digests, codeowners, file_digests_lf, property_values)))
     reading["files_present"] = files_present
     _read_files(reading, list(iter_repo_files(repo_path, excluded_dir_counts, walk_problems)),
                 repo_path, resolved_exclude, config_excludes)
@@ -5421,6 +5427,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         # Hybrids named on a line, with their halves; the CBOM keeps those a half of
         # which is in the inventory at that line.
         "file_digests": file_digests,
+        "file_digests_lf": file_digests_lf,
         "hybrid_names": [{"path": p, "line": n, "name": name,
                           "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}
                          for p, n, name in hybrid_names],
