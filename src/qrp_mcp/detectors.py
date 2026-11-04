@@ -2492,6 +2492,27 @@ _IN_DOUBLE = re.compile(r'[\\"]')
 _IN_SINGLE = re.compile(r"[\\']")
 
 
+# Visual Basic's comment symbol `'` "tells the Visual Basic compiler to ignore the text
+# following it", and "Comments can follow a statement on the same line" (Learn, Comments in
+# Code); outside a string only ("" is a quote inside one). In a batch file "If a line begins
+# with a colon, it's treated as a label and any commands on that line are ignored" (Learn,
+# goto) -- which is why `::` serves as a comment; REM is matched by _COMMENT_LINE. Batch
+# 0.42.0, the comment limits of rows 308 and 388.
+_APOSTROPHE_COMMENT_EXT = {".vb"}
+_BATCH_EXT = {".bat", ".cmd"}
+_BATCH_LABEL_COMMENT = re.compile(r"^\s*:")
+
+
+def _vb_comment_spans(line: str) -> list[tuple[int, int]]:
+    in_string = False
+    for i, char in enumerate(line):
+        if char == '"':
+            in_string = not in_string
+        elif char == "'" and not in_string:
+            return [(i, len(line))]
+    return []
+
+
 def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[int, int]], bool]:
     """Where the comments are on this line, and whether the next line continues one.
 
@@ -2506,6 +2527,10 @@ def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[
     string literal is usually the configuration itself, and calling it a comment
     would lose the very lines a configuration scan is for.
     """
+    if ext in _APOSTROPHE_COMMENT_EXT:
+        return _vb_comment_spans(line), False
+    if ext in _BATCH_EXT:
+        return ([(0, len(line))] if _BATCH_LABEL_COMMENT.match(line) else []), False
     slash, hash_, dash = ext in _SLASH_COMMENT_EXT, ext in _HASH_COMMENT_EXT, ext in _DASH_COMMENT_EXT
     spans: list[tuple[int, int]] = []
     n, i, quote = len(line), 0, ""
