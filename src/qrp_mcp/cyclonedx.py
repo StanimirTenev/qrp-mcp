@@ -268,6 +268,7 @@ _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versio
                     "recipient_family", "hndl", "key_exchange", "policy_known",
                     # switches.py (batch 0.42.0).
                     "setting", "tls_disabled", "weak_crypto_allowed",
+                    "channel", "channel_type", "tls_not_established",
                     # fortios.py (row 228).
                     "default_setting", "default_value", "firmware", "defaults_documented_for",
                     "defaults_applied", "defaults_not_evaluated")
@@ -281,6 +282,8 @@ def _protocol_label(asset: dict[str, Any]) -> str:
         return f"TLS peer verification off ({asset['verification_setting']})"
     if asset.get("basis") == "firmware_defaults":
         return f"FortiOS firmware defaults ({asset['firmware']})"
+    if asset.get("channel"):
+        return f"IBM MQ channel {asset['channel']} ({asset['setting']})"
     if asset.get("tls_disabled"):
         return f"TLS disabled ({asset['setting']})"
     if asset.get("weak_crypto_allowed"):
