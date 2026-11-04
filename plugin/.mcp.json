@@ -3,7 +3,7 @@
     "qrp": {
       "command": "uvx",
       "args": [
-        "qrp-mcp==0.40.1"
+        "qrp-mcp==0.41.0"
       ]
     }
   }
