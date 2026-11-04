@@ -636,7 +636,11 @@ _TLS_VERSION = re.compile(
     r"PROTOCOL_TLSv1(?:_(\d))?|"                 # Python ssl
     r"TLS1_(\d)_VERSION|"                        # OpenSSL
     r"TLS_?v?1\.(\d)|"                           # rustls, prose in config
-    r"tls1\.(\d)"                                # Caddy `protocols tls1.2 tls1.3`
+    r"tls1\.(\d)|"                               # Caddy `protocols tls1.2 tls1.3`
+    # Istio's TLSProtocol enum (`TLSV1_0`) and Traefik's bare Go constant name
+    # (`minVersion: VersionTLS10`), ZA-OPRAVYANE row 332.
+    r"TLSV1_([0-3])|"
+    r"VersionTLS(1[0-3])"
     r")(?![A-Za-z0-9])")
 
 # Where a protocol is being configured rather than mentioned. Without one of
@@ -652,7 +656,14 @@ _TLS_CONTEXT = re.compile(
     # defaults that carry them (Configuration Manual 3.5; ZA-OPRAVYANE row 30).
     r"ssl-(?:min|max)-ver|ssl-default-(?:bind|server)-options|"
     # Caddy's `tls` block: `protocols <min> [<max>]` (ZA-OPRAVYANE row 111).
-    r"^\s*protocols\s+tls1\.[0-3]",
+    r"^\s*protocols\s+tls1\.[0-3]|"
+    # ZA-OPRAVYANE row 332, each from the product's documentation: Ingress-NGINX
+    # `ssl-protocols`, Istio `minProtocolVersion`/`maxProtocolVersion`, Dovecot
+    # `ssl_min_protocol`, Kafka `ssl.enabled.protocols`/`ssl.protocol`, ZooKeeper
+    # `ssl.enabledProtocols`/`ssl.protocol`, MySQL `tls_version`. (Traefik's `minVersion`
+    # is MinVersion above.)
+    r"ssl-protocols|(?:min|max)ProtocolVersion|ssl_(?:min|max)_protocol|"
+    r"ssl\.enabled\.?protocols|ssl\.(?:quorum\.)?protocol\s*=|^\s*tls_version\s*=",
     re.IGNORECASE)
 
 # SSH transport, configured the same way.
@@ -871,8 +882,11 @@ def _tls_version_name(match: re.Match) -> str:
 # ("Allowed values are "1.0", "1.1", "1.2", and "1.3"", v3.2.x, read 23.10.2026). The
 # spellings above need `TLSv1`/`TLS1.x`, so the EAP-TLS minimum gave nothing
 # (ZA-OPRAVYANE row 103).
+# OpenVPN 2.6 writes it bare too: "tls-version-min version ['or-highest'] Sets the minimum
+# TLS version we will accept" (reference manual; ZA-OPRAVYANE row 332).
 _BARE_TLS_VERSION_SETTING = re.compile(
-    r"^\s*tls_(?:min|max)_version\s*=\s*[\"']?1\.([0-3])[\"']?\s*(?:#.*)?$")
+    r"^\s*(?:tls_(?:min|max)_version\s*=\s*[\"']?1\.([0-3])[\"']?|"
+    r"tls-version-(?:min|max)\s+1\.([0-3])(?:\s+or-highest)?)\s*(?:#.*)?$")
 
 
 _LOWERED: list[Any] = [None, ""]
@@ -922,7 +936,7 @@ def scan_protocols(line: str) -> list[dict[str, Any]]:
     seen: set[tuple[str, bool]] = set()
     bare = _BARE_TLS_VERSION_SETTING.match(line)
     if bare:
-        name = f"TLSv1.{bare.group(1)}"
+        name = f"TLSv1.{bare.group(1) or bare.group(2)}"
         seen.add((name, False))
         out.append({
             "protocol": "tls",
