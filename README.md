@@ -1143,6 +1143,60 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
+**From 0.41.0**, a batch of the fix list (rows 160, 196, 200–206, 208–211, and six rows from a
+comparison with another scanner on Hyperledger Fabric). Most were places where the output said more
+than the scan had seen. Each was reproduced as a failing test before the fix, and each fix was
+reverted once to see its test fail.
+
+- **An unread certificate is not an absent one** (row 200). nginx naming its certificate and key
+  at paths outside the tree (`ssl_certificate /etc/...`) left `by_role.signature` at `none_found`.
+  The places are now in `tls_termination.authentication_not_read` (nginx `ssl_certificate[_key]`,
+  Apache `SSLCertificate[Key]File`, HAProxy `crt`), and the signature part reads
+  `not_established` with the reason. A named file whose name is among the files read counts as read.
+- **The headline shows the split** (row 200). Beside `pqc_readiness`, `summary.readiness_by_role`
+  gives the key-establishment and signature values and `roles_differ`. The headline word itself is
+  unchanged.
+- **The `--mandate nist-ir-8547` gate counts 2030** (row 160). It counted the disallowance
+  (2035-12-31) while `next_deadline` said 2030-12-31; it now counts the deprecation
+  (`gate_counts: deprecated_after`). ⚠️ This changes exit codes: from November 2026, with
+  `--lead-months 50` or more, a run that passed now exits 1.
+- **A gate over files not read is not a pass** (row 204). Where it would pass while files went
+  unread (a `.jar`, a `.so`), `gate` reads `not_established` and `gate_not_established_because`
+  gives the count. The exit code of that case stays 0, as for a pass; a fail is still a fail.
+- **A switch set off is not a use** (rows 203, 196). `USE_RSA = False` and Kconfig
+  `CONFIG_ECDSA=n` are bans now, as `!MD5` is; switched on they are uses as before. A list named
+  LEGACY (`LEGACY_ALGS = ["RSA-PSS", "DSA"]`) is an identifier row: low, not counted in the
+  headline or `by_role`.
+- **AWS KMS `RSAES_OAEP_SHA_1|256` is a key spec** (row 208), as `KeySpec.RSA_2048` was: RSA key
+  transport beside an ML-KEM key no longer leaves key establishment reading `pqc_ready`.
+- **The parameter set against the profile** (row 210). Under `--profile au-ism` (and `us-cnsa2`),
+  an ML-KEM or ML-DSA finding whose parameter set the document limits carries
+  `profile_parameter_sets` with the document's words (ML-KEM-768: "will not be approved beyond
+  2030"), on the finding and on its part in `by_role`. Under `--mandate cnsa-2.0` such an
+  occurrence gets the status `parameter_set_not_in_mandate`, with no deadline; the gate is not
+  moved by it. The classification stays `pqc_ready`.
+- **The size and use beside the algorithm** (rows 201, 205, 209, 211, 196). In a Terraform or
+  configuration block: Vault `key_bits`, Azure Key Vault `key_size` and `key_opts`, AWS KMS
+  `customer_master_key_spec = "RSA_3072"` and `key_usage`, a Vault root or intermediate CA (whose
+  key signs); on the line: `CONFIG_..._RSA_LEN=2048`, `"rsa2048"`. Fabric CA's
+  `keyrequest: algo/size` and cfssl's `"key": {"algo", "size"}` give the family and the size (ECDSA
+  256/384/521 as P-256/P-384/P-521). An INI section header now ends a block.
+- **Hyperledger Fabric's BCCSP** gives ECDSA and its curve: `Default: SW` with `Security: 256|384`
+  is P-256 or P-384 (Fabric `bccsp/sw`, v2.5.9); `Default: PKCS11` the same with `key_held: hsm`.
+- **PEM inside JSON and YAML is parsed**: a certificate in a JSON string (`\n` escapes, as in a
+  Fabric connection profile) or an indented YAML block scalar is a row at its BEGIN line, a key's
+  family joins its embedded-key row, and a block that does not parse is listed with its reason.
+- **The CBOM primitive of RSA and EC follows the role**: all signature → `signature`; all key
+  establishment → `key-agree` for EC, `pke` for RSA; undetermined or mixed, EC is `unknown`
+  (it was `pke`) and RSA stays `pke`.
+- **IBM MQ `.mqsc` is read** (row 202): a channel's `SSLCIPH(TLS_RSA_WITH_...)` gives RSA key
+  establishment. An empty `SSLCIPH` (a channel without TLS) is not detected.
+- **`bind ssl ...` is not an HAProxy listener** (row 206): NetScaler-style `bind ssl profile` lines
+  read as "TLS is terminated here (HAProxy ...)". The algorithms on them are found as before;
+  `ns.conf` itself (front end and back end, its curve names) is not read.
+
+⚠️ What is not claimed: no detection figure in this README was re-measured.
+
 **From 0.40.1**, on Windows a file reached through a link swapped in after the walk is refused
 when it lies outside the scanned tree (row 150, the last three tests). Windows has no `dir_fd` and
 no `O_NOFOLLOW`, so the open still follows the link; the opened handle is then asked where it ended
@@ -1240,7 +1294,7 @@ Every field below is in the scan JSON and in the CBOM, through `qrp-mcp cbom` an
   3.2.1) and not HNDL-exposed; a classical group offered on its own in the same list
   (`X25519MLKEM768:X25519`) keeps its dates. The block names the date the gate counts
   (`gate_counts`, `next_gate_deadline`) beside `next_deadline`, the earliest date of any clause.
-  The gate itself still counts the disallowance, as before.
+  The gate itself still counted the disallowance, as before (until 0.41.0, which counts 2030).
 - **A fingerprint of the findings beside the file's digest** (row 178, from Mark McGovern's
   reply): see *Without an agent*. Two scans of one commit now print the same `findings sha256`
   and, as before, different file digests.
