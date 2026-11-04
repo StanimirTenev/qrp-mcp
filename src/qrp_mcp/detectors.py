@@ -1830,7 +1830,9 @@ def _suite_table_entry(line: str) -> list[tuple[str, int]]:
 # --- key sizes named on the same line as the algorithm ---
 _KEY_SIZE = re.compile(
     r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|"
-    r"(?<![A-Za-z])rsa[:\-_](\d{3,5})(?![0-9])|\bRSA_(\d{3,5})\b|"
+    r"(?<![A-Za-z])rsa[:\-_]?(\d{3,5})(?![0-9])|\bRSA_(\d{3,5})\b|"
+    # Rows 205, 196 (a): Kconfig `..._RSA_LEN=2048`; Yocto's `FIT_SIGN_ALG = "rsa2048"` (above).
+    r"(?<![A-Za-z])rsa_(?:len|bits|size)\s*=\s*(\d{3,5})\b|"
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
     r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
@@ -3544,6 +3546,10 @@ def scan_source_file(path: Path, rel_path: str,
                                   else "identifier"),
                 "in_test_code": in_test_code(rel_path),
             }
+            # Row 205: `CONFIG_BOOT_SIGNATURE_TYPE_RSA_LEN=2048` names the size with the name.
+            size = key_size_on_line(line, family) if family in ("RSA", "DSA", "DH") else None
+            if size:
+                item["key_size"] = size
             by_identifier.append(item)
             named_here[family] = item
             if alone:
@@ -3668,12 +3674,23 @@ def scan_ci_file(path: Path, rel_path: str,
 # `algorithm: RSA` / `key_size: 2048` in YAML, `algorithm = "RSA"` / `rsa_bits = 4096` in a
 # Terraform tls_private_key. Only lines indented exactly as the algorithm's, until the block
 # ends (a line indented less).
+# Row 201: Vault's `key_bits`.
 _IAC_KEY_SIZE = re.compile(
-    r"""^\s*["']?(?:key_?size|key_?length|keySize|keyLength|rsa_bits|bits|size)["']?\s*[:=]\s*"""
-    r"""["']?(\d{3,5})["']?\s*,?\s*(?:#.*)?$""", re.IGNORECASE)
+    r"""^\s*["']?(?:key_?size|key_?length|keySize|keyLength|rsa_bits|key_bits|bits|size)["']?"""
+    r"""\s*[:=]\s*["']?(\d{3,5})["']?\s*,?\s*(?:#.*)?$""", re.IGNORECASE)
+# Rows 209, 211: what the key is for, in the same block -- AWS KMS `key_usage = "SIGN_VERIFY"`,
+# Azure Key Vault `key_opts = ["sign", "verify"]`. The value is read for its role as a line is.
+_IAC_KEY_USE = re.compile(
+    r"""^\s*["']?(key_usage|key_opts|key_ops)["']?\s*[:=]\s*(.+?)\s*,?\s*(?:#.*)?$""",
+    re.IGNORECASE)
+# Row 201: a resource that makes a CA certificate; its key signs certificates and does nothing
+# else. Vault's root and intermediate CA resources.
+_CA_RESOURCE = re.compile(
+    r'^\s*resource\s+"(vault_pki_secret_backend_(?:root_cert|intermediate_cert_request|'
+    r'root_sign_intermediate))"')
 
 
-def _iac_key_size(lines: list[str], index: int) -> int | None:
+def _in_block(lines: list[str], index: int, pattern: re.Pattern[str]) -> re.Match[str] | None:
     indent = len(lines[index]) - len(lines[index].lstrip())
     for step in (1, -1):
         j = index + step
@@ -3684,11 +3701,47 @@ def _iac_key_size(lines: list[str], index: int) -> int | None:
                 if here < indent or text.strip() in ("}", "{"):
                     break
                 if here == indent:
-                    m = _IAC_KEY_SIZE.match(text)
+                    m = pattern.match(text)
                     if m:
-                        return int(m.group(1))
+                        return m
             j += step
     return None
+
+
+def _iac_key_size(lines: list[str], index: int) -> int | None:
+    m = _in_block(lines, index, _IAC_KEY_SIZE)
+    return int(m.group(1)) if m else None
+
+
+def _iac_key_use(lines: list[str], index: int) -> str | None:
+    """The key's use as its block states it, for remediation.role_of; None where not stated."""
+    m = _in_block(lines, index, _IAC_KEY_USE)
+    if m:
+        return f"{m.group(1)} {m.group(2)}"
+    indent = len(lines[index]) - len(lines[index].lstrip())
+    for j in range(index - 1, -1, -1):
+        text = lines[j]
+        if text.strip() and len(text) - len(text.lstrip()) < indent:
+            ca = _CA_RESOURCE.match(text)
+            return f"{ca.group(1)}: a CA key, which signs certificates" if ca else None
+    return None
+
+
+def _beside_in_block(items: list[dict[str, Any]], lines: list[str]) -> None:
+    """Rows 201, 209, 211: the size and the use set beside the algorithm in an IaC block, on
+    the rows the source rules made there (`key_type = "RSA"`), which had neither."""
+    for item in items:
+        index = item["line"] - 1
+        if not 0 <= index < len(lines):
+            continue
+        if item.get("algorithm") in ("RSA", "DSA", "DH", "EC") and not item.get("key_size"):
+            size = _iac_key_size(lines, index)
+            if size is not None and (item["algorithm"] != "EC" or size in (224, 256, 384, 521)):
+                item["key_size"] = size
+        if item.get("algorithm") in ("RSA", "EC") and "key_use_in_block" not in item:
+            use = _iac_key_use(lines, index)
+            if use:
+                item["key_use_in_block"] = use
 
 
 def scan_iac_file(path: Path, rel_path: str,
@@ -3707,7 +3760,8 @@ def scan_iac_file(path: Path, rel_path: str,
                     "description": description,
                     "excerpt": line.strip()[:200],
                 }
-                size = _iac_key_size(lines, line_no - 1)
+                size = ((key_size_on_line(line, algorithm) if algorithm == "RSA" else None)
+                        or _iac_key_size(lines, line_no - 1))
                 if size is not None:
                     item["key_size"] = size
                 algorithm_findings.append(item)
@@ -4253,6 +4307,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # embedded TLS configuration; the two IaC rules alone missed them.
         _merge(algo_findings,
                scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot))
+        _beside_in_block(algo_findings, lines)
         iac_findings.extend(algo_findings)
         embedded_key_findings.extend(key_findings)
     elif path.suffix.lower() in SOURCE_EXTENSIONS:

@@ -167,7 +167,8 @@ def role_of(item: dict[str, Any]) -> str | None:
     # OAEP padding too; it is no evidence of a signature (ZA-OPRAVYANE row 161: pyca
     # `pub.encrypt(k, padding.OAEP(...))` read as both roles, and so undetermined).
     description = str(item.get("description") or "").replace(_EITHER_NAME, "")
-    text = f"{excerpt} {description}".lower()
+    # Rows 209, 211, 201: the use stated in the same IaC block, read as the line is.
+    text = f"{excerpt} {description} {item.get('key_use_in_block') or ''}".lower()
     # PSS named beside the generic RSA key type is a table of both uses, not a signature.
     if _GENERIC_RSA.search(text) and "pss" in text:
         return "undetermined"
