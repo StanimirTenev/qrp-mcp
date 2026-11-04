@@ -20,8 +20,8 @@ from . import _warm
 # The rules' regexes compile through the cache of _warm until the end of this module.
 _warm.start_regex()
 
-from . import (aws_tls, components, dnssec, fortios, ike, indirection, linegate, oids, opcua,
-               registry, snk, suppression, switches)
+from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirection, linegate,
+               oids, opcua, registry, snk, suppression, switches)
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
@@ -4496,9 +4496,10 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _beside_in_block(src, lines)
         if path.suffix.lower() in (".yaml", ".yml"):
             src.extend(fabric_bccsp(rel_path, lines))
-        # The IKE rows say more than a generic row on the same line (its size, the setting),
-        # so they replace it rather than sit beside it.
-        ike_rows = ike.scan_groups(lines) + ike.scan_auth(lines)
+        # The IKE and setting rows say more than a generic row on the same line (its size,
+        # the setting), so they replace it rather than sit beside it.
+        ike_rows = (ike.scan_groups(lines) + ike.scan_auth(lines)
+                    + config_values.scan(path.name, lines))
         replaced = {(item["line"], item["algorithm"]) for item in ike_rows}
         src[:] = [f for f in src if (f["line"], f["algorithm"]) not in replaced]
         for item in ike_rows:
