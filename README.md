@@ -1187,6 +1187,10 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
   Ed25519 branch beside the new ML-DSA one was "2 closed" with Ed25519 [2, 2] per family. An
   occurrence that left a file in which the second run finds its family again is now paired with
   that occurrence under `changed`, and the statement ends with the families not down to 0.
+- **Crypto libraries a Dockerfile installs** with `apt-get|apt install`, `apk add` or
+  `dnf|yum|microdnf install` (OpenSSL/libssl, GnuTLS, NSS, libsodium) are `dependencies` with
+  `basis: os_package`, and the version apt or apk pins with `=`. Declared, not observed. They
+  were read and gave nothing.
 - **Misreads**: `createECDH('secp256k1')` is ECDH, not ECDSA; camelCase `RsaSha256` is not a
   DNSSEC algorithm; UTF-16 is read with or without a byte-order mark (Cyrillic comments, a PEM
   saved by PowerShell `Out-File`).

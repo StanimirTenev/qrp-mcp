@@ -27,6 +27,7 @@ from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
+                     os_packages,
                      dockerfile_pins, library_support, names_none_of, pinned_versions,
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
@@ -4398,6 +4399,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     elif re.match(r"(?:Dockerfile|Containerfile)(?:[-.].*)?$|.*\.(?:Dockerfile|Containerfile)$",
                   path.name):
         pinned_images.extend(dockerfile_pins(rel_path, lines))
+        dependency_findings.extend(os_packages(rel_path, lines))
     if b"age1" in raw or b"-----BEGIN" in raw:
         at_rest_findings, at_rest_assets = scan_encrypted_at_rest(rel_path, lines)
         for item in at_rest_findings:
