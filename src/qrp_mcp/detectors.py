@@ -1648,6 +1648,31 @@ def _names_an_assigned_variable(line: str, match: re.Match) -> bool:
         if re.match(r"\s*=(?!=)", line[end:]) else False
 
 
+# Row 421: `ecdsa_fallback_count = 0`, `const ED25519_ROLLOUT_PCT: u32 = 100;` -- the family is
+# a piece of the name being assigned, with or without a type annotation, and nothing else on
+# the line names it. RSA in the same place was already an identifier row (registry); ECDSA and
+# Ed25519 were declarations at medium (the L1 control, 19 of 21 planted lines).
+_ASSIGNED_AFTER_NAME = re.compile(r"\s*(?::\s*[\w&<>\[\]()', ]+?)?\s*=(?![=>~])")
+
+
+def _only_names_the_assigned_variable(line: str, matches: list[re.Match]) -> bool:
+    for match in matches:
+        start, end = match.start(), match.end()
+        while start > 0 and (line[start - 1].isalnum() or line[start - 1] in "_$"):
+            start -= 1
+        while end < len(line) and (line[end].isalnum() or line[end] == "_"):
+            end += 1
+        if not (start < match.start() or end > match.end()):
+            return False
+        if not _ASSIGNED_AFTER_NAME.match(line, end):
+            return False
+        before = line[:start].rstrip()
+        # Only a name being declared: nothing but keywords and a type before it.
+        if before and not re.fullmatch(r"[\w\s.<>\[\],?]*", before):
+            return False
+    return True
+
+
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(r"\bgpg\s+(--detach-sign|--sign|-s)\b")),
@@ -3498,6 +3523,9 @@ def scan_source_file(path: Path, rel_path: str,
                   and all(_names_an_assigned_variable(searched, m) for m in matches)):
                 # Row 368: `implicitSha1 = new Rfc2898DeriveBytes(..., SHA256)` -- the name
                 # the result is stored under, not what the call does.
+                evidence = "identifier"
+            elif kind in ("declaration", "reference") and _only_names_the_assigned_variable(
+                    searched, matches):
                 evidence = "identifier"
             else:
                 evidence = kind
