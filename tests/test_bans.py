@@ -51,13 +51,17 @@ def test_the_ban_is_still_reported_and_says_what_it_is(tmp_path):
     assert rows and rows[0]["evidence_kind"] == "ban"
 
 
-def test_an_allowed_algorithm_on_a_ban_line_is_still_a_use(tmp_path):
-    """A real hardened config bans some algorithms and enables others on the same
-    line. Reading the whole line as a ban would hide the live one."""
+def test_an_openssh_removal_list_removes_every_name_on_it(tmp_path):
+    """Row 420 corrects what this test used to say. In OpenSSH the `-` opens the list, not
+    an entry: sshd_config(5), "If the specified list begins with a '-' character, then the
+    specified algorithms (including wildcards) will be removed from the default set", and
+    kex_assemble_names applies it to the whole list. `-ssh-dss,rsa-sha2-512` removes both;
+    the line names nothing live. A list without the prefix still offers what it names
+    (test_sshd_removal_lists.py)."""
     result = scan(tmp_path, "sshd_config",
                   "HostKeyAlgorithms -ssh-dss,rsa-sha2-512\n")
-    assert "RSA" in result["detected_algorithms"]
-    assert "DSA" in result["named_but_not_used"]
+    assert result["detected_algorithms"] == []
+    assert {"DSA", "RSA"} <= set(result["named_but_not_used"])
 
 
 def test_a_comment_only_family_lands_in_the_same_place(tmp_path):

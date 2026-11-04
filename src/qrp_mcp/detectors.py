@@ -2917,6 +2917,18 @@ _SWITCH_ECHOED_OFF = re.compile(
 _DISABLE_CMDLET = re.compile(r"^\s*Disable-Tls(?:CipherSuite|EccCurve)\b", re.IGNORECASE)
 
 
+# Row 420: in OpenSSH a list that begins with `-` removes every algorithm it names from the
+# default set -- the prefix governs the list, not the first entry. sshd_config(5) and
+# ssh_config(5) at 7fe3b24 for Ciphers, MACs, KexAlgorithms, PubkeyAcceptedAlgorithms,
+# HostbasedAcceptedAlgorithms, CASignatureAlgorithms (and HostKeyAlgorithms in ssh_config);
+# sshd assembles HostKeyAlgorithms with the same kex_assemble_names (servconf.c). `+` and `^`
+# still offer what they name. The old *KeyTypes spellings are aliases of the same options.
+_SSH_REMOVAL_LIST = re.compile(
+    r"^\s*(?:HostKeyAlgorithms|KexAlgorithms|PubkeyAccepted(?:Algorithms|KeyTypes)|"
+    r"HostbasedAccepted(?:Algorithms|KeyTypes)|CASignatureAlgorithms|Ciphers|MACs)"
+    r"(?:\s*=\s*|\s+)\"?-", re.IGNORECASE)
+
+
 def _switched_off(code: str, position: int) -> bool:
     m = _SWITCH_SET_OFF.match(code) or _SWITCH_ECHOED_OFF.match(code)
     if not m or position >= m.end(1) or not _SWITCH_NAME.search(m.group(1)):
@@ -2964,6 +2976,9 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     if _switched_off(searchable, position):
         return True
     if _DISABLE_CMDLET.match(searchable):
+        return True
+    removal = _SSH_REMOVAL_LIST.match(searchable)
+    if removal and position >= removal.end() - 1:
         return True
     # Work in entries, not characters. A hyphen inside a name belongs to it --
     # ssh-rsa, ecdsa-sha2-nistp256, aes256-sha256-modp2048 -- and strikes an entry
