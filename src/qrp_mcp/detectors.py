@@ -4287,6 +4287,16 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
         sniffed = _read_file(real, repo_path)
         claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
+    # BIND's `db.<zone>`, `dsset-<zone>.` and a `<zone>.db` that starts like a zone file
+    # (row 340); any other `.db` (SQLite) stays the declared boundary.
+    if not claimed and (dnssec.ZONE_FILE_NAME.match(path.name)
+                        or dnssec.KEY_FILE_NAME.match(path.name)):
+        claimed = True
+    if not claimed and path.suffix.lower() == ".db":
+        sniffed = _read_file(real, repo_path)
+        claimed = sniffed is not None and bool(dnssec.ZONE_FILE_START.match(sniffed[0][:4096]))
+        if not claimed:
+            sniffed = None
     # A `.sarif` is opened only to be named as the report it is (row 144); one that is
     # not a SARIF log stays the declared boundary.
     if not claimed and path.suffix.lower() == ".sarif":
@@ -4436,7 +4446,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
         if not algo_findings:
             undecoded.append(rel_path)
-    elif is_certificate_file(path) or peeked_key:
+    elif (is_certificate_file(path) or peeked_key) and not dnssec.KEY_FILE_NAME.match(path.name):
         # Certificates and keys are read as bytes, not lines: a .der carries no
         # lines at all, and a .pem that fails to decode must still be counted.
         files_scanned["certificate"] += 1
@@ -4500,6 +4510,20 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # the setting), so they replace it rather than sit beside it.
         ike_rows = (ike.scan_groups(lines) + ike.scan_auth(lines)
                     + config_values.scan(path.name, lines))
+        if dnssec.KEY_FILE_NAME.match(path.name) and path.suffix == ".private":
+            private_rows = dnssec.private_key_file(lines)
+            ike_rows += private_rows
+            embedded_key_findings.extend(
+                {"path": rel_path, "line": 1, "type": "BIND DNSSEC private key",
+                 "description": "private key material in a BIND DNSSEC key file",
+                 "key_algorithm": row["algorithm"],
+                 **({"key_size": row["key_size"]} if "key_size" in row else {})}
+                for row in private_rows)
+        for item in src:
+            if item["algorithm"] == "RSA" and item.get("key_size") in (None, "undetermined"):
+                bits = dnssec.rsa_dnskey_bits(lines[item["line"] - 1])
+                if bits:
+                    item["key_size"] = bits
         replaced = {(item["line"], item["algorithm"]) for item in ike_rows}
         src[:] = [f for f in src if (f["line"], f["algorithm"]) not in replaced]
         for item in ike_rows:

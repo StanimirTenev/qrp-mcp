@@ -205,7 +205,11 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             "config": sorted(detectors.CONFIG_EXTENSIONS),
             "config_filenames": sorted(detectors.CONFIG_FILENAMES),
             "config_filename_pattern": [detectors.CONFIG_FILENAME_PATTERN.pattern,
-                                        detectors.DOTNET_CONFIG_NAME.pattern],
+                                        detectors.DOTNET_CONFIG_NAME.pattern,
+                                        dnssec.ZONE_FILE_NAME.pattern,
+                                        dnssec.KEY_FILE_NAME.pattern],
+            # A `.db` is read only when it starts like a DNS zone file (row 340).
+            "config_when_a_zone_file": [".db"],
             "config_extensionless_in_directories": sorted(detectors.CONFIG_DIRECTORIES),
             # Read for owners only (ZA-OPRAVYANE row 94), never matched for algorithms.
             "codeowners": list(detectors.CODEOWNERS_LOCATIONS),
