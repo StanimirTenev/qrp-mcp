@@ -1,13 +1,14 @@
 """ZA-OPRAVYANE row 208 (LinkedIn, 04.11.2026; fixture from the room's probe `rn-kms`).
 
 AWS KMS in C#: an ML-KEM-768 key, and the stored records wrapped with
-`EncryptionAlgorithmSpec.RSAES_OAEP_SHA_256`. The RSA line is an identifier row, which by
-design (rel3-rules) never moves the headline or by_role, so `by_role.key_establishment` read
-`pqc_ready` -- with RSA key transport on the line the scan had read.
+`EncryptionAlgorithmSpec.RSAES_OAEP_SHA_256`. That constant was read only as a component of
+an identifier, and identifier rows by design (rel3-rules) never move the headline or by_role,
+so `by_role.key_establishment` read `pqc_ready` with RSA key transport on a line the scan had
+read.
 
-The identifier row still does not count. But a part that would say nothing classical, beside
-an identifier row naming a classical family for that role, now reads `not_established` and
-names the row."""
+The constant is an AWS KMS API value naming RSA-OAEP, as `KeySpec.RSA_2048` names an RSA key:
+it is now a rule of its own (a key spec), not an identifier. The rel3 rule for identifiers
+stands (test_identifier_rows_keep_the_headline)."""
 
 from __future__ import annotations
 
@@ -28,16 +29,14 @@ def _scan(tmp_path: Path, text: str | None = None):
     return scan_directory(tree)
 
 
-def test_rsa_oaep_named_beside_ml_kem_withholds_key_establishment(tmp_path):
+def test_rsa_oaep_spec_counts_for_key_establishment(tmp_path):
     result = _scan(tmp_path)
     row = [e for e in result["evidence"]["source_code"]
            if e["algorithm"] == "RSA" and e["line"] == 25][0]
-    assert row["evidence_kind"] == "identifier" and row["role"] == "key_establishment"
+    assert row["evidence_kind"] != "identifier" and row["role"] == "key_establishment"
     part = result["summary"]["by_role"]["key_establishment"]
-    assert part["pqc_readiness"] == "not_established", part
-    assert any("Envelope.cs:25" in b for b in part["because"]), part
-    # Still not counted: RSA does not join the part's families on a name alone.
-    assert "RSA" not in part["families"]
+    assert "RSA" in part["families"]
+    assert part["pqc_readiness"] == "hybrid_partial", part
 
 
 def test_without_the_rsa_line_the_part_reads_ready(tmp_path):
@@ -53,4 +52,4 @@ def test_through_the_mcp_tool(tmp_path):
     tree.mkdir()
     shutil.copy(FIXTURE, tree / "Envelope.cs")
     part = scan_repo(str(tree))["summary"]["by_role"]["key_establishment"]
-    assert part["pqc_readiness"] == "not_established"
+    assert part["pqc_readiness"] == "hybrid_partial"

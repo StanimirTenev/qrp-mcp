@@ -1291,7 +1291,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     #   Node's tls.createSecureContext `dhparam` option.
     # * key specs: AWS KMS KeySpec (RSA_2048 is above; ECC_NIST_P256, ECC_SECG_P256K1), ACM
     #   KeyAlgorithm (EC_prime256v1), Google Cloud KMS CryptoKeyVersionAlgorithm
-    #   (RSA_SIGN_PSS_2048_SHA256, EC_SIGN_P256_SHA256), a size glued to the family
+    #   (RSA_SIGN_PSS_2048_SHA256, EC_SIGN_P256_SHA256), AWS KMS EncryptionAlgorithmSpec
+    #   (RSAES_OAEP_SHA_1, RSAES_OAEP_SHA_256), a size glued to the family
     #   (RSA2048, ECCPRIME256V1, as Lemur and many key-type enums write it), and cfssl's key
     #   request (csr.KeyRequest "algo"). The glued and Cloud KMS names only as a whole quoted
     #   value: `rsa1024-leaf.der` is a fixture's file name, and the name in a sentence ("RSA_SIGN_
@@ -1306,6 +1307,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bxmlsec\.Transform\.RSA_\w+|\bcrypto\.TYPE_RSA\b|"
         r"[\"'](?i:rsa)(?:1024|2048|3072|4096|8192)[\"']|"
         r"[\"']RSA_(?:SIGN_(?:PSS|PKCS1|RAW_PKCS1)|DECRYPT_OAEP)_(?:2048|3072|4096)\w*[\"']|"
+        # AWS KMS EncryptionAlgorithmSpec, RSA key transport (ZA-OPRAVYANE row 208).
+        r"\bEncryptionAlgorithmSpec\.RSAES_OAEP_SHA_(?:1|256)\b|[\"']RSAES_OAEP_SHA_(?:1|256)[\"']|"
         r"(?i:\b(?:key_?algo|algo)[\"']?\s*[:=]\s*[\"']rsa[\"'])|\bAlg(?:RS|PS)(?:1|256|384|512)\b")),
     ("DSA", "DSA named by an XML-DSig URI or a library constant (release 3e)", re.compile(
         r"(?i:xmldsig(?:11)?#dsa-|xmldsig#DSAKeyValue)|\bSIG_DSA_\w+|\bSignatureMethod\.DSA_\w+|"
