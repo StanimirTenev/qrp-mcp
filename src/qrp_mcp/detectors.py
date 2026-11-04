@@ -102,7 +102,11 @@ CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
                      # Windows build and request files whose lines name algorithms and
                      # signing steps: certreq `.inf`, MSBuild `.vcxproj`/`.props`/
                      # `.targets`, WiX `.wxs` (row 387).
-                     ".mk", ".reg", ".inf", ".vcxproj", ".props", ".targets", ".wxs"}
+                     ".mk", ".reg", ".inf", ".vcxproj", ".props", ".targets", ".wxs",
+                     # Helm's template partials: "_helpers.tpl" is "the default location
+                     # for template partials" (helm.sh named templates; row 309). Read as
+                     # the configuration they render into, as Jinja templates are.
+                     ".tpl", ".gotmpl"}
 
 # .NET's configuration files, by name: web.config, app.config, machine.config, IIS's
 # applicationHost.config, and their transforms (Web.Release.config). Not every `.config`:
@@ -137,7 +141,10 @@ CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
 # The same names with a variant after them (Dockerfile-QUIC, Dockerfile.alpine,
 # Kconfig.defconfig) or before them (nginx.Dockerfile).
 CONFIG_FILENAME_PATTERN = re.compile(
-    r"^(?:Dockerfile|Containerfile|Kconfig)[-.][\w.-]+$|^[\w.-]+\.(?:Dockerfile|Containerfile)$")
+    r"^(?:Dockerfile|Containerfile|Kconfig)[-.][\w.-]+$|^[\w.-]+\.(?:Dockerfile|Containerfile)$|"
+    # ESP-IDF's project configuration: sdkconfig, sdkconfig.defaults and
+    # sdkconfig.defaults.TARGET_NAME (ESP-IDF build system guide; ZA-OPRAVYANE row 304).
+    r"^sdkconfig(?:\.[\w.-]+)?$")
 
 # Directories whose files are configuration without an extension: FreeRADIUS keeps its
 # EAP-TLS settings in raddb/mods-available/eap (ZA-OPRAVYANE row 103), and Debian's nginx
@@ -538,6 +545,15 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bPSA_KEY_TYPE_RSA_\w+|\bPSA_ALG_RSA_\w+")),
     ("EC", "EC named by the Mbed TLS API", re.compile(
         r"\bmbedtls_ecp_\w+|\bMBEDTLS_ECP_DP_\w+|\bPSA_KEY_TYPE_ECC_\w+")),
+    # EC J-PAKE (row 304): RFC 8236, "a Password-Authenticated Key Exchange by Juggling
+    # (J-PAKE) protocol", which "works basically the same in the elliptic curve (EC)
+    # setting". Mbed TLS's ecjpake module and ESP-IDF's CONFIG_MBEDTLS_ECJPAKE_C ("Elliptic
+    # curve J-PAKE") / CONFIG_MBEDTLS_KEY_EXCHANGE_ECJPAKE ("ciphersuites with prefix
+    # TLS-ECJPAKE-WITH-"); Thread commissioning runs on it.
+    ("EC", "EC J-PAKE (RFC 8236), a password-authenticated key exchange over an elliptic "
+           "curve", re.compile(
+        r"\bmbedtls_ecjpake_\w+|(?<![A-Za-z0-9])MBEDTLS_(?:KEY_EXCHANGE_)?ECJPAKE\w*|"
+        r"\bTLS[-_]ECJPAKE[-_]WITH\w*|(?<![A-Za-z0-9])EC[-_]?JPAKE\b")),
     ("MD5", "MD5 named by the Mbed TLS API", re.compile(
         r"\bmbedtls_md5\w*|\bMBEDTLS_MD_MD5\b|\bPSA_ALG_MD5\b")),
     ("SHA1", "SHA-1 named by the Mbed TLS API", re.compile(
