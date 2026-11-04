@@ -715,7 +715,11 @@ _TLS_CONTEXT = re.compile(
     r"ssl-protocols|(?:min|max)ProtocolVersion|ssl_(?:min|max)_protocol|"
     r"ssl\.enabled\.?protocols|ssl\.(?:quorum\.)?protocol\s*=|^\s*tls_version\s*=|"
     # FortiOS: `set admin-https-ssl-versions`, `set ssl-min-proto-ver(sion)`, `-max-`.
-    r"^\s*set\s+[\w-]*ssl-versions\s|^\s*set\s+ssl-(?:min|max)-proto-ver",
+    r"^\s*set\s+[\w-]*ssl-versions\s|^\s*set\s+ssl-(?:min|max)-proto-ver|"
+    # Postfix, postconf(5): smtpd_tls_protocols, smtp_tls_mandatory_protocols, lmtp_... --
+    # "The valid protocol names ... are "SSLv2", "SSLv3", "TLSv1", "TLSv1.1", "TLSv1.2" and
+    # "TLSv1.3"", with `!` to exclude one and `>=`/`<=` for bounds (row 336).
+    r"(?:^\s*|-o\s+)(?:smtpd?|lmtp)_tls_(?:mandatory_)?protocols\s*=",
     re.IGNORECASE)
 
 # SSH transport, configured the same way.

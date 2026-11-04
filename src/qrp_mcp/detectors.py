@@ -129,7 +129,10 @@ CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
                     # (`ARG SIG_ALG="mldsa65"`; oqs-demos keeps 17 such files), Kconfig
                     # selects a bootloader's signature type, and a Caddyfile is a TLS
                     # server's whole configuration (ZA-OPRAVYANE rows 79 and 52).
-                    "Dockerfile", "Containerfile", "Kconfig", "Caddyfile"}
+                    "Dockerfile", "Containerfile", "Kconfig", "Caddyfile",
+                    # Postfix's main.cf and master.cf: its TLS protocols, ciphers and curves
+                    # (postconf(5); ZA-OPRAVYANE row 336).
+                    "main.cf", "master.cf"}
 
 # The same names with a variant after them (Dockerfile-QUIC, Dockerfile.alpine,
 # Kconfig.defconfig) or before them (nginx.Dockerfile).
