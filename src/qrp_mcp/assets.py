@@ -744,6 +744,12 @@ _VERSION_MACRO = re.compile(r"(?<![A-Za-z0-9_])(SSL[23]|TLS1(?:_[0-3])?)_VERSION
 
 _DEPRECATED_TLS = {"SSLv2", "SSLv3", "TLSv1.0", "TLSv1.1"}
 
+# Rows 405, 407, 410: a method function pins one version -- OpenSSL's `TLSv1_method()` (and
+# `_client`/`_server`), Node's `secureProtocol: 'TLSv1_method'`, wolfSSL's
+# `wolfTLSv1_client_method()`. The version-flexible TLS_method and SSLv23_method do not.
+_METHOD_FUNCTION = re.compile(
+    r"(?<![A-Za-z0-9_])(?:wolf)?(SSLv3|TLSv1(?:_[123])?)_(?:client_|server_)?method(?![A-Za-z0-9_])")
+
 # `SSLProtocol all` or `+all`, but not `-all`, as Apache writes the directive.
 _SSL_PROTOCOL_ALL = re.compile(r"^\s*SSLProtocol\s+(?:.*\s)?\+?all(?:\s|$)",
                                re.IGNORECASE)
@@ -1005,6 +1011,21 @@ def scan_protocols(line: str) -> list[dict[str, Any]]:
             "deprecated": name in _DEPRECATED_TLS,
             "description": (f"{name} is named here. Which algorithms it negotiates "
                             f"is not stated by the version."),
+        })
+    for method in _METHOD_FUNCTION.finditer(line):
+        raw = method.group(1)
+        name = "SSLv3" if raw == "SSLv3" else f"TLSv1.{raw[6] if len(raw) > 5 else 0}"
+        if (name, False) in seen:
+            continue
+        seen.add((name, False))
+        out.append({
+            "protocol": "tls",
+            "version": name,
+            "banned": False,
+            "basis": "configured_protocol",
+            "deprecated": name in _DEPRECATED_TLS,
+            "description": (f"{name} only, by the method {method.group(0)}. Which algorithms "
+                            f"it negotiates is not stated by the version."),
         })
     if _TLS_CONTEXT.search(line):
         for match in _TLS_VERSION.finditer(line):

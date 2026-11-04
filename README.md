@@ -1179,6 +1179,11 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
   `CipherMode.ECB` and `EncryptEcb`/`DecryptEcb` on an object named for AES. A SignTool step's
   `/fd` is its `digest_algorithm`, and a `.ps1`/`.psm1` script's signing steps are listed as a
   `.sh` script's were.
+- **A TLS method function pins its version**: OpenSSL `TLSv1_method()` / `TLSv1_1_client_method()`
+  / `SSLv3_method()`, Node `secureProtocol: 'TLSv1_method'`, wolfSSL `wolfTLSv1_client_method()`
+  are `protocols` rows, deprecated where the version is. `TLS_method` and `SSLv23_method` pin
+  nothing. Also: PyNaCl `nacl.bindings.crypto_sign_keypair()` is Ed25519, and Ruby
+  `OpenSSL::PKey::DH.new|generate(N)` is DH with its size.
 - **A linked directory that points into the scanned tree** no longer stops the verdict from
   accounting for every file: the walk entered its target under its own name, and the verdict
   says so ("alias/ points into the scanned tree (real/), which was walked"). A link outside the
