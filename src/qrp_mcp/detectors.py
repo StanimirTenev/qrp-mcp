@@ -3896,8 +3896,37 @@ def scan_source_file(path: Path, rel_path: str,
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
     findings = _drop_ecdh_named_only_by_the_setting(findings)
-    return _drop_signatures_covered_by_a_call(_drop_imports_covered_by_a_call(findings),
-                                              signature_lines)
+    findings = _drop_signatures_covered_by_a_call(_drop_imports_covered_by_a_call(findings),
+                                                  signature_lines)
+    if len(lines) > 1:
+        findings = _split_call_names(path, rel_path, lines, findings, cipher_exclusions)
+    return findings
+
+
+# Row 424: `generateKeyPairSync(\n  'rsa',` and `getInstance(\n  "RSA");` were silent, while the
+# same call on one line is read. A line holding nothing but a short string -- then a comma or
+# the closing of the call -- right under a line that ends in an open parenthesis is read as the
+# two lines joined, and only what the join adds is kept, at the string's line.
+_BARE_NAME_LINE = re.compile(r"""^\s*(["'])[A-Za-z0-9_.-]{2,32}\1\s*(?:,|\)+\s*;?)\s*$""")
+
+
+def _split_call_names(path: Path, rel_path: str, lines: list[str],
+                      findings: list[dict[str, Any]], cipher_exclusions: bool) -> list[dict[str, Any]]:
+    added: list[dict[str, Any]] = []
+    for index in range(1, len(lines)):
+        line, above = lines[index], lines[index - 1]
+        if not above.rstrip().endswith("(") or not _BARE_NAME_LINE.match(line):
+            continue
+        here = {f["algorithm"] for f in findings if f["line"] in (index, index + 1)}
+        joined = scan_source_file(path, rel_path, [above.rstrip() + line.strip()],
+                                  cipher_exclusions)
+        for item in joined:
+            if item["algorithm"] in here or item.get("evidence_kind") != "call":
+                continue
+            here.add(item["algorithm"])
+            added.append({**item, "line": index + 1, "excerpt": line.strip()[:200],
+                          "description": item["description"] + " (the call opens on the line above)"})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 _NOT_A_SETTING = ("#", ";", "//", "--", "/*", "*", "<!--")
