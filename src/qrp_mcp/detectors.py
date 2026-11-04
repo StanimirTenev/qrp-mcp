@@ -4215,7 +4215,8 @@ _PARAMETER_SETS: dict[str, tuple[re.Pattern[str], Any]] = {
 # drafts); curveSM2MLKEM768 as the registry names it. SSH: draft-ietf-sshm-mlkem-hybrid-kex
 # (mlkem768x25519-sha256, mlkem768nistp256-sha256, mlkem1024nistp384-sha384) and the
 # Streamlined NTRU Prime draft (sntrup761x25519-sha512, OpenSSH 9.0's default; sntrup761
-# is in the NTRU family here, classifier.py). X-Wing: draft-connolly-cfrg-xwing-kem.
+# is in the NTRU family here, classifier.py). X-Wing: draft-connolly-cfrg-xwing-kem. IKE:
+# strongSwan's proposal keywords (docs.strongswan.org, config/proposals).
 HYBRIDS: dict[str, tuple[str, tuple[tuple[str, str | None], ...]]] = {
     name.lower(): (name, halves) for name, halves in (
         ("X25519MLKEM768", (("X25519", None), ("ML-KEM", "768"))),
@@ -4229,6 +4230,9 @@ HYBRIDS: dict[str, tuple[str, tuple[tuple[str, str | None], ...]]] = {
         ("mlkem1024nistp384-sha384", (("ML-KEM", "1024"), ("ECDH", "P-384"))),
         ("sntrup761x25519-sha512", (("NTRU", "sntrup761"), ("X25519", None))),
         ("X-Wing", (("ML-KEM", "768"), ("X25519", None))),
+        # strongSwan, an RFC 9370 additional key exchange: `ecp256-ke1_mlkem768` (proposals
+        # page: "prefixing the algorithm keyword with keX_"; ecp256 is IANA group 19).
+        ("ecp256-ke1_mlkem768", (("ECDH", "P-256"), ("ML-KEM", "768"))),
     )}
 _HYBRID_NAME = re.compile(
     r"(?<![A-Za-z0-9])(" + "|".join(re.escape(n) for n in sorted(HYBRIDS, key=len, reverse=True))
