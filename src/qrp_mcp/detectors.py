@@ -297,6 +297,16 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z0-9])ECDSAP256SHA256(?![A-Za-z0-9])", re.IGNORECASE)),
     ("ECDSA", "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)", re.compile(
         r"(?<![A-Za-z0-9])ECDSAP384SHA384(?![A-Za-z0-9])", re.IGNORECASE)),
+    # Row 344: OpenSSL's signature-algorithm pairs, "algorithm+hash"
+    # (https://docs.openssl.org/3.0/man3/SSL_CONF_cmd/, SignatureAlgorithms); mod_ssl's own
+    # example is `SSLOpenSSLConfCmd SignatureAlgorithms RSA+SHA384:ECDSA+SHA256`
+    # (https://httpd.apache.org/docs/2.4/mod/mod_ssl.html#sslopensslconfcmd).
+    ("RSA", "RSA named in a signature-algorithm pair (RSA+SHA...)", re.compile(
+        r"(?<![A-Za-z0-9])RSA(?:-PSS)?\+SHA(?:1|224|256|384|512)(?![A-Za-z0-9])")),
+    ("DSA", "DSA named in a signature-algorithm pair (DSA+SHA...)", re.compile(
+        r"(?<![A-Za-z0-9])DSA\+SHA(?:1|224|256|384|512)(?![A-Za-z0-9])")),
+    ("SHA1", "SHA-1 named in a signature-algorithm pair (...+SHA1)", re.compile(
+        r"(?<![A-Za-z0-9])(?:RSA|RSA-PSS|DSA|ECDSA)\+SHA1(?![A-Za-z0-9])")),
     # Row 307: the mnemonic in upper case (IANA) or lower case (BIND's `algorithm rsasha256`),
     # never camelCase: `SecurityAlgorithms.RsaSha256` is the JOSE RS256 constant and `struct
     # RsaSha256` a type, neither DNSSEC.
@@ -4116,8 +4126,11 @@ def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
 # The NIST prime curves by their SEC 2, ANSI X9.62 and NIST spellings (SEC 2 v2.0 Table 1:
 # secp256r1 = prime256v1 = P-256). An EC row whose line names exactly one of them carries it as
 # `curve`, which the CBOM's algorithmProperties.curve takes (ZA-OPRAVYANE row 129).
+# Rows 310, 345: IKE's `ecp256`/`ecp384`/`ecp521` are the same curves, groups 19-21 (RFC 5903,
+# https://www.rfc-editor.org/rfc/rfc5903#section-3).
 _NIST_CURVE = re.compile(
-    r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))(?![0-9])",
+    r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))(?![0-9])|"
+    r"(?<![A-Za-z])ecp(256|384|521)(?![0-9])",
     re.IGNORECASE)
 
 
@@ -4477,6 +4490,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             src.extend(fabric_bccsp(rel_path, lines))
         _schannel_disabled(src, lines)
         src = _jwk_sizes(src, lines)
+        _ssh_public_keys(src, lines)
         source_findings.extend(src)
         # An IKE configuration carrying a post-quantum algorithm: name its
         # fragmentation setting (see ike.py).
@@ -4565,6 +4579,51 @@ def _jwk_sizes(found: list[dict[str, Any]], lines: list[str]) -> list[dict[str, 
         if f.get("line") in sizes and f.get("algorithm") == "RSA":
             f["key_size"] = sizes[f["line"]]
     return found
+
+
+# Row 338: an `ssh-rsa` public key carries its modulus: "string "ssh-rsa", mpint e, mpint n"
+# (RFC 4253 §6.6, https://www.rfc-editor.org/rfc/rfc4253#section-6.6). Row 353: "Revoked keys are
+# specified by including the "@revoked" marker ... Revoked keys are never accepted" (sshd(8),
+# https://man.openbsd.org/sshd.8#SSH_KNOWN_HOSTS_FILE_FORMAT): a ban, not a key in use.
+_SSH_RSA_BLOB = re.compile(r"(?<![\w-])ssh-rsa\s+(AAAAB3NzaC1yc2E[A-Za-z0-9+/]*={0,2})(?![A-Za-z0-9+/=])")
+
+
+def _ssh_rsa_bits(blob: str) -> int | None:
+    import base64
+    try:
+        data = base64.b64decode(blob, validate=True)
+    except (ValueError, TypeError):
+        return None
+    fields, at = [], 0
+    while at + 4 <= len(data) and len(fields) < 3:
+        size = int.from_bytes(data[at:at + 4], "big")
+        fields.append(data[at + 4:at + 4 + size])
+        at += 4 + size
+    if len(fields) < 3 or fields[0] != b"ssh-rsa" or at > len(data):
+        return None
+    bits = int.from_bytes(fields[2], "big").bit_length()
+    return bits or None
+
+
+def _ssh_public_keys(found: list[dict[str, Any]], lines: list[str]) -> None:
+    sizes: dict[int, int] = {}
+    revoked: set[int] = set()
+    for number, line in enumerate(lines, 1):
+        if "ssh-" not in line and "ecdsa-" not in line:
+            continue
+        if line.lstrip().startswith("@revoked"):
+            revoked.add(number)
+        match = _SSH_RSA_BLOB.search(line)
+        if match:
+            bits = _ssh_rsa_bits(match.group(1))
+            if bits:
+                sizes[number] = bits
+    for item in found:
+        line = item.get("line")
+        if line in sizes and item.get("algorithm") == "RSA":
+            item["key_size"] = sizes[line]
+        if line in revoked and item.get("evidence_kind") != "comment":
+            item["evidence_kind"] = "ban"
 
 
 def _device_grammar(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:

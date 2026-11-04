@@ -925,6 +925,8 @@ def scan_certificate_file(path: Path, rel_path: str,
     blobs: list[bytes] = []
     # The blobs that are an `RSA PUBLIC KEY` block, read as a bare RSAPublicKey.
     pkcs1_public: set[int] = set()
+    # Row 350: a private-key block that parsed, by its blob's index: the line of its BEGIN.
+    parsed_key_blobs: dict[int, int] = {}
     text = decode_text(raw)
     # What `cryptography` read (release C). A block it parsed as certificates is reported
     # from the parse, at its own line, and kept out of the identifier walk below.
@@ -954,6 +956,8 @@ def scan_certificate_file(path: Path, rel_path: str,
             blobs.append(base64.b64decode(_bare_body(match.group(2)), validate=False))
         except (ValueError, TypeError):
             continue
+        if "key_algorithm" in material["keys"].get(line_no, {}):
+            parsed_key_blobs[len(blobs) - 1] = line_no
         if label == "RSA PUBLIC KEY":
             pkcs1_public.add(len(blobs) - 1)
 
@@ -986,7 +990,22 @@ def scan_certificate_file(path: Path, rel_path: str,
             record(named, f"{named} in an SSH {'certificate' if certified else 'key'} "
                    f"of type {head}", line_no, line)
 
-    for blob in blobs:
+    for index, blob in enumerate(blobs):
+        if index in parsed_key_blobs:
+            # Row 350: an .ovpn's inline `<key>` gave "observed in the file; the file was not
+            # decoded" at line 1, beside the decoded certificate. The key did parse: its
+            # identifiers are named at its own line, as from a parsed key.
+            for oid in sorted(_iter_oids(blob)):
+                entry = _find_oid_family(oid)
+                if entry is not None:
+                    record(entry[1], f"{entry[1]} object identifier {oid} in a private key "
+                           f"block that parsed as a key", parsed_key_blobs[index], oid,
+                           kind="reference")
+                    fields = material["keys"][parsed_key_blobs[index]]
+                    if (algorithms and algorithms[-1]["algorithm"] == fields["key_algorithm"]
+                            and isinstance(fields.get("key_size"), int)):
+                        algorithms[-1]["key_size"] = fields["key_size"]
+            continue
         # Sorted: _iter_oids returns a set, so the order of the evidence list
         # changed between interpreters with different hash seeds. A report whose
         # own field order moves between runs cannot be diffed.
