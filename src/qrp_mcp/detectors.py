@@ -1664,6 +1664,11 @@ def _only_names_the_assigned_variable(line: str, matches: list[re.Match]) -> boo
             end += 1
         if not (start < match.start() or end > match.end()):
             return False
+        # A switch (`CONFIG_ECDSA=y`, `ECDSA_ENABLED = true`) names what it turns on: set on,
+        # it is a declaration of the use; set off, a ban (_switched_off).
+        name = line[start:end].lstrip("$")
+        if _SWITCH_NAME.search(name) or _SWITCH_NAME_CAMEL.search(name):
+            return False
         if not _ASSIGNED_AFTER_NAME.match(line, end):
             return False
         before = line[:start].rstrip()
@@ -2918,12 +2923,23 @@ def _opens_a_denial_block(line: str) -> bool:
 # `USE_RSA = False`, Kconfig `CONFIG_ECDSA=n` -- and was counted as a use. The name has to be a
 # switch (Kconfig's CONFIG_, or a use/enable/with/allow/support/have word), the value off, and
 # nothing else on the line; `n` only for Kconfig.
+# Row 422: the same switch in Rust, TypeScript, PHP, Java and Go -- `const ECDSA_ENABLED: bool =
+# false;`, `static final boolean ...`, `$ecdsaEnabled = false;` -- after the declaring keywords,
+# a type, a `$`, and with a type annotation; and `= 0`, off as `false` is.
 _SWITCH_SET_OFF = re.compile(
-    r"^\s*(?:export\s+)?([A-Za-z_][\w.-]*)\s*[:=]\s*[\"']?(false|no|off|disabled|n)[\"']?"
-    r"\s*[,;]?\s*$", re.IGNORECASE)
+    r"^\s*(?:export\s+)?"
+    r"(?:(?:pub(?:\([\w:]+\))?|const|let|var|val|static|final|private|public|protected|"
+    r"internal|readonly|mut)\s+)*(?:(?:boolean|bool|int)\s+)?\$?"
+    r"([A-Za-z_][\w.-]*)\s*(?::\s*(?:bool|boolean|int|u8|u32|i32|number)\s*=|[:=])\s*"
+    r"[\"']?(false|no|off|disabled|n|0)[\"']?\s*[,;]?\s*$", re.IGNORECASE)
 _SWITCH_NAME = re.compile(
     r"^CONFIG_|(?:^|[_.-])(?:use|enable|enabled|with|allow|allowed|support|supported|have)"
     r"(?:[_.-]|$)", re.IGNORECASE)
+# The same words in a camelCase name (`ecdsaEnabled`, `useEd25519`): a capital opens the word,
+# and a lower-case letter right after it means a different word.
+_SWITCH_NAME_CAMEL = re.compile(
+    r"(?:^(?:use|enable|with|allow|support|have)|(?<=[a-z0-9])(?:Use|Enable|Enabled|With|Allow|"
+    r"Allowed|Support|Supported|Have))(?![a-z])")
 
 
 # Row 302: the same switch written into a file by a build script, `echo "USE_ML_KEM_768=false"
@@ -2956,7 +2972,8 @@ _SSH_REMOVAL_LIST = re.compile(
 
 def _switched_off(code: str, position: int) -> bool:
     m = _SWITCH_SET_OFF.match(code) or _SWITCH_ECHOED_OFF.match(code)
-    if not m or position >= m.end(1) or not _SWITCH_NAME.search(m.group(1)):
+    if not m or position >= m.end(1) or not (_SWITCH_NAME.search(m.group(1))
+                                             or _SWITCH_NAME_CAMEL.search(m.group(1))):
         return False
     return m.group(2).lower() != "n" or m.group(1).startswith("CONFIG_")
 
