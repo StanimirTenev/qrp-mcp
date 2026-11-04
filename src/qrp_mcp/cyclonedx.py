@@ -265,7 +265,13 @@ _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versio
                     "fragmentation_default", "udp_setting", "udp_size", "included_by",
                     "listener", "library_defaults", "peer_verification",
                     "verification_setting", "dnssec_algorithm", "dnssec_mnemonic",
-                    "recipient_family", "hndl", "key_exchange", "policy_known")
+                    "recipient_family", "hndl", "key_exchange", "policy_known",
+                    # switches.py (batch 0.42.0).
+                    "setting", "tls_disabled", "weak_crypto_allowed",
+                    "channel", "channel_type", "tls_not_established",
+                    # fortios.py (row 228).
+                    "default_setting", "default_value", "firmware", "defaults_documented_for",
+                    "defaults_applied", "defaults_not_evaluated")
 _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 
 
@@ -274,6 +280,14 @@ def _protocol_label(asset: dict[str, Any]) -> str:
         return f"TLS listener ({asset['listener']})"
     if asset.get("peer_verification"):
         return f"TLS peer verification off ({asset['verification_setting']})"
+    if asset.get("basis") == "firmware_defaults":
+        return f"FortiOS firmware defaults ({asset['firmware']})"
+    if asset.get("channel"):
+        return f"IBM MQ channel {asset['channel']} ({asset['setting']})"
+    if asset.get("tls_disabled"):
+        return f"TLS disabled ({asset['setting']})"
+    if asset.get("weak_crypto_allowed"):
+        return f"Strong cryptography off ({asset['setting']})"
     if asset.get("security_policy"):
         return f"OPC UA SecurityPolicy {asset['security_policy']}"
     if asset.get("policy"):
@@ -1095,7 +1109,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "cryptoProperties": {"assetType": "algorithm",
                                  "algorithmProperties": {"primitive": "pke"}},
             "properties": [
-                {"name": f"{NS}basis", "value": "configured_cipher_suite"},
+                # A FortiOS switch or firmware default enables the suites without naming
+                # them (batch 0.42.0): its basis is said, not folded into a cipher suite's.
+                {"name": f"{NS}basis", "value": ", ".join(sorted(
+                    {g.get("basis", "configured_cipher_suite") for g in static_rsa}))},
                 {"name": f"{NS}family", "value": "RSA"},
                 {"name": f"{NS}key_exchange", "value": "RSA"},
                 {"name": f"{NS}suites", "value": ", ".join(suites)},

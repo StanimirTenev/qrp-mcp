@@ -124,6 +124,14 @@ DEPENDENCY_FAMILIES: dict[str, dict[str, tuple[str, ...]]] = {
         "rbnacl": ("X25519", "EdDSA"),
         "ed25519": ("EdDSA",),
     },
+    # Row 313. JOSESwift's README lists RS*/PS*, ES* and RSA1_5/RSA-OAEP/ECDH-ES as supported
+    # (https://github.com/airsidemobile/JOSESwift, read 04.11.2026).
+    "cocoapods": {
+        "JOSESwift": ("RSA", "ECDSA", "ECDH"),
+    },
+    "swiftpm": {
+        "joseswift": ("RSA", "ECDSA", "ECDH"),
+    },
     "nuget": {
         "BouncyCastle.Cryptography": ("RSA", "ECDSA", "ECDH", "DSA"),
         "Portable.BouncyCastle": ("RSA", "ECDSA", "ECDH", "DSA"),
@@ -173,6 +181,17 @@ MANIFEST_FILENAMES: dict[str, str] = {
 
 # NuGet has no fixed filename: the project file is named after the project.
 _NUGET_SUFFIXES = (".csproj", ".vbproj", ".fsproj")
+# Row 313: manifests named after the project too. A Gradle script of any name
+# (`samples-demo.gradle`, `settings.gradle`) is read as build.gradle is; a gem's
+# `.gemspec` (`add_dependency`), a CocoaPods `.podspec` (`s.dependency`) and SwiftPM's
+# Package.resolved (`pins[].identity`, v2/v3; `object.pins[].package`, v1).
+_SUFFIX_ECOSYSTEMS = {".gradle": "maven", ".gemspec": "rubygems",
+                      ".podspec": "cocoapods"}
+_RESOLVED_NAMES = {"Package.resolved": "swiftpm"}
+_GEMSPEC_DEP = re.compile(
+    r"""^\s*\w+\.add_(?:runtime_|development_)?dependency\s*\(?\s*['"]([^'"]+)['"]""")
+_PODSPEC_DEP = re.compile(r"^\s*\w+(?:\.(?:ios|osx|macos|tvos|watchos|visionos))?"
+                          r"""\.dependency\s*\(?\s*['"]([^'"/]+)""")
 _NUGET_FILENAMES = {"packages.config", "Directory.Packages.props"}
 
 # A dependency is read from the structure of the manifest, never from the text
@@ -293,6 +312,19 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
     if ecosystem == "nuget":
         return [(m.group(1), n) for n, text in enumerate(lines, 1)
                 for m in _NUGET_PACKAGE.finditer(text)]
+    if ecosystem == "swiftpm":
+        try:
+            data = json.loads("\n".join(lines))
+        except (ValueError, TypeError):
+            return []
+        pins = (data.get("pins") or (data.get("object") or {}).get("pins") or []
+                if isinstance(data, dict) else [])
+        for pin in pins if isinstance(pins, list) else []:
+            package = pin.get("identity") or pin.get("package") if isinstance(pin, dict) else None
+            if isinstance(package, str):
+                line = next((n for n, text in enumerate(lines, 1) if f'"{package}"' in text), 1)
+                out.append((package.lower(), line))
+        return out
     inside_cargo_deps = False
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
@@ -320,8 +352,12 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
             pattern = _MAVEN_ARTIFACT if name == "pom.xml" else _GRADLE_DEP
             for match in pattern.finditer(text):
                 out.append((match.group(1), number))
+        elif ecosystem == "cocoapods":
+            match = _PODSPEC_DEP.match(text)
+            if match:
+                out.append((match.group(1), number))
         elif ecosystem == "rubygems":
-            match = _GEM.match(text)
+            match = (_GEMSPEC_DEP if name.endswith(".gemspec") else _GEM).match(text)
             if match:
                 out.append((match.group(1), number))
     return out
@@ -489,16 +525,24 @@ def os_packages(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     return out
 
 
+def _suffix_ecosystem(path: Path) -> str | None:
+    if path.name.endswith(".gradle.kts"):
+        return "maven"
+    return _SUFFIX_ECOSYSTEMS.get(path.suffix)
+
+
 def is_manifest(path: Path) -> bool:
     return (path.name in MANIFEST_FILENAMES
             or path.name in _NUGET_FILENAMES
-            or path.suffix in _NUGET_SUFFIXES)
+            or path.suffix in _NUGET_SUFFIXES
+            or path.name in _RESOLVED_NAMES or _suffix_ecosystem(path) is not None)
 
 
 def _ecosystem_of(path: Path) -> str | None:
     if path.name in _NUGET_FILENAMES or path.suffix in _NUGET_SUFFIXES:
         return "nuget"
-    return MANIFEST_FILENAMES.get(path.name)
+    return (MANIFEST_FILENAMES.get(path.name) or _RESOLVED_NAMES.get(path.name)
+            or _suffix_ecosystem(path))
 
 
 def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
@@ -688,14 +732,21 @@ def _at_rest(protocol: str, path: str, line: int, excerpt: str,
 # The spellings a version pin actually takes, across the languages that pin one.
 _TLS_VERSION = re.compile(
     r"(?<![A-Za-z0-9])(?:"
-    r"TLSv1(?:[._](\d))?|"                       # TLSv1.2, TLSv1_2, TLSv1
+    r"TLSv1(?:[._-](\d))?|"                      # TLSv1.2, TLSv1_2, TLSv1, FortiOS TLSv1-1
     r"SSLv(2|3)|"                                # SSLv3
     r"tls\.VersionTLS(1[0-3])|"                  # Go
     r"SslProtocols\.Tls(1[123])?|"               # .NET
     r"PROTOCOL_TLSv1(?:_(\d))?|"                 # Python ssl
     r"TLS1_(\d)_VERSION|"                        # OpenSSL
     r"TLS_?v?1\.(\d)|"                           # rustls, prose in config
-    r"tls1\.(\d)"                                # Caddy `protocols tls1.2 tls1.3`
+    r"tls1\.(\d)|"                               # Caddy `protocols tls1.2 tls1.3`
+    # Istio's TLSProtocol enum (`TLSV1_0`) and Traefik's bare Go constant name
+    # (`minVersion: VersionTLS10`), ZA-OPRAVYANE row 332.
+    r"TLSV1_([0-3])|"
+    r"VersionTLS(1[0-3])|"
+    # FortiOS (7.6.4 CLI reference, row 226): admin-https-ssl-versions `tlsv1-1 tlsv1-2`,
+    # vpn ssl settings ssl-min/max-proto-ver `tls1-0`..`tls1-3`.
+    r"tlsv1-([0-3])|tls1-([0-3])"
     r")(?![A-Za-z0-9])")
 
 # Where a protocol is being configured rather than mentioned. Without one of
@@ -711,7 +762,20 @@ _TLS_CONTEXT = re.compile(
     # defaults that carry them (Configuration Manual 3.5; ZA-OPRAVYANE row 30).
     r"ssl-(?:min|max)-ver|ssl-default-(?:bind|server)-options|"
     # Caddy's `tls` block: `protocols <min> [<max>]` (ZA-OPRAVYANE row 111).
-    r"^\s*protocols\s+tls1\.[0-3]",
+    r"^\s*protocols\s+tls1\.[0-3]|"
+    # ZA-OPRAVYANE row 332, each from the product's documentation: Ingress-NGINX
+    # `ssl-protocols`, Istio `minProtocolVersion`/`maxProtocolVersion`, Dovecot
+    # `ssl_min_protocol`, Kafka `ssl.enabled.protocols`/`ssl.protocol`, ZooKeeper
+    # `ssl.enabledProtocols`/`ssl.protocol`, MySQL `tls_version`. (Traefik's `minVersion`
+    # is MinVersion above.)
+    r"ssl-protocols|(?:min|max)ProtocolVersion|ssl_(?:min|max)_protocol|"
+    r"ssl\.enabled\.?protocols|ssl\.(?:quorum\.)?protocol\s*=|^\s*tls_version\s*=|"
+    # FortiOS: `set admin-https-ssl-versions`, `set ssl-min-proto-ver(sion)`, `-max-`.
+    r"^\s*set\s+[\w-]*ssl-versions\s|^\s*set\s+ssl-(?:min|max)-proto-ver|"
+    # Postfix, postconf(5): smtpd_tls_protocols, smtp_tls_mandatory_protocols, lmtp_... --
+    # "The valid protocol names ... are "SSLv2", "SSLv3", "TLSv1", "TLSv1.1", "TLSv1.2" and
+    # "TLSv1.3"", with `!` to exclude one and `>=`/`<=` for bounds (row 336).
+    r"(?:^\s*|-o\s+)(?:smtpd?|lmtp)_tls_(?:mandatory_)?protocols\s*=",
     re.IGNORECASE)
 
 # SSH transport, configured the same way.
@@ -936,8 +1000,13 @@ def _tls_version_name(match: re.Match) -> str:
 # ("Allowed values are "1.0", "1.1", "1.2", and "1.3"", v3.2.x, read 23.10.2026). The
 # spellings above need `TLSv1`/`TLS1.x`, so the EAP-TLS minimum gave nothing
 # (ZA-OPRAVYANE row 103).
+# OpenVPN 2.6 writes it bare too: "tls-version-min version ['or-highest'] Sets the minimum
+# TLS version we will accept" (reference manual; ZA-OPRAVYANE row 332).
+# Vault's listener, the whole value only: tls_min_version "Accepted values are "tls10",
+# "tls11", "tls12" or "tls13"" (row 305). Vault's own error messages list the same words.
 _BARE_TLS_VERSION_SETTING = re.compile(
-    r"^\s*tls_(?:min|max)_version\s*=\s*[\"']?1\.([0-3])[\"']?\s*(?:#.*)?$")
+    r"^\s*(?:tls_(?:min|max)_version\s*=\s*[\"']?(?:1\.|tls1)([0-3])[\"']?|"
+    r"tls-version-(?:min|max)\s+1\.([0-3])(?:\s+or-highest)?)\s*(?:#.*)?$")
 
 
 _LOWERED: list[Any] = [None, ""]
@@ -987,7 +1056,7 @@ def scan_protocols(line: str) -> list[dict[str, Any]]:
     seen: set[tuple[str, bool]] = set()
     bare = _BARE_TLS_VERSION_SETTING.match(line)
     if bare:
-        name = f"TLSv1.{bare.group(1)}"
+        name = f"TLSv1.{bare.group(1) or bare.group(2)}"
         seen.add((name, False))
         out.append({
             "protocol": "tls",

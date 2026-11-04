@@ -20,8 +20,9 @@ from . import _warm
 # The rules' regexes compile through the cache of _warm until the end of this module.
 _warm.start_regex()
 
-from . import (aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, registry,
-               suppression)
+from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirection, linegate,
+               mqsc, oids, openpgp, opcua, plist, registry, snk, suppression, switches,
+               wireguard)
 from . import grammar
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
@@ -64,6 +65,13 @@ SOURCE_EXTENSIONS = {
     # React's JSX and TSX: a WebCrypto call in a component was "type not claimed"
     # (ZA-OPRAVYANE row 96), though the comment rules already knew both.
     ".jsx", ".tsx",
+    # Batch 0.42.0 (ZA-OPRAVYANE rows 308, 387, 388), measured on real trees where each was
+    # "type not claimed": the other shells' spellings and Windows batch files carry the
+    # same `openssl genrsa` and `signtool` lines as .sh; Visual Basic and F# call the same
+    # System.Security.Cryptography APIs as C#; a PowerShell data file (.psd1) is
+    # PowerShell syntax. Limits: VB's `'` comment and batch `::` are not told from code
+    # (`REM` is, by _COMMENT_LINE).
+    ".bash", ".zsh", ".ksh", ".bat", ".cmd", ".vb", ".fs", ".fsx", ".psd1",
 }
 
 EXCLUDED_DIRS = {
@@ -91,7 +99,28 @@ CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
                      ".zone",
                      # IBM MQ's command scripts: a channel's SSLCIPH names its CipherSpec,
                      # an IANA suite name (ZA-OPRAVYANE row 202).
-                     ".mqsc"}
+                     ".mqsc",
+                     # Batch 0.42.0: make fragments (`.mk`, row 308), the registry exports
+                     # that carry SCHANNEL and cipher-order policy (`.reg`, row 386), and
+                     # Windows build and request files whose lines name algorithms and
+                     # signing steps: certreq `.inf`, MSBuild `.vcxproj`/`.props`/
+                     # `.targets`, WiX `.wxs` (row 387).
+                     ".mk", ".reg", ".inf", ".vcxproj", ".props", ".targets", ".wxs",
+                     # Helm's template partials: "_helpers.tpl" is "the default location
+                     # for template partials" (helm.sh named templates; row 309). Read as
+                     # the configuration they render into, as Jinja templates are.
+                     ".tpl", ".gotmpl"}
+
+# .NET's configuration files, by name: web.config, app.config, machine.config, IIS's
+# applicationHost.config, and their transforms (Web.Release.config). Not every `.config`:
+# packages.config and nuget.config are manifests (row 386).
+DOTNET_CONFIG_NAME = re.compile(r"^(?:web|app|machine|applicationhost)(?:\.[\w-]+)?\.config$",
+                                re.IGNORECASE)
+
+# Scripts and build files read for signing commands as a pipeline is (ZA-OPRAVYANE rows 34,
+# 308, 387).
+SIGNING_SCRIPT_EXTENSIONS = {".sh", ".bash", ".zsh", ".ksh", ".bat", ".cmd",
+                             ".csproj", ".vcxproj", ".props", ".targets", ".mk"}
 
 # The same files that carry no extension at all.
 CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
@@ -107,12 +136,22 @@ CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
                     # (`ARG SIG_ALG="mldsa65"`; oqs-demos keeps 17 such files), Kconfig
                     # selects a bootloader's signature type, and a Caddyfile is a TLS
                     # server's whole configuration (ZA-OPRAVYANE rows 79 and 52).
-                    "Dockerfile", "Containerfile", "Kconfig", "Caddyfile"}
+                    "Dockerfile", "Containerfile", "Kconfig", "Caddyfile",
+                    # Postfix's main.cf and master.cf: its TLS protocols, ciphers and curves
+                    # (postconf(5); ZA-OPRAVYANE row 336).
+                    "main.cf", "master.cf",
+                    # OpenID Connect Discovery 1.0, 4: "a JSON document ... at the path formed
+                    # by concatenating the string /.well-known/openid-configuration"; it lists
+                    # the JWS algorithms (id_token_signing_alg_values_supported; row 352).
+                    "openid-configuration"}
 
 # The same names with a variant after them (Dockerfile-QUIC, Dockerfile.alpine,
 # Kconfig.defconfig) or before them (nginx.Dockerfile).
 CONFIG_FILENAME_PATTERN = re.compile(
-    r"^(?:Dockerfile|Containerfile|Kconfig)[-.][\w.-]+$|^[\w.-]+\.(?:Dockerfile|Containerfile)$")
+    r"^(?:Dockerfile|Containerfile|Kconfig)[-.][\w.-]+$|^[\w.-]+\.(?:Dockerfile|Containerfile)$|"
+    # ESP-IDF's project configuration: sdkconfig, sdkconfig.defaults and
+    # sdkconfig.defaults.TARGET_NAME (ESP-IDF build system guide; ZA-OPRAVYANE row 304).
+    r"^sdkconfig(?:\.[\w.-]+)?$")
 
 # Directories whose files are configuration without an extension: FreeRADIUS keeps its
 # EAP-TLS settings in raddb/mods-available/eap (ZA-OPRAVYANE row 103), and Debian's nginx
@@ -532,8 +571,31 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bmbedtls_dhm_\w+|\bMBEDTLS_DHM_\w+|\bPSA_ALG_FFDH\b|\bPSA_KEY_TYPE_DH_\w+")),
     ("RSA", "RSA named by the PSA Crypto API", re.compile(
         r"\bPSA_KEY_TYPE_RSA_\w+|\bPSA_ALG_RSA_\w+")),
+    # phpseclib, the pure-PHP library (row 303): its classes by namespace (`\phpseclib3`,
+    # `\phpseclib4`, 2.x `\phpseclib`; README) and v3's static key generators. phpseclib
+    # 3.0 phpseclib/Crypt/RSA.php: `namespace phpseclib3\Crypt;`, `public static function
+    # createKey($bits = 2048)`. Laravel Passport makes its OAuth key with `RSA::createKey`.
+    ("RSA", "RSA named by phpseclib", re.compile(
+        r"\bphpseclib\d?\\+Crypt\\+RSA\b|(?<![\w\\])RSA::createKey\s*\(")),
+    ("DSA", "DSA named by phpseclib", re.compile(
+        r"\bphpseclib\d?\\+Crypt\\+DSA\b|(?<![\w\\])DSA::createKey\s*\(")),
+    ("DH", "DH named by phpseclib", re.compile(
+        r"\bphpseclib\d?\\+Crypt\\+DH\b|(?<![\w\\])DH::createKey\s*\(")),
+    ("EC", "EC named by phpseclib", re.compile(
+        r"\bphpseclib\d?\\+Crypt\\+EC\b|"
+        # `EC::createKey('Ed25519')` is the Ed25519 rule's, not a second family.
+        r"(?<![\w\\])EC::createKey\s*\((?!\s*['\"](?:Ed|Curve|X)(?:25519|448))")),
     ("EC", "EC named by the Mbed TLS API", re.compile(
         r"\bmbedtls_ecp_\w+|\bMBEDTLS_ECP_DP_\w+|\bPSA_KEY_TYPE_ECC_\w+")),
+    # EC J-PAKE (row 304): RFC 8236, "a Password-Authenticated Key Exchange by Juggling
+    # (J-PAKE) protocol", which "works basically the same in the elliptic curve (EC)
+    # setting". Mbed TLS's ecjpake module and ESP-IDF's CONFIG_MBEDTLS_ECJPAKE_C ("Elliptic
+    # curve J-PAKE") / CONFIG_MBEDTLS_KEY_EXCHANGE_ECJPAKE ("ciphersuites with prefix
+    # TLS-ECJPAKE-WITH-"); Thread commissioning runs on it.
+    ("EC", "EC J-PAKE (RFC 8236), a password-authenticated key exchange over an elliptic "
+           "curve", re.compile(
+        r"\bmbedtls_ecjpake_\w+|(?<![A-Za-z0-9])MBEDTLS_(?:KEY_EXCHANGE_)?ECJPAKE\w*|"
+        r"\bTLS[-_]ECJPAKE[-_]WITH\w*|(?<![A-Za-z0-9])EC[-_]?JPAKE\b")),
     ("MD5", "MD5 named by the Mbed TLS API", re.compile(
         r"\bmbedtls_md5\w*|\bMBEDTLS_MD_MD5\b|\bPSA_ALG_MD5\b")),
     ("SHA1", "SHA-1 named by the Mbed TLS API", re.compile(
@@ -1920,6 +1982,8 @@ _KEY_SIZE = re.compile(
     # a whole quoted value (`rsa512_key.pem` is a fixture's file name, as for the key specs).
     r"(?<![A-Za-z])rsa_(?:len|bits|size)\s*=\s*(\d{3,5})\b|[\"'](?i:rsa)(\d{3,5})[\"']|"
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
+    # phpseclib 3: `RSA::createKey(4096)` (row 303).
+    r"(?<![\w\\])RSA::createKey\(\s*(\d{3,5})\s*\)|"
     r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
     r"EVP_PKEY_Q_keygen\((?:[^)]|\(size_t\))*?(\d{3,5})\s*\)|"
@@ -2188,7 +2252,8 @@ def is_config_file(path: Path) -> bool:
     """A configuration file, by extension or by one of the extensionless names."""
     return (path.suffix.lower() in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
             or bool(CONFIG_FILENAME_PATTERN.match(path.name))
-            or (not path.suffix and path.parent.name in CONFIG_DIRECTORIES))
+            or (not path.suffix and path.parent.name in CONFIG_DIRECTORIES)
+            or bool(DOTNET_CONFIG_NAME.match(path.name)))
 
 
 # Returned when the platform cannot open relative to a directory descriptor, to
@@ -2443,7 +2508,7 @@ _SLASH_COMMENT_EXT = {
     ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".cs", ".java", ".js",
     ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".go", ".rs", ".swift", ".kt",
     ".kts", ".scala", ".sc", ".php", ".m", ".mm", ".groovy", ".dart", ".proto",
-    ".json5",
+    ".json5", ".fs", ".fsx",
 }
 _HASH_COMMENT_EXT = {
     ".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".pm", ".ps1", ".psm1",
@@ -2516,6 +2581,27 @@ _IN_DOUBLE = re.compile(r'[\\"]')
 _IN_SINGLE = re.compile(r"[\\']")
 
 
+# Visual Basic's comment symbol `'` "tells the Visual Basic compiler to ignore the text
+# following it", and "Comments can follow a statement on the same line" (Learn, Comments in
+# Code); outside a string only ("" is a quote inside one). In a batch file "If a line begins
+# with a colon, it's treated as a label and any commands on that line are ignored" (Learn,
+# goto) -- which is why `::` serves as a comment; REM is matched by _COMMENT_LINE. Batch
+# 0.42.0, the comment limits of rows 308 and 388.
+_APOSTROPHE_COMMENT_EXT = {".vb"}
+_BATCH_EXT = {".bat", ".cmd"}
+_BATCH_LABEL_COMMENT = re.compile(r"^\s*:")
+
+
+def _vb_comment_spans(line: str) -> list[tuple[int, int]]:
+    in_string = False
+    for i, char in enumerate(line):
+        if char == '"':
+            in_string = not in_string
+        elif char == "'" and not in_string:
+            return [(i, len(line))]
+    return []
+
+
 def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[int, int]], bool]:
     """Where the comments are on this line, and whether the next line continues one.
 
@@ -2530,6 +2616,10 @@ def _comment_spans(line: str, ext: str, inside_block: bool) -> tuple[list[tuple[
     string literal is usually the configuration itself, and calling it a comment
     would lose the very lines a configuration scan is for.
     """
+    if ext in _APOSTROPHE_COMMENT_EXT:
+        return _vb_comment_spans(line), False
+    if ext in _BATCH_EXT:
+        return ([(0, len(line))] if _BATCH_LABEL_COMMENT.match(line) else []), False
     slash, hash_, dash = ext in _SLASH_COMMENT_EXT, ext in _HASH_COMMENT_EXT, ext in _DASH_COMMENT_EXT
     spans: list[tuple[int, int]] = []
     n, i, quote = len(line), 0, ""
@@ -4347,7 +4437,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                or path.suffix.lower() in IAC_EXTENSIONS
                or path.suffix.lower() in SOURCE_EXTENSIONS
                or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
-               or is_certificate_file(path) or is_manifest(path))
+               or is_certificate_file(path) or is_manifest(path)
+               or path.suffix.lower() == ".snk" or path.suffix.lower() in openpgp.KEY_EXTENSIONS
+               or path.name == "KEYS" or path.suffix.lower() == ".plist")
     if template and not claimed and path.suffix.lower() not in TEMPLATE_DOCUMENTS:
         # Rendered to a name no type claims (`realm.provider.j2`): configuration, as
         # what Ansible and Salt render almost always is. Documentation stays unclaimed.
@@ -4360,6 +4452,16 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
         sniffed = _read_file(real, repo_path)
         claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
+    # BIND's `db.<zone>`, `dsset-<zone>.` and a `<zone>.db` that starts like a zone file
+    # (row 340); any other `.db` (SQLite) stays the declared boundary.
+    if not claimed and (dnssec.ZONE_FILE_NAME.match(path.name)
+                        or dnssec.KEY_FILE_NAME.match(path.name)):
+        claimed = True
+    if not claimed and path.suffix.lower() == ".db":
+        sniffed = _read_file(real, repo_path)
+        claimed = sniffed is not None and bool(dnssec.ZONE_FILE_START.match(sniffed[0][:4096]))
+        if not claimed:
+            sniffed = None
     # A `.sarif` is opened only to be named as the report it is (row 144); one that is
     # not a SARIF log stays the declared boundary.
     if not claimed and path.suffix.lower() == ".sarif":
@@ -4441,6 +4543,13 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         for asset in _policy_assets(text_line):
             asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
             protocol_findings.append(asset)
+        places, static = switches.scan(text_line)
+        for asset in places:
+            asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
+            protocol_findings.append(asset)
+        for item in static:
+            item.update(path=rel_path, line=number, in_test_code=in_test_code(rel_path))
+            static_rsa_findings.append(item)
         if not text_line.lstrip().startswith(_NOT_A_SETTING):
             for asset in dnssec.unnamed_records(text_line):
                 asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
@@ -4492,7 +4601,41 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # source made `ecdsa-sig-formatter` an "ECDSA usage" beside the dependencies row
         # that already says "declared, not observed" (ZA-OPRAVYANE row 88).
         files_scanned["config"] += 1
-    elif is_certificate_file(path) or peeked_key:
+    elif path.suffix.lower() in openpgp.KEY_EXTENSIONS or path.name == "KEYS":
+        # OpenPGP keys, armored or binary, read from their packets (openpgp.py; row 337).
+        files_scanned["certificate"] += 1
+        algo_findings, key_findings = openpgp.scan(rel_path, raw)
+        for item in algo_findings:
+            item["in_test_code"] = in_test_code(rel_path)
+        source_findings.extend(algo_findings)
+        embedded_key_findings.extend(key_findings)
+        key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
+        if not algo_findings:
+            undecoded.append(rel_path)
+    elif path.suffix.lower() == ".plist":
+        # Apple property lists, XML or binary (plist.py; row 306).
+        files_scanned["config"] += 1
+        found = plist.scan(rel_path, raw, lines if raw[:8] != b"bplist00" else [])
+        if found is None:
+            undecoded.append(rel_path)
+        else:
+            for item in found["source"]:
+                item["in_test_code"] = in_test_code(rel_path)
+            source_findings.extend(found["source"])
+            embedded_key_findings.extend(found["keys"])
+            protocol_findings.extend(found["protocols"])
+    elif path.suffix.lower() == ".snk":
+        # A .NET strong-name key, read from its bytes (snk.py; row 311).
+        files_scanned["certificate"] += 1
+        algo_findings, key_findings = snk.scan(rel_path, raw)
+        for item in algo_findings:
+            item["in_test_code"] = in_test_code(rel_path)
+        source_findings.extend(algo_findings)
+        embedded_key_findings.extend(key_findings)
+        key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
+        if not algo_findings:
+            undecoded.append(rel_path)
+    elif (is_certificate_file(path) or peeked_key) and not dnssec.KEY_FILE_NAME.match(path.name):
         # Certificates and keys are read as bytes, not lines: a .der carries no
         # lines at all, and a .pem that fails to decode must still be counted.
         files_scanned["certificate"] += 1
@@ -4537,7 +4680,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         # A release script signs the same way a pipeline does, and the pipeline
         # often only calls it (ZA-OPRAVYANE row 34).
         # Row 383: a PowerShell script too.
-        if path.suffix.lower() in (".sh", ".ps1", ".psm1"):
+        if path.suffix.lower() in SIGNING_SCRIPT_EXTENSIONS | {".ps1", ".psm1"}:
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
     else:
         # Configuration: the extensions above, and any YAML that is not a
@@ -4556,9 +4699,51 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _beside_in_block(src, lines)
         if path.suffix.lower() in (".yaml", ".yml"):
             src.extend(fabric_bccsp(rel_path, lines))
+            for asset in switches.helm_tls_disable(lines):
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
         _schannel_disabled(src, lines)
         src = _jwk_sizes(src, lines)
         _ssh_public_keys(src, lines)
+        # The IKE and setting rows say more than a generic row on the same line (its size,
+        # the setting), so they replace it rather than sit beside it.
+        ike_rows = (ike.scan_groups(lines) + ike.scan_auth(lines)
+                    + config_values.scan(path.name, lines))
+        if dnssec.KEY_FILE_NAME.match(path.name) and path.suffix == ".private":
+            private_rows = dnssec.private_key_file(lines)
+            ike_rows += private_rows
+            embedded_key_findings.extend(
+                {"path": rel_path, "line": 1, "type": "BIND DNSSEC private key",
+                 "description": "private key material in a BIND DNSSEC key file",
+                 "key_algorithm": row["algorithm"],
+                 **({"key_size": row["key_size"]} if "key_size" in row else {})}
+                for row in private_rows)
+        if path.suffix.lower() == ".mqsc":
+            for asset in mqsc.scan(lines):
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
+        wg_rows, wg_keys = wireguard.scan(lines)
+        ike_rows += wg_rows
+        embedded_key_findings.extend({**k, "path": rel_path} for k in wg_keys)
+        for item in src:
+            if item["algorithm"] == "RSA" and item.get("key_size") in (None, "undetermined"):
+                bits = dnssec.rsa_dnskey_bits(lines[item["line"] - 1])
+                if bits:
+                    item["key_size"] = bits
+        replaced = {(item["line"], item["algorithm"]) for item in ike_rows}
+        src[:] = [f for f in src if (f["line"], f["algorithm"]) not in replaced]
+        for item in ike_rows:
+            item.update(path=rel_path, in_test_code=in_test_code(rel_path))
+            src.append(item)
+        firmware_defaults = fortios.defaults(lines)
+        if firmware_defaults:
+            for item in firmware_defaults["source"] + firmware_defaults["static_rsa"]:
+                item.update(path=rel_path, in_test_code=in_test_code(rel_path))
+            src.extend(firmware_defaults["source"])
+            static_rsa_findings.extend(firmware_defaults["static_rsa"])
+            for asset in firmware_defaults["protocols"]:
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
         source_findings.extend(src)
         # An IKE configuration carrying a post-quantum algorithm: name its
         # fragmentation setting (see ike.py).
@@ -4572,6 +4757,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             protocol_findings.append(asset)
         if path.suffix.lower() == ".cnf":
             fips_findings.extend(scan_openssl_fips(rel_path, lines))
+        if path.suffix.lower() in SIGNING_SCRIPT_EXTENSIONS:
+            ci_findings.extend(scan_ci_file(path, rel_path, lines))
         # HAProxy listeners and unverified backends (HAProxy, nginx): see
         # assets.scan_tls_listeners.
         protocol_findings.extend(scan_tls_listeners(rel_path, lines))

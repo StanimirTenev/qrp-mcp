@@ -204,22 +204,33 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             "iac": sorted(detectors.IAC_EXTENSIONS),
             "config": sorted(detectors.CONFIG_EXTENSIONS),
             "config_filenames": sorted(detectors.CONFIG_FILENAMES),
-            "config_filename_pattern": [detectors.CONFIG_FILENAME_PATTERN.pattern],
+            "config_filename_pattern": [detectors.CONFIG_FILENAME_PATTERN.pattern,
+                                        detectors.DOTNET_CONFIG_NAME.pattern,
+                                        dnssec.ZONE_FILE_NAME.pattern,
+                                        dnssec.KEY_FILE_NAME.pattern],
+            # A `.db` is read only when it starts like a DNS zone file (row 340).
+            "config_when_a_zone_file": [".db"],
             "config_extensionless_in_directories": sorted(detectors.CONFIG_DIRECTORIES),
             # Read for owners only (ZA-OPRAVYANE row 94), never matched for algorithms.
             "codeowners": list(detectors.CODEOWNERS_LOCATIONS),
             "ci_filenames": sorted(detectors.CI_CONFIG_FILENAMES),
             # Read as bytes rather than lines, and missing from this list while the
             # scan was reporting findings from them.
-            "certificate": sorted(certificates.CERTIFICATE_EXTENSIONS),
+            "certificate": sorted(certificates.CERTIFICATE_EXTENSIONS | {".snk"}
+                                  | detectors.openpgp.KEY_EXTENSIONS),
+            "openpgp_key_filenames": ["KEYS"],
+            # Apple property lists, XML or binary (row 306).
+            "plist": [".plist"],
             # Read only when the file names an OPC UA SecurityPolicy URI; otherwise
             # counted under type_not_claimed like any other unclaimed file.
             "config_when_naming_opcua_security_policy": sorted(opcua.SNIFF_EXTENSIONS),
             # Read by the scan and missing here until a CAP-1 examiner counted 44 such
             # files in certbot as examined outside the declared types (13.10.2026).
             "yaml": [".yaml", ".yml"],
-            "manifest": sorted(assets._NUGET_SUFFIXES),
-            "manifest_filenames": sorted(set(assets.MANIFEST_FILENAMES) | assets._NUGET_FILENAMES),
+            "manifest": sorted(set(assets._NUGET_SUFFIXES) | set(assets._SUFFIX_ECOSYSTEMS)
+                               | {".gradle.kts"}),
+            "manifest_filenames": sorted(set(assets.MANIFEST_FILENAMES) | assets._NUGET_FILENAMES
+                                         | set(assets._RESOLVED_NAMES)),
             # Read as the file they render (kragg-3); a template rendering documentation
             # (detectors.TEMPLATE_DOCUMENTS: .md, .rst, ...) is not claimed.
             "jinja_template": list(detectors.TEMPLATE_SUFFIXES),

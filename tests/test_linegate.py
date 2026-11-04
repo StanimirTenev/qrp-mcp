@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from qrp_mcp import (assets, aws_tls, components, detectors as d, dnssec, ike, indirection,
-                     linegate, oids, opcua, registry)
+                     linegate, oids, opcua, registry, switches)
 from qrp_mcp.scan import scan_directory
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -129,7 +129,7 @@ RULES = [assets.scan_protocols, assets.scan_tls_groups, assets.scan_hybrid_group
          d.scan_hybrid_names, assets.scan_static_rsa_kex, assets.scan_ssh_kex, d._policy_assets,
          dnssec.unnamed_records, d.scan_openssl3_names, d.scan_cose_algorithms, d.scan_jca_names,
          opcua.scan, aws_tls.scan, ike.fortios_addke, dnssec.scan_records, d.scan_cipher_suites,
-         assets.static_rsa_positions, d.PPK_CONFIG_ASSIGN.search]
+         assets.static_rsa_positions, d.PPK_CONFIG_ASSIGN.search, switches.matches]
 
 
 def identifier_members(line):

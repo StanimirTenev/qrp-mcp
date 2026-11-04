@@ -1143,7 +1143,7 @@ took 28 s against 26 s for 0.35.0 on the same machine (one run each).
 how much of a real codebase's cryptography is named this way was not measured. Still not seen:
 the inside of a certificate (a PEM file is reported, not what signed it) and TPM 2.0 names.
 
-**From 0.42.0** (core rows of the fix list; another part of the batch adds file formats). Each was
+**From 0.42.0** (core rows of the fix list; the file formats follow below). Each was
 reproduced as a failing test before the fix, and each fix was reverted once to see its test fail.
 
 - **A file read only in part is not called read.** The verdict said "This scan read every one of
@@ -1219,6 +1219,51 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
 - **Misreads**: `createECDH('secp256k1')` is ECDH, not ECDSA; camelCase `RsaSha256` is not a
   DNSSEC algorithm; UTF-16 is read with or without a byte-order mark (Cyrillic comments, a PEM
   saved by PowerShell `Out-File`).
+
+**From 0.42.0 (file types and grammars)**, rows 225–228, 303–306, 308, 309, 311, 313, 332, 334–337,
+340, 342, 346–349, 352 and 386–388 of the fix list. Each format's settings and values are quoted
+from its vendor's documentation in the test that pins it, and each fix was reverted once to see
+that test fail.
+
+- **Types that were "type not claimed" and are now read.** `.bash`/`.zsh`/`.ksh`, `.bat`/`.cmd`,
+  `.mk`, Visual Basic `.vb` and F# `.fs`/`.fsx`, PowerShell data `.psd1`; `.reg` exports (UTF-16
+  with a BOM included); certreq `.inf`, MSBuild `.vcxproj`/`.props`/`.targets`, WiX `.wxs`;
+  `web.config`, `app.config`, `machine.config`, `applicationHost.config` and their transforms (by
+  name: not every `.config`); Postfix `main.cf`/`master.cf`; ESP-IDF `sdkconfig*`; Helm `.tpl`
+  and `.gotmpl`; `openid-configuration`; Gradle scripts of any name, `.gemspec`, `.podspec` and
+  SwiftPM `Package.resolved` as manifests. Scripts and MSBuild files are read for signing
+  commands as `.sh` was. Limits: VB's `'` and batch `::` comments are not told from code.
+- **Formats read from their bytes or structure.** `.snk` strong-name keys (CryptoAPI RSA1/RSA2
+  BLOB: RSA and its size); OpenPGP keys in `.asc`/`.gpg`/`.pgp`/`KEYS` (RFC 9580 key packets:
+  family, size from the first MPI, curve from its OID, secret keys as key material); Apple
+  `.plist`, XML or binary (ATS `NSAllowsArbitraryLoads`, `*MinimumTLSVersion`, DER keys and
+  certificates in values); WireGuard (each section is X25519, fixed by the protocol; whether a
+  peer sets a PresharedKey is said; the PrivateKey is key material); BIND `K*.key`/`K*.private`,
+  `dsset-*`, `db.*` and a `.db` that starts like a zone file (an RSA DNSKEY's size from its RFC
+  3110 key field). A file in one of these formats that does not parse is listed as not decoded.
+- **TLS versions in more spellings**: Ingress-NGINX `ssl-protocols`, Istio `TLSV1_0`, Traefik
+  `VersionTLS10`, Dovecot `ssl_min_protocol`, OpenVPN `tls-version-min 1.0`, Kafka and ZooKeeper
+  `ssl.enabled(.)protocols`/`ssl.protocol`, MySQL `tls_version`, Postfix `smtpd_tls_protocols`
+  (with `!` and `>=`), FortiOS `tlsv1-1`/`tls1-1`/`TLSv1-1`, Vault `"tls10"`.
+- **IKE key exchange groups by number** (IANA IKEv2 Transform Type 4): FortiOS `set dhgrp`, Cisco
+  IOS XE `group` in a `crypto ikev2 proposal`, Junos `dh-group groupN` and PFS `keys groupN` —
+  each group a row with its family and size. IKE authentication by signature: Cisco `rsa-sig`,
+  Junos `authentication-method rsa-/dsa-/ecdsa-signatures-NNN`.
+- **Settings that switch protection off**, each a TLS place and its own CBOM component, never an
+  algorithm use: Vault `tls_disable` and Helm `global.tlsDisable`, .NET
+  `DontEnableSchUseStrongCrypto=true`, FortiOS `strong-crypto disable` and
+  `ssl-static-key-ciphers enable` (static RSA key exchange), Kafka's empty
+  `ssl.endpoint.identification.algorithm` and ZooKeeper `ssl.hostnameVerification=false`.
+- **FortiOS firmware defaults.** A backup omits settings at their default. Where a section it
+  carries omits `ssl-static-key-ciphers`, the SSL VPN `ssl-min/max-proto-ver`, or a phase1 entry
+  omits `dhgrp`, the FortiOS 7.6.4 CLI reference's default is applied (`basis: firmware_default`,
+  with the URL and the quoted row, beside the backup's own firmware version). Defaults the
+  reference says "may differ between models" (`strong-crypto`, `ssl-min-proto-version`,
+  `admin-https-ssl-versions`) and every other omitted setting are listed as not evaluated.
+- **Names that were not in the vocabulary**: phpseclib's `RSA::createKey(N)` (with its size) and
+  its `\phpseclib3\Crypt\RSA|DSA|DH|EC` classes; EC J-PAKE (RFC 8236; Mbed TLS `ecjpake`,
+  `CONFIG_MBEDTLS_ECJPAKE_C`); Caddy `key_type`; PostgreSQL `password_encryption = md5` and a
+  `pg_hba.conf` `md5` method; OpenVPN `auth SHA1` and `dh <file>`.
 
 **From 0.41.0**, a batch of the fix list (rows 160, 196, 200–206, 208–211, and six rows from a
 comparison with another scanner on Hyperledger Fabric). Most were places where the output said more
