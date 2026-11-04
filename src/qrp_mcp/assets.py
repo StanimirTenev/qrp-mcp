@@ -1209,6 +1209,8 @@ _TLS_GROUP_SETTING = re.compile(
     # HAProxy's global defaults (Configuration Manual 3.5; ZA-OPRAVYANE row 30). Its
     # `curves` keyword on a bind or server line is matched below, by the line's shape.
     r"ssl-default-(?:bind|server)-curves|"
+    # Ingress-NGINX `ssl-ecdh-curve:`, Dovecot `ssl_curve_list =` (row 343).
+    r"ssl-ecdh-curve\s*:|^\s*ssl_curve_list\s*=|"
     # Caddy's `tls` block: `curves x25519 secp256r1`, the names alone on the line
     # (caddyserver.com/docs/caddyfile/directives/tls; ZA-OPRAVYANE row 111).
     # Each of Caddy's names holds a digit, so `curves P-256 are fine` stays prose.
@@ -1225,7 +1227,8 @@ _HAPROXY_CURVES = re.compile(r"(?<=\s)curves(?=\s)")
 def _group_setting(line: str) -> re.Match | None:
     """The group setting on this line, if it has one."""
     # Every alternative of the two regexes contains one of these words (release D).
-    if names_none_of(line, ("ecdh_curve", "ecdhcurve", "groups", "curves", "curvepreferences")):
+    if names_none_of(line, ("ecdh_curve", "ecdhcurve", "groups", "curves", "curvepreferences",
+                            "ecdh-curve", "curve_list")):
         return None
     setting = _TLS_GROUP_SETTING.search(line)
     if setting is None and _HAPROXY_LINE.match(line):
@@ -1251,7 +1254,10 @@ _TLS_CIPHER_SETTING = re.compile(
     # before `set_` is a word character), Java's SSLParameters.setCipherSuites, Node's
     # `ciphers:` option and Ruby's `ctx.ciphers =`.
     r"_set_(?:strict_)?cipher_list\b|\bsetCipherSuites\b|\bciphers\s*:\s*[\"'`]|"
-    r"\.ciphers\s*=(?!=)",
+    r"\.ciphers\s*=(?!=)|"
+    # Row 339: Ingress-NGINX `ssl-ciphers:`, Dovecot `ssl_cipher_list =`, MySQL
+    # `ssl_cipher =`, Kafka `ssl.cipher.suites =`.
+    r"ssl-ciphers\s*:|^\s*ssl_cipher(?:_list)?\s*=|ssl\.cipher\.suites\s*=",
     re.IGNORECASE)
 _HAPROXY_CIPHERS = re.compile(r"(?<=\s)ciphers(?:uites)?(?=\s)")
 
@@ -1298,6 +1304,32 @@ _STATIC_RSA = re.compile(
     r"(?<![A-Za-z0-9_-])("
     + "|".join(re.escape(s) for s in sorted(STATIC_RSA_SUITES, key=len, reverse=True))
     + r"|kRSA|TLS_RSA_WITH_[A-Z0-9_]+)(?![A-Za-z0-9_-])")
+
+
+# A YAML block list under a key that has no value of its own: Envoy's `cipher_suites:` and
+# `ecdh_curves:`, Istio's and Traefik's `cipherSuites:`, Traefik's `curvePreferences:` put one
+# suite or curve per line below the key (rows 339, 343).
+_YAML_LIST_KEY = re.compile(r"^(\s*)([A-Za-z_][\w.-]*)\s*:\s*(?:#.*)?$")
+_YAML_LIST_ITEM = re.compile(r"^(\s*)-\s+[\"']?([A-Za-z0-9_+.-]+)[\"']?\s*(?:#.*)?$")
+
+
+def yaml_list_settings(lines: list[str]) -> list[tuple[int, str]]:
+    """(line, `key: item`) for each item of a YAML block list, so that the setting rules,
+    which read one line, see the key beside the item."""
+    out: list[tuple[int, str]] = []
+    key: str | None = None
+    indent = 0
+    for number, text in enumerate(lines, 1):
+        item = _YAML_LIST_ITEM.match(text)
+        if key is not None and item and len(item.group(1)) >= indent:
+            out.append((number, f"{key}: {item.group(2)}"))
+            continue
+        head = _YAML_LIST_KEY.match(text)
+        if head:
+            key, indent = head.group(2), len(head.group(1))
+        elif text.strip() and not text.lstrip().startswith("#"):
+            key = None
+    return out
 
 
 def _cipher_setting_name(line: str) -> str:

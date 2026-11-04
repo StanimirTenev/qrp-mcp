@@ -32,7 +32,7 @@ from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins
                      dockerfile_pins, library_support, names_none_of, pinned_versions,
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
-                     scan_tls_listeners, static_rsa_positions)
+                     scan_tls_listeners, static_rsa_positions, yaml_list_settings)
 from .certificates import (decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
                            looks_like_key_file, scan_certificate_file, small_scalar_keys,
                            unparsed_material, SMALL_SCALAR_BOUND)
@@ -4554,6 +4554,16 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             for asset in dnssec.unnamed_records(text_line):
                 asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
                 protocol_findings.append(asset)
+    # One suite or curve per line under its key, in a YAML list (rows 339, 343).
+    if path.suffix.lower() in (".yaml", ".yml"):
+        for number, virtual in yaml_list_settings(lines):
+            for item in scan_static_rsa_kex(virtual):
+                item.update(path=rel_path, line=number, in_test_code=in_test_code(rel_path))
+                static_rsa_findings.append(item)
+            for group in scan_tls_groups(virtual):
+                group.update(path=rel_path, line=number, in_test_code=in_test_code(rel_path))
+                tls_group_findings.append(group)
+            hybrid_places.extend((rel_path, number, g) for g in scan_hybrid_groups(virtual))
     # A load-balancer listener that serves HTTPS or TLS and names no policy gets
     # the provider's: said as a default, with the reason, on the resource.
     for number in aws_tls.listeners_without_policy(path.suffix.lower(), lines):
