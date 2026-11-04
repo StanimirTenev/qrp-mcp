@@ -297,18 +297,39 @@ def prove_closure(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
             removed.append({**_brief(cat, item),
                             "why": "the file is not in the second tree"})
         else:
-            closed.append(_brief(cat, item))
+            closed.append((cat, item))
+
+    # An occurrence that left a file where the second run finds its family again was
+    # changed, not closed: a verifier that keeps a branch for old proofs still holds the
+    # family (row 218). Paired one to one with a new occurrence of that family in that file.
+    pending: dict[tuple[str, str], list] = defaultdict(list)
+    for entry in sorted(new, key=lambda i: i.get("line") or 0):
+        pending[(str(entry.get("path") or ""), _family(entry))].append(entry)
+    changed, still_closed = [], []
+    for cat, item in closed:
+        bucket = pending.get((str(item.get("path") or ""), _family(item)))
+        if bucket:
+            now = bucket.pop(0)
+            new.remove(now)
+            changed.append({**_brief(cat, item), "now_line": now.get("line"),
+                            "now_excerpt": now.get("excerpt"),
+                            "now_evidence_kind": now.get("evidence_kind")})
+        else:
+            still_closed.append(_brief(cat, item))
+    closed = still_closed
 
     per_family: dict[str, list[int]] = {}
     count_a = Counter(_family(i) for _, i in _occurrences(before))
     count_b = Counter(_family(i) for _, i in _occurrences(after))
     for fam in sorted(set(count_a) | set(count_b)):
         per_family[fam] = [count_a.get(fam, 0), count_b.get(fam, 0)]
+    left = [f"{fam} ({a} -> {b})" for fam, (a, b) in per_family.items() if a and b]
 
     return {
         "comparability": comparability,
         "closure": {
             "closed": closed,
+            "changed": changed,
             "removed": removed,
             "still_open_count": len(still_open),
             "still_open_moved_lines": moved_lines,
@@ -320,7 +341,10 @@ def prove_closure(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
             "suppressed": suppressed,
             "per_family_before_after": per_family,
         },
-        "statement": (f"{len(closed)} occurrence(s) closed, {len(removed)} removed with "
+        "statement": (f"{len(closed)} occurrence(s) closed, "
+                      + (f"{len(changed)} changed in place (the family is still in the same "
+                         f"file), " if changed else "")
+                      + f"{len(removed)} removed with "
                       f"their file, {len(still_open)} still open "
                       f"({moved_lines} of them only moved lines), {len(relocated)} relocated to "
                       f"another path, {len(new)} new, {len(unverifiable)} unverifiable"
@@ -329,5 +353,7 @@ def prove_closure(before: dict[str, Any], after: dict[str, Any]) -> dict[str, An
                       f"Closed means present in the first tree and absent from every file "
                       f"the second run read, under the same instrument. Removed means the "
                       f"whole file is gone; whether its cryptography is still needed "
-                      f"elsewhere is not something this comparison can see."),
+                      f"elsewhere is not something this comparison can see."
+                      + (f" Not down to 0 in the second tree: {', '.join(left)}." if left
+                         else "")),
     }

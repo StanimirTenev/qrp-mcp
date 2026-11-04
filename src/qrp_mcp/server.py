@@ -272,7 +272,8 @@ def prove_closure(
     Only then does it match every occurrence without its line number: `closed`
     (present before, absent from every file the second run read), still open (and
     how many only moved lines), `relocated` to another path (renamed or moved, not
-    fixed), `removed` (the whole file is gone from the second tree -- not counted as
+    fixed), `changed` (gone from a file in which the second run finds the same family
+    again -- not closed), `removed` (the whole file is gone from the second tree -- not counted as
     closed), moved into or out of test code, `new`, and `unverifiable` (in a file the
     second run did not read). A file the second run could not open is never counted
     as fixed.

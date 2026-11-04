@@ -1183,6 +1183,10 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
   line). A `until=` that is not a date does not apply. A reason that calls itself temporary
   ("temporary", "for now", "interim") with no date still applies and is listed in
   `markers_flagged`: it cannot expire. The date is compared with the day the scan runs.
+- **Closure: a family that stays in the file is changed, not closed.** A verifier that keeps an
+  Ed25519 branch beside the new ML-DSA one was "2 closed" with Ed25519 [2, 2] per family. An
+  occurrence that left a file in which the second run finds its family again is now paired with
+  that occurrence under `changed`, and the statement ends with the families not down to 0.
 - **Misreads**: `createECDH('secp256k1')` is ECDH, not ECDSA; camelCase `RsaSha256` is not a
   DNSSEC algorithm; UTF-16 is read with or without a byte-order mark (Cyrillic comments, a PEM
   saved by PowerShell `Out-File`).
@@ -1554,7 +1558,8 @@ answers in two steps:
    compared, **nothing is reported as closed**, the reasons are listed, and the repair is named:
    scan the first commit again with the instrument that did the second.
 2. **Only then, occurrence by occurrence, without line numbers:** `closed`, still open (and how
-   many only moved lines), `relocated` to another path (a rename is not a fix), moved into or
+   many only moved lines), `relocated` to another path (a rename is not a fix), `changed` (gone
+   from a file in which the second run finds the same family again: not closed), moved into or
    out of test code (neither is a fix), `new`, `unverifiable` — in a file the second run did
    not read — and `removed`: the whole file is gone from the second tree. A deleted file does
    remove its code, but it is also the cheapest way to make a finding disappear, so it is named
