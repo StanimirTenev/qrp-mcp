@@ -382,6 +382,8 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
                     "the files read, and no family is claimed for these lines"),
         "count": len(places), "places": places}
     _library_default_key_exchange(result)
+    _authentication_not_read(result, repo_path)
+    _readiness_by_role(result)
     _unowned(result)
     result["findings_fingerprint"] = findings_fingerprint(result)
     return result
@@ -479,6 +481,71 @@ def _library_default_key_exchange(result: dict[str, Any]) -> None:
     _not_established(summary, [
         "TLS is configured and no key exchange is set in the files read: the TLS library's "
         "default applies and is not resolved (tls_termination.key_exchange)"])
+
+
+# ZA-OPRAVYANE row 200 (b): the certificate and key a TLS server is told to load. nginx
+# `ssl_certificate[_key]`, Apache `SSLCertificate[Key]File`, HAProxy `crt` on a bind line.
+_AUTHENTICATION_FILE = re.compile(
+    r"^\s*(?:(ssl_certificate(?:_key)?|SSLCertificate(?:Key)?File)\s+[\"']?([^\s;\"']+)"
+    r"|bind\s.*?\bcrt\s+[\"']?([^\s;\"']+))")
+
+
+def _authentication_not_read(result: dict[str, Any], root: Path) -> None:
+    """A TLS server that names its certificate in a file outside the files read: what signs
+    is not in the scan, and `by_role.signature` said `none_found` as if nothing did. The places
+    are listed, and the signature part -- and the headline where it said nothing classical --
+    read `not_established`. A named file whose name is among the files read counts as read."""
+    tls = result.get("tls_termination")
+    if not tls:
+        return
+    files_read = result.get("files_read") or []
+    names_read = {rel.rsplit("/", 1)[-1] for rel in files_read}
+    configs = sorted({p["path"] for p in tls.get("configured_in") or []})
+    places = []
+    for rel in configs:
+        try:
+            lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for n, line in enumerate(lines, 1):
+            m = _AUTHENTICATION_FILE.match(line)
+            if not m:
+                continue
+            named = m.group(2) or m.group(3)
+            if named.rsplit("/", 1)[-1] not in names_read:
+                places.append({"path": rel, "line": n,
+                               "setting": m.group(1) or "crt", "file": named})
+    if not places:
+        return
+    tls["authentication_not_read"] = {
+        "meaning": ("certificates and keys a TLS server here is told to load, at paths that are "
+                    "not among the files read: what signs on these servers was not read"),
+        "count": len(places), "places": places}
+    because = ["TLS certificate or key named outside the files read: "
+               + ", ".join(f"{p['path']}:{p['line']}" for p in places)
+               + " (tls_termination.authentication_not_read)"]
+    summary = result["summary"]
+    part = summary["by_role"]["signature"]
+    if part["pqc_readiness"] in ("none_found", *_REASSURING):
+        part["pqc_readiness"] = "not_established"
+        part["because"] = because
+        _not_established(summary, because)
+
+
+def _readiness_by_role(result: dict[str, Any]) -> None:
+    """ZA-OPRAVYANE row 200 (a): the headline is one word for the whole tree; next to it, the
+    two parts' values, so a reader of the headline alone sees when they differ."""
+    summary = result["summary"]
+    parts = {part: summary["by_role"][part]["pqc_readiness"]
+             for part in ("key_establishment", "signature")}
+    rebuilt: dict[str, Any] = {}
+    for key, value in summary.items():
+        rebuilt[key] = value
+        if key == "pqc_readiness":
+            rebuilt["readiness_by_role"] = {
+                **parts, "roles_differ": parts["key_establishment"] != parts["signature"]}
+    summary.clear()
+    summary.update(rebuilt)
 
 
 def _not_established(summary: dict[str, Any], because: list[str]) -> None:
