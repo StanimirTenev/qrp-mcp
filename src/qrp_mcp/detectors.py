@@ -297,9 +297,12 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z0-9])ECDSAP256SHA256(?![A-Za-z0-9])", re.IGNORECASE)),
     ("ECDSA", "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)", re.compile(
         r"(?<![A-Za-z0-9])ECDSAP384SHA384(?![A-Za-z0-9])", re.IGNORECASE)),
+    # Row 307: the mnemonic in upper case (IANA) or lower case (BIND's `algorithm rsasha256`),
+    # never camelCase: `SecurityAlgorithms.RsaSha256` is the JOSE RS256 constant and `struct
+    # RsaSha256` a type, neither DNSSEC.
     ("RSA", "RSA named by a DNSSEC algorithm (1, 5, 7, 8 or 10)", re.compile(
-        r"(?<![A-Za-z0-9])(?:RSAMD5|RSASHA1(?:-NSEC3-SHA1)?|RSASHA256|RSASHA512)(?![A-Za-z0-9])",
-        re.IGNORECASE)),
+        r"(?<![A-Za-z0-9])(?:RSAMD5|RSASHA1(?:-NSEC3-SHA1)?|RSASHA256|RSASHA512|"
+        r"rsamd5|rsasha1(?:-nsec3-sha1)?|rsasha256|rsasha512)(?![A-Za-z0-9])")),
     ("DSA", "DSA named by a DNSSEC algorithm (6, DSA-NSEC3-SHA1)", re.compile(
         r"(?<![A-Za-z0-9])DSA-NSEC3-SHA1(?![A-Za-z0-9])", re.IGNORECASE)),
     ("ECDSA", "ECDSA usage", re.compile(
@@ -1885,10 +1888,20 @@ _KEY_SIZE_GENERIC = re.compile(
     re.IGNORECASE)
 
 
+_MODP_GROUP = re.compile(r"(?<![A-Za-z])modp(\d{3,5})(?![0-9])", re.IGNORECASE)
+
+
 def key_size_on_line(line: str, family: str = "RSA") -> int | None:
     """The key size named on this line, if any: RSA (where a size below the minimum is itself
     the finding), DSA and DH. Only a modulus size a key can have (registry._SIZES):
     `CKM_RSA_9796` is ISO/IEC 9796 padding, not a 9796-bit key (release 3d)."""
+    if family == "DH" and "modp" in line.lower():
+        # Row 310: an IKE proposal's `modp2048` is the MODP group's size in bits (Libreswan
+        # ipsec.conf(5): "modp2048 (DH14)", "the very weak modp1024 (DH2)"; RFC 3526). A line
+        # that offers several groups is as weak as the smallest it offers.
+        offered = [int(n) for n in _MODP_GROUP.findall(line) if int(n) in registry._SIZES]
+        if offered:
+            return min(offered)
     for m in (_KEY_SIZE if family == "RSA" else _KEY_SIZE_GENERIC).finditer(line):
         for group in m.groups():
             if group and int(group) in registry._SIZES:
