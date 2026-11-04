@@ -99,9 +99,17 @@ def test_vault_tls_kept_on(tmp_path, text):
 
 
 def test_vault_helm_values(tmp_path):
-    result = _protocols(tmp_path, "values.yaml", "global:\n  tlsDisable: true\n")
+    result = _protocols(tmp_path, "values.yaml", "global:\n  enabled: true\n  tlsDisable: true\n")
     [place] = result["evidence"]["protocols"]
-    assert (place["line"], place["setting"], place["tls_disabled"]) == (2, "tlsDisable", True)
+    assert (place["line"], place["setting"], place["tls_disabled"]) == (3, "global.tlsDisable", True)
+
+
+@pytest.mark.parametrize("text", ["server:\n  tlsDisable: true\n",
+                                  "global:\n  ui:\n    tlsDisable: true\n",
+                                  "tlsDisable: true\n"])
+def test_tls_disable_elsewhere_is_not_the_vault_chart(tmp_path, text):
+    result = _protocols(tmp_path, "values.yaml", text)
+    assert [p for p in result["evidence"]["protocols"] if p.get("tls_disabled")] == []
 
 
 def test_dotnet_strong_crypto_switch(tmp_path):

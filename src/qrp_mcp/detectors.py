@@ -4560,6 +4560,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _beside_in_block(src, lines)
         if path.suffix.lower() in (".yaml", ".yml"):
             src.extend(fabric_bccsp(rel_path, lines))
+            for asset in switches.helm_tls_disable(lines):
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
         # The IKE and setting rows say more than a generic row on the same line (its size,
         # the setting), so they replace it rather than sit beside it.
         ike_rows = (ike.scan_groups(lines) + ike.scan_auth(lines)

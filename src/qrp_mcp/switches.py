@@ -32,14 +32,15 @@ import re
 from typing import Any
 
 # Every match below contains one of these, lower-case (the line gate's literals).
-LITERALS = ("tls_disable", "tlsdisable", "dontenableschusestrongcrypto", "strong-crypto",
+LITERALS = ("tls_disable", "dontenableschusestrongcrypto", "strong-crypto",
             "ssl-static-key-ciphers", "ssl.endpoint.identification.algorithm",
             "hostnameverification")
 
 _TRUE = r"""(?:["']?(?:1|true|yes)["']?)"""
 
 _VAULT_TLS_DISABLE = re.compile(rf"^\s*tls_disable\s*=\s*{_TRUE}\s*(?:#.*)?$", re.I)
-_HELM_TLS_DISABLE = re.compile(rf"^\s*tlsDisable\s*:\s*{_TRUE}\s*(?:#.*)?$")
+_HELM_TLS_DISABLE = re.compile(rf"^(\s+)tlsDisable\s*:\s*{_TRUE}\s*(?:#.*)?$")
+_YAML_TOP_KEY = re.compile(r"^([A-Za-z_][\w-]*)\s*:")
 _DOTNET_STRONG_CRYPTO_OFF = re.compile(
     r"Switch\.System\.Net\.DontEnableSchUseStrongCrypto\s*=\s*true\b", re.I)
 _FORTIOS_STRONG_CRYPTO_OFF = re.compile(r"^\s*set\s+strong-crypto\s+disable\s*$", re.I)
@@ -66,11 +67,6 @@ def scan(line: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             "encrypted. Vault's documentation: \"Vault assumes TLS by default, so you must "
             "explicitly disable TLS to opt-in to insecure communication.\""),
             tls_disabled=True)], []
-    if _HELM_TLS_DISABLE.match(line):
-        return [_place("tlsDisable", (
-            "TLS is disabled by the Vault Helm chart's global.tlsDisable (\"When set to true, "
-            "changes URLs from https to http\"). Which listener the rendered configuration "
-            "carries is not stated by this line."), tls_disabled=True)], []
     if _DOTNET_STRONG_CRYPTO_OFF.search(line):
         return [_place("Switch.System.Net.DontEnableSchUseStrongCrypto", (
             "Strong cryptography is turned off for this .NET application "
@@ -114,3 +110,31 @@ def matches(line: str) -> list[dict[str, Any]]:
     """Everything scan() finds on the line, in one list (the line gate's check)."""
     places, static = scan(line)
     return places + static
+
+
+def helm_tls_disable(lines: list[str]) -> list[dict[str, Any]]:
+    """`tlsDisable: true` where the Vault Helm chart puts it: directly under the top-level
+    `global:` key of a values file (global.tlsDisable). Anywhere else it is a key of some other
+    schema and says nothing here."""
+    out: list[dict[str, Any]] = []
+    top = None
+    child_indent = None
+    for number, line in enumerate(lines, 1):
+        key = _YAML_TOP_KEY.match(line)
+        if key:
+            top, child_indent = key.group(1), None
+            continue
+        if top != "global" or not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if child_indent is None:
+            child_indent = indent
+        match = _HELM_TLS_DISABLE.match(line)
+        if match and indent == child_indent:
+            place = _place("global.tlsDisable", (
+                "TLS is disabled by global.tlsDisable, the Vault Helm chart's setting (\"When "
+                "set to true, changes URLs from https to http\"). Which listener the rendered "
+                "configuration carries is not stated by this line."), tls_disabled=True)
+            place.update(line=number, excerpt=line.strip()[:200])
+            out.append(place)
+    return out
