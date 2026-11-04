@@ -20,8 +20,8 @@ from . import _warm
 # The rules' regexes compile through the cache of _warm until the end of this module.
 _warm.start_regex()
 
-from . import (aws_tls, components, dnssec, ike, indirection, linegate, oids, opcua, registry,
-               suppression, switches)
+from . import (aws_tls, components, dnssec, fortios, ike, indirection, linegate, oids, opcua,
+               registry, suppression, switches)
 from .classifier import _PQC_SCHEMES
 from .assets import _LOCKFILES as LOCKFILES
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
@@ -4452,6 +4452,15 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         for item in ike.scan_groups(lines):
             item.update(path=rel_path, in_test_code=in_test_code(rel_path))
             src.append(item)
+        firmware_defaults = fortios.defaults(lines)
+        if firmware_defaults:
+            for item in firmware_defaults["source"] + firmware_defaults["static_rsa"]:
+                item.update(path=rel_path, in_test_code=in_test_code(rel_path))
+            src.extend(firmware_defaults["source"])
+            static_rsa_findings.extend(firmware_defaults["static_rsa"])
+            for asset in firmware_defaults["protocols"]:
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
         source_findings.extend(src)
         # An IKE configuration carrying a post-quantum algorithm: name its
         # fragmentation setting (see ike.py).

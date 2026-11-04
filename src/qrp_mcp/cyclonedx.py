@@ -267,7 +267,10 @@ _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versio
                     "verification_setting", "dnssec_algorithm", "dnssec_mnemonic",
                     "recipient_family", "hndl", "key_exchange", "policy_known",
                     # switches.py (batch 0.42.0).
-                    "setting", "tls_disabled", "weak_crypto_allowed")
+                    "setting", "tls_disabled", "weak_crypto_allowed",
+                    # fortios.py (row 228).
+                    "default_setting", "default_value", "firmware", "defaults_documented_for",
+                    "defaults_applied", "defaults_not_evaluated")
 _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 
 
@@ -276,6 +279,8 @@ def _protocol_label(asset: dict[str, Any]) -> str:
         return f"TLS listener ({asset['listener']})"
     if asset.get("peer_verification"):
         return f"TLS peer verification off ({asset['verification_setting']})"
+    if asset.get("basis") == "firmware_defaults":
+        return f"FortiOS firmware defaults ({asset['firmware']})"
     if asset.get("tls_disabled"):
         return f"TLS disabled ({asset['setting']})"
     if asset.get("weak_crypto_allowed"):
