@@ -31,11 +31,14 @@ def test_openssl_and_wolfssl_methods(tmp_path):
                        "    WOLFSSL_CTX *d = wolfSSL_CTX_new(wolfTLSv1_3_client_method());\n"
                        "    SSL_CTX *e = SSL_CTX_new(TLS_method());\n"
                        "    SSL_CTX *g = SSL_CTX_new(SSLv23_method());\n"
+                       "    SSL_CTX *h = SSL_CTX_new(SSLv3_method());\n"
                        "}\n")
-    assert {(2, "TLSv1.0"), (3, "TLSv1.1"), (4, "TLSv1.0"), (5, "TLSv1.3")} <= got
+    assert {(2, "TLSv1.0"), (3, "TLSv1.1"), (4, "TLSv1.0"), (5, "TLSv1.3"), (8, "SSLv3")} <= got
     assert not any(line in (6, 7) for line, _ in got)
     deprecated = {p["version"] for p in r["evidence"]["protocols"] if p.get("deprecated")}
-    assert deprecated == {"TLSv1.0", "TLSv1.1"}
+    assert deprecated == {"TLSv1.0", "TLSv1.1", "SSLv3"}
+    # What the probe read: the summary.
+    assert set(r["summary"]["deprecated_protocols"]) == {"TLSv1.0", "TLSv1.1", "SSLv3"}
 
 
 def test_node_secure_protocol(tmp_path):

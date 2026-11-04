@@ -15,7 +15,25 @@ import json
 from qrp_mcp import closure
 from qrp_mcp.server import prove_closure
 
-from tests.test_closure import _result
+
+
+def _result(items, commit="aaa"):
+    """A comparable scan result (the shape tests/test_closure.py builds)."""
+    return {
+        "excerpt_level": "full",
+        "coverage": {
+            "instrument": {"version": "0.19.0",
+                           "source_commit": {"pinned": True, "commit": "tool1", "dirty": False},
+                           "ruleset": {"algorithm_patterns": 48},
+                           "claimed_types": {"source": [".py"]}, "excluded_dirs": [".git"]},
+            "corpus": {"target": "/repo", "pinned_at": {"pinned": True, "kind": "git",
+                                                        "commit": commit, "dirty": False}},
+        },
+        "evidence": {"source_code": items},
+        "unreadable_files": [], "files_left_out": [], "unreadable_directories": [],
+        "symlinks_not_followed": [],
+        "files_read": sorted({"a.py"} | {i["path"] for i in items}),
+    }
 
 
 def _ed(path, line, kind, excerpt):
@@ -54,7 +72,8 @@ def test_the_verifier_that_keeps_ed25519_is_changed_not_closed(tmp_path):
 
 
 def test_a_family_gone_from_every_file_is_named_nowhere():
-    out = closure.prove_closure(_result(BEFORE[:1]), _result([], commit="bbb",
-                                                             files_read=["signer.py"]))
+    after = _result([], commit="bbb")
+    after["files_read"] = ["signer.py"]
+    out = closure.prove_closure(_result(BEFORE[:1]), after)
     assert len(out["closure"]["closed"]) == 1 and out["closure"]["changed"] == []
     assert "Not down to 0" not in out["statement"]
