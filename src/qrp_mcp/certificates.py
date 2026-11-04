@@ -680,6 +680,25 @@ def _load_private_key(pem: bytes) -> dict[str, Any]:
     return _key_fields(_key_info(key))
 
 
+def _bare_body(body: str) -> str:
+    """A PEM body without its line breaks, whether real, JSON-escaped (`\\n`) or indented."""
+    return re.sub(r"\\[nr]|\s", "", body)
+
+
+def embedded_material(rel_path: str, raw: bytes) -> tuple[list[dict[str, Any]],
+                                                          dict[int, dict[str, Any]],
+                                                          list[dict[str, Any]]]:
+    """PEM blocks inside a configuration file -- a JSON string with `\\n` escapes, an indented
+    YAML block scalar (fix list, 04.11.2026: Fabric connection profiles and Kubernetes
+    manifests). The parsed certificates as rows at their own line, the private keys' fields by
+    line, and the blocks that did not parse."""
+    material = _material_once(rel_path, raw)
+    rows: list[dict[str, Any]] = []
+    for line_no, excerpt, cert, families in material["certificates"]:
+        rows.extend(_certificate_rows(rel_path, line_no, excerpt, cert, families))
+    return rows, material["keys"], list(material["problems"])
+
+
 def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
     """Parse what `cryptography` can: certificates by line, private keys by line, the
     blocks that did not parse, and which PEM blocks were certificates read in full."""
@@ -709,7 +728,7 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
         line = text.count("\n", 0, match.start()) + 1
         if label in _CERTIFICATE_LABELS or label == "PKCS7":
             try:
-                body = base64.b64decode(match.group(2), validate=False)
+                body = base64.b64decode(_bare_body(match.group(2)), validate=False)
                 if label == "PKCS7":
                     found = pkcs7.load_der_pkcs7_certificates(body)
                 else:
@@ -724,6 +743,12 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
                 found)
         elif _PRIVATE_KEY_LABEL.search(label) and label != "OPENSSH PRIVATE KEY":
             keys[line] = _load_private_key(match.group(0).encode())
+            if keys[line].get("key_unread") == "body_not_a_key":
+                # Inside a JSON string (`\n` escapes) or an indented YAML block scalar: the
+                # block put together again from its base64 alone (fix list, 04.11.2026).
+                keys[line] = _load_private_key(
+                    f"-----BEGIN {label}-----\n{_bare_body(match.group(2))}\n"
+                    f"-----END {label}-----\n".encode())
             unread = keys[line].get("key_unread")
             if unread in ("password_protected", "body_not_a_key"):
                 problem(line, label, "password_protected" if unread == "password_protected"
@@ -882,7 +907,7 @@ def scan_certificate_file(path: Path, rel_path: str,
                 **material["keys"].get(line_no, {}),
             })
         try:
-            blobs.append(base64.b64decode(match.group(2), validate=False))
+            blobs.append(base64.b64decode(_bare_body(match.group(2)), validate=False))
         except (ValueError, TypeError):
             continue
         if label == "RSA PUBLIC KEY":

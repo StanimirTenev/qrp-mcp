@@ -1,0 +1,12 @@
+{
+  "name": "test-network-org1",
+  "version": "1.0.0",
+  "peers": {
+    "peer0.org1.example.com": {
+      "url": "grpcs://localhost:7051",
+      "tlsCACerts": {
+        "pem": "-----BEGIN CERTIFICATE-----\nMIIBkDCCATegAwIBAgIUKMbdHZd7VmumgT/gey+seQCvhGAwCgYIKoZIzj0EAwIw\nHjEcMBoGA1UEAwwTY2Eub3JnMS5leGFtcGxlLmNvbTAeFw0yNjExMDQwNzE5MTBa\nFw0zNTExMTcwNzE5MTBaMB4xHDAaBgNVBAMME2NhLm9yZzEuZXhhbXBsZS5jb20w\nWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQKd1zc2fEFgNti5XQ0YtrjXEWh5Ai8\nZe2CmyThDFnLRINv1qTty8nUCFu/WEsEWXYKSpXRw+XznOWot9IL4UkXo1MwUTAd\nBgNVHQ4EFgQUbJBKeK1tp4beN5KPd8roIHUuTtYwHwYDVR0jBBgwFoAUbJBKeK1t\np4beN5KPd8roIHUuTtYwDwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBE\nAiAI6AMvrHoq4feZ0C8XwwzP08rZXFqnQXJSktYLJDAwvQIgRG7ztbPsYPIB8xUC\nYPk7DOB9gC9eWyz1dYUOw2LqexI=\n-----END CERTIFICATE-----\n"
+      }
+    }
+  }
+}

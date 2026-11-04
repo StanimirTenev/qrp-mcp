@@ -30,9 +30,9 @@ from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions)
-from .certificates import (is_certificate_file, is_undecoded, key_in_source, looks_like_key_file,
-                           scan_certificate_file, small_scalar_keys, unparsed_material,
-                           SMALL_SCALAR_BOUND)
+from .certificates import (embedded_material, is_certificate_file, is_undecoded, key_in_source,
+                           looks_like_key_file, scan_certificate_file, small_scalar_keys,
+                           unparsed_material, SMALL_SCALAR_BOUND)
 
 SOURCE_EXTENSIONS = {
     ".py", ".go", ".js", ".ts", ".java", ".rb", ".php", ".c", ".cpp", ".cs", ".sh",
@@ -4385,6 +4385,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot))
         _beside_in_block(algo_findings, lines)
         iac_findings.extend(algo_findings)
+        _embedded_pem(path, rel_path, raw, source_findings, key_findings, material_problems)
         embedded_key_findings.extend(key_findings)
     elif path.suffix.lower() in SOURCE_EXTENSIONS:
         files_scanned["source"] += 1
@@ -4437,7 +4438,27 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             protocol_findings.append(asset)
         algo_findings, key_findings = scan_iac_file(path, rel_path, lines)
         _merge(iac_findings, algo_findings, already=src)
+        _embedded_pem(path, rel_path, raw, source_findings, key_findings, material_problems)
         embedded_key_findings.extend(key_findings)
+
+
+def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[dict[str, Any]],
+                  key_findings: list[dict[str, Any]],
+                  material_problems: list[dict[str, Any]]) -> None:
+    """Fix list, 04.11.2026: a certificate in a JSON string (`"pem": "-----BEGIN ...\\n..."`)
+    or an indented YAML block scalar was read as text and gave nothing; a key there gave
+    "Embedded private key material" without its family. JSON and YAML only."""
+    if path.suffix.lower() not in (".json", ".yaml", ".yml") or b"-----BEGIN" not in raw:
+        return
+    rows, keys, problems = embedded_material(rel_path, raw)
+    for row in rows:
+        row["in_test_code"] = in_test_code(rel_path)
+    source_findings.extend(rows)
+    for item in key_findings:
+        fields = keys.get(item.get("line"))
+        if fields and "key_algorithm" in fields:
+            item.update(fields)
+    material_problems.extend(problems)
 
 
 def _new_reading() -> dict[str, Any]:
