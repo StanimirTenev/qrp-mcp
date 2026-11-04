@@ -4442,6 +4442,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _beside_in_block(src, lines)
         if path.suffix.lower() in (".yaml", ".yml"):
             src.extend(fabric_bccsp(rel_path, lines))
+        for item in ike.scan_groups(lines):
+            item.update(path=rel_path, in_test_code=in_test_code(rel_path))
+            src.append(item)
         source_findings.extend(src)
         # An IKE configuration carrying a post-quantum algorithm: name its
         # fragmentation setting (see ike.py).
