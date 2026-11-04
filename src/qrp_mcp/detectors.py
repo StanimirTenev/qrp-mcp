@@ -1061,6 +1061,34 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<=[\"'])(?i:sha-?1)(?=[\"'])|"
         r"(?<=[a-z])Sha1(?![0-9a-z])|(?<=[0-9])SHA1(?![0-9a-z])|"   # DH14SHA1, MD5SHA1
         r"(?<![A-Za-z0-9])SHA(?=(?:with|WITH|With)(?:RSA|DSA|ECDSA)|/(?:RSA|DSA|ECDSA)\b)")),
+    # Row 377 (W1): a CNG algorithm identifier string, plain, wide (`L"MD5"`) or `TEXT("...")`,
+    # as BCryptOpenAlgorithmProvider's second argument (Learn, "CNG Algorithm Identifiers").
+    *[(family, f"{family} named by its CNG algorithm identifier string", re.compile(
+        r"\bBCryptOpenAlgorithmProvider\s*\([^,]*,\s*(?:L|u|TEXT\(\s*|_T\(\s*)?\"(?:"
+        + ids + r")\"")) for family, ids in (
+        ("RSA", "RSA|RSA_SIGN"), ("DSA", "DSA"), ("DH", "DH"),
+        ("ECDSA", "ECDSA|ECDSA_P256|ECDSA_P384|ECDSA_P521"),
+        ("ECDH", "ECDH|ECDH_P256|ECDH_P384|ECDH_P521"),
+        ("MD5", "MD5"), ("MD4", "MD4"), ("MD2", "MD2"), ("SHA1", "SHA1"),
+        ("3DES", "3DES|3DES_112"), ("DES", "DES|DESX"), ("RC4", "RC4"), ("RC2", "RC2"))],
+    # Rows 379, 382, 383 (W1): the digest a Windows certificate, signing or hashing tool is
+    # told to use -- New-SelfSignedCertificate -HashAlgorithm, signtool /fd and /td,
+    # certutil -hashfile FILE ALG, makecert -a.
+    *[(family, f"{family} named as the digest of a Windows signing or hashing tool",
+       re.compile(
+           r"\bNew-SelfSignedCertificate\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
+           r"\bsigntool(?:\.exe)?\s+sign\b[^\n]*\s/[ft]d\s+\"?" + name + r"\b|"
+           r"\bcertutil(?:\.exe)?\s+-hashfile\s+\S+\s+" + name + r"\b|"
+           r"\bmakecert(?:\.exe)?\b[^\n]*\s-a\s+" + name + r"\b", re.IGNORECASE))
+      for family, name in (("SHA1", "sha-?1"), ("MD5", "md5"))],
+    # Row 380: Rfc2898DeriveBytes without a HashAlgorithmName defaults to SHA-1 (SYSLIB0041).
+    ("SHA1", "SHA-1 as the default hash of Rfc2898DeriveBytes (no HashAlgorithmName given)",
+     re.compile(r"\bnew\s+Rfc2898DeriveBytes\s*\((?!.*HashAlgorithmName)(?=.*\)\s*;)")),
+    # Row 381: .NET's ECB mode, where the object is named for AES (minimum: its type is
+    # usually declared on another line).
+    ("AES-ECB", "AES in ECB mode (.NET CipherMode.ECB or EncryptEcb)", re.compile(
+        r"\b\w*aes\w*\.Mode\s*=\s*CipherMode\.ECB\b|\b\w*aes\w*\.(?:En|De)cryptEcb\s*\(",
+        re.IGNORECASE)),
     # X448 and Ed25519 inside a camel-case name (wolfSSL's SetX448KeyGenCb, libgcrypt-style
     # HpkeDhKemX448Sha512), and libsodium's old batch Ed25519 signature.
     ("X448", "X448 named in a camel-case name", re.compile(r"(?<=[a-z])X448(?=[A-Z_])")),
@@ -2019,8 +2047,11 @@ def _link_target(repo_path: Path, rel: str) -> str:
         resolved = (repo_path / rel).resolve(strict=False)
         inside = resolved.relative_to(repo_path.resolve(strict=False))
     except (OSError, ValueError, RuntimeError):
-        return "outside the scanned directory"
+        return _OUTSIDE_ROOT
     return display_path(inside.as_posix())
+
+
+_OUTSIDE_ROOT = "outside the scanned directory"
 
 
 def _is_link(path: Path) -> bool:
@@ -3752,6 +3783,9 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
             step["signing_key"] = {"path": posixpath.normpath(written), "in_tree": False}
 
 
+_SIGNTOOL_DIGEST = re.compile(r"\s/fd\s+\"?([A-Za-z0-9-]+)")
+
+
 def scan_ci_file(path: Path, rel_path: str,
                  lines: list[str] | None = None) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
@@ -3765,6 +3799,11 @@ def scan_ci_file(path: Path, rel_path: str,
                     "command_type": command_type,
                     "excerpt": line.strip()[:200],
                 })
+                # Row 382: signtool's file digest, `/fd SHA1`.
+                digest = (_SIGNTOOL_DIGEST.search(line) if command_type == "signtool_sign"
+                          else None)
+                if digest:
+                    findings[-1]["digest_algorithm"] = digest.group(1).upper()
     return findings
 
 
@@ -4494,7 +4533,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         embedded_key_findings.extend(source_keys)
         # A release script signs the same way a pipeline does, and the pipeline
         # often only calls it (ZA-OPRAVYANE row 34).
-        if path.suffix.lower() == ".sh":
+        # Row 383: a PowerShell script too.
+        if path.suffix.lower() in (".sh", ".ps1", ".psm1"):
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
     else:
         # Configuration: the extensions above, and any YAML that is not a
@@ -4922,12 +4962,17 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             if not is_dir:
                 files_present += 1
                 present_kinds["(symlink)"] = present_kinds.get("(symlink)", 0) + 1
+            target = _link_target(repo_path, rel)
             symlinks.append({
                 "path": rel + ("/" if is_dir else ""),
                 "kind": "directory" if is_dir else "file",
-                "target": _link_target(repo_path, rel),
+                "target": target,
                 "reason": "symlink_not_followed",
             })
+            # Row 389: a directory link whose target is inside the root hides nothing; the
+            # walk enters that directory under its own name.
+            if is_dir and target != _OUTSIDE_ROOT:
+                symlinks[-1]["points_into_tree"] = True
         else:
             unreadable_dirs.append(rel + "/")
         content_parts.append(f"{rel}\0{kind}")

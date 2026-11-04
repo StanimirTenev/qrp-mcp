@@ -1172,6 +1172,17 @@ reproduced as a failing test before the fix, and each fix was reverted once to s
   (a `kid` label names nothing), .NET `RSA.Create(N)`, `RSACryptoServiceProvider(N)`,
   `RSACng(N)`, `DSA.Create(N)`, and PowerShell `New-SelfSignedCertificate -KeyLength N`. Not
   yet: a size on another line than the family.
+- **Windows names that gave nothing**: a CNG identifier string as `BCryptOpenAlgorithmProvider`'s
+  algorithm (`L"MD5"`, `TEXT("RSA")`); the digest of `New-SelfSignedCertificate -HashAlgorithm`,
+  `signtool sign /fd|/td`, `certutil -hashfile FILE ALG` and `makecert -a` (SHA-1, MD5);
+  `new Rfc2898DeriveBytes(...)` without a `HashAlgorithmName`, which defaults to SHA-1;
+  `CipherMode.ECB` and `EncryptEcb`/`DecryptEcb` on an object named for AES. A SignTool step's
+  `/fd` is its `digest_algorithm`, and a `.ps1`/`.psm1` script's signing steps are listed as a
+  `.sh` script's were.
+- **A linked directory that points into the scanned tree** no longer stops the verdict from
+  accounting for every file: the walk entered its target under its own name, and the verdict
+  says so ("alias/ points into the scanned tree (real/), which was walked"). A link outside the
+  root still does.
 - **Misread names**: `signtool sign /f codesign.pfx` is one SignTool step, not also Apple's
   `codesign` (the command is now the word followed by an option); a variable named
   `implicitSha1 = ...` is an `identifier`, not a SHA-1 call.

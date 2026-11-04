@@ -505,6 +505,8 @@ def build(
     # A linked directory was not entered, so how many files it holds is
     # unknown -- the same state as one that could not be read.
     linked_dirs = [e for e in links if e.get("kind") == "directory"]
+    # Row 389: one that points into the scanned tree hides no file.
+    hiding_dirs = [e for e in linked_dirs if not e.get("points_into_tree")]
 
     excluded = scan_result.get("files_excluded_by_dir", {})
     pin = _tool_pin()
@@ -600,6 +602,7 @@ def build(
             "count": len(links),
             "files": len(links) - len(linked_dirs),
             "directories": len(linked_dirs),
+            "directories_into_tree": len(linked_dirs) - len(hiding_dirs),
             "paths": links,
         },
         # Directories the walk could not enter. Their files are not in any count
@@ -614,7 +617,7 @@ def build(
         # from the walk. Asserted in the output rather than in a test, so a reader
         # can check it without trusting us.
         "accounts_for_every_file": (accounted == present and not dirs_not_entered
-                                    and not linked_dirs),
+                                    and not hiding_dirs),
     }
 
 
@@ -810,9 +813,14 @@ def verdict_line(block: dict[str, Any]) -> str:
                 .get("by_directory") or {})
     named = sorted(((n, d) for d, n in excluded.items() if d != ".git" and n),
                    key=lambda nd: (-nd[0], nd[1]))
+    into = [e for e in (block.get("symlinks_not_followed") or {}).get("paths") or []
+            if e.get("points_into_tree")]
+    said = _verdict(block) + "".join(
+        f" {e['path']} points into the scanned tree ({e['target'].rstrip('/')}/), which was "
+        f"walked." for e in into)
     if not named:
-        return _verdict(block)
-    return (_verdict(block) + " Left out before counting, by directory name: "
+        return said
+    return (said + " Left out before counting, by directory name: "
             + ", ".join(f"{n} file{'' if n == 1 else 's'} in {d}/" for n, d in named) + ".")
 
 
@@ -829,7 +837,8 @@ def _verdict(block: dict[str, Any]) -> str:
         return (f"This scan cannot account for every file: {hidden} "
                 f"director{'y' if hidden == 1 else 'ies'} could not be entered, so the "
                 f"{scope['files_present']} files counted are not all there were.")
-    linked_dirs = (block.get("symlinks_not_followed") or {}).get("directories", 0)
+    links = block.get("symlinks_not_followed") or {}
+    linked_dirs = links.get("directories", 0) - links.get("directories_into_tree", 0)
     if linked_dirs:
         subject = ("1 linked directory was" if linked_dirs == 1
                    else f"{linked_dirs} linked directories were")
