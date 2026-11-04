@@ -123,8 +123,14 @@ def apply(evidence: dict[str, list[dict[str, Any]]], markers: list[dict[str, Any
                                                     f"(YYYY-MM-DD)"})
                 continue
             if until < today:
-                not_applied.append({**brief, "why": f"expired on {marker['until']}: the "
-                                                    f"occurrence is in evidence again"})
+                wanted = _normal(marker["family"])
+                there = any(item.get("path") == marker["path"]
+                            and item.get("line") == marker["target_line"]
+                            and wanted in _names(item, family_of)
+                            for items in evidence.values() for item in items)
+                not_applied.append({**brief, "why": f"expired on {marker['until']}" + (
+                    ": the occurrence is in evidence again" if there else
+                    f"; no {marker['family']} occurrence on line {marker['target_line']}")})
                 continue
         elif _TEMPORARY.search(marker["reason"]):
             flagged.append({**brief, "why": "the reason says it is temporary and gives no "

@@ -136,7 +136,8 @@ def scan_repo(
     root (its excludes are listed under `coverage.not_examined` as `excluded_by_config`;
     its baseline marks rows new or baselined), and `qrp:ignore <family> <reason>` comments,
     whose rows move to `suppressed` with the reason and are counted in
-    `coverage.suppressed`.
+    `coverage.suppressed`; a marker past its `until=YYYY-MM-DD` no longer applies and is
+    listed as expired.
 
     Cost scales with the size of the tree, so a large monorepo takes proportionally
     longer; there is no cache and no partial mode.

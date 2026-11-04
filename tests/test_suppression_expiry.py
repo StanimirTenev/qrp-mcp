@@ -98,3 +98,10 @@ def test_temporary_with_a_date_is_not_flagged(tmp_path):
     r = _scan(tmp_path, "# qrp:ignore-next-line RSA until=2999-01-01 temporary, ticket 41")
     assert r["suppressed"]["count"] == 1
     assert r["suppressed"]["markers_flagged"] == []
+
+
+def test_an_expired_marker_over_nothing_does_not_claim_an_occurrence(tmp_path):
+    (tmp_path / "a.py").write_text("# qrp:ignore-next-line RSA until=2001-01-31 old\nx = 1\n")
+    r = scan_directory(tmp_path)
+    assert r["suppressed"]["markers_not_applied"][0]["why"] == (
+        "expired on 2001-01-31; no RSA occurrence on line 2")
