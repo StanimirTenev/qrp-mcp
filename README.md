@@ -125,6 +125,19 @@ it is the document built to be sent. `closure` writes the `prove_closure` verdic
 scans, and names both inputs by their SHA-256, so the three files can be tied together by
 whoever receives them. Both print the SHA-256 of what they wrote.
 
+### A control on your own tree
+
+```
+uvx qrp-mcp control ~/code/my-protocol --seed 1 --out control.json
+```
+
+From 0.43.0. The tree is copied to a temporary directory, known cryptographic uses (9 styles) and
+lines that name an algorithm without using it (7 kinds) are planted into the copy, and the copy
+is scanned with the same instrument. The result says which planted lines were found, which were
+missed and which non-uses were reported as uses — **robustness on known patterns**, for this
+version. It is not a statement about what your tree contains, and it never makes the coverage
+claim stronger. `scan --control-seed N` carries the block in the result. [The control](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/control.md).
+
 ## What it reads
 
 Every file under the path is either read or named with the reason it was not. The full list of
@@ -155,7 +168,7 @@ parse).
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | OpenSSH | 873 | 741 | 84.88% | 5 | 84.31% | 70 | 54 |
 | certbot | 1,250 | 850 | 68.00% | 0 | 68.00% | 39 | 28 |
-| Vault | 9,281 | 5,421 | 58.41% | 9 | 58.31% | 74 | 62 |
+| Vault | 9,281 | 5,434 | 58.55% | 9 | 58.45% | 74 | 62 |
 
 These are reading figures, not detection figures. How well the rules find what is there is a
 different question; the measurements made of it, each with its date and version, are in
@@ -175,6 +188,8 @@ current.
   `--min-coverage`, `.qrp.toml`, `qrp:ignore` with `until=` and `owner=`
 - [Closure, replacements and profiles](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/closure-and-profiles.md) — whether a fix closed it,
   what to replace it with, national profiles, the role of an RSA or EC line
+- [The control](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/control.md) — `qrp-mcp control`, what it plants, the
+  `self_seeded_control` block and its fields
 - [How it is measured](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/measurement.md) — the measurements, the corpora, what an outside
   review found, what is still missing
 - [CHANGELOG](https://github.com/StanimirTenev/qrp-mcp/blob/main/CHANGELOG.md) — what changed in each version, newest first

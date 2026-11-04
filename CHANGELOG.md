@@ -4,6 +4,80 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.43.0
+
+**`qrp-mcp control PATH --seed N`: a control planted into your own tree.** The tree is copied
+to a temporary directory; 9 styles of cryptographic use (direct calls, aliased names, names
+built from pieces, calls split over lines, shell commands in strings, cert-manager, Terraform,
+Java properties, UTF-16 without a BOM) and 7 kinds of line that name an algorithm without using
+it (switched-off flags, deny lists, log strings, variable names, comments, a JWKS key label, an
+sshd_config removal list) are planted for RSA, ECDSA and Ed25519 in each language present; the
+copy is scanned with the same instrument and every planted line is scored. The same seed on the
+same tree plants the same lines (`plan_sha256`). The MCP tool is `run_self_seeded_control`, and
+`scan --control-seed N` (and `cbom`) carries the block as `coverage.claims.self_seeded_control`;
+every other scan carries `ran: false`. The figure is **robustness on known patterns** for this
+version: the denominator is what was planted, and it says nothing about what the tree contains.
+So `claims.control.held` stays `false` and nothing in the block feeds the CBOM's
+`compositions[].aggregate`, both pinned by a test. The block's shape is published in
+[docs/control.md](docs/control.md). The harness is the one written for the measurement of
+04.11.2026, moved into the package; on its seven trees it reproduces that round's 0.42.0
+results item for item.
+
+On those seven trees at seed 1: planted uses not found 28 of 189 (0.42.0) -> 26 of 189;
+decoys reported as a use 50 of 126 -> 23 of 126; rows at `high` on planted lines 100 on uses
+and 3 on decoys -> 103 and 0. The rows below were corrected against five of the decoy classes,
+so those classes no longer measure the rules independently ([measurement](docs/measurement.md)).
+
+Each row below was reproduced as a failing test before the fix, and each fix was reverted once
+to see its test fail.
+
+- **An OpenSSH list that begins with `-` removes every name on it** (row 420).
+  `HostKeyAlgorithms -ssh-rsa,ssh-dss` gave a ban for `ssh-rsa` and a DSA reference for
+  `ssh-dss`; `KexAlgorithms -diffie-hellman-group14-sha1,...` a DH reference with size 2048.
+  sshd_config(5) and kex_assemble_names: the prefix governs the list. `+` and `^` still offer.
+  A test that said the opposite (`-ssh-dss,rsa-sha2-512` keeps RSA live) is corrected.
+- **A family named only in an assigned variable's name is an identifier** (row 421), for ECDSA
+  and Ed25519 as it was for RSA: `ecdsa_fallback_count = 0` was a declaration at medium. Code
+  only: a Terraform or config key (`ecdsa_curve = "P256"`) is the setting, and a switch name
+  (`CONFIG_ECDSA=y`) stays a declaration of the use. Still counted as named, at low.
+- **A switch set off is a ban in Rust, TypeScript, PHP, Java and Go** (row 422):
+  `const ECDSA_ENABLED: bool = false;`, `static final boolean ... = false;`,
+  `$ecdsaEnabled = false;`, `const ecdsaEnabled = false`, and `= 0`.
+- **A string handed to a log or print call is text** (row 423): Rust `log::info!("Ed25519 ...")`
+  and TypeScript ``console.info(`ECDSA ...`)`` were calls at high. A call nested inside the log
+  call is still a call.
+- **A bare name on its own line in a split call** (row 424): `generateKeyPairSync(\n 'rsa',` and
+  `getInstance(\n "RSA");` were silent; read as the joined call, at the string's line.
+- **.NET and Go lockfiles** (rows 425-428): `*.deps.json` (`libraries` of type `package`),
+  `packages.lock.json` and `packages.<project>.lock.json`, `go.sum` (module lines; a
+  `/go.mod`-only line hashes a go.mod consulted while resolving, and is not a dependency) and
+  `vendor/modules.txt`, the one file under `vendor/` that is read. Formats from their owners'
+  documentation, quoted in the test. Vault: 13 more files read (its `go.sum` files), 21 more
+  dependency rows.
+- **A file hash that survives a line-ending change** (row 429): one commit checked out with CRLF
+  and with LF gave different `evidence_file_sha256` for every file. The result now carries
+  `evidence_file_sha256_crlf_as_lf` beside it, and each CBOM evidence file
+  `qrp:sha256_crlf_as_lf`. The raw digest is unchanged.
+- **The CBOM's identity does not depend on the path** (row 430): `serialNumber` is a UUIDv5 over
+  the commit pin, the instrument and the findings, not the target path; `metadata.component` is
+  named by the directory's own name, with the commit as its `version`. Two byte-identical trees
+  at two paths now share it. Not changed: `qrp:coverage:corpus:target` still carries the path as
+  given.
+- **`expired` is relative to `--as-of`** (row 431), which no longer needs `--mandate`. Without it,
+  SOURCE_DATE_EPOCH, else the scan's date at 00:00 UTC (`expired_basis: "scan date"`, was the
+  clock, `"scan time"`), so two scans of one tree on one day carry the same certificate rows.
+- **A git link checked out as a text file is counted as the link is** (row 432). With
+  `core.symlinks=false` (Windows' default) git writes a link as a file holding its target; certbot's
+  12 `cert.pem` links were PEM files that did not decode, and its coverage read 68.0 % on Linux
+  and 71.2 % on Windows. An index entry of mode 120000 is now listed in `symlinks_not_followed`
+  with `checked_out_as_text` and its target, whatever the checkout wrote.
+
+Positive controls, against 0.42.0: OpenSSH and certbot read the same files and give the same
+findings; Vault reads 13 more (5,434 of 9,281, its `go.sum` files) with the same findings.
+Families are the same in all three. 41 OpenSSH rows (`sshkey_ecdsa_funcs = {`, `SSHFP_KEY_ECDSA
+= 3`) moved from declaration to identifier, and one certbot and two Vault log lines to comment.
+Not claimed: any change to how much of a tree's own cryptography is found.
+
 ## 0.42.0
 
 **From 0.42.0** (core rows of the fix list; the file formats follow below). Each was

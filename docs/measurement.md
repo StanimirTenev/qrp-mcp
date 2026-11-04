@@ -328,6 +328,37 @@ The corpus is a floor, not a measurement. It was written by the same hands that 
 so a construct nobody here thought of is in neither. Its honest use is as a difference between
 two releases.
 
+## The control planted into the tree
+
+From 0.43.0, `qrp-mcp control PATH --seed N` plants known lines into a temporary copy of the
+tree and scans the copy ([the control](control.md)). Seeding known cases into real third-party
+code to evaluate a detector is established: *Why Crypto-detectors Fail: A Systematic Evaluation
+of Cryptographic Misuse Detection Techniques* (IEEE S&P 2022) seeds misuse mutants into open
+source Android apps to evaluate misuse detectors. What this control adds is narrower: it runs on
+the client's own tree at scan time, grades the scanner's confidence against decoy lines that name
+an algorithm without using it, and travels in the scanner's own output under a name of its own,
+robustness on known patterns. It never licenses the CBOM's `complete`.
+
+The first figures, on seven trees in seven languages at seed 1 (pyjwt, ruby-jwt, rcgen,
+passport, jose, spring-authorization-server, go-jose; 27 planted uses and 18 decoys each):
+
+| | 0.42.0 | 0.43.0 |
+| --- | ---: | ---: |
+| planted uses not found | 28 of 189 | 26 of 189 |
+| decoys reported as a use | 50 of 126 | 23 of 126 |
+| rows at `high` on planted lines: on uses / on decoys | 100 / 3 | 103 / 0 |
+| rows at `medium`: on uses / on decoys | 59 / 40 | 58 / 2 |
+| rows at `low`: on uses / on decoys | 2 / 7 | 2 / 21 |
+
+Between the two columns, five decoy classes were corrected against (ZA-OPRAVYANE rows 420-424:
+sshd `-` lists, switched-off flags, log strings, variable names, a bare name in a split call), so
+the 0.43.0 figures on those classes are no longer independent of the rules. What is still
+missed is the same shape as before: a name carried by an alias or a constant (15 of 21) and a
+name built from pieces (11 of 21). A variable named after a family is now an identifier at low
+in every language, which is still counted as reported (19 of 21). Two Go flags whose names run
+into the harness's identifier (`ecdsaEnabledp1x017`) are not read as switches, by design: a
+lower-case letter after `Enabled` means a different word.
+
 ## What is still missing here
 
 Stated rather than hidden, and each of these is a known gap rather than a suspicion:

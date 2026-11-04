@@ -40,6 +40,11 @@ cannot.
 
 Then stop.
 
+If the user asks how far the scanner's silence can be relied on in this tree, run
+`run_self_seeded_control` on it and report its `sentence` as written: it plants known lines into
+a temporary copy and says which were found. It is robustness on known patterns for this
+version, not a statement about what the tree contains.
+
 ## What not to do
 
 Do not assign a risk level, a severity ranking of your own, a score, or a migration order.
