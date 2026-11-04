@@ -736,6 +736,12 @@ _TLS_VERSION = re.compile(
     r"SSLv(2|3)|"                                # SSLv3
     r"tls\.VersionTLS(1[0-3])|"                  # Go
     r"SslProtocols\.Tls(1[123])?|"               # .NET
+    # .NET SecurityProtocolType, C# `.Tls11` and PowerShell `]::Tls` (row 378).
+    r"SecurityProtocolType(?:\.|\]::)(?:(Ssl3)|Tls(1[123])?)|"
+    # Rust openssl crate `SslVersion::TLS1_2` / `::TLS1` / `::SSL3`, rustls
+    # `version::TLS13`, mbedTLS `MBEDTLS_SSL_VERSION_TLS1_2` (row 411).
+    r"SslVersion::(?:(SSL3)|TLS1(?:_([0-3]))?)|version::TLS1([23])|"
+    r"MBEDTLS_SSL_VERSION_TLS1_([23])|"
     r"PROTOCOL_TLSv1(?:_(\d))?|"                 # Python ssl
     r"TLS1_(\d)_VERSION|"                        # OpenSSL
     r"TLS_?v?1\.(\d)|"                           # rustls, prose in config
@@ -756,6 +762,14 @@ _TLS_CONTEXT = re.compile(
     # Python's ssl: `ctx.minimum_version = ssl.TLSVersion.TLSv1_3` (ZA-OPRAVYANE row 166).
     r"(?:minimum|maximum)_version\s*=|TLSVersion\.|"
     r"enabled-protocols|SSLProtocol|set_ciphers|SslProtocols|protocol_version|"
+    r"SecurityProtocolType|"
+    # Java SSLSocket/SSLEngine `setEnabledProtocols`, SSLParameters `setProtocols`, the
+    # `jdk.tls.client|server.protocols` properties (row 406); Ruby `ssl_version =` (row 409);
+    # Rust `set_min|max_proto_version`, rustls `builder_with_protocol_versions`, mbedTLS
+    # `mbedtls_ssl_conf_min|max_tls_version` (row 411).
+    r"set(?:Enabled)?Protocols\s*\(|jdk\.tls\.(?:client|server)\.protocols|"
+    r"ssl_version\s*=|_proto_version\s*\(|protocol_versions\s*\(|"
+    r"mbedtls_ssl_conf_(?:min|max)_tls_version|"
     r"PROTOCOL_TLS|SSL_CTX_set_|supported_protocols|versions\s*[:=]|"
     r"ServerOptions|SSLContext|tls\.Config|rustls|sslVersion|"
     # HAProxy: `ssl-min-ver`/`ssl-max-ver` on a bind or server line, and the global
@@ -987,8 +1001,10 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
 def _tls_version_name(match: re.Match) -> str:
     minor = next((g for g in match.groups() if g), None)
     text = match.group(0)
-    if text.upper().startswith("SSLV"):
+    if text.upper().startswith("SSLV") and not text.startswith("SslVersion::"):
         return f"SSLv{minor}"
+    if minor in ("Ssl3", "SSL3"):  # .NET SecurityProtocolType.Ssl3, Rust SslVersion::SSL3
+        return "SSLv3"
     if minor is None:
         return "TLSv1.0"
     if len(minor) == 2:            # VersionTLS12, TLS1_2_VERSION spelled 12/13

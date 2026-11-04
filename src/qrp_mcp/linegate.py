@@ -131,7 +131,8 @@ PARTS: list[tuple[str, str]] = [
     (r"(?-i:0x[0-9A-Fa-f]{4}\s*,[\sA-Z0-9,]*(?:AES|CAMELLIA|CHACHA|SEED|IDEA|RC4|3DES|DES|"
      r"NULL|ARIA|RC2))", ""),
     # assets.scan_protocols, _TLS_VERSION: each alternative's fixed start.
-    (r"(?-i:TLSv1|SSLv[23]|VersionTLS1[0-3]|SslProtocols\.Tls|TLS1_\d_VERSION|"
+    (r"(?-i:TLSv1|SSLv[23]|VersionTLS1[0-3]|SslProtocols\.Tls|SecurityProtocolType|"
+     r"SslVersion::|version::TLS1[23]|MBEDTLS_SSL_VERSION_TLS1_|TLS1_\d_VERSION|"
      r"TLS_?v?1\.\d|tls1\.\d|TLSV1_[0-3]|tlsv1-[0-3]|tls1-[0-3])", ""),
     # assets.scan_protocols, _SSH_KEY_LINE without its leading boundary.
     (r"(?-i:ssh-(?:rsa|dss|ed25519|mldsa)|ecdsa-sha2-nistp\d|sk-\S+\s+[A-Za-z0-9+/]{20})", ""),
