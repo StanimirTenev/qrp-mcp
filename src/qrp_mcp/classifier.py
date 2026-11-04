@@ -612,7 +612,9 @@ class Finding(_Model):
     pqc_status: str | None = None
     classification: Classification
     quantum_vulnerable: bool
-    weak_key: bool
+    # None: the family has a size table and no size was read, so weak or not is not
+    # established (row 391). Never False for that case.
+    weak_key: bool | None
     severity: str
     reason: str
 
@@ -814,6 +816,9 @@ def classify_algorithm(
         # EC families, each against its own table, with the table named in the reason.
         status = classical_status(family, key_size)
         weak_key = bool(status and status["status"] in ("broken_in_public", "disallowed"))
+        # Row 391: a DSA key whose size was never read was "weak_key: false"; it is not
+        # established, and said so.
+        unread_size = bool(status and status["status"] == "undetermined")
 
         severity = "high"
         reasons = [f"{family} is broken by a large-scale quantum computer (Shor's algorithm)."]
@@ -824,6 +829,10 @@ def classify_algorithm(
         if weak is not None:
             severity = "critical"
             reasons.append(weak[1] + ".")
+        elif unread_size and not weak_key:
+            weak_key = None
+            reasons.append(f"Whether the {family} key is below the classical minimum is not "
+                           f"established: {status['source']}.")
 
         return Finding(
             source=source,

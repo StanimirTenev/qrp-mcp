@@ -72,8 +72,10 @@ def _classify(value):
 def test_dsa_and_ec_below_the_minimum_and_strong_sizes_are_not_weak():
     assert _classify("DSA-1024").weak_key is True
     assert _classify("ECDSA-192").weak_key is True
-    for strong in ("DH-2048", "DSA-3072", "ECDSA-256", "RSA-2048", "DH"):
+    for strong in ("DH-2048", "DSA-3072", "ECDSA-256", "RSA-2048"):
         assert _classify(strong).weak_key is False, strong
+    # Row 391: no size read is not established, never "not weak".
+    assert _classify("DH").weak_key is None
 
 
 # -- row 182: the status and its source ------------------------------------------------

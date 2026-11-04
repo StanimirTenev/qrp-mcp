@@ -1837,6 +1837,9 @@ def _suite_table_entry(line: str) -> list[tuple[str, int]]:
 
 
 # --- key sizes named on the same line as the algorithm ---
+# Node's and WebCrypto's `modulusLength: 2048`, PHP's `"private_key_bits" => 2048` (rows 392,
+# 396, 398): an option that is the size and names no family.
+_SIZE_OPTIONS = r"\bmodulusLength\s*:\s*(\d{3,5})\b|[\"']private_key_bits[\"']\s*=>\s*(\d{3,5})\b"
 _KEY_SIZE = re.compile(
     r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|"
     r"(?<![A-Za-z])rsa[:\-_](\d{3,5})(?![0-9])|\bRSA_(\d{3,5})\b|"
@@ -1846,16 +1849,24 @@ _KEY_SIZE = re.compile(
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
     r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
-    r"EVP_PKEY_Q_keygen\([^)]*?(\d{3,5})\s*\)|"
+    r"EVP_PKEY_Q_keygen\((?:[^)]|\(size_t\))*?(\d{3,5})\s*\)|"
     # DNSSEC: BIND's `algorithm rsasha256 2048` and `dnssec-keygen -a RSASHA256 -b 2048`.
     r"\balgorithm\s+rsa\w*\s+(\d{3,5})\b|\bdnssec-keygen\b[^\n]*?\s-b\s+(\d{3,5})\b|"
     # Release 3d: certbot's `rsa-key-size = 4096` / `--rsa-key-size 4096` / `rsa_key_size`,
     # Java's `KeyPairGenerator.initialize(2048)`.
-    r"\brsa[-_]key[-_]size[\"'\]]*\s*[=:,]?\s*[\"']?(\d{3,5})|\.initialize\(\s*(\d{3,5})\b",
+    r"\brsa[-_]key[-_]size[\"'\]]*\s*[=:,]?\s*[\"']?(\d{3,5})|(?:\.|\b)initialize\(\s*(\d{3,5})\b|"
+    # Rows 392-400 (W2): the size argument of each library's key generation, on its line.
+    r"\bRSA\.(?:new|generate)\(\s*(\d{3,5})\b|\bRsa::generate\(\s*(\d{3,5})\b|"
+    r"\bRsaPrivateKey::new\([^,]*,\s*(\d{3,5})\b|\bwc_MakeRsaKey\([^,]*,\s*(\d{3,5})\b|"
+    r"\bEVP_RSA_gen\(\s*(\d{3,5})\b|set_rsa_keygen_bits\([^,]*,\s*(\d{3,5})\b|"
+    r"RSAKeyGenParameterSpec\(\s*(\d{3,5})\b|" + _SIZE_OPTIONS,
     re.IGNORECASE)
 # The same for DSA and DH (release 3d): only the forms that name no algorithm themselves.
 _KEY_SIZE_GENERIC = re.compile(
-    r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|\.initialize\(\s*(\d{3,5})\b",
+    r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|(?:\.|\b)initialize\(\s*(\d{3,5})\b|"
+    r"\b(?:DSA|DH)\.(?:new|generate)\(\s*(\d{3,5})\b|\bcreateDiffieHellman\(\s*(\d{3,5})\b|"
+    r"set_dsa_paramgen_bits\([^,]*,\s*(\d{3,5})\b|set_dh_paramgen_prime_len\([^,]*,\s*(\d{3,5})\b|"
+    + _SIZE_OPTIONS,
     re.IGNORECASE)
 
 
@@ -3313,6 +3324,10 @@ def scan_source_file(path: Path, rel_path: str,
                 "excerpt": line.strip()[:200],
                 "evidence_kind": "ban" if _is_banned_here(line, pos, in_denial) else kind,
             })
+            # Row 394: `EVP_PKEY_Q_keygen(NULL, NULL, "RSA", (size_t)3072)`.
+            size = key_size_on_line(line, family) if family in ("RSA", "DSA", "DH") else None
+            if size:
+                findings[-1]["key_size"] = size
 
         for family, pos, name in scan_cose_algorithms(line):
             if family in seen_on_line or _in_blob(pos, blobs):
