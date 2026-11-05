@@ -2012,7 +2012,7 @@ def _suite_table_entry(line: str) -> list[tuple[str, int]]:
 _SIZE_OPTIONS = r"\bmodulusLength\s*:\s*(\d{3,5})\b|[\"']private_key_bits[\"']\s*=>\s*(\d{3,5})\b"
 _KEY_SIZE = re.compile(
     r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|"
-    r"(?<![A-Za-z])rsa[:\-_](\d{3,5})(?![0-9])|\bRSA_(\d{3,5})\b|"
+    r"(?<![A-Za-z])rsa(?P<sep>[:\-_])(?P<named>\d{3,5})(?![0-9])|\bRSA_(?P<named2>\d{3,5})\b|"
     # Rows 205, 196 (a): Kconfig `..._RSA_LEN=2048`; Yocto's `FIT_SIGN_ALG = "rsa2048"`, only as
     # a whole quoted value (`rsa512_key.pem` is a fixture's file name, as for the key specs).
     r"(?<![A-Za-z])rsa_(?:len|bits|size)\s*=\s*(\d{3,5})\b|[\"'](?i:rsa)(\d{3,5})[\"']|"
@@ -2062,10 +2062,28 @@ def key_size_on_line(line: str, family: str = "RSA") -> int | None:
         if offered:
             return min(offered)
     for m in (_KEY_SIZE if family == "RSA" else _KEY_SIZE_GENERIC).finditer(line):
+        if family == "RSA" and _digest_in_a_name(m, line):
+            continue
         for group in m.groups():
-            if group and int(group) in registry._SIZES:
+            if group and group.isdigit() and int(group) in registry._SIZES:
                 return int(group)
     return None
+
+
+# Row 434 (Daniel Stokes, paramiko 0e9ccb9): `SIGNED_RSA_512`, the fixture of an
+# `rsa-sha2-512` signature, gave `key_size: 512`. In a name, a SHA-2 digest length after RSA is
+# as likely the hash as the modulus; it is not read as a size when the name runs on before RSA
+# (`SIGNED_RSA_512`, `ALG_RSA_512`) or the line names a SHA. `rsa:512` (openssl's key spec) and
+# the size arguments (`bits=512`, `key_size=512`) are the key itself and still count.
+_DIGEST_LENGTHS = {"256", "384", "512"}
+
+
+def _digest_in_a_name(m: re.Match, line: str) -> bool:
+    number = m.group("named") or m.group("named2")
+    if number not in _DIGEST_LENGTHS or m.group("sep") == ":":
+        return False
+    before = line[m.start() - 1] if m.start() else ""
+    return before == "_" or before.isalnum() or "sha" in line.lower()
 
 
 # `ppk = ...` is a directive in a VPN configuration and an ordinary variable name in
@@ -4270,6 +4288,13 @@ _RUNTIME_ASSIGNMENT = re.compile(
     r"(" + _RUNTIME_SETTING.pattern + r")[\w.-]*[\"']?\s*(?:[:=(,]|\s)\s*(?:get\(\s*)?[\"']?("
     # The setting's name in any case; the reference as written (`$CIPHERS`, not `$cipher`).
     + r"(?-i:" + _RUNTIME_REFERENCE.pattern + r"))", re.IGNORECASE)
+# Row 436: `hsm.sign(batch, mechanism=os.environ["HSM_SIGN_MECH"])` -- a sign, encrypt or derive
+# call whose mechanism argument is read at run time. Only inside such a call: `mechanism=` alone
+# is as often a SASL or login mechanism.
+_RUNTIME_CRYPTO_CALL = re.compile(
+    r"\.(?:sign|verify|encrypt|decrypt|derive|wrap|unwrap|wrap_?key|unwrap_?key|"
+    r"derive_?key|generate_?key(?:_?pair)?)\w*\s*\([^)]*?\b(mech(?:anism)?|alg(?:orithm)?|cipher)"
+    r"\s*=\s*(?:get\(\s*)?[\"']?((?-i:" + _RUNTIME_REFERENCE.pattern + r"))", re.IGNORECASE)
 _RUNTIME_BYTES = (b"environ", b"getenv", b"process.env", b"System.getenv",
                   b"GetEnvironmentVariable", b"${", b"$")
 
@@ -4284,7 +4309,7 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
             continue
         # The reference must be the setting's value: right after it, past `=`, `:`, `(`, a
         # comma or a space and an optional quote -- not merely on the same line.
-        found = _RUNTIME_ASSIGNMENT.search(text)
+        found = _RUNTIME_ASSIGNMENT.search(text) or _RUNTIME_CRYPTO_CALL.search(text)
         if not found:
             continue
         out.append({"path": rel_path, "line": number, "setting": found.group(1),
@@ -4476,12 +4501,17 @@ _NIST_CURVE = re.compile(
 
 def _tag_curves(items: list[dict[str, Any]]) -> None:
     for item in items:
-        if item.get("algorithm") not in ("EC", "ECDSA", "ECDH") or item.get("curve"):
+        if item.get("algorithm") not in ("EC", "ECDSA", "ECDH"):
             continue
-        found = {f"P-{next(g for g in m.groups() if g)}"
-                 for m in _NIST_CURVE.finditer(item.get("excerpt") or "")}
-        if len(found) == 1:
-            item["curve"] = found.pop()
+        if not item.get("curve"):
+            found = {f"P-{next(g for g in m.groups() if g)}"
+                     for m in _NIST_CURVE.finditer(item.get("excerpt") or "")}
+            if len(found) == 1:
+                item["curve"] = found.pop()
+        # Row 435: a NIST prime curve on the row is its size, so it reaches the finding and
+        # `algorithm_key_sizes` as the suite rows' P-256 already did.
+        if item.get("curve") in ("P-256", "P-384", "P-521") and "key_size" not in item:
+            item["key_size"] = int(item["curve"][2:])
 
 
 # baseline.FORMAT and config.FILENAME, written out here so this module imports neither.
