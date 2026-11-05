@@ -22,8 +22,8 @@ coverage of the build. [docs/build-gap.md](docs/build-gap.md).
 Tested on: a real Go binary built at test time (Go 1.22, two local modules, `crypto/tls`); by
 hand, a Go 1.26.9 binary with `golang.org/x/crypto` v0.56.0, where the build-only families came
 out as the six of the measurement of 04.11.2026 (ML-KEM, X25519, SHA-1, MD5, DES, RC4). The
-.NET metadata reader on real compiler output (one net8.0 assembly and two COM interop
-assemblies) and on minimal assemblies written by the test; no crypto-bearing .NET publish was
+.NET metadata reader on real compiler output (one net8.0 assembly in the test where the file
+exists, and two COM interop assemblies by hand) and on minimal assemblies written by the test; no crypto-bearing .NET publish was
 built for this release (no .NET SDK on the build machine), so the .NET K and J are tested on
 written fixtures only.
 
@@ -42,7 +42,9 @@ to see its test fail.
 - **A curve on the row is its size** (row 435). `ec.generate_private_key(ec.SECP256R1())` put
   `curve: P-256` on the row, and the finding still said "key size not read", with no EC in
   `algorithm_key_sizes`. A NIST P-256, P-384 or P-521 on the row now gives `key_size` to the
-  row, the finding (`EC-256`, `weak_key: false`) and the summary.
+  row, the finding (`EC-256`, `weak_key: false`), the summary and the CBOM
+  (`parameterSetIdentifier: "256"` beside `curve: "P-256"`). A tree with such rows gets a new
+  `findings_fingerprint`; baseline entries are keyed on the line text and still match.
 - **A signing mechanism read from the environment is chosen outside the files** (row 436).
   `hsm.sign(batch, mechanism=os.environ["HSM_SIGN_MECH"])` gave no row and the scan read as 0
   findings. A sign, verify, encrypt, decrypt, derive, wrap or key-generation call whose
