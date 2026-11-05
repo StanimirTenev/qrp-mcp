@@ -138,6 +138,19 @@ missed and which non-uses were reported as uses — **robustness on known patter
 version. It is not a statement about what your tree contains, and it never makes the coverage
 claim stronger. `scan --control-seed N` carries the block in the result. [The control](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/control.md).
 
+### A source scan against the build
+
+```
+uvx qrp-mcp scan ~/code/my-service --out scan.json      # before building
+uvx qrp-mcp build-gap scan.json ~/code/my-service/bin/publish --out gap.json
+```
+
+From 0.44.0. Of K public-key-bearing packages or modules in the build, the source scan named J;
+the K - J list; the families on one side only; and a Go binary's `DefaultGODEBUG` crypto
+settings as recorded. It reads only tables the toolchain wrote (`*.deps.json`, .NET metadata
+names, `go version -m`, `go tool nm`), never code, and never a key size from the build —
+**robustness on known patterns**, not recall or coverage of the build. [Source against build](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/build-gap.md).
+
 ## What it reads
 
 Every file under the path is either read or named with the reason it was not. The full list of
@@ -190,6 +203,8 @@ current.
   what to replace it with, national profiles, the role of an RSA or EC line
 - [The control](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/control.md) — `qrp-mcp control`, what it plants, the
   `self_seeded_control` block and its fields
+- [Source against build](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/build-gap.md) — `qrp-mcp build-gap`, what it reads
+  from a build, what it never reads, what K and J are
 - [How it is measured](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/measurement.md) — the measurements, the corpora, what an outside
   review found, what is still missing
 - [CHANGELOG](https://github.com/StanimirTenev/qrp-mcp/blob/main/CHANGELOG.md) — what changed in each version, newest first
@@ -198,7 +213,7 @@ current.
 
 It reads source, configuration, CI pipelines, infrastructure-as-code, Kubernetes manifests,
 build files, certificates and key inventories. It does not read documentation, binaries or
-images.
+images; `build-gap` reads only the name tables a toolchain wrote into a build, never its code.
 
 Every file under the path is accounted for in one of four ways: **scanned**, **unreadable**,
 **skipped because the tool does not claim that type** — counted by extension, so

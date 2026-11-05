@@ -4,6 +4,63 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.44.0
+
+**`qrp-mcp build-gap SCAN.json BUILD_DIR`: a source scan against the build.** Of K
+public-key-bearing packages (NuGet, from `*.deps.json`) or modules (Go, from `go version -m`) in a
+build output, the source scan named J; the K - J list by name and version; the families in the
+build and not in the source scan, and the reverse; and each Go binary's `DefaultGODEBUG` line,
+with its cryptographic settings, as the toolchain recorded it. It reads only tables the
+toolchain wrote: `*.deps.json`, the .NET metadata tables AssemblyRef, TypeRef and TypeDef
+(names, by a reader of ECMA-335 Partition II in the package, no new dependency), `go version -m`
+and `go tool nm`. It never reads method bodies, IL or machine code, builds no call graph, and
+reads no key size, mode or curve from the build: a parameter appears only where the source scan
+had it. A test fails if the module imports a disassembler or an IL reader. The figure is
+**robustness on known patterns**, by the fixed name lists in the report, not recall and not
+coverage of the build. [docs/build-gap.md](docs/build-gap.md).
+
+Tested on: a real Go binary built at test time (Go 1.22, two local modules, `crypto/tls`); by
+hand, a Go 1.26.9 binary with `golang.org/x/crypto` v0.56.0, where the build-only families came
+out as the six of the measurement of 04.11.2026 (ML-KEM, X25519, SHA-1, MD5, DES, RC4). The
+.NET metadata reader on real compiler output (one net8.0 assembly and two COM interop
+assemblies) and on minimal assemblies written by the test; no crypto-bearing .NET publish was
+built for this release (no .NET SDK on the build machine), so the .NET K and J are tested on
+written fixtures only.
+
+Each row below was reproduced as a failing test before the fix, and each fix was reverted once
+to see its test fail.
+
+- **A SHA-2 digest length in a signature's name is not an RSA key size** (row 434, Daniel
+  Stokes). paramiko's `SIGNED_RSA_512` (the fixture of an `rsa-sha2-512` signature) gave
+  `key_size: 512` on `tests/test_pkey.py:65` and `:202`, so the scan reported RSA-512, weak and
+  broken in public, and the CBOM carried `parameterSetIdentifier: "512"`. In a name, a 256, 384
+  or 512 after RSA is no longer read as a size when the name runs on before RSA
+  (`SIGNED_RSA_512`) or the line names a SHA. Not changed: `bits=512`, `key_size=512`,
+  `openssl ... rsa:512` and `genrsa ... 512` still give 512, and the name form still gives
+  sizes that are not a digest length (`KEY_RSA_4096`). On paramiko 0e9ccb9 the only change is
+  RSA-512 -> RSA; every other finding is the same.
+- **A curve on the row is its size** (row 435). `ec.generate_private_key(ec.SECP256R1())` put
+  `curve: P-256` on the row, and the finding still said "key size not read", with no EC in
+  `algorithm_key_sizes`. A NIST P-256, P-384 or P-521 on the row now gives `key_size` to the
+  row, the finding (`EC-256`, `weak_key: false`) and the summary.
+- **A signing mechanism read from the environment is chosen outside the files** (row 436).
+  `hsm.sign(batch, mechanism=os.environ["HSM_SIGN_MECH"])` gave no row and the scan read as 0
+  findings. A sign, verify, encrypt, decrypt, derive, wrap or key-generation call whose
+  `mechanism`, `algorithm` or `cipher` argument is read from the environment is now a place in
+  `chosen_outside_files`, with no family claimed. `mechanism=` outside such a call (a SASL or
+  login mechanism) is not.
+
+Positive controls, against 0.43.0 (OpenSSH 7fe3b24, certbot 56ee049, Vault 41e571b): the same
+files read (741, 850, 5,434), the same findings (70, 40, 74), the same families and the same
+`chosen_outside_files` counts. The only rows that moved are EC, ECDSA and ECDH rows that named a
+curve and now carry its size (199, 22, 487); no RSA row's size changed in the three.
+Not claimed: any change to how much of a tree's own cryptography is found.
+
+Corpus regression against 0.43.0 (185 repositories, labels of an independent model): the same
+disagreement in both splits and every family (395/261 and 71/42), exit 0. It counts families,
+so the key-size and curve changes above do not show in it. It is disagreement with a model,
+never recall or precision.
+
 ## 0.43.0
 
 **`qrp-mcp control PATH --seed N`: a control planted into your own tree.** The tree is copied

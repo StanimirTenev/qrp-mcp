@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from . import __version__, certificates, closure, config, control, coverage, cyclonedx, jsonout, mandates, profiles, sarif
+from . import __version__, buildgap, certificates, closure, config, control, coverage, cyclonedx, jsonout, mandates, profiles, sarif
 from . import baseline as baseline_mod
 from .classifier import known_algorithms
 from .scan import scan_directory
@@ -645,6 +645,44 @@ def closure_to_file(argv: list[str]) -> int:
     return _write(result, out_path, "closure")
 
 
+def build_gap_to_file(argv: list[str]) -> int:
+    """`qrp-mcp build-gap SCAN.json BUILD_DIR --out FILE`: a source scan set beside the tables
+    a build's toolchain wrote (buildgap.py says which, and what is never read)."""
+    p = argparse.ArgumentParser(
+        prog="qrp-mcp build-gap",
+        description="Compare a saved source scan with a build output directory: of K "
+                    "public-key-bearing packages or modules in the build, how many the scan "
+                    "named, the rest by name, the families on one side only, and a Go "
+                    "binary's DefaultGODEBUG crypto settings as recorded. Reads only *.deps.json, "
+                    ".NET metadata names, `go version -m` and `go tool nm`; nothing is executed. "
+                    "Robustness on known patterns, not recall or coverage of the build.")
+    p.add_argument("scan", help="scan result of the source tree (`qrp-mcp scan PATH --out FILE`)")
+    p.add_argument("build_dir", help="the build output: a publish folder, a Go binary's folder")
+    p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
+    a = p.parse_args(argv)
+    sys.stderr.reconfigure(errors="backslashreplace")
+    scan_path, build_dir = Path(a.scan).expanduser(), Path(a.build_dir).expanduser()
+    if not scan_path.is_file():
+        p.error(f"no scan result at {a.scan}")
+    try:
+        scan = json.loads(scan_path.read_bytes())
+    except ValueError:
+        p.error(f"not a JSON scan result: {a.scan}")
+    if not isinstance(scan, dict) or "findings" not in scan:
+        p.error(f"not a qrp-mcp scan result: {a.scan}")
+    if not build_dir.is_dir():
+        p.error(f"not a directory: {a.build_dir}")
+    out_path = Path(a.out).expanduser() if a.out else None
+    if out_path is not None and not out_path.resolve().parent.is_dir():
+        p.error(f"the folder for --out does not exist: {out_path.parent}")
+    result = buildgap.build_gap(scan, build_dir)
+    result["scan"]["sha256"] = hashlib.sha256(scan_path.read_bytes()).hexdigest()
+    print(f"of {result['K_public_key_bearing']} public-key-bearing packages/modules in the "
+          f"build, the source scan named {result['J_named_by_source_scan']} "
+          f"(robustness on known patterns)", file=sys.stderr)
+    return _write(result, out_path, "build-gap")
+
+
 USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MCP clients run)
        qrp-mcp scan PATH [--out FILE] [--level full|masked|trimmed] [--profile NAME]
                     [--format json|sarif] [--mandate cnsa-2.0|nist-ir-8547]
@@ -667,6 +705,11 @@ USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MC
                                plant known lines into a temporary copy, scan it, and
                                write what the scan did with each (robustness on known
                                patterns); `scan --control-seed N` carries the same block
+       qrp-mcp build-gap SCAN.json BUILD_DIR [--out FILE]
+                               set a source scan beside a build output: of K public-key-
+                               bearing packages/modules in the build, the scan named J;
+                               reads only deps.json, .NET metadata names, `go version -m`
+                               and `go tool nm` (robustness on known patterns)
        qrp-mcp --version
 """
 
@@ -684,6 +727,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(closure_to_file(argv[1:]))
     if argv[0] == "control":
         raise SystemExit(control_to_file(argv[1:]))
+    if argv[0] == "build-gap":
+        raise SystemExit(build_gap_to_file(argv[1:]))
     if argv[0] in ("-h", "--help", "help"):
         print(USAGE, end="")
         raise SystemExit(0)
