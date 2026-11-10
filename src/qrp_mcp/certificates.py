@@ -464,6 +464,23 @@ COMPOSITE_SIGNATURES: dict[str, tuple[str, tuple[str, str]]] = {
 _ML_DSA_SETS = {"2.16.840.1.101.3.4.3.17": "ML-DSA-44", "2.16.840.1.101.3.4.3.18": "ML-DSA-65",
                 "2.16.840.1.101.3.4.3.19": "ML-DSA-87"}
 
+_PQC_SET_BY_OID: dict[str, tuple[str, str]] = {}
+
+
+def pqc_set(oid: str | None) -> tuple[str, str] | None:
+    """(family, parameter set) a post-quantum identifier names, or None.
+
+    Each NIST arc names one set (FIPS 203 ML-KEM-512/768/1024 at 2.16.840.1.101.3.4.4.1-3,
+    FIPS 204 ML-DSA-44/65/87 at ...3.17-19, FIPS 205's twelve SLH-DSA sets at ...3.20-31), so
+    the identifier says what `ML-KEM-768` on a source line says. The set is given in the form
+    a line's set takes (`768`, `65`, `SHA2-128s`), so the profiles, the CNSA 2.0 clause and
+    the CBOM read a key file's set as they read a line's. The table is cyclonedx._PQC_OID,
+    read the other way: the arcs are written down once."""
+    if not _PQC_SET_BY_OID:
+        from .cyclonedx import _PQC_OID  # local: avoids an import cycle
+        _PQC_SET_BY_OID.update({dotted: key for key, dotted in _PQC_OID.items()})
+    return _PQC_SET_BY_OID.get(oid or "")
+
 # `cryptography`'s curve names, in the spelling CURVE_OIDS uses.
 _CURVE_NAMES = {"secp256r1": "P-256", "secp384r1": "P-384", "secp521r1": "P-521"}
 
@@ -688,6 +705,14 @@ def _certificate_rows(rel_path: str, line: int, excerpt: str, cert: dict[str, An
                 row["key_size"] = key["size"]
             if key.get("curve"):
                 row["curve"] = key["curve"]
+        # The parameter set its identifier names: the subject key's from the key's, the
+        # signature's from the signature's, each of which names one set. `public_key` says
+        # ML-DSA-65 already; until this the row, which the profiles, the mandates and the
+        # CBOM's algorithm component read, did not.
+        said = pqc_set(key.get("oid") if role == "subject_public_key"
+                       else cert["signature_algorithm"].get("oid"))
+        if said and said[0] == family:
+            row["parameter_set"] = said[1]
         rows.append(row)
     return rows
 
@@ -1051,6 +1076,23 @@ def scan_certificate_file(path: Path, rel_path: str,
             item["curve"] = ", ".join(name for name, _ in curves)
             item["key_size"] = curves[0][1]
             item["description"] += f"; curve {item['curve']} from its object identifier"
+
+    # The parameter set of a post-quantum key from its identifier, as the curve above. A key
+    # `cryptography` does not parse is still named by its OID (`openssl genpkey` 3.6 writes
+    # ML-KEM and ML-DSA keys as seed and expanded key together by default, which
+    # `cryptography` 50 refuses), and that OID names one set. Only where the file's identifiers name one set of
+    # the family: two give none, as on a source line.
+    sets: dict[str, set[str]] = {}
+    for oid in {oid for blob in blobs for oid in _iter_oids(blob)}:
+        said = pqc_set(oid)
+        if said:
+            sets.setdefault(said[0], set()).add(said[1])
+    for item in algorithms:
+        found = sets.get(item["algorithm"], set())
+        if len(found) == 1 and "parameter_set" not in item:
+            item["parameter_set"] = next(iter(found))
+            item["description"] += (f"; parameter set {item['algorithm']}-"
+                                    f"{item['parameter_set']} from its object identifier")
 
     # The size of an RSA key, from its public key (ZA-OPRAVYANE row 46). The smallest when
     # a file holds several, as for the curve above; all of them in the description.
