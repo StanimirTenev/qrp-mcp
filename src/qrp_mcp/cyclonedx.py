@@ -762,6 +762,19 @@ _CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_p
                                  "fallback_beside_hybrid")}
 
 
+# The order of a named curve's base point, in bits: SEC 2 v2.0 section 2 (secp*), FIPS 186-4
+# appendix D (P-*), RFC 5639 section 3 (brainpool*). A curve named without a key size read
+# was reported `undetermined` although the curve fixes it (Daniel Stokes, 10.11.2026).
+_CURVE_BITS = {name: bits for bits, names in {
+    192: ("p-192", "secp192r1", "prime192v1"),
+    224: ("p-224", "secp224r1"),
+    256: ("p-256", "secp256r1", "prime256v1", "secp256k1", "brainpoolp256r1"),
+    384: ("p-384", "secp384r1", "brainpoolp384r1"),
+    521: ("p-521", "secp521r1"),
+    512: ("brainpoolp512r1",),
+}.items() for name in names}
+
+
 def _size_and_status(family: str, finding: dict[str, Any], sizes: list[int],
                      curve: str | None = None) -> list[dict[str, str]]:
     """`qrp:key_size` and the classical status with its source, for one component of an RSA,
@@ -775,7 +788,7 @@ def _size_and_status(family: str, finding: dict[str, Any], sizes: list[int],
     elif len(sizes) > 1:
         said, size = "several: see qrp:observedKeySizes", min(sizes)
     elif curve:
-        said, size = f"set by the curve {curve}", None
+        said, size = f"set by the curve {curve}", _CURVE_BITS.get(curve.lower().replace("nist ", ""))
     else:
         said, size = "undetermined", None
     out = [{"name": f"{NS}key_size", "value": said}]

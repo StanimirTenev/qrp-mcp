@@ -152,3 +152,18 @@ def test_fixed_size_and_post_quantum_components_get_no_classical_size(tmp_path):
         if name.startswith(("ML-KEM", "X25519")):
             assert "qrp:classical_status" not in _props(c), name
             assert _props(c).get("qrp:key_size") != "undetermined", name
+
+
+# -- a curve named without a size read (Daniel Stokes, 10.11.2026) ------------------------
+
+def test_a_named_curve_gives_the_size_its_status_is_read_from():
+    from qrp_mcp.cyclonedx import _size_and_status
+    finding = {"classification": "classical_vulnerable"}
+    p = {x["name"]: x["value"] for x in _size_and_status("ECDSA", finding, [], "P-256")}
+    assert p["qrp:key_size"] == "set by the curve P-256"
+    assert p["qrp:classical_status"] == "meets_minimum_length"
+    assert "224-bit minimum" in p["qrp:classical_status_source"]
+    low = {x["name"]: x["value"] for x in _size_and_status("ECDSA", finding, [], "secp192r1")}
+    assert low["qrp:classical_status"] == "disallowed"
+    unknown = {x["name"]: x["value"] for x in _size_and_status("ECDSA", finding, [], "curveXYZ")}
+    assert unknown["qrp:classical_status"] == "undetermined"
