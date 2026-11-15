@@ -188,7 +188,7 @@ material" component for all the keys in the tree
 ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/cbom.md)).
 
 From 0.47.0 an RSA line that encrypts a named value with OAEP (`pub.encrypt(archive_key,
-padding.OAEP(...))`) carries `wraps`: the value's name (masked below `--level full`), and, where the
+padding.OAEP(...))`, on one line or split over up to four) carries `wraps`: the value's name (masked below `--level full`), and, where the
 file assigns it once with `generate_key(bit_length=N)`, `os.urandom(n)`, `secrets.token_bytes(n)` or
 `get_random_bytes(n)`, `what: "symmetric key"` and its size -- a symmetric key is as safe as the key
 that wraps it. In the CBOM as `qrp:wraps`. AES itself is still not reported: symmetric cryptography

@@ -118,6 +118,23 @@ def test_size_only_from_one_recognised_assignment(tmp_path, source, want):
         assert rows[0]["wraps"]["what"] == "not read"
 
 
+def test_a_call_split_over_lines_is_read(tmp_path):
+    (tmp_path / "store.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import rsa, padding\n"
+        "archive_key = AESGCM.generate_key(bit_length=256)\n"
+        "kek = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n"
+        "wrapped = kek.public_key().encrypt(\n"
+        "    archive_key,\n"
+        "    padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(),"
+        " label=None),\n"
+        ")\n")
+    rows = _wrap_rows(server.scan_repo(str(tmp_path), level="full")["evidence"])
+    assert rows and {r["wraps"]["name"] for r in rows} == {"archive_key"}
+    assert {r["wraps"]["key_size"] for r in rows} == {256}
+    # The generator line (3) is not inside the call.
+    assert all(r["line"] >= 4 for r in rows)
+
+
 @pytest.mark.parametrize("source", [
     # A signature, or encryption without OAEP named: not a key transport this reads.
     "sig = key.sign(data, padding.PSS(m, s), h)  # RSA\n",

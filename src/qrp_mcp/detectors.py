@@ -4372,9 +4372,10 @@ def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> 
 
 # Row 495: an RSA key that wraps a symmetric key -- `pub.encrypt(archive_key, padding.OAEP(...))`
 # -- says so, with the wrapped value's name and, where the file assigns that name once with a
-# recognised generator, its size. Only an OAEP encrypt of a plain name on one line: ECIES and AES
-# key wrap under a DH-derived key need the data flow across lines and are not read.
-_OAEP_WRAP = re.compile(r"\.encrypt\(\s*([A-Za-z_]\w*)\s*,[^\n]*\bOAEP\b")
+# recognised generator, its size. Only an OAEP encrypt of a plain name, the call on one line or
+# split over up to four (a formatter's wrapping), the row's line inside it: ECIES and AES key wrap
+# under a DH-derived key need the data flow across statements and are not read.
+_OAEP_WRAP = re.compile(r"\.encrypt\(\s*([A-Za-z_]\w*)\s*,[^;]{0,300}?\bOAEP\b")
 _SYMMETRIC_KEY_SOURCES = (
     (re.compile(r"\bgenerate_key\(\s*(?:bit_length\s*=\s*)?(\d+)\s*\)"), 1,
      "generate_key(bit_length=N) (pyca AESGCM, AESCCM, AESOCB3, AESSIV, ChaCha20Poly1305)"),
@@ -4388,7 +4389,13 @@ def _wrapped_key(findings: list[dict[str, Any]], lines: list[str]) -> None:
     for f in findings:
         if f.get("algorithm") != "RSA" or f.get("evidence_kind") in ("comment", "ban"):
             continue
-        m = _OAEP_WRAP.search(lines[f["line"] - 1])
+        first = max(0, f["line"] - 4)
+        window = "\n".join(lines[first:f["line"] + 3])
+        row_at = sum(len(line) + 1 for line in lines[first:f["line"] - 1])
+        row_end = row_at + len(lines[f["line"] - 1])
+        m = next((m for m in _OAEP_WRAP.finditer(window)
+                  if m.start() <= row_end and m.end() >= row_at
+                  and window.count("\n", m.start(), m.end()) <= 3), None)
         if not m:
             continue
         name = m.group(1)
