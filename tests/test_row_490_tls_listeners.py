@@ -81,12 +81,13 @@ def test_the_cbom_carries_the_listeners(tmp_path):
     for doc in _cboms(root, tmp_path):
         props = {p["name"]: p["value"] for p in doc["properties"]}
         listeners = json.loads(props["qrp:tls_listeners"])
-        assert [(x["location"], x["line"], x["ports"], x["groups"], x["certificates"])
-                for x in listeners] == [
+        assert [(x["location"], x["line"], x["ports"], x["groups"], x["groups_set"],
+                 x["certificates"], x["certificates_set"]) for x in listeners] == [
             ("conf.d/pq.conf", 2, ["443"], ["X25519MLKEM768 (X25519 + ML-KEM-768)"],
-             ["ML-DSA-65 (named in a path)"]),
-            ("conf.d/pq.conf", 11, ["8443"], ["X25519 (X25519)"],
-             ["ECDSA 256 (named in a path)"])]
+             "in this block", ["ML-DSA-65 (named in a path)"], ["in this block"]),
+            ("conf.d/pq.conf", 11, ["8443"], ["X25519 (X25519)"], "in this block",
+             ["ECDSA 256 (named in a path)"], ["in this block"])]
+        assert "pq.example.test" not in json.dumps(doc)   # server names stay out of the CBOM
 
 
 def test_server_names_are_masked_below_full(tmp_path):
@@ -118,8 +119,52 @@ def test_a_parsed_certificate_and_a_setting_outside_the_block(tmp_path):
     assert listener["groups"]["set"].startswith("in this file, outside the server block")
     (cert,) = listener["certificates"]
     assert cert["file_read"] == ["certs/srv.crt"]
-    assert {(a["family"], a["named_in_a_path"]) for a in cert["algorithms"]} == {
-        ("EC", False), ("ECDSA", False)}
+    assert {(a["family"], a["part"], a["named_in_a_path"]) for a in cert["algorithms"]} == {
+        ("EC", "public key", False), ("ECDSA", "signature on the certificate", False)}
+
+
+def _cert(root: Path) -> Path:
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt",
+                    "ec_paramgen_curve:P-256", "-nodes", "-keyout", str(root / "k.pem"),
+                    "-out", str(root / "server.crt"), "-days", "1", "-subj", "/CN=x"],
+                   check=True, capture_output=True)
+    (root / "k.pem").unlink()
+    return root / "server.crt"
+
+
+def test_a_file_of_the_same_name_is_not_the_server_certificate(tmp_path):
+    # An absolute path outside the tree, and a fixture of the same name in it.
+    root = _tree(tmp_path / "d", {"nginx.conf": (
+        "server {\n    listen 443 ssl;\n    ssl_certificate /etc/ssl/certs/server.crt;\n}\n")})
+    (root / "tests").mkdir()
+    _cert(root / "tests")
+    (listener,) = scan_directory(root)["tls_listeners"]["places"]
+    (cert,) = listener["certificates"]
+    assert cert["file_read"] == [] and cert["algorithms"] == []
+    assert cert["same_file_name_read"] == {"paths": ["tests/server.crt"], "linked": False,
+                                           "basis": "same file name, not established"}
+
+
+def test_two_read_files_of_the_name_link_only_the_written_path(tmp_path):
+    root = _tree(tmp_path / "t", {"nginx.conf": (
+        "server {\n    listen 443 ssl;\n    ssl_certificate a/server.crt;\n}\n")})
+    for d in ("a", "b"):
+        (root / d).mkdir()
+        _cert(root / d)
+    (listener,) = scan_directory(root)["tls_listeners"]["places"]
+    (cert,) = listener["certificates"]
+    assert cert["file_read"] == ["a/server.crt"]
+    assert cert["same_file_name_read"]["paths"] == ["b/server.crt"]
+
+
+def test_a_port_is_given_only_where_written(tmp_path):
+    root = _tree(tmp_path / "l", {"nginx.conf": (
+        "server {\n    listen 10.0.0.5 ssl;\n    listen unix:/run/x.sock ssl;\n"
+        "    listen [::]:8443 ssl;\n}\n")})
+    for result in (scan_directory(root), scan_repo(str(root), level="trimmed")):
+        (listener,) = result["tls_listeners"]["places"]
+        assert [p["port"] for p in listener["listen"]] == [None, None, "8443"]
+        assert "x.sock" not in json.dumps(result["tls_listeners"])
 
 
 def test_no_group_set_is_said(tmp_path):

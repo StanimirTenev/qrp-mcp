@@ -682,12 +682,14 @@ def _row_algorithms(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
     rows: dict[tuple[str, int], list[dict[str, Any]]] = {}
-    by_name: dict[str, list[dict[str, Any]]] = {}
+    parsed_in: dict[str, list[dict[str, Any]]] = {}
     for category in ("source_code", "iac"):
         for r in result["evidence"].get(category, []):
             rows.setdefault((r["path"], r["line"]), []).append(r)
-            if r.get("certificate"):
-                by_name.setdefault(r["path"].rsplit("/", 1)[-1], []).append(r)
+            # The leaf: the first certificate of the file, not a chain's intermediates.
+            if (r.get("certificate") or {}).get("index") == 1:
+                parsed_in.setdefault(r["path"], []).append(r)
+    read = set(result.get("files_read") or [])
     places = []
     for rel in result.get("files_read") or []:
         if not confidence._is_config(rel):
@@ -711,9 +713,10 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
             if target and listen:
                 words = listen.group(1).split()
                 if any(w in ("ssl", "quic") for w in words[1:]):
-                    port = words[0].rsplit(":", 1)[-1] if ":" in words[0] or \
-                        words[0].isdigit() else "443"
-                    target["listen"].append({"line": n, "port": port})
+                    # Only a port that is written: an address alone or a unix socket has none.
+                    tail = words[0].rsplit(":", 1)[-1] if not words[0].startswith("unix:") \
+                        else ""
+                    target["listen"].append({"line": n, "port": tail if tail.isdigit() else None})
             name = _NGINX_SERVER_NAME.match(line)
             if target and name:
                 target["server_name"].extend(name.group(1).split())
@@ -750,12 +753,27 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
             certificates = []
             for at in cert_lines:
                 m = _AUTHENTICATION_FILE.match(lines[at - 1])
-                named = (m.group(2) or "").rsplit("/", 1)[-1]
-                parsed = by_name.get(named, [])
+                named = m.group(2) or ""
+                # Linked only where the written path is a file read: relative to the root or
+                # to this file's directory. An absolute path, or a file of the same name
+                # elsewhere, links nothing.
+                linked = sorted({c for c in (named, str(Path(rel).parent / named))
+                                 if not named.startswith("/") and c in read})
+                same_name = sorted(f for f in read if f.rsplit("/", 1)[-1]
+                                   == named.rsplit("/", 1)[-1] and f not in linked)
+                parsed = parsed_in.get(linked[0], []) if len(linked) == 1 else []
+                algorithms = _row_algorithms(parsed or rows.get((rel, at), []))
+                for a, r in zip(algorithms, parsed):
+                    a["part"] = ("signature on the certificate" if a["family"] in
+                                 r["certificate"].get("signature_algorithm", {}).get(
+                                     "families", []) else "public key")
                 certificates.append({
                     "line": at, "setting": m.group(1), "set": where,
-                    "file_read": sorted({r["path"] for r in parsed}),
-                    "algorithms": _row_algorithms(parsed or rows.get((rel, at), []))})
+                    "file_read": linked if parsed else [],
+                    **({"same_file_name_read": {"paths": same_name, "linked": False,
+                                                "basis": "same file name, not established"}}
+                       if same_name else {}),
+                    "algorithms": algorithms})
             places.append({"path": rel, "line": block["line"], "listen": block["listen"],
                            "server_name": block["server_name"], "groups": groups,
                            "certificates": certificates})

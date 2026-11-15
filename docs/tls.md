@@ -85,12 +85,16 @@ not, tested on 22 Oct 2026.
 the block's place, its `listen` lines with the port, `server_name` (masked below `--level full`),
 `groups` -- the `ssl_ecdh_curve` value split into groups, each with its families and
 `post_quantum` -- and `certificates` -- each `ssl_certificate[_key]` line with the families on
-it, or, when a file of that name was read, the families parsed from it (`file_read`). A family
+it, or, when the written path (relative to the root or to the config's directory) is a file
+read, the leaf certificate's public key and the signature on it (`file_read`, `part`); an
+absolute path or a file read with the same name only links nothing (`same_file_name_read`). A
+port is given only where `listen` writes one. A family
 read only from the file's name says `named_in_a_path: true` (row 491). A setting outside every
 server block of the same file is reported with `set` saying so; none at all reads "not in this
 file". `include` is not followed, Apache and HAProxy are not listed here, and it says what each
 server asks for, not what a connection negotiates. `null` when there is no such block. The CBOM
-carries it as one document property, `qrp:tls_listeners`.
+carries it as one document property, `qrp:tls_listeners`, with `groups_set` and
+`certificates_set`; it leaves server names out at every level.
 
 ### A classical group offered on its own
 

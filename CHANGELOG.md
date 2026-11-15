@@ -20,8 +20,11 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   result could not say which port pays an ML-KEM encapsulation and an ML-DSA signature per
   handshake. `tls_listeners` now lists each nginx `server` block that listens with `ssl` or `quic`:
   ports, server names (masked below `--level full`), the groups set (each with its families and
-  `post_quantum`) and the certificates (families from the line, or from the parsed file when a file
-  of that name was read; ML-DSA with its parameter set). In the scan JSON, the MCP tools and the
+  `post_quantum`) and the certificates (families from the line, or from the parsed leaf
+  certificate -- public key and the signature on it -- when the written path, relative to the root
+  or to the config's directory, is a file read; a file read with the same name only is listed as
+  "same file name, not established"; ML-DSA with its parameter set). A port is given only where
+  written. In the scan JSON, the MCP tools and the
   CBOM (`qrp:tls_listeners`). Found by re-running the probe. **Not claimed / not changed:** what a
   connection negotiates; `include` is not followed; a setting outside the block is reported as set
   outside it, not resolved through nginx inheritance; Apache, HAProxy and other terminators are not
@@ -34,9 +37,9 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   `SSLCertificate[Key]File`, HAProxy `crt`), and nowhere else on the line, now carries
   `named_in_a_path: true` and is one step lower, with "family read from the name of a file the line
   loads, not from the file" in `confidence_basis`; the CBOM's `qrp:confidence` follows. Found by
-  re-running the probe. The row's other half did not reproduce: the parameter set was already
-  taken from the name (`parameter_set: "65"`, component `ML-DSA-65`); `key_size` is not a field
-  ML-DSA uses. **Not claimed / not changed:** the findings, families and components are the same;
+  re-running the probe. The row's other half holds only as written: `key_size` and
+  `algorithm_key_sizes` are empty for ML-DSA, but the parameter set was already taken from the
+  name, in `parameter_set: "65"` and the CBOM component `ML-DSA-65`; no change there. **Not claimed / not changed:** the findings, families and components are the same;
   a parsed certificate is still `high`; a row another reader made on the same line (a cipher suite
   on a HAProxy `bind`) keeps its level.
 - **A composite declared beside two KMS aliases is tied to the Terraform keys, where the files

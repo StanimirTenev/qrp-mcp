@@ -54,6 +54,14 @@ def test_an_inferred_family_is_one_step_lower():
                       description=description) == "low"
 
 
+def test_a_family_named_in_a_loaded_file_s_path_is_one_step_lower():
+    """Row 491: `ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;`."""
+    assert _level("source_code", evidence_kind="reference", description="ML-DSA (Dilithium) usage",
+                  named_in_a_path=True) == "low"
+    assert _level("source_code", path="haproxy.cfg", evidence_kind="declaration",
+                  description="ECDSA usage", named_in_a_path=True) == "medium"
+
+
 def test_a_getproperty_fallback_is_low():
     """The default literal, used because no properties file sets the key: 27/27 wrong on the
     OWASP subset without benchmark.properties, so not medium."""

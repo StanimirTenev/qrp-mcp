@@ -192,7 +192,8 @@ def _listener_algorithm(a: dict[str, Any]) -> str:
     size = a.get("parameter_set") or a.get("key_size")
     name = (f"{a['family']}-{size}" if size and a["family"] in ("ML-DSA", "ML-KEM", "SLH-DSA")
             else f"{a['family']} {size}" if size else a["family"])
-    return name + (" (named in a path)" if a.get("named_in_a_path") else "")
+    return (name + (f", {a['part']}" if a.get("part") else "")
+            + (" (named in a path)" if a.get("named_in_a_path") else ""))
 
 
 def _group_size(name: str) -> str | None:
@@ -1590,9 +1591,11 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                   "ports": [p["port"] for p in x["listen"]],
                   "groups": [f"{g['name']} ({' + '.join(g['families']) or 'not in table'})"
                              for g in x["groups"]["groups"]],
+                  "groups_set": x["groups"]["set"],
                   "certificates": [_listener_algorithm(a) for c in x["certificates"]
                                    for a in c["algorithms"]
-                                   if c["setting"] == "ssl_certificate"]}
+                                   if c["setting"] == "ssl_certificate"],
+                  "certificates_set": sorted({c["set"] for c in x["certificates"]})}
                  for x in scan_result["tls_listeners"]["places"]], ensure_ascii=False)}]
             if scan_result.get("tls_listeners") else []) + (
             # Row 473: the lines closed as not a use, with the rule that closed each.
