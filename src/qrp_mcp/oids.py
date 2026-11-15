@@ -115,7 +115,9 @@ OIDS.update({
 # The classical rest of the NIST CSOR sigAlgs arc, which the watched-arc rule below would
 # otherwise call unknown (asn1crypto's algos.py lists them; read on the corpus, 15.11.2026):
 # .3/.4 dsa-with-sha384/512, .5-.8 DSA, .9-.12 ECDSA and .13-.16 RSA PKCS #1 v1.5, with SHA3-224,
-# -256, -384 and -512, as the NIST CSOR sigAlgs arc assigns them.
+# -256, -384 and -512, as the NIST CSOR sigAlgs arc assigns them. Checked against OpenSSL 3.6.5's
+# crypto/objects/objects.txt (`sigAlgs 3`-`46`, `nistKems 1`-`3`), which the table above also
+# matches.
 OIDS.update({
     "2.16.840.1.101.3.4.3.3": (("DSA",), "dsa-with-sha384"),
     "2.16.840.1.101.3.4.3.4": (("DSA",), "dsa-with-sha512"),

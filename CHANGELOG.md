@@ -20,7 +20,9 @@ suite name is carried from the detector, so it is the same at the default `maske
 output is validated against the CycloneDX 1.6 schema in the tests, and every ref is checked to
 resolve. **Not claimed:** the link is by file, not by `server` block, and says what the file
 configures, not what a connection negotiates. A protocol component with links has a new bom-ref
-(a suffix from its links); one with nothing to link keeps the one it had.
+(a suffix from its links); one with nothing to link keeps the one it had. A version Apache enables
+by `SSLProtocol all` is linked as a plain pin; Go's `tls.TLS_*` and Envoy's `[A|B]` are read as
+the suites they name; OpenSSL selectors (`EECDH+AES`) are not expanded.
 
 Each row below was reproduced as a failing test before the fix, tested through `scan --out`, the
 MCP tools and the CBOM export where the row reaches them, and each fix was reverted once to see its
@@ -34,8 +36,12 @@ test fail.
   `hybrid_names` entry with both halves and their parameters, and in the CBOM one `combiner`
   component that signs and verifies, with its OID and `dependencies` to both halves. Readiness
   reads it as the TLS hybrids read (`hybrid_partial`). The NIST CSOR post-quantum OIDs (ML-DSA,
-  SLH-DSA, ML-KEM) written as numbers are read too, and a name such as `ML_DSA_65` beside such an
-  OID no longer settles the line as an identifier. An OID one component under
+  SLH-DSA, ML-KEM; HashML-DSA .32-.34 and HashSLH-DSA .35-.46 included) written as numbers are read
+  too, and a name such as `ML_DSA_65` beside such an OID no longer settles the line as an
+  identifier. So are the classical OIDs of the same NIST arc, `2.16.840.1.101.3.4.3.3`-`.16` (DSA,
+  ECDSA and RSA PKCS #1 v1.5 with SHA-2/SHA-3): on the corpus they add DSA and RSA rows to
+  asn1crypto's OID table, which the first form reported as not known. Every OID added was checked
+  against OpenSSL 3.6.5's `objects.txt`. An OID one component under
   `1.3.6.1.5.5.7.6` or `2.16.840.1.101.3.4.3` that this version does not know is listed in
   `oids_not_known` ("an OID this version does not know") and in the CBOM, not passed over.
   **Changed for `--mandate nist-ir-8547`:** the classical half of a composite on its line (the
@@ -57,12 +63,16 @@ test fail.
   encryption to a key not in these files" unless the recipient key or certificate is a file the
   scan read, whose families it then names. `openssl enc` with a passphrase stays silent. The CBOM
   counts these apart from signing commands, and a `--mandate` does not date them as signatures
-  (nor counts them in its `hndl_exposed` total, which counts dated occurrences).
+  (nor counts them in its `hndl_exposed` total, which counts dated occurrences). **Not claimed:**
+  `summary.pqc_readiness` and `readiness_by_role` are over algorithm families and do not read
+  these rows, so a tree whose only cryptography is `gpg --encrypt` still reads `unknown` /
+  `none_found` beside the row; and `gpg -r X` without `-e` is not read.
 - **Two TLS layers that disagree are one open finding** (row 472): an nginx group setting with a
   post-quantum hybrid and an AWS load-balancer policy without one were two findings in two
   sections. `layer_disagreements` names both lines, says the weaker value applies until measured on
   the wire, and carries the load balancer's CODEOWNERS owner. No link is claimed: a shared port 443
-  is not a basis, so the finding is made at repository level with "link not established".
+  is not a basis, so the finding is made at repository level with "link not established". A layer
+  in test code is not compared.
 - **A line closed as not a use keeps its basis** (row 473): `named_but_not_used_lines` (and
   `qrp:named_but_not_used:lines`) gives file, line and the rule -- removal list, ban list, switch
   off, comment, identifier -- for every line of a family the inventory does not count.

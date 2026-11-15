@@ -64,6 +64,6 @@ def test_the_note_is_cited_beside_the_guideline():
     assert source["what"].startswith("2026-01")
     (note,) = source["also"]
     assert note == {"standard": "BSI: Notes on recent developments concerning Classic McEliece",
-                    "what": "29 September 2026", "url": NOTE_URL}
+                    "what": "29 September 2026", "url": NOTE_URL, "read_on": "2026-11-15"}
     block = remediation.suggest(RSA, None, "de-bsi")["profile"]
     assert NOTE_URL in json.dumps(block["source"])

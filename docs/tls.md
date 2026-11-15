@@ -154,5 +154,6 @@ No link between the two layers is claimed. Nothing in the files says this nginx 
 listener, and both naming port 443 would join any two HTTPS services in a monorepo, so the link is
 `{"established": false, "basis": "link not established: ..."}` and the finding stands at
 repository level. Layers that agree make no finding, and no link can clear one. Only the
-post-quantum key exchange is compared, and only an AWS load-balancer policy is a policy layer.
+post-quantum key exchange is compared, only an AWS load-balancer policy is a policy layer, and a
+layer in test code is not compared.
 

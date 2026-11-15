@@ -199,7 +199,8 @@ PROFILES: dict[str, dict[str, Any]] = {
             "standard": "BSI: Notes on recent developments concerning Classic McEliece",
             "what": "29 September 2026",
             "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Crypto/"
-                   "Notes_Classic_McEliece.pdf"}],
+                   "Notes_Classic_McEliece.pdf",
+            "read_on": "2026-11-15"}],
         # Families the document recommends that NIST did not standardise: their finding
         # still says `candidate` (that is NIST's standing), and says this beside it.
         "recommends": {

@@ -465,13 +465,16 @@ s2n-tls, rustls) every piece of evidence is identical before and after.
   names (`id-MLDSA65-ECDSA-P256-SHA512`) and labels (`COMPSIG-MLDSA65-ECDSA-P256-SHA512`) in code
   and configuration. Each is one `hybrid_names` entry with its ML-DSA parameter set and its
   traditional half (RSA size, curve, Ed25519 or Ed448), beside the two family rows.
-- **Post-quantum OIDs as numbers**: ML-DSA `2.16.840.1.101.3.4.3.17`-`.19`, SLH-DSA `.20`-`.31`
-  and `.35`-`.46`, ML-KEM `2.16.840.1.101.3.4.4.1`-`.3`. An OID one component under
+- **Post-quantum OIDs as numbers**: ML-DSA `2.16.840.1.101.3.4.3.17`-`.19` and HashML-DSA
+  `.32`-`.34`, SLH-DSA `.20`-`.31` and `.35`-`.46`, ML-KEM `2.16.840.1.101.3.4.4.1`-`.3`; and the
+  classical rest of the arc, `.3`-`.16` (DSA, ECDSA, RSA with SHA-2/SHA-3), as OpenSSL's
+  `objects.txt` names them. An OID one component under
   `1.3.6.1.5.5.7.6` or `2.16.840.1.101.3.4.3` that the table does not hold is listed in
   `oids_not_known` with "an OID this version does not know"; what it names is not read.
 - **Public-key encryption in scripts and pipelines** (row 479): `gpg -e`/`--encrypt`,
   `openssl smime -encrypt` and `openssl cms -encrypt` (recipients positional or `-recip`),
   `openssl pkeyutl -encrypt -inkey`, `age -r`/`-R`. A `ci_pipeline` row with role
   `key_establishment` and `hndl_exposed: true`; the recipient key's families only where it is a
-  file the scan read. A commented line, `openssl enc` and `gpg -c` (a passphrase) are not here.
+  file the scan read. A commented line, `openssl enc` and `gpg -c` (a passphrase) are not here, nor
+  `gpg -r X` without `-e`. The readiness summary is over families and does not read these rows.
 - **Cipher suites by name** (rows 465, 475): see [The CBOM it emits](cbom.md).
