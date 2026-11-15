@@ -70,6 +70,15 @@ OpenSSH (16%)**, including 493 ML-DSA and 429 ML-KEM mentions in OpenSSH, which 
 of prose to present as post-quantum adoption. An occurrence whose evidence is a comment
 now says `[comment]`.
 
+From 0.45.0 an occurrence whose evidence is an identifier row (a family read from a name,
+`RSAUtil`, `mlkem_key`) says `[identifier]`, and one named but not used `[named_but_not_used]`,
+in the same place: `qrp:evidence_kind` is a list on the component, which no consumer filters an
+occurrence by (row 470; on QCI's CBOM-Benchmark, filtering by kind took false positives from 85
+to 31). A family whose every use is an identifier row carries `qrp:identifier_only: true` on its
+component, as the scan result carries `identifier_only` on the finding (row 463). A default
+written beside an environment read is listed in the document's
+`qrp:chosen_outside_files:overridable_defaults` (a JSON array of place, default, family; row 440).
+
 ⚠️ A banned algorithm is not marked, it is **absent**: `!RC4` in a cipher list never
 becomes a component. What the line forbids is not inventory; what it enables is.
 

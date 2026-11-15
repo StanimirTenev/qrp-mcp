@@ -91,6 +91,16 @@ files with no extension, .rst and .txt — being 73.09% of them) are listed with
 The published measurement, with the raw artefacts:
 [quantumreadiness.eu/evidence/scan-coverage](https://quantumreadiness.eu/evidence/scan-coverage/)
 
+## Directories excluded before counting, named (from 0.45.0)
+
+`scope.files_excluded_before_counting` counted the files the directory exclusions (`dist`,
+`build`, `node_modules`, `vendor`, …) removed by directory name — `dist: 3` — and named none of
+them; on QCI's CBOM-Benchmark those files held 13 findings another scanner read (row 471). It
+now also carries `directories`: each excluding directory from the root (`tier5/javascript/dist`,
+`svc/build`), its file count, and its `paths`, up to 50, with `paths_not_listed` for the rest.
+`.git` is not listed. In the CBOM each directory's paths are one property holding a JSON array.
+The counts by name are unchanged.
+
 ## Read in part (from 0.42.0)
 
 - `coverage.scope.read_in_part` — the files that were opened but read only in part or gave

@@ -157,6 +157,21 @@ as well (`ML-KEM (Kyber)`) resolves the old name and is ML-KEM only. Whether cod
 `pqcrystals_kyber` was updated to FIPS 203 under the old name is not visible from the name, and the
 finding says so.
 
+**A post-quantum name is not post-quantum code (from 0.45.0).** QCI's CBOM-Benchmark 2.6.6 has
+PQC-washing decoys: `class MlkemSession`, `self.mlkem_key = ec.generate_private_key(ec.SECP256R1())`,
+`def kyber_exchange(...)` over `exchange(ec.ECDH(), ...)`, and a Java `KeyPair mlKemKeyPair`
+field. Until 0.45.0 those names gave ML-KEM and Kyber as calls at high, and the file alone read
+`hybrid_partial` with ML-KEM `pqc_ready`. Now, for the post-quantum families only, a match that
+is a piece of a name **the file itself defines** (a def, class, function, method, field,
+`let`/`const`/`var`, a `self.`/`this.` assignment or a `NAME =` at the start of a line), outside
+any string literal, is an `identifier` row — low, and a family whose every use is such a row is
+`identifier_only`, not counted in `pqc_readiness`, `by_role` or the mandates. It is settled per
+family and file: where the same file also uses the family for real — a library call
+(`ml_kem_768.generate_keypair()`, `mlkem.GenerateKey768()`), a string naming the algorithm
+(`KeyEncapsulation("ML-KEM-768")`), a configuration value — every row keeps its kind, so an
+implementation such as OpenSSH's `kexmlkem768x25519.c` reads as before. Not seen: a washing name
+defined in one file and only used in another still reads as a use there.
+
 **OpenSSH's experimental ML-DSA key is not the one that replaced it.** OpenSSH 10.4 shipped a
 composite of ML-DSA-44 and Ed25519 as an experiment, as `ssh-mldsa44-ed25519@openssh.com`; 10.6
 enabled the scheme without the suffix, and its release notes say keys generated with the
@@ -256,6 +271,15 @@ From 0.32.0 an EC key's **curve is named** from its named-curve identifier — P
 (`1.2.840.10045.3.1.7`), P-384 (`1.3.132.0.34`), P-521 (`1.3.132.0.35`) from RFC 5480 §2.1.1.1,
 secp256k1 (`1.3.132.0.10`) from SEC 2 v2.0 — as `curve` and `key_size` on the EC finding. Before,
 the curve identifier was swallowed by `id-ecPublicKey`, and a P-384 key read as "EC".
+
+From 0.45.0 an **OpenSSH private key** (`-----BEGIN OPENSSH PRIVATE KEY-----`) names its
+family: the openssh-key-v1 format (OpenSSH `PROTOCOL.key`) keeps the public key in the clear
+ahead of the encrypted part, so the key type (`ssh-ed25519`, `ecdsa-sha2-nistp384`, `ssh-rsa`
+with its modulus size, the `sk-` variants) is read even when the key has a passphrase. Until then
+it was "Embedded private key material" with no family. A **base64 certificate in a Kubernetes
+TLS Secret** (`tls.crt: LS0tLS1CRUdJTi...`, the base64 of a PEM block) is decoded and parsed
+at the line of the value; until 0.45.0 the file was read and gave nothing. Certificates only:
+a `tls.key` there is not named. Both from QCI's CBOM-Benchmark 2.6.6 (rows 467, 469).
 
 From 0.33.0 an RSA key's **size** is read the same way, from its public key: the modulus in a
 SubjectPublicKeyInfo whose algorithm is `rsaEncryption` (RFC 3279 §2.3.1, RFC 8017 A.1.1) and in
@@ -397,6 +421,30 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   }
 }
 ```
+
+### Smaller readings added in 0.45.0
+
+- **`openssl.cnf` settings** (row 464): `default_bits` in `[req]` is the RSA size `openssl req`
+  uses when none is given (req(1)), `default_md` the signing digest (req(1), ca(1); named only
+  where it is a digest reported elsewhere: sha1, md5, md4, md2, sha224), and `MinProtocol` /
+  `MaxProtocol` the lowest / highest TLS version allowed (SSL_CONF_cmd(3)). `.cnf` files only.
+- **`sshd_config` and `ssh_config` variants** (row 468): `sshd_config_pq`,
+  `sshd_config.bastion`, `ssh_config-prod`, `bastion.sshd_config` are read as the file they are.
+  OpenSSH's manual pages (`sshd_config.5`, `ssh_config.0`) are not configuration and stay
+  `type_not_claimed`.
+- **MD5 quoted alone** (row 466): `digest("MD5", data)`, `AUDIT_DIGEST = "md5"` — as SHA-1
+  quoted alone already was. A longer string (`"md5sum"`, a message) is not.
+- **secp256k1** (rows 458, 460, 461): pyca's `ec.SECP256K1()` now carries the curve and 256 bits
+  (python-ecdsa's `SECP256k1` already did); a line naming two curves names none. ethers,
+  btcec, bitcoinjs-lib, ECPair, ecrecover and the JSON-RPC signing calls carry secp256k1 too;
+  `web3` alone does not (@solana/web3.js signs with Ed25519). `eth_keys` and `eth_account` are
+  named as ECDSA (secp256k1).
+- **A default beside an environment read** (row 440):
+  `mech = os.environ.get("HSM_SIGN_MECH", "RSA-PSS")` keeps the RSA finding — the default is
+  what runs when nothing is set — and is now also a place in `chosen_outside_files` with
+  `default`, `default_family` and `overridable: true` (Python `os.environ.get`/`os.getenv`,
+  Node `process.env.X || "..."` / `?? "..."`, shell `${X:-...}`). A default that names no
+  algorithm (`us-east-1`) is not a place.
 
 ### Very long lines
 

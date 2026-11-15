@@ -162,12 +162,17 @@ rules, file types and their limits is in [What it looks at](https://github.com/S
 | Scripts | `.sh`/`.bash`/`.zsh`/`.ksh`, `.bat`/`.cmd`, PowerShell `.ps1`/`.psm1`/`.psd1` — algorithms, and signing commands as a pipeline's are |
 | CI/CD pipelines | signing commands (`gpg --sign`, `cosign sign`, `signtool`, `jarsigner`, `codesign`, Secure Boot and kernel-module signing), with the key they name |
 | Infrastructure as code | Terraform/HCL, Kubernetes manifests and Helm (`.tpl`, `.gotmpl`), Dockerfiles (including the crypto libraries a `RUN` installs) |
-| TLS, SSH and VPN configuration | nginx, Apache, HAProxy, Caddy, Envoy, Istio, Traefik, Ingress-NGINX, Postfix, Dovecot, MySQL, PostgreSQL, Kafka, ZooKeeper, OpenVPN, WireGuard, strongSwan, OpenSSH, `openssl.cnf`, `java.security`, Vault, IBM MQ (`.mqsc`), AWS load-balancer policies, OPC UA |
+| TLS, SSH and VPN configuration | nginx, Apache, HAProxy, Caddy, Envoy, Istio, Traefik, Ingress-NGINX, Postfix, Dovecot, MySQL, PostgreSQL, Kafka, ZooKeeper, OpenVPN, WireGuard, strongSwan, OpenSSH (`sshd_config` and its variants), `openssl.cnf` (keys, digest and protocol bounds), `java.security`, Vault, IBM MQ (`.mqsc`), AWS load-balancer policies, OPC UA |
 | Device configuration | FortiOS backups, Cisco IOS and Junos — read in part, and named as read in part with what was and was not read |
 | Windows | `.reg` exports (SCHANNEL), `web.config`/`app.config`/`applicationHost.config`, MSBuild `.vcxproj`/`.props`/`.targets`, WiX `.wxs`, certreq `.inf`, `.snk` strong-name keys |
-| Certificates and keys | PEM and DER (`.pem`, `.der`, `.crt`, `.cer`, `.key`, `.pub`, …), PEM inside any text file or source string, `.p12`/`.pfx`, Java keystores, SSH keys, `authorized_keys`, `known_hosts`, OpenPGP keys and signatures, JWKS, BIND DNSSEC key and zone files, Apple `.plist` |
+| Certificates and keys | PEM and DER (`.pem`, `.der`, `.crt`, `.cer`, `.key`, `.pub`, …), PEM inside any text file or source string, base64 certificates in a Kubernetes TLS Secret, `.p12`/`.pfx`, Java keystores, SSH keys (OpenSSH private keys by their key type), `authorized_keys`, `known_hosts`, OpenPGP keys and signatures, JWKS, BIND DNSSEC key and zone files, Apple `.plist` |
 | Manifests and lockfiles | the dependencies that bring cryptography in, by ecosystem (npm, PyPI, Cargo, Go, Maven/Gradle, NuGet, RubyGems, CocoaPods, SwiftPM, deb/apk/rpm in a Dockerfile) |
 | Not read, on purpose | documentation (`.txt`, `.md`, `.rst`, `.pod`), binaries and images — counted and named, never silently left out |
+
+A name is not a use. A post-quantum name that only names something the file defines
+(`self.mlkem_key = ec.generate_private_key(...)`, `def kyber_exchange`) is an identifier row and
+does not make a file post-quantum ready; a file that also calls the library keeps every row as it
+was ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md)).
 
 ## Coverage on three public repositories
 

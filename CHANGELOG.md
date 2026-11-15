@@ -4,6 +4,82 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.45.0
+
+**A post-quantum name is no longer read as post-quantum code** (row 463, the most important of
+this release). QCI's CBOM-Benchmark 2.6.6 carries PQC-washing decoys: `class MlkemSession`,
+`self.mlkem_key = ec.generate_private_key(ec.SECP256R1())`, `def kyber_exchange(...)` over
+`exchange(ec.ECDH(), ...)`, a Java `KeyPair mlKemKeyPair` field. 0.44.0 reported ML-KEM and Kyber
+there as calls at high, and the file alone read `pqc_readiness: hybrid_partial` with ML-KEM
+`pqc_ready`, for code that does ECDH on P-256. Found by running qrp-mcp on that benchmark with its
+own scorer (15.11.2026). Now, for the post-quantum families only, a match that is a piece of a
+name the file itself defines (def, class, function, method, field, `let`/`const`/`var`, a
+`self.`/`this.` assignment, a `NAME =` at the start of a line), outside any string literal, is
+an `identifier` row where the family has no other use in that file. Such a family is
+`identifier_only`: still listed, not counted in `pqc_readiness`, `by_role` or the mandates, and
+its CBOM component says `qrp:identifier_only: true`. Where the file also uses the family for real
+(a library call, a string naming the algorithm, a configuration value), every row keeps its kind:
+on OpenSSH no post-quantum row changed kind. **Not claimed:** a washing name defined in one file
+and only used in another still reads as a use there. The benchmark's own over-claim count did not
+move (26 before and after): its scorer counts every CBOM component, and the ML-KEM component is
+still there, marked; a consumer has to filter on `qrp:identifier_only` or on the occurrence tag
+below.
+
+Each row below was reproduced as a failing test before the fix, tested through `scan --out`, the
+MCP tools and the CBOM export, and each fix was reverted once to see its test fail.
+
+- **pyca `ec.SECP256K1()` carries its curve** (row 458): it gave EC with no curve and size
+  undetermined, and no secp256k1 in the CBOM. A line naming two curves now names none (it had
+  picked the NIST one).
+- **ethers and eth_keys are secp256k1** (rows 460, 461): `Wallet.createRandom()` gave ECDSA with no
+  curve; `eth_keys` gave nothing. `web3` alone is not given the curve (@solana/web3.js is Ed25519).
+- **openssl.cnf `default_bits`, `default_md`, `MinProtocol`/`MaxProtocol`** (row 464): read and
+  silent before; now RSA with its size ([req] only), the digest where it is one reported elsewhere,
+  and the TLS bound as a configured protocol.
+- **MD5 quoted alone** (row 466): `digest("MD5", ...)`, `AUDIT_DIGEST = "md5"` gave nothing while
+  `TOKEN_DIGEST = "sha1"` gave SHA-1. The two agree now. Cost, measured: on the benchmark's
+  negatives one more line reads MD5 (a test-vector tuple `("MD5", "", ...)`, a dict key `"md5"`),
+  86 false positives against 85; on the corpus, an icon theme's `name = "md5"` and test enums
+  (`MD5 = "MD5"`) now read MD5, beside HTTP Digest authentication (guzzle, requests, httprb), which
+  is MD5 in use.
+- **A base64 certificate in a Kubernetes TLS Secret is decoded** (row 467), and so is any base64
+  run of a PEM certificate in a text file.
+- **`sshd_config` / `ssh_config` variants are claimed** (row 468): `sshd_config_pq` was
+  `type_not_claimed`; OpenSSH's manual pages (`sshd_config.5`) still are.
+- **An OpenSSH private key names its family** (row 469) from the openssh-key-v1 header, which a
+  passphrase does not hide.
+- **A default beside an environment read is a place** (row 440):
+  `os.environ.get("HSM_SIGN_MECH", "RSA-PSS")` keeps the RSA finding and is now also in
+  `chosen_outside_files` with `default`, `default_family`, `overridable: true`; the CBOM lists it in
+  `qrp:chosen_outside_files:overridable_defaults`.
+- **An identifier occurrence is tagged in the CBOM** (row 470): `[identifier]` (and
+  `[named_but_not_used]`) in `additionalContext`, as `[comment]` already was.
+- **Directories excluded before counting are named** (row 471):
+  `files_excluded_before_counting.directories` lists each excluding directory from the root, its
+  file count and its paths (up to 50, then `paths_not_listed`). The counts are unchanged.
+- **CBOM: a named curve gives the key size its classical status is read from** (1c9b88a,
+  unreleased since 0.44.0).
+
+Also checked, no change needed: `--mandate nist-ir-8547` already follows the final text
+(October 2026): RSA-3072 and P-384 get `deprecated_after: 2030-12-31` (row 168, since 0.39.0),
+and `--lead-months 50` from 15.11.2026 fails on them.
+
+On QCI's CBOM-Benchmark 2.6.6 with its own scorer, unscoped: 214/410 detected with 0.44.0, 228/410
+with this release (52.2% -> 55.6%); false positives 85 -> 86. Positive controls against 0.44.0:
+OpenSSH 7fe3b24 coverage 84.88% and certbot 68.00%, the same files read (741, 850) and the same
+findings (70, 39); OpenSSH gains 26 family rows from its OpenSSH-format test keys (row 469) and one
+MD5 table entry; certbot is identical.
+
+Corpus regression against 0.44.0 (185 repositories, labels of an independent model): the same in
+every family of both splits except RSA in `obuchenie`, 30 -> 31 rows where the scanner reports and
+the labeller does not; the script exits 1. That row was read: `WithTestData.groovy` in NCANode
+holds an RSA-2048 certificate as base64 (row 467 decodes it), which the labeller, reading the
+text, cannot see. It counts the classical families only, so rows 463 and 466 do not show in it.
+It is disagreement with a model, never recall or precision.
+
+Left open: rows 459 (a DER key as a C byte array), 462 (a QKD key source) and 465
+(`cipherSuites` on TLS protocol components); see the release notes.
+
 ## 0.44.0
 
 **`qrp-mcp build-gap SCAN.json BUILD_DIR`: a source scan against the build.** Of K
