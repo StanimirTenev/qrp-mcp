@@ -1,8 +1,8 @@
 """Rows 475 and 465 (15.11.2026): the TLS protocol component is empty for a CBOM reader.
 
-Row 475 (Shivansh Khari, Conscious): a reader of the standard fields saw "TLS 1.3" with
+Row 475 (a CBOM consumer, 15.11.2026): a reader of the standard fields saw "TLS 1.3" with
 nothing under it. The groups the same file configures (X25519MLKEM768, X25519) were algorithm
-components of their own, linked to no protocol, so Conscious classed the key exchange as
+components of their own, linked to no protocol, so the reader classed the key exchange as
 "unknown". Row 465 (QCI CBOM-Benchmark 2.6.6): the suites of an `ssl_ciphers` line were split
 into RSA/ECDH/3DES on the right line, but the suite itself never reached
 `protocolProperties.cipherSuites`.

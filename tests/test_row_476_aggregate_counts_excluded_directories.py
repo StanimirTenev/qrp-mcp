@@ -1,4 +1,4 @@
-"""Row 476 (15.11.2026, Shivansh Khari, Conscious): a reader that skips `properties` has only
+"""Row 476 (15.11.2026, a CBOM consumer): a reader that skips `properties` has only
 `compositions[].aggregate` to tell it the inventory is not whole.
 
 Checked before changing anything: a file the scan does not claim (`lib/x.so`) made the aggregate

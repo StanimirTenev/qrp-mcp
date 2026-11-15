@@ -9,8 +9,8 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 **A TLS protocol component now says what it is linked to, in CycloneDX's own fields** (rows 475
 and 465, first in this release because a CBOM consumer depends on it). A reader of the standard
 fields saw `TLS 1.3` with nothing under it: the groups the same file configures
-(`X25519MLKEM768`, `X25519`) were algorithm components of their own, linked to no protocol, and
-Conscious (Shivansh Khari, 15.11.2026) classed the key exchange as "unknown". The suites of an
+(`X25519MLKEM768`, `X25519`) were algorithm components of their own, linked to no protocol, and a
+CBOM consumer that reads only the standard fields classed the key exchange as "unknown". The suites of an
 `ssl_ciphers` line were split into RSA, ECDH and 3DES on the right line, but the suite itself never
 reached `protocolProperties.cipherSuites` (found by running qrp-mcp over QCI's CBOM-Benchmark
 2.6.6). Now a TLS version pin carries `protocolProperties.cryptoRefArray` (the bom-refs of the
@@ -38,6 +38,9 @@ test fail.
   OID no longer settles the line as an identifier. An OID one component under
   `1.3.6.1.5.5.7.6` or `2.16.840.1.101.3.4.3` that this version does not know is listed in
   `oids_not_known` ("an OID this version does not know") and in the CBOM, not passed over.
+  **Changed for `--mandate nist-ir-8547`:** the classical half of a composite on its line (the
+  ECDSA of `id-MLDSA65-ECDSA-P256-SHA512`) now reads `composite_allowed`, as a TLS hybrid's
+  classical half already did; in 0.45.0 it read `due`, as a classical signature alone.
 - **de-bsi no longer recommends Classic McEliece** (row 481, wrong advice). BSI's "Notes on recent
   developments concerning Classic McEliece" (29 September 2026) says it "should currently no
   longer be used in new developments"; the profile offered it as a replacement for RSA and called a
@@ -53,7 +56,8 @@ test fail.
   `operation: public_key_encryption`, role `key_establishment` and `hndl_exposed: true`, "public-key
   encryption to a key not in these files" unless the recipient key or certificate is a file the
   scan read, whose families it then names. `openssl enc` with a passphrase stays silent. The CBOM
-  counts these apart from signing commands, and a `--mandate` does not date them as signatures.
+  counts these apart from signing commands, and a `--mandate` does not date them as signatures
+  (nor counts them in its `hndl_exposed` total, which counts dated occurrences).
 - **Two TLS layers that disagree are one open finding** (row 472): an nginx group setting with a
   post-quantum hybrid and an AWS load-balancer policy without one were two findings in two
   sections. `layer_disagreements` names both lines, says the weaker value applies until measured on

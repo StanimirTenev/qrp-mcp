@@ -162,3 +162,19 @@ def test_only_an_oid_turns_a_defined_name_into_a_use(tmp_path):
     families = {f["algorithm_family"]: f["classification"]
                 for f in scan_directory(root)["findings"]}
     assert families["ML-KEM"] == "identifier_only"
+
+
+def test_the_mandate_dates_a_composite_s_classical_half_as_a_composite(tmp_path):
+    # Moved by rows 477/478: in 0.45.0 these halves read `due` under NIST IR 8547, as a classical
+    # signature alone. A composite is now a hybrid on its line, and the mandate reads its
+    # classical half as it reads a TLS hybrid's: `composite_allowed`.
+    root = _write(tmp_path / "r", {"verify.py": VERIFY_PY, "signer.conf": SIGNER_CONF})
+    out = tmp_path / "m.json"
+    _cli(["scan", str(root), "--mandate", "nist-ir-8547", "--as-of", "2026-11-15",
+          "--out", str(out)])
+    result = json.loads(out.read_text())
+    block = result["mandates"]["nist-ir-8547"]
+    assert block["composite"] == 3 and block["gate"] == "pass"
+    for item in result["evidence"]["source_code"]:
+        if item["algorithm"] in ("ECDSA", "RSA"):
+            assert item["mandates"]["nist-ir-8547"]["status"] == "composite_allowed"
