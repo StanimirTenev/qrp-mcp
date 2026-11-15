@@ -35,7 +35,7 @@ from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips, scan_openssl_cnf_keys,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions, yaml_list_settings)
-from .certificates import (decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
+from .certificates import (BASE64_PEM_MARK, decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
                            looks_like_key_file, scan_certificate_file, small_scalar_keys,
                            unparsed_material, SMALL_SCALAR_BOUND)
 
@@ -5265,7 +5265,7 @@ def _embedded_pem(path: Path, rel_path: str, raw: bytes, source_findings: list[d
     file read as text -- a FortiOS `set certificate "-----BEGIN ...`, a C# raw or verbatim
     string, a Go raw string constant. A block that does not parse is named, never silent;
     row 230: a key whose body did not parse says so rather than "key material parsed"."""
-    if b"-----BEGIN" not in raw:
+    if b"-----BEGIN" not in raw and BASE64_PEM_MARK not in raw:   # row 467: base64 of a PEM
         return
     rows, keys, problems = embedded_material(rel_path, raw)
     for row in rows:

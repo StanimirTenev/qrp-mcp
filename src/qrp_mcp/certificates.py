@@ -842,6 +842,29 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
                 problem(line, label, "password_protected" if unread == "password_protected"
                         else "not_parsed_as_key")
 
+    # Row 467 (QCI CBOM-Benchmark 2.6.6): a Kubernetes TLS Secret carries its certificate as
+    # the base64 of the PEM text (`tls.crt: LS0tLS1CRUdJTi...`, "-----BEGIN" encoded), and the
+    # file was read and gave nothing. A base64 run that decodes to a certificate block is
+    # parsed as one, at the line of the run. Certificates only: a key there is not named.
+    for run in _BASE64_PEM.finditer(text):
+        body = run.group(0)
+        try:
+            inner = base64.b64decode(body + "=" * (-len(body) % 4), validate=True)
+        except Exception:  # noqa: BLE001 -- not base64 after all
+            continue
+        line = text.count("\n", 0, run.start()) + 1
+        for match in _PEM_BLOCK.finditer(decode_text(inner)):
+            label = match.group(1).strip()
+            if label not in _CERTIFICATE_LABELS:
+                continue
+            try:
+                found = [x509.load_der_x509_certificate(
+                    base64.b64decode(_bare_body(match.group(2)), validate=False))]
+            except Exception:  # noqa: BLE001
+                problem(line, label, "not_parsed_as_certificate")
+                continue
+            add(line, f"base64 of -----BEGIN {label}----- (decoded)", "PEM", found)
+
     if not blocks and not text.lstrip().startswith("-----BEGIN"):
         suffix = os.path.splitext(rel_path)[1].lower()
         if raw[:4] in _JKS_MAGIC:
@@ -872,6 +895,9 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
 
 
 _LAST_MATERIAL: list[Any] = [None, None, None]
+# "-----BEGIN" in base64: the start of a base64 run whose text begins with a PEM block.
+_BASE64_PEM = re.compile(r"(?<![A-Za-z0-9+/])LS0tLS1CRUdJTi[A-Za-z0-9+/]{16,}={0,2}")
+BASE64_PEM_MARK = b"LS0tLS1CRUdJTi"
 
 
 def _material_once(rel_path: str, raw: bytes) -> dict[str, Any]:
