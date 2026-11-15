@@ -2072,7 +2072,8 @@ _SUITE_TABLE = json.loads((Path(__file__).with_name("data") / "tls_cipher_suites
 _IANA_SUITE = re.compile(r"(?:TLS|SSL)_[A-Z0-9]+(?:_[A-Za-z0-9]+)*")
 # TLS 1.3 suites (RFC 8446 B.4, RFC 9150) name no key exchange and are set apart from the rest.
 _TLS13_SUITE = re.compile(r"TLS_(?:AES_\w+|CHACHA20_POLY1305_SHA256|SHA256_SHA256|SHA384_SHA384)$")
-_SUITE_ENTRY = re.compile(r"[^:,;\s'\"(){}\[\]]+")
+# Envoy joins suites of equal preference with `|`; Go writes `tls.TLS_...`.
+_SUITE_ENTRY = re.compile(r"[^:,;|\s'\"(){}\[\]]+")
 
 
 def scan_suite_names(line: str) -> list[dict[str, Any]]:
@@ -2086,6 +2087,8 @@ def scan_suite_names(line: str) -> list[dict[str, Any]]:
         if text[:1] in "!-":
             continue
         text = text.lstrip("+")
+        if text.startswith("tls.TLS_"):
+            text = text[4:]
         iana = _SUITE_TABLE.get(text.upper())
         if iana is None and ((_IANA_SUITE.fullmatch(text) and "_WITH_" in text)
                              or _TLS13_SUITE.match(text)):

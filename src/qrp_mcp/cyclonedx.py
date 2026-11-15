@@ -1106,7 +1106,8 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # A named policy (OPC UA, AWS) or an IKE configuration is one component per policy
     # and per state: what it says is in the fields below, and two files that say
     # different things about the same policy are two facts.
-    # Rows 465, 475: a plain TLS version pin (no policy, listener or switch; not forbidden) is linked to
+    # Rows 465, 475: a plain TLS version pin (no policy, listener or switch; not forbidden; `all`
+    # in Apache counts) is linked to
     # the groups and suites its own file sets. The link is part of the key, so two files that
     # pin the same version with different groups are two components, and a pin with nothing to
     # link keeps the ref it had.
@@ -1122,7 +1123,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                           sort_keys=True)
         link = (_link_for(tls_links.get(asset["path"]), asset.get("version"))
                 if asset["protocol"] == "tls" and not asset.get("banned")
-                and set(json.loads(said)) <= {"key_exchange"}
+                and set(json.loads(said)) <= {"key_exchange", "included_by"}
                 else {})
         by_protocol.setdefault(
             (asset["protocol"], asset.get("version"), bool(asset.get("banned")), said,

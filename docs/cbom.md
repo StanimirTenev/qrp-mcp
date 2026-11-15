@@ -72,8 +72,10 @@ connection negotiates. A hybrid (a TLS 1.3 group) goes to TLS 1.3 or an unversio
 classical group to every version. A TLS 1.3 suite (`TLS_AES_*`, `TLS_CHACHA20_POLY1305_SHA256`)
 goes to TLS 1.3 only and the others to the other versions, because nginx's `ssl_ciphers` and
 OpenSSL's `CipherString` do not set TLS 1.3 suites. A commented-out setting, an entry struck out
-with `!` or `-`, and a selector (`HIGH`, `EECDH+aRSA`) are not suites. Only plain version pins
-are linked (not an AWS policy, a listener or a switch), and a ref is written only where its
+with `!` or `-`, and a selector (`HIGH`, `EECDH+aRSA`) are not suites; Go's `tls.TLS_...` and
+Envoy's `[A|B]` are read as the suites they name. Only plain version pins are linked (a version
+Apache enables by `SSLProtocol all` counts; an AWS policy, a listener or a switch does not, and a
+forbidden version is never linked), and a ref is written only where its
 component is in the document. Two files that pin the same version with different groups are two
 components; a pin with nothing to link keeps the ref it had. The scan result carries the same
 suites, by name and as written, in `cipher_suites`.

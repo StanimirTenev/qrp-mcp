@@ -200,3 +200,27 @@ def test_a_hybrid_goes_to_tls_1_3_and_a_classical_group_to_both(tmp_path):
             ["cryptoRefArray"]] == ["X25519 (TLS group offered alone)"]
     assert sorted(by_ref[r] for r in tls13["cryptoProperties"]["protocolProperties"]
                   ["cryptoRefArray"]) == ["X25519 (TLS group offered alone)", "X25519MLKEM768"]
+
+
+def test_a_version_apache_enables_by_all_is_linked_too(tmp_path):
+    # certbot's current-options-ssl-apache.conf: `SSLProtocol all -SSLv3 -TLSv1 -TLSv1.1`
+    # enables TLS 1.2 and 1.3 by `all` (`included_by`); the suites of the same file go to 1.2.
+    root = _write(tmp_path / "r", {"ssl.conf": (
+        "SSLProtocol             all -SSLv2 -SSLv3 -TLSv1 -TLSv1.1\n"
+        "SSLCipherSuite          ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384\n")})
+    doc = build(scan_directory(root))
+    _refs_resolve(doc)
+    (tls12,) = _tls(doc, "TLSv1.2")
+    assert [s["name"] for s in tls12["cryptoProperties"]["protocolProperties"]["cipherSuites"]] == [
+        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384"]
+    assert all("cipherSuites" not in c["cryptoProperties"]["protocolProperties"]
+               for c in doc["components"] if "(forbidden)" in c["name"])
+
+
+def test_go_and_envoy_suite_forms_are_carried():
+    from qrp_mcp.detectors import scan_suite_names
+    go = "\tCipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},"
+    envoy = '      cipher_suites: "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]"'
+    assert [s["name"] for s in scan_suite_names(go)] == ["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"]
+    assert [s["name"] for s in scan_suite_names(envoy)] == [
+        "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"]
