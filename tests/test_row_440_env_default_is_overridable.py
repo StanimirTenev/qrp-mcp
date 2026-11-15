@@ -40,11 +40,16 @@ def test_a_default_beside_an_env_read_is_a_place_and_a_finding(tmp_path):
 def test_other_languages_and_non_crypto_defaults(tmp_path):
     (tmp_path / "a.js").write_text('const wrap = process.env.KEY_WRAP ?? "RSA-OAEP";\n')
     (tmp_path / "b.sh").write_text('openssl genpkey -algorithm "${KEY_ALG:-ed25519}" -out k\n')
-    (tmp_path / "c.py").write_text('import os\nregion = os.environ.get("AWS_REGION", "us-east-1")\n')
+    (tmp_path / "c.py").write_text('import os\nregion = os.environ.get("AWS_REGION", "us-east-1")\n'
+                                   'mode = os.environ.get("UI_MODE", "desktop")\n')
+    # Shapes the corpus regression turned up: a path or a command is not an algorithm name,
+    # and the classifier alone reads `echo` as EC and `desktop` as DES.
+    (tmp_path / "d.sh").write_text('USER_HOME="${HOME:-$(eval echo ~)}"\n'
+                                   'PREFIX="${PREFIX:-"$DESTDIR/usr/local"}"\n')
     places = {p["path"]: p for p in scan_directory(tmp_path)["chosen_outside_files"]["places"]}
     assert places["a.js"]["default"] == "RSA-OAEP" and places["a.js"]["overridable"] is True
     assert places["b.sh"]["default"] == "ed25519"
-    assert "c.py" not in places
+    assert "c.py" not in places and "d.sh" not in places
 
 
 def test_the_default_leaves_by_every_exit(tmp_path):

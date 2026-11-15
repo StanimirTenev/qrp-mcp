@@ -20,7 +20,10 @@ an `identifier` row where the family has no other use in that file. Such a famil
 its CBOM component says `qrp:identifier_only: true`. Where the file also uses the family for real
 (a library call, a string naming the algorithm, a configuration value), every row keeps its kind:
 on OpenSSH no post-quantum row changed kind. **Not claimed:** a washing name defined in one file
-and only used in another still reads as a use there. The benchmark's own over-claim count did not
+and only used in another still reads as a use there; and in a file that also names the family in
+a string or an import, the washing names keep their kind (`call` at high), since the rule is
+settled per family and file. The washing ML-KEM component still says `qrp:classification:
+pqc_ready` (the family's class); `qrp:identifier_only` is what says it was not counted. The benchmark's own over-claim count did not
 move (26 before and after): its scorer counts every CBOM component, and the ML-KEM component is
 still there, marked; a consumer has to filter on `qrp:identifier_only` or on the occurrence tag
 below.
@@ -52,13 +55,19 @@ MCP tools and the CBOM export, and each fix was reverted once to see its test fa
   `os.environ.get("HSM_SIGN_MECH", "RSA-PSS")` keeps the RSA finding and is now also in
   `chosen_outside_files` with `default`, `default_family`, `overridable: true`; the CBOM lists it in
   `qrp:chosen_outside_files:overridable_defaults`.
-- **An identifier occurrence is tagged in the CBOM** (row 470): `[identifier]` (and
-  `[named_but_not_used]`) in `additionalContext`, as `[comment]` already was.
+- **An identifier occurrence is tagged in the CBOM** (row 470): `[identifier]` in
+  `additionalContext`, as `[comment]` already was.
 - **Directories excluded before counting are named** (row 471):
   `files_excluded_before_counting.directories` lists each excluding directory from the root, its
   file count and its paths (up to 50, then `paths_not_listed`). The counts are unchanged.
 - **CBOM: a named curve gives the key size its classical status is read from** (1c9b88a,
   unreleased since 0.44.0).
+
+**What this changes for an existing pipeline.** Rows 458, 460, 461, 464 and 466-469 add rows or
+families, so a tree with such lines gets a new `findings_fingerprint`, new entries against an
+existing baseline (marked `new`), and can newly fail a `--mandate` gate (an RSA-1024 from
+`default_bits`, an OpenSSH test key). Row 463 changes `pqc_readiness` and the evidence kind of
+the washing rows but not the findings list, so `findings_fingerprint` stays the same there.
 
 Also checked, no change needed: `--mandate nist-ir-8547` already follows the final text
 (October 2026): RSA-3072 and P-384 get `deprecated_after: 2030-12-31` (row 168, since 0.39.0),
@@ -67,7 +76,8 @@ and `--lead-months 50` from 15.11.2026 fails on them.
 On QCI's CBOM-Benchmark 2.6.6 with its own scorer, unscoped: 214/410 detected with 0.44.0, 228/410
 with this release (52.2% -> 55.6%); false positives 85 -> 86. Positive controls against 0.44.0:
 OpenSSH 7fe3b24 coverage 84.88% and certbot 68.00%, the same files read (741, 850) and the same
-findings (70, 39); OpenSSH gains 26 family rows from its OpenSSH-format test keys (row 469) and one
+findings (70, 39; 39 is also what the v0.44.0 tag gives on this checkout today, against the 40
+in the 0.44.0 entry); OpenSSH gains 26 family rows from its OpenSSH-format test keys (row 469) and one
 MD5 table entry; certbot is identical.
 
 Corpus regression against 0.44.0 (185 repositories, labels of an independent model): the same in

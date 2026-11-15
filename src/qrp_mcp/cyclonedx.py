@@ -601,9 +601,10 @@ def _scope(located: list[dict[str, Any]], family: str,
 #
 # Row 470 (QCI CBOM-Benchmark 2.6.6): a name is not a use either. `qrp:evidence_kind` is a
 # list on the component, which no consumer filters an occurrence by; filtering by kind cut
-# that benchmark's false positives 85 -> 31. An identifier row (`mlkem_key`, `RSAUtil`) and a
-# family named but not used are now tagged on the occurrence as a comment is: `[identifier]`.
-_NOT_CODE = {"comment", "identifier", "named_but_not_used"}
+# that benchmark's false positives 85 -> 31. An identifier row (`mlkem_key`, `RSAUtil`) is now
+# tagged on the occurrence as a comment is: `[identifier]`. (`named_but_not_used` is a list of
+# families in the scan result, never an occurrence's kind, so it has no tag here.)
+_NOT_CODE = {"comment", "identifier"}
 
 
 def _context(item: dict[str, Any]) -> str:

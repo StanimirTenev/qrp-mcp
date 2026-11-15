@@ -34,13 +34,22 @@ def test_variant_names_are_read(tmp_path):
 
 
 def test_manual_pages_are_not_configuration(tmp_path):
-    for name in ("sshd_config.5", "ssh_config.0"):
+    docs = ("sshd_config.5", "ssh_config.0", "sshd_config.md", "ssh_config.txt",
+            "ssh_config.5.html")
+    for name in docs:
         (tmp_path / name).write_text(".Cm KexAlgorithms mlkem768x25519-sha256\n")
     result = scan_directory(tmp_path)
     assert not result["evidence"]["source_code"]
     unclaimed = {p for r in result["coverage"]["not_examined"]
                  if r["reason"] == "type_not_claimed" for p in r.get("paths", [])}
-    assert {"sshd_config.5", "ssh_config.0"} <= unclaimed, unclaimed
+    assert set(docs) <= unclaimed, unclaimed
+
+
+def test_a_file_another_type_claims_stays_that_type(tmp_path):
+    # As in 0.44.0: ssh_config.py is Python, ssh_config_test.go is Go.
+    from qrp_mcp.detectors import CONFIG_FILENAME_PATTERN
+    for name in ("ssh_config.py", "ssh_config_test.go"):
+        assert not CONFIG_FILENAME_PATTERN.match(name), name
 
 
 def test_variant_on_every_exit(tmp_path):

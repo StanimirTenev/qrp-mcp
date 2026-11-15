@@ -161,8 +161,13 @@ CONFIG_FILENAME_PATTERN = re.compile(
     # mlkem768x25519 and sntrup761x25519 lines unread. A variant after the name
     # (sshd_config_pq, sshd_config.bastion, ssh_config-prod) or before it (bastion.sshd_config).
     # Not OpenSSH's own manual pages, sshd_config.5 / ssh_config.0, which describe every
-    # algorithm and configure none.
-    r"^(?!.*\.[0-9](?:\.gz)?$)(?:sshd|ssh)_config[-_.][\w.-]+$|^[\w.-]+\.(?:sshd|ssh)_config$")
+    # algorithm and configure none; not documentation (sshd_config.md, ssh_config.5.html); and
+    # not a file whose extension another type claims (ssh_config.py is source, and stays so).
+    r"^(?!.*\.(?i:[0-9]|" + "|".join(sorted(
+        re.escape(e.lstrip(".")) for e in SOURCE_EXTENSIONS | CONFIG_EXTENSIONS | {
+            ".md", ".markdown", ".txt", ".rst", ".pod", ".html", ".htm", ".adoc", ".pdf",
+            ".gz", ".xz", ".bz2", ".zip"})) + r")$)"
+    r"(?:sshd|ssh)_config[-_.][\w.-]+$|^[\w.-]+\.(?:sshd|ssh)_config$")
 
 # Directories whose files are configuration without an extension: FreeRADIUS keeps its
 # EAP-TLS settings in raddb/mods-available/eap (ZA-OPRAVYANE row 103), and Debian's nginx
@@ -3598,7 +3603,7 @@ def scan_source_file(path: Path, rel_path: str,
     by_identifier: list[dict[str, Any]] = []
     standing_alone: list[dict[str, Any]] = []   # release 3e: kept without that (stands_alone)
     rejection_tests = _rejection_tests(lines) if ext in _DOCSTRING_EXT else set()
-    defined = names_defined_in(lines) if ext in SOURCE_EXTENSIONS else frozenset()  # row 463
+    defined: list[frozenset[str]] = []  # row 463: the file's defined names, read on first need
     # The lines visited: with a gate, those it marked and those a comment, docstring or Go
     # raw string opens or closes on, and the rejection tests' `def` lines; the others change
     # nothing below but the end of a denial block, which is looked for among them where one
@@ -3754,7 +3759,10 @@ def scan_source_file(path: Path, rel_path: str,
             # Row 463: provisionally an identifier; settled per family after the walk.
             named_here_only = (evidence not in ("ban", "comment", "identifier")
                                and algorithm in _pqc_names() and ext in SOURCE_EXTENSIONS
-                               and _only_names_defined_here(searched, matches, code, defined))
+                               and _only_names_defined_here(
+                                   searched, matches, code,
+                                   defined[0] if defined else
+                                   defined.append(names_defined_in(lines)) or defined[0]))
             item = {
                 "path": rel_path,
                 "line": line_no,
@@ -4421,13 +4429,22 @@ _RUNTIME_DEFAULT = re.compile(
     r"\$\{([A-Za-z_]\w*):?-([^}\n]{2,80})\}")
 
 
+_DEFAULT_SHAPE = re.compile(r"^[A-Za-z][A-Za-z0-9_.+-]{1,40}$")
+
+
 def _runtime_default(text: str) -> dict[str, Any] | None:
     from .classifier import classify_algorithm  # local: classifier is imported lazily here
     for m in _RUNTIME_DEFAULT.finditer(text):
         groups = [g for g in m.groups() if g is not None]
         name, default = groups[0], groups[-1].strip()
+        # A name, not a path or a command (`${HOME:-$(eval echo ~)}`), and one that spells its
+        # family as a word: the classifier alone reads `echo` as EC and `desktop` as DES.
+        if not _DEFAULT_SHAPE.match(default):
+            continue
         family = classify_algorithm(default, "explicit", source="", location="").algorithm_family
-        if family and family != "unknown":
+        if family and family != "unknown" and re.search(
+                r"(?<![A-Za-z0-9])" + re.escape(family).replace(r"\-", "[-_]?") + r"(?![a-z])",
+                default, re.IGNORECASE):
             return {"setting": name, "read_from": m.group(0).strip(), "default": default,
                     "default_family": family, "overridable": True}
     return None
