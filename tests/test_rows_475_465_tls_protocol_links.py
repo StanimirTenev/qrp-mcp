@@ -186,3 +186,17 @@ def test_the_scan_result_carries_the_suites_at_the_masked_level(tmp_path):
                          "TLS_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_RSA_WITH_AES_256_CBC_SHA",
                          "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"]
         assert result["cipher_suites"][0]["suites"][1]["written"] == "DES-CBC3-SHA"
+
+
+def test_a_hybrid_goes_to_tls_1_3_and_a_classical_group_to_both(tmp_path):
+    root = _write(tmp_path / "r", {"nginx.conf": (
+        "server {\n  ssl_protocols TLSv1.2 TLSv1.3;\n"
+        "  ssl_ecdh_curve X25519MLKEM768:X25519;\n}\n")})
+    doc = build(scan_directory(root))
+    by_ref = {c["bom-ref"]: c["name"] for c in doc["components"]}
+    (tls12,) = _tls(doc, "TLSv1.2")
+    (tls13,) = _tls(doc, "TLSv1.3")
+    assert [by_ref[r] for r in tls12["cryptoProperties"]["protocolProperties"]
+            ["cryptoRefArray"]] == ["X25519 (TLS group offered alone)"]
+    assert sorted(by_ref[r] for r in tls13["cryptoProperties"]["protocolProperties"]
+                  ["cryptoRefArray"]) == ["X25519 (TLS group offered alone)", "X25519MLKEM768"]

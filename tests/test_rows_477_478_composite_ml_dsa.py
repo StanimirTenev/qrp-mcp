@@ -140,14 +140,25 @@ def test_the_cbom_holds_one_composite_signing_asset_with_both_halves(tmp_path):
 
 
 def test_an_oid_this_version_does_not_know_is_said(tmp_path):
-    root = _write(tmp_path / "u", {"a.py": 'A = "1.3.6.1.5.5.7.6.99"\nB = "2.16.840.1.101.3.4.3.33"\n'
-                                           'C = "1.3.6.1.5.5.7.6.45"\n'})
+    # .33 is HashML-DSA-65 (FIPS 204, NIST CSOR) and is known; .60 is not assigned here.
+    root = _write(tmp_path / "u", {"a.py": 'A = "1.3.6.1.5.5.7.6.99"\nB = "2.16.840.1.101.3.4.3.60"\n'
+                                           'C = "1.3.6.1.5.5.7.6.45"\nD = "2.16.840.1.101.3.4.3.33"\n'})
     for result in _scans(root, tmp_path):
         got = [(o["path"], o["line"], o["oid"]) for o in result["oids_not_known"]]
-        assert got == [("a.py", 1, "1.3.6.1.5.5.7.6.99"), ("a.py", 2, "2.16.840.1.101.3.4.3.33")]
+        assert got == [("a.py", 1, "1.3.6.1.5.5.7.6.99"), ("a.py", 2, "2.16.840.1.101.3.4.3.60")]
+        assert "ML-DSA" in {f["algorithm_family"] for f in result["findings"]}
         assert all(o["statement"] == "an OID this version does not know"
                    for o in result["oids_not_known"])
     for doc in _cboms(root, tmp_path):
         (prop,) = [p for p in doc["properties"] if p["name"] == "qrp:oids_not_known"]
         assert [o["oid"] for o in json.loads(prop["value"])] == [
-            "1.3.6.1.5.5.7.6.99", "2.16.840.1.101.3.4.3.33"]
+            "1.3.6.1.5.5.7.6.99", "2.16.840.1.101.3.4.3.60"]
+
+
+def test_only_an_oid_turns_a_defined_name_into_a_use(tmp_path):
+    # Row 463 still holds: a library identifier beside a washing name is not an OID.
+    root = _write(tmp_path / "w", {"w.py": "from cryptography.hazmat.primitives.asymmetric import ec\n"
+                                           "mlkem_key = ec.generate_private_key(ec.SECP256R1())\n"})
+    families = {f["algorithm_family"]: f["classification"]
+                for f in scan_directory(root)["findings"]}
+    assert families["ML-KEM"] == "identifier_only"

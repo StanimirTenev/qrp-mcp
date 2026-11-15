@@ -63,9 +63,9 @@ def test_one_open_finding_names_both_lines_and_the_terminator_owner(tmp_path):
         assert "until" in d["governs"] and "on the wire" in d["governs"]
         assert d["owners"] == ["@acme/platform"] and d["owners_source"] == ".github/CODEOWNERS:2"
         assert d["link"] == {"established": False,
-                             "basis": "link not established: nothing in the files ties "
-                                      "web/nginx.conf to infra/lb.tf (both naming port 443 is "
-                                      "not a basis)"}
+                             "basis": "link not established: this version does not read "
+                                      "which listener, target group or upstream joins "
+                                      "web/nginx.conf to infra/lb.tf"}
 
 
 def test_owners_are_masked_below_full_on_all_three_exits(tmp_path):
@@ -94,3 +94,12 @@ def test_the_other_direction_is_a_disagreement_too(tmp_path):
     (d,) = scan_directory(_tree(tmp_path / "c", NGINX_CLASSICAL, PQ_POLICY))["layer_disagreements"]
     assert (d["weaker"]["path"], d["weaker"]["post_quantum"]) == ("web/nginx.conf", False)
     assert d["owners"] == ["@acme/platform"]
+
+
+def test_a_layer_in_test_code_is_not_compared(tmp_path):
+    root = tmp_path / "t"
+    for name, text in {"tests/fixtures/nginx.conf": NGINX_PQ, "infra/lb.tf": _lb(CLASSICAL_POLICY)
+                       }.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(text)
+    assert scan_directory(root)["layer_disagreements"] == []

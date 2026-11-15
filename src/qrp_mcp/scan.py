@@ -445,11 +445,13 @@ def _layer_disagreements(result: dict[str, Any]) -> list[dict[str, Any]]:
     balancer's policy offers none, or the other way round. One open finding naming both, the
     weaker governing until measured, with the CODEOWNERS owner of the load balancer.
 
-    No link between the two is claimed: nothing in the files says this nginx sits behind that
-    listener, and a shared port 443 is not a basis. So the finding is made at repository level
-    and says the link is not established. Whatever a link could say, it never clears one."""
+    No link between the two is claimed: this version does not read which listener, target group
+    or upstream joins one to the other, and a shared port would join any two HTTPS services. So
+    the finding is made at repository level and says the link is not established. Whatever a link
+    could say, it never clears one. A layer in test code (detectors.in_test_code) is a fixture,
+    not a layer of this repository's deployment, and is not compared."""
     in_use = {(i["path"], i["line"]) for i in result["evidence"]["source_code"]
-              if i.get("evidence_kind") not in ("comment", "ban")}
+              if i.get("evidence_kind") not in ("comment", "ban") and not i.get("in_test_code")}
     groups: dict[str, dict[str, Any]] = {}
     for h in result.get("hybrid_names") or []:
         if h["name"] in _TLS_HYBRID_GROUPS and (h["path"], h["line"]) in in_use:
@@ -459,6 +461,8 @@ def _layer_disagreements(result: dict[str, Any]) -> list[dict[str, Any]]:
             layer["post_quantum"] = True
             layer["value"].append(h["name"])
     for g in result["evidence"].get("tls_groups") or []:
+        if g.get("in_test_code"):
+            continue
         layer = groups.setdefault(g["path"], {"path": g["path"], "line": g["line"],
                                               "setting": g.get("setting") or "TLS group setting",
                                               "value": [], "post_quantum": False})
@@ -468,7 +472,8 @@ def _layer_disagreements(result: dict[str, Any]) -> list[dict[str, Any]]:
                  "value": [p["policy"]], "post_quantum": bool(p["post_quantum"]),
                  "owners": p.get("owners"), "owners_source": p.get("owners_source")}
                 for p in result["evidence"].get("protocols") or []
-                if p.get("protocol") == "tls" and p.get("policy") and "post_quantum" in p]
+                if p.get("protocol") == "tls" and p.get("policy") and "post_quantum" in p
+                and not detectors.in_test_code(p["path"])]
     layers = list(groups.values()) + policies
     if not policies or not groups or len({layer["post_quantum"] for layer in layers}) < 2:
         return []
@@ -488,8 +493,8 @@ def _layer_disagreements(result: dict[str, Any]) -> list[dict[str, Any]]:
         "owners": owner["owners"] if owner else [],
         "owners_source": owner["owners_source"] if owner else None,
         "link": {"established": False,
-                 "basis": f"link not established: nothing in the files ties {group_paths} to "
-                          f"{policy_paths} (both naming port 443 is not a basis)"},
+                 "basis": f"link not established: this version does not read which listener, "
+                          f"target group or upstream joins {group_paths} to {policy_paths}"},
     }]
 
 

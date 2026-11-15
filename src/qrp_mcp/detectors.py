@@ -1803,7 +1803,8 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
 # `-e`/`--encrypt`, openssl-smime(1) and openssl-cms(1) `-encrypt` (recipients positional, or
 # `-recip`), openssl-pkeyutl(1) `-encrypt` with `-inkey`, age(1) `-r`/`-R`.
 ENCRYPTION_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("gpg_encrypt", re.compile(r"\bgpg2?\b[^|;&\n]*?\s(?:--encrypt|-e|-se|-es)(?=\s|$)")),
+    # `-e` alone or in a cluster of short options (`-er`, `-se`, `-sea`).
+    ("gpg_encrypt", re.compile(r"\bgpg2?\b[^|;&\n]*?\s(?:--encrypt|-[asuvzrb]*e[asuvzrb]*)(?=\s|$)")),
     ("openssl_smime_encrypt", re.compile(r"\bopenssl\s+(?:smime|cms)\b[^|;&\n]*\s-encrypt\b")),
     ("openssl_pkeyutl_encrypt", re.compile(r"\bopenssl\s+pkeyutl\b[^|;&\n]*\s-encrypt\b")),
     ("age_encrypt", re.compile(
@@ -4083,7 +4084,9 @@ def scan_source_file(path: Path, rel_path: str,
         # The algorithm as a component of a library's own name: GNUTLS_SIGN_DSA_SHA256,
         # d2i_DSAPublicKey, CKK_RSA, "sha1WithRSAEncryption"; and its OID as a number
         # (ZA-OPRAVYANE rows 132-135; see components.py and oids.py).
-        for family, pos, said in components.scan(searched) + oids.scan(searched):
+        for family, pos, said, by_oid in (
+                [(*hit, False) for hit in components.scan(searched)]
+                + [(*hit, True) for hit in oids.scan(searched)]):
             if _in_blob(pos, blobs):
                 continue
             # Rows 136-143 name a piece; rows 131-135 read the identifier whole. Where the
@@ -4101,7 +4104,8 @@ def scan_source_file(path: Path, rel_path: str,
             if family in seen_on_line:
                 # Row 477: `ML_DSA_65 = "2.16.840.1.101.3.4.3.18"` -- the OID names the
                 # algorithm, so the name beside it is not all the line says (row 463's settle).
-                for held in findings[first_on_line:]:
+                # An OID only: a library identifier is a name as the other is.
+                for held in (findings[first_on_line:] if by_oid else []):
                     if (held["algorithm"] == family and "_kind_if_used" in held
                             and not _in_spans(pos, spans)):
                         held["evidence_kind"] = held.pop("_kind_if_used")

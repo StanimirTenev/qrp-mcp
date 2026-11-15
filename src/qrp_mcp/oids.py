@@ -94,11 +94,15 @@ OIDS.update({oid: (tuple(family for family, _ in halves), name)
              for oid, (name, _, halves, _) in COMPOSITE_ML_DSA.items()})
 
 # Row 477: the post-quantum OIDs of the NIST CSOR arcs (as classifier._OID_FAMILIES and
-# cyclonedx._PQC_OID): sigAlgs 2.16.840.1.101.3.4.3.17-19 ML-DSA (FIPS 204, RFC 9881),
+# cyclonedx._PQC_OID): sigAlgs 2.16.840.1.101.3.4.3.17-19 ML-DSA and .32-.34 HashML-DSA
+# (FIPS 204, RFC 9881),
 # .20-.31 SLH-DSA and .35-.46 HashSLH-DSA (FIPS 205, RFC 9909), kems 2.16.840.1.101.3.4.4.1-3
 # ML-KEM (FIPS 203). Until 0.46.0 a number among them, alone in code, gave nothing.
 OIDS.update({
     **{f"2.16.840.1.101.3.4.3.{17 + i}": (("ML-DSA",), f"id-ml-dsa-{n}")
+       for i, n in enumerate((44, 65, 87))},
+    # HashML-DSA, FIPS 204 section 5.4 (NIST CSOR sigAlgs .32-.34).
+    **{f"2.16.840.1.101.3.4.3.{32 + i}": (("ML-DSA",), f"id-hash-ml-dsa-{n}-with-sha512")
        for i, n in enumerate((44, 65, 87))},
     **{f"2.16.840.1.101.3.4.3.{20 + i}": (("SLH-DSA",), f"id-slh-dsa-{h}-{n}{v}")
        for i, (h, n, v) in enumerate((h, n, v) for h in ("sha2", "shake")

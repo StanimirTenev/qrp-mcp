@@ -27,7 +27,8 @@ OFFSITE = ("#!/bin/sh\n"
            "openssl smime -encrypt -aes256 -binary -in /backup/db.dump -out /backup/db.dump.p7m "
            "-outform DER /etc/backup/vault-rsa4096.crt\n"
            "openssl pkeyutl -encrypt -pubin -inkey keys/archive_pub.pem -in k.bin -out k.enc\n"
-           "age -r age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p -o x.age x.tar\n")
+           "age -r age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p -o x.age x.tar\n"
+           "gpg -er ops@example.com notes.txt\n")
 
 
 def _pub_pem() -> str:
@@ -63,7 +64,12 @@ def test_each_command_is_a_key_establishment_row(tmp_path):
     _cli(["scan", str(root), "--out", str(out)])
     for result in (json.loads(out.read_text()), scan_repo(str(root)), scan_directory(root)):
         rows = {(r["path"], r["line"]): r for r in _rows(result)}
-        assert set(rows) == {("offsite_backup.sh", n) for n in (2, 3, 4, 5)}
+        assert set(rows) == {("offsite_backup.sh", n) for n in (2, 3, 4, 5, 6)}
+        # The finding beside the row: not a signing command, and not an algorithm component.
+        encrypting = [f for f in result["findings"]
+                      if f["algorithm_family"] == "public_key_encryption"]
+        assert len(encrypting) == 5 and all("harvest now" in f["reason"] for f in encrypting)
+        assert not [f for f in result["findings"] if f["algorithm_family"] == "signing_command"]
         assert {r["command_type"] for r in rows.values()} == {
             "gpg_encrypt", "openssl_smime_encrypt", "openssl_pkeyutl_encrypt", "age_encrypt"}
         for r in rows.values():
@@ -90,7 +96,8 @@ def test_the_cbom_counts_them_apart_from_signing(tmp_path):
         props = {p["name"]: p["value"] for p in doc["properties"]}
         assert props["qrp:evidence:ci_signing_commands"] == "0"
         rows = json.loads(props["qrp:evidence:public_key_encryption_commands"])
-        assert len(rows) == 4 and all(r["hndl_exposed"] is True for r in rows)
+        assert len(rows) == 5 and all(r["hndl_exposed"] is True for r in rows)
+        assert not [c for c in doc["components"] if c["name"] == "public_key_encryption"]
 
 
 def test_a_mandate_does_not_read_them_as_signatures(tmp_path):
@@ -101,7 +108,7 @@ def test_a_mandate_does_not_read_them_as_signatures(tmp_path):
                     "--out", str(out)],
                    capture_output=True)
     rows = _rows(json.loads(out.read_text()))
-    assert len(rows) == 4
+    assert len(rows) == 5
     for r in rows:
         # CNSA 2.0 dates every signing step; an encryption step is not one.
         assert r["hndl_exposed"] is True and "mandates" not in r
