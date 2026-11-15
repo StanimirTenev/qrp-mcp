@@ -207,9 +207,8 @@ survey was done, and it is corrected here:
 ## Measured on a corpus this project did not write
 
 The nearest tool of the same kind is **QuantaKrypto's `qscan`** — lexical like this one by its
-own changelog, and in September 2026 the one other tool in this class we found publishing a
-detection figure (from November 2026 QCI's `qci-pqc-scanner` publishes one too, measured on QCI's
-own CBOM-Benchmark). In
+own changelog, and one of the few tools in this class that publish a detection figure (from
+November 2026 QCI's `qci-pqc-scanner` publishes one too, measured on QCI's own CBOM-Benchmark). In
 September 2026 both were run against **Cryben** (Näther & Hirsch, arXiv 2608.04857): an
 independent corpus with its own reference CBOM and its own scorer, written by neither of us.
 The scripts and the raw output are reproducible; the method matters more than the number.
