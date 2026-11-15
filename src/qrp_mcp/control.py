@@ -774,6 +774,11 @@ def sentence(block: dict[str, Any]) -> str:
         + ". This says what the instrument does on those styles. It does not say what this "
           "tree contains, how much of it was found, or that the inventory lists everything, "
           "and it is for this version only."
+        + (" The tree's own findings also sit in file types no style was planted in ("
+           + ", ".join(f"{u['file_type']}: {_plural(u['files'], 'file', 'files')}"
+                       for u in block.get("not_covered_by_control") or [])
+           + "); the figure does not cover them."
+           if block.get("not_covered_by_control") else "")
     )
 
 
@@ -795,8 +800,44 @@ def plan_sha256(plan: dict[str, Any]) -> str:
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
+def _file_type(path: str) -> str:
+    name = path.rsplit("/", 1)[-1]
+    return ("." + name.rsplit(".", 1)[1].lower()) if "." in name.lstrip(".") else name
+
+
+def not_covered(plan: dict[str, Any], scan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Row 474: the file types that carry findings of the tree's own (not a planted line) and
+    in which no style was planted. The figure says nothing about them."""
+    new_files = {it["path"] for it in plan["items"] if it.get("new_file")}
+    planted = {(it["path"], line) for it in plan["items"] for line in it.get("lines", [])}
+    covered = {_file_type(it["path"]) for it in plan["items"] if it["kind"] == "positive"}
+    evidence = scan.get("evidence") or {}
+    rows = [r for key in ("source_code", "iac") for r in evidence.get(key, [])
+            if r.get("evidence_kind") not in ("comment", "ban", "identifier")]
+    rows += list(evidence.get("ci_pipeline", [])) + list(evidence.get("embedded_keys", []))
+    by_type: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        path = r.get("path")
+        if not path or path in new_files or (path, r.get("line")) in planted:
+            continue
+        kind = _file_type(path)
+        if kind in covered:
+            continue
+        entry = by_type.setdefault(kind, {"file_type": kind, "files": 0, "findings": 0,
+                                          "paths": []})
+        entry["findings"] += 1
+        if path not in entry["paths"]:
+            entry["paths"].append(path)
+            entry["files"] += 1
+    out = sorted(by_type.values(), key=lambda e: e["file_type"])
+    for entry in out:
+        entry["paths"] = sorted(entry["paths"])[:20]
+    return out
+
+
 def block_from(plan: dict[str, Any], instrument: dict[str, Any],
-               git_head: str | None) -> dict[str, Any]:
+               git_head: str | None, uncovered: list[dict[str, Any]] | None = None
+               ) -> dict[str, Any]:
     """The `claims.self_seeded_control` block. Its keys are a published shape
     (docs/control.md): added to, never renamed."""
     pos = [i for i in plan["items"] if i["kind"] == "positive"]
@@ -844,6 +885,8 @@ def block_from(plan: dict[str, Any], instrument: dict[str, Any],
                                      "read": sum(1 for i in sized if i["size_read"])},
         "indirect_name_line": {"planted": len(named),
                                "found": sum(1 for i in named if i["found_on_name_line"])},
+        # Row 474: file types with findings of the tree's own and no planted style.
+        "not_covered_by_control": uncovered or [],
     }
     block["sentence"] = sentence(block)
     return block
@@ -888,5 +931,6 @@ def run(path: str | Path, seed: int) -> dict[str, Any]:
     instrument = {"tool": inst.get("tool", "qrp-mcp"), "version": inst.get("version", __version__),
                   "revision": inst.get("revision")}
     git_head = coverage._git_pin(tree).get("commit")
-    return {"self_seeded_control": block_from(plan, instrument, git_head),
+    return {"self_seeded_control": block_from(plan, instrument, git_head,
+                                              not_covered(plan, scan)),
             "items": [{k: it[k] for k in _ITEM_KEYS if k in it} for it in plan["items"]]}
