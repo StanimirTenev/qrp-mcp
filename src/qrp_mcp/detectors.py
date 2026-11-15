@@ -4569,19 +4569,29 @@ _NIST_CURVE = re.compile(
     re.IGNORECASE)
 
 
+# Row 458: pyca's `ec.SECP256K1()` gave an EC row with no curve and no size, while python-ecdsa's
+# `curve=SECP256k1` (a registry name, read as its own token) gave secp256k1. SEC 2 v2.0 section
+# 2.4.1: secp256k1, a Koblitz curve over a 256-bit prime field.
+_SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])", re.IGNORECASE)
+_CURVE_SIZE = {"P-256": 256, "P-384": 384, "P-521": 521, "secp256k1": 256}
+
+
 def _tag_curves(items: list[dict[str, Any]]) -> None:
     for item in items:
         if item.get("algorithm") not in ("EC", "ECDSA", "ECDH"):
             continue
         if not item.get("curve"):
+            excerpt = item.get("excerpt") or ""
             found = {f"P-{next(g for g in m.groups() if g)}"
-                     for m in _NIST_CURVE.finditer(item.get("excerpt") or "")}
+                     for m in _NIST_CURVE.finditer(excerpt)}
+            if _SECP256K1.search(excerpt):
+                found.add("secp256k1")
             if len(found) == 1:
                 item["curve"] = found.pop()
         # Row 435: a NIST prime curve on the row is its size, so it reaches the finding and
         # `algorithm_key_sizes` as the suite rows' P-256 already did.
-        if item.get("curve") in ("P-256", "P-384", "P-521") and "key_size" not in item:
-            item["key_size"] = int(item["curve"][2:])
+        if item.get("curve") in _CURVE_SIZE and "key_size" not in item:
+            item["key_size"] = _CURVE_SIZE[item["curve"]]
 
 
 # baseline.FORMAT and config.FILENAME, written out here so this module imports neither.
