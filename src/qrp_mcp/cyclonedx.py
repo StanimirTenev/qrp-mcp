@@ -759,7 +759,7 @@ def _certificate_components(located: list[dict[str, Any]],
 # What a family's own component says that its parameter-set components do not (release 3d).
 _CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_pins",
                                  "provider_configuration", "not_negotiable_by", "not_enabled",
-                                 "fallback_beside_hybrid")}
+                                 "fallback_beside_hybrid", "identifier_only")}
 
 
 # The order of a named curve's base point, in bits: SEC 2 v2.0 section 2 (secp*), FIPS 186-4
@@ -953,6 +953,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         if finding.get("not_enabled"):
             component["properties"].append({"name": f"{NS}not_enabled",
                                             "value": finding["not_enabled"]["basis"]})
+        # Row 463: every use is a name this file defines (`mlkem_key`, `kyber_exchange`) or
+        # another identifier row: the summary does not count it, and the component says so.
+        if finding.get("identifier_only"):
+            component["properties"].append({"name": f"{NS}identifier_only", "value": "true"})
         # The modules the evidence names, one JSON array like every other list here.
         # Not `certificationLevel`: that field states a validation, and nothing in a
         # file establishes one. Not `implementationPlatform`: that is a CPU.

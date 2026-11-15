@@ -1679,6 +1679,72 @@ def _only_names_the_assigned_variable(line: str, matches: list[re.Match]) -> boo
     return True
 
 
+# Row 463 (QCI CBOM-Benchmark 2.6.6, PQC-washing): `self.mlkem_key = ec.generate_private_key(...)`,
+# `def kyber_exchange`, `class MlkemSession` and `KeyPair mlKemKeyPair;` named ML-KEM and Kyber
+# as calls at high, and a file doing ECDH on P-256 read as hybrid_partial. A post-quantum name
+# that is only a piece of a name THIS FILE defines -- a function, class, method, field or
+# variable it declares or assigns -- is what the author called something, not what the code
+# does: an identifier row, which is low and never moves the headline (scan._identifier_only).
+# Post-quantum families only: a classical name over-reports a vulnerability, a post-quantum
+# one over-claims readiness. A name the file does not define (`ml_kem_768.generate_keypair()`,
+# `mlkem.GenerateKey768()`, `MlKem768::generate`) and a string literal stay uses. Not seen: a
+# washing name defined in another file and only used here still reads as a use.
+_NOT_A_TYPE = (r"(?!(?:return|throw|new|case|else|yield|await|goto|typeof|delete|in|of|not|and|"
+               r"or|is|print|echo|import|package|using|from|raise|assert|del|with|as)\b)")
+_DEFINES = re.compile(
+    # def/class/function/fn/func/type/struct/... NAME, let/const/var/val NAME
+    r"\b(?:def|class|function|func|fn|struct|enum|trait|interface|type|record|object|let|const|"
+    r"var|val)\s+(?:mut\s+)?(?:\([^)\n]*\)\s*)?([A-Za-z_$][\w$]*)"
+    # self.NAME = / this.NAME = / this->NAME =
+    r"|\b(?:self|this)\s*(?:\.|->)\s*([A-Za-z_$][\w$]*)\s*(?::[^=\n]*)?=(?![=>~])"
+    # a typed declaration: `KeyPair mlKemKeyPair;`, `uint8_t mlkem_pk[32];`, `Foo bar = ...`
+    r"|\b" + _NOT_A_TYPE + r"[A-Za-z_][\w.]*(?:<[^<>\n]*>)?(?:\[\])*\s+\**([A-Za-z_]\w*)"
+    r"\s*(?:\[[^\]\n]*\]\s*)?(?:;|=(?![=>~]))"
+    # a method or function declaration: `byte[] kyberAgree(PqWashing peer) throws E {`
+    r"|\b" + _NOT_A_TYPE + r"[A-Za-z_][\w.]*(?:<[^<>\n]*>)?(?:\[\])*\s+\**([A-Za-z_]\w*)"
+    r"\s*\([^;\n]*\)\s*(?:throws\s+[\w.,\s]+)?\{",
+    re.MULTILINE)
+# NAME = / a, b := at the start of a line (Python, Go, Ruby, shell).
+_ASSIGNED_NAMES = re.compile(
+    r"^\s*((?:[A-Za-z_$][\w$]*\s*,\s*)*[A-Za-z_$][\w$]*)\s*(?::[^=\n]*)?(?::=|=(?![=>~]))",
+    re.MULTILINE)
+
+
+@functools.cache
+def _pqc_names() -> frozenset[str]:
+    "Detector names the classifier reads as post-quantum (ready or pre-standard)."
+    from .classifier import classify_algorithm
+    return frozenset(name for name in {a for a, *_ in ALGORITHM_PATTERNS}
+                     if classify_algorithm(name, "explicit", source="", location="").classification
+                     in ("pqc_ready", "pqc_pre_standard"))
+
+
+def names_defined_in(lines: list[str]) -> frozenset[str]:
+    """The names a file defines (row 463): declared, or assigned at the start of a line."""
+    text = "\n".join(lines)
+    names = {name for m in _DEFINES.finditer(text) for name in m.groups() if name}
+    for m in _ASSIGNED_NAMES.finditer(text):
+        names.update(part.strip() for part in m.group(1).split(","))
+    return frozenset(names)
+
+
+def _only_names_defined_here(line: str, matches: list[re.Match], code: str,
+                             defined: frozenset[str]) -> bool:
+    """Every match is a piece of a word the file defines, outside any string literal."""
+    strings = [(m.start(), m.end()) for m in _STRING_LITERAL.finditer(code)]
+    for match in matches:
+        if _in_spans(match.start(), strings):
+            return False
+        start, end = match.start(), match.end()
+        while start > 0 and (line[start - 1].isalnum() or line[start - 1] in "_$"):
+            start -= 1
+        while end < len(line) and (line[end].isalnum() or line[end] in "_$"):
+            end += 1
+        if line[start:end].lstrip("$") not in defined and line[start:end] not in defined:
+            return False
+    return True
+
+
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(r"\bgpg\s+(--detach-sign|--sign|-s)\b")),
@@ -3498,6 +3564,7 @@ def scan_source_file(path: Path, rel_path: str,
     by_identifier: list[dict[str, Any]] = []
     standing_alone: list[dict[str, Any]] = []   # release 3e: kept without that (stands_alone)
     rejection_tests = _rejection_tests(lines) if ext in _DOCSTRING_EXT else set()
+    defined = names_defined_in(lines) if ext in SOURCE_EXTENSIONS else frozenset()  # row 463
     # The lines visited: with a gate, those it marked and those a comment, docstring or Go
     # raw string opens or closes on, and the rejection tests' `def` lines; the others change
     # nothing below but the end of a denial block, which is looked for among them where one
@@ -3642,6 +3709,9 @@ def scan_source_file(path: Path, rel_path: str,
                   and all(_names_an_assigned_variable(searched, m) for m in matches)):
                 # Row 368: `implicitSha1 = new Rfc2898DeriveBytes(..., SHA256)` -- the name
                 # the result is stored under, not what the call does.
+                evidence = "identifier"
+            elif (algorithm in _pqc_names() and ext in SOURCE_EXTENSIONS
+                  and _only_names_defined_here(searched, matches, code, defined)):
                 evidence = "identifier"
             elif (kind in ("declaration", "reference") and ext in SOURCE_EXTENSIONS
                   and _only_names_the_assigned_variable(searched, matches)):
