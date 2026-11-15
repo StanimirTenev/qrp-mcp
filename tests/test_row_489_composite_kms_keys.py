@@ -61,15 +61,18 @@ def _write(root: Path, files: dict[str, str]) -> Path:
     return root
 
 
-def _cli(args: list[str]) -> None:
+def _cli(args: list[str], **env) -> None:
     subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", *args],
-                   check=True, capture_output=True, env=dict(os.environ))
+                   check=True, capture_output=True, env={**os.environ, **env})
 
 
 def _scans(root: Path, tmp_path: Path) -> list[dict]:
-    out = tmp_path / "s.json"
+    out, plain = tmp_path / "s.json", tmp_path / "s0.json"
     _cli(["scan", str(root), "--out", str(out)])
-    return [json.loads(out.read_text()), scan_repo(str(root)), scan_directory(root)]
+    # The same with the line gate's core off: the alias rule reads the whole file either way.
+    _cli(["scan", str(root), "--out", str(plain)], QRP_MCP_CORE="0")
+    return [json.loads(out.read_text()), json.loads(plain.read_text()), scan_repo(str(root)),
+            scan_directory(root)]
 
 
 def _cboms(root: Path, tmp_path: Path) -> list[dict]:
@@ -132,6 +135,20 @@ def test_a_key_of_another_spec_or_one_half_alone_does_not_link(tmp_path):
                 "alias_at": "signer/signer.yaml:5",
                 "reason": "resolves to an aws_kms_key of spec ML_DSA_65 (keys.tf:3), "
                           "which is neither half"}]
+
+
+def test_a_key_of_the_same_name_in_another_module_does_not_link(tmp_path):
+    # Terraform resolves aws_kms_key.pq inside the alias's own module (directory). A key of the
+    # same name in another directory is another key; the alias's module holds none.
+    root = _write(tmp_path / "d", {"signer/signer.yaml": SIGNER, "envs/a/aliases.tf": ALIASES,
+                                   "envs/b/keys.tf": KEYS})
+    for result in _scans(root, tmp_path):
+        for h in _composites(result):
+            keys = h["kms_keys"]
+            assert keys["linked"] is False and keys["halves"] == []
+            assert {n["reason"] for n in keys["not_linked"]} == {
+                "its aws_kms_alias does not name exactly one aws_kms_key of its own directory "
+                "in the files read"}
 
 
 def test_no_alias_beside_the_composite_adds_nothing(tmp_path):

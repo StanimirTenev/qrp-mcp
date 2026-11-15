@@ -4865,16 +4865,17 @@ def _half_text(family: str, param: str | None) -> str:
 def _link_kms_keys(hybrids: list[dict[str, Any]], refs: list[dict[str, Any]]) -> None:
     """Row 489: a composite named in a file that also writes KMS aliases gets `kms_keys`. An
     alias links a half only through a Terraform aws_kms_alias of that name whose target_key_id
-    is an aws_kms_key with that half's spec; anything else is named under `not_linked` with its
+    is an aws_kms_key with that half's spec, declared in the alias's own directory (a Terraform
+    module is a directory); anything else is named under `not_linked` with its
     reason. Places, not alias text, so the field is the same at every level."""
     composites = {name for name, _, _, _ in oids.COMPOSITE_ML_DSA.values()}
     aliases: dict[str, list[dict[str, Any]]] = {}
-    keys: dict[str, list[dict[str, Any]]] = {}
+    keys: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for ref in refs:
         if ref["kind"] == "tf_kms_alias" and ref.get("alias"):
             aliases.setdefault(ref["alias"], []).append(ref)
         elif ref["kind"] == "tf_kms_key":
-            keys.setdefault(ref["name"], []).append(ref)
+            keys.setdefault((posixpath.dirname(ref["path"]), ref["name"]), []).append(ref)
     for hybrid in hybrids:
         if hybrid["name"] not in composites:
             continue
@@ -4890,14 +4891,18 @@ def _link_kms_keys(hybrids: list[dict[str, Any]], refs: list[dict[str, Any]]) ->
         for alias, ref in written.items():
             at = f"{ref['path']}:{ref['line']}"
             declared = aliases.get(alias, [])
-            target = keys.get(declared[0].get("target", ""), []) if len(declared) == 1 else []
+            target = keys.get((posixpath.dirname(declared[0]["path"]), declared[0].get("target", "")),
+                              []) if len(declared) == 1 else []
             if not declared:
                 reason = "no aws_kms_alias with this name in the files read"
             elif len(declared) > 1:
                 reason = "more than one aws_kms_alias with this name"
             elif len(target) != 1:
-                reason = ("its aws_kms_alias does not name exactly one aws_kms_key in the files "
-                          "read")
+                reason = ("its aws_kms_alias does not name exactly one aws_kms_key of its own "
+                          "directory in the files read")
+            elif not target[0].get("spec"):
+                reason = (f"resolves to an aws_kms_key with no key spec in the files read "
+                          f"({target[0]['path']}:{target[0]['line']})")
             elif _KMS_SPEC_HALF.get(target[0].get("spec")) not in wanted:
                 reason = (f"resolves to an aws_kms_key of spec {target[0].get('spec')} "
                           f"({target[0]['path']}:{target[0]['line']}), which is neither half")

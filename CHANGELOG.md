@@ -12,14 +12,16 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   but nothing said which keys it signs with. A composite `hybrid_names` entry in a file that writes
   KMS aliases now carries `kms_keys`: each alias resolved through a Terraform `aws_kms_alias`
   (`name`, `target_key_id`) to an `aws_kms_key` whose `customer_master_key_spec` is that half
-  (`ML_DSA_87` for ML-DSA-87, `ECC_NIST_P384` for ECDSA P-384), with the places; an alias that does
+  (`ML_DSA_87` for ML-DSA-87, `ECC_NIST_P384` for ECDSA P-384), declared in the alias's own
+  directory (a Terraform module), with the places; an alias that does
   not resolve, or resolves to a key of another spec, is under `not_linked` with the reason. The CBOM
   combiner carries the same as `qrp:kms_keys`. Places only, never the alias text, so the field is
   the same at every `--level`. Found by re-running the probe: as written there the yaml names
   `alias/zv-*`, the code `alias/pq-*` and `alias/trad-*`, and the Terraform declares no alias, so
   0.47.0 says "not linked" for both aliases there. **Not claimed / not changed:** an alias name that
   contains "mldsa87" links nothing; aliases in another file than the composite, key IDs and key ARNs, `data`
-  sources and other clouds are not read; the findings stay as they were (ECDSA is still counted as
+  sources and other clouds are not read; two environments that declare the same alias name read
+  "more than one aws_kms_alias with this name", not linked; the findings stay as they were (ECDSA is still counted as
   quantum-vulnerable), and `readiness_by_role.signature` still reads `hybrid_partial` for a linked
   composite, as a TLS hybrid group does. What a linked composite should read is left open: the
   label has no value for a complete hybrid, and changing it would change the TLS hybrids too.
