@@ -1742,6 +1742,20 @@ def names_defined_in(lines: list[str]) -> frozenset[str]:
     return frozenset(names)
 
 
+def _settle_names_defined_here(findings: list[dict[str, Any]]) -> None:
+    """Row 463, per family and file: the rows that only name something the file defines are
+    identifiers where the family has no other use in the file (washing: `mlkem_key = ec...`).
+    Where it has one -- a call into a library, a string naming the algorithm -- they keep their
+    kind: there the names are the code around a real use (OpenSSH's kexmlkem768x25519.c)."""
+    used = {f["algorithm"] for f in findings
+            if f.get("evidence_kind") not in ("comment", "ban", "identifier")}
+    for f in findings:
+        if "_kind_if_used" in f:
+            kind = f.pop("_kind_if_used")
+            if f["algorithm"] in used:
+                f["evidence_kind"] = kind
+
+
 def _only_names_defined_here(line: str, matches: list[re.Match], code: str,
                              defined: frozenset[str]) -> bool:
     """Every match is a piece of a word the file defines, outside any string literal."""
@@ -3730,9 +3744,6 @@ def scan_source_file(path: Path, rel_path: str,
                 # Row 368: `implicitSha1 = new Rfc2898DeriveBytes(..., SHA256)` -- the name
                 # the result is stored under, not what the call does.
                 evidence = "identifier"
-            elif (algorithm in _pqc_names() and ext in SOURCE_EXTENSIONS
-                  and _only_names_defined_here(searched, matches, code, defined)):
-                evidence = "identifier"
             elif (kind in ("declaration", "reference") and ext in SOURCE_EXTENSIONS
                   and _only_names_the_assigned_variable(searched, matches)):
                 # Code only: in Terraform or a config file the key is the setting's name
@@ -3740,16 +3751,22 @@ def scan_source_file(path: Path, rel_path: str,
                 evidence = "identifier"
             else:
                 evidence = kind
+            # Row 463: provisionally an identifier; settled per family after the walk.
+            named_here_only = (evidence not in ("ban", "comment", "identifier")
+                               and algorithm in _pqc_names() and ext in SOURCE_EXTENSIONS
+                               and _only_names_defined_here(searched, matches, code, defined))
             item = {
                 "path": rel_path,
                 "line": line_no,
                 "algorithm": algorithm,
                 "description": description,
                 "excerpt": line.strip()[:200],
-                "evidence_kind": evidence,
+                "evidence_kind": "identifier" if named_here_only else evidence,
                 # Named, not judged -- see TEST_PATH_RULE. A fixture's RSA is real RSA.
                 "in_test_code": in_test_code(rel_path),
             }
+            if named_here_only:
+                item["_kind_if_used"] = evidence
             size = key_size_on_line(line, algorithm) if algorithm in ("RSA", "DSA", "DH") else None
             if size:
                 item["key_size"] = size
@@ -4048,6 +4065,7 @@ def scan_source_file(path: Path, rel_path: str,
         by_identifier = standing_alone
     if by_identifier:
         findings = sorted(findings + by_identifier, key=lambda f: f["line"])
+    _settle_names_defined_here(findings)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
     findings = _drop_ecdh_named_only_by_the_setting(findings)

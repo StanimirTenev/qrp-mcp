@@ -82,6 +82,8 @@ def _assert_washing_not_believed(result):
     for f in result["findings"]:
         if f["algorithm_family"] in PQ:
             assert f.get("identifier_only") is True, f
+    # The provisional marker never leaves the detector.
+    assert not any(k.startswith("_") for o in result["evidence"]["source_code"] for k in o)
 
 
 def test_python_washing_names_are_identifiers(tmp_path):
@@ -185,7 +187,7 @@ def test_real_ml_kem_use_is_still_a_use_and_counted(tmp_path):
         assert result["summary"]["pqc_ready_count"] >= 1, name
 
 
-def test_a_defined_name_beside_a_real_call_keeps_the_call(tmp_path):
+def test_a_file_with_a_real_use_keeps_every_kind(tmp_path):
     (tmp_path / "w.py").write_text(
         "from pqcrypto.kem import ml_kem_768\n"
         "mlkem_keys = ml_kem_768.generate_keypair()\n"
@@ -195,7 +197,8 @@ def test_a_defined_name_beside_a_real_call_keeps_the_call(tmp_path):
     rows = {o["line"]: o["evidence_kind"] for o in result["evidence"]["source_code"]
             if o["algorithm"] == "ML-KEM"}
     assert rows[2] == "call" and rows[4] == "call", rows
-    assert rows[3] == "identifier", rows
+    # Per family and file: where the file has a real use, the names around it keep their kind.
+    assert rows[3] != "identifier", rows
     assert result["summary"]["pqc_ready_count"] == 1
 
 
