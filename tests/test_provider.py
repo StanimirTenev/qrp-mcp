@@ -112,7 +112,8 @@ def test_the_cbom_carries_providers_and_claims_no_validation(tmp_path):
     for doc in (_tool(export_cbom)(str(tree)),
                 _cli(tree, tmp_path.parent / f"{tmp_path.name}.cdx.json", "cbom")):
         validator.validate(doc)
-        mlkem = next(c for c in doc["components"] if c["name"] == "ML-KEM")
+        # Row 488: Go's GenerateKey768 names the set too since 0.47.0.
+        mlkem = next(c for c in doc["components"] if c["name"] == "ML-KEM-768")
         props = {p["name"]: p["value"] for p in mlkem["properties"]}
         assert json.loads(props["qrp:providers"]) == ["@noble/post-quantum",
                                                       "Go standard library"]

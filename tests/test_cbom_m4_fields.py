@@ -112,7 +112,9 @@ def test_a_pqc_parameter_set_read_on_the_line(tmp_path, validator, line, family,
 
 
 def test_a_pqc_family_without_a_set_gets_no_level_and_no_oid(tmp_path):
-    doc = _cbom(tmp_path, {"a.go": 'import "crypto/mlkem"\nvar dk, _ = mlkem.GenerateKey768()\n'})
+    # Row 488: `mlkem.GenerateKey768()` names the set since 0.47.0; a line naming none.
+    doc = _cbom(tmp_path, {"a.go": 'package k\nimport "crypto/mlkem"\n'
+                                   'func f(ct []byte) { ss, _ := dk.Decapsulate(ct); _ = ss }\n'})
     algo = _algo(doc, "ML-KEM")
     assert "nistQuantumSecurityLevel" not in algo
     assert "parameterSetIdentifier" not in algo

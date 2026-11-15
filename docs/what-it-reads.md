@@ -211,6 +211,11 @@ its file imports for that family; two modules in one file and none on the line l
 An unknown provider is **absent, never guessed**: a header such as `<openssl/evp.h>` is shared by
 OpenSSL, BoringSSL and LibreSSL and names no one. What is named is the API, not the build — a fork
 that keeps the API reads the same — and **nothing here claims CMVP or FIPS 140-3 validation**.
+From 0.47.0 the Rust crates too: RustCrypto (`ml_kem::`, `ml_dsa::`, `slh_dsa::`) and libcrux
+(`libcrux_ml_kem::`, and the C names extracted from it such as OpenSSH's
+`libcrux_ml_kem_mlkem768_portable_generate_key_pair`); and Go's `crypto/mlkem` names give the
+parameter set (`GenerateKey768`, `NewEncapsulationKey1024`, `DecapsulationKey768`…), which a line
+naming only the function did not.
 
 From 0.32.0 (raised by Paul J. Lilly, extending a point Solahuddin Shamsuddin made): Python's
 `cryptography` is a provider too (`pyca/cryptography`, by `from cryptography.hazmat…`), and **a

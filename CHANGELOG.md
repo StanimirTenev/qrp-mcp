@@ -6,6 +6,17 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **The implementation and the parameter set were not always recorded** (row 488, Adam
+  Firestone; probe `impl-proba`). Rust `use ml_kem::{MlKem768, ...}` read ML-KEM 768 with no
+  `provider`; Go `mlkem.GenerateKey768()` read ML-KEM with no `parameter_set`. RustCrypto's
+  `ml_kem::`, `ml_dsa::`, `slh_dsa::` paths now name `RustCrypto`, libcrux's `libcrux_ml_kem` and
+  `libcrux_ml_dsa` (Rust paths and their C names) `libcrux`, and Go's crypto/mlkem names
+  (GenerateKey, NewEncapsulationKey, NewDecapsulationKey, EncapsulationKey, DecapsulationKey with
+  768 or 1024, read from the Go 1.26 source) give the parameter set -- which now also reaches the
+  CBOM component and the CNSA 2.0 parameter-set clause. Found by re-running the probe. OpenSSH's
+  vendored libcrux lines now carry `provider: libcrux`. **Not claimed:** any validation; the
+  crate path names the API, and a fork that keeps it reads the same. The Rust `pqcrypto::kem::`
+  umbrella path is not read (the `pqcrypto_mlkem`-style crate names already were).
 - **Where a KEM key is generated was not said** (row 494, Paarrthhh Birla, after Keyber, IACR
   ePrint 2026/2766; probe `keyber-proba`). A pqm4-style `provision.c` generating the device's
   ML-KEM-512 key once with `crypto_kem_keypair` (line 6) and decapsulating with `crypto_kem_dec`

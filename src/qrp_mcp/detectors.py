@@ -3476,6 +3476,12 @@ PROVIDER_PATTERNS: list[tuple[str, re.Pattern]] = [
         r"\bEVP_(?:KEM|SIGNATURE|KEYMGMT)_fetch\b")),
     # Python's cryptography, by its own module path (ZA-OPRAVYANE row 35).
     ("pyca/cryptography", re.compile(r"\b(?:from|import)\s+cryptography\.hazmat\b")),
+    # Row 488: Rust crates by their paths. RustCrypto's ml-kem (RustCrypto/KEMs), ml-dsa and
+    # slh-dsa (RustCrypto/signatures); never inside a longer name (liboqs `OQS_KEM_ml_kem_768`).
+    ("RustCrypto", re.compile(r"(?<![\w:])(?:ml_kem|ml_dsa|slh_dsa)::")),
+    # Cryspen's libcrux: the Rust paths and the C names extracted from them (OpenSSH vendors
+    # `libcrux_ml_kem_mlkem768_portable_generate_key_pair`).
+    ("libcrux", re.compile(r"\blibcrux_ml_(?:kem|dsa)(?:::|_)")),
 ]
 
 # The manifest package a provider is installed as, so a version pinned for it can be
@@ -4809,8 +4815,11 @@ def _sizes_by_algorithm(findings: list[dict[str, Any]]) -> dict[str, list[int]]:
 # (`HashML-DSA`, `HashSLH-DSA` are the pre-hash variants, which have other OIDs). A line
 # naming two sets of one family gives none.
 _PARAMETER_SETS: dict[str, tuple[re.Pattern[str], Any]] = {
-    "ML-KEM": (re.compile(r"(?<![a-z])ml[-_]?kem[-_]?(512|768|1024)(?!\d)", re.I),
-               lambda m: m.group(1)),
+    # Row 488: and Go's crypto/mlkem names (Go 1.26 source: GenerateKey768, NewEncapsulationKey768,
+    # NewDecapsulationKey768, EncapsulationKey768, DecapsulationKey768, and the 1024 forms).
+    "ML-KEM": (re.compile(r"(?<![a-z])ml[-_]?kem[-_]?(512|768|1024)(?!\d)"
+                          r"|\b(?:GenerateKey|(?:New)?(?:En|De)capsulationKey)(768|1024)\b", re.I),
+               lambda m: m.group(1) or m.group(2)),
     "ML-DSA": (re.compile(r"(?<![a-z])ml[-_]?dsa[-_]?(44|65|87)(?!\d)", re.I),
                lambda m: m.group(1)),
     "SLH-DSA": (re.compile(r"(?<![a-z])slh[-_]?dsa[-_]?(sha2|shake)[-_]?(128|192|256)([sf])"

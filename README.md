@@ -162,6 +162,10 @@ functions. Where the call does not name the scheme, the family is the one the sa
 (`family_named_at`); a file naming none or two gives no row. Declarations are not calls. Code
 shows where a key is generated, not whether that step survives a fault.
 
+From 0.47.0 RustCrypto's `ml_kem`, `ml_dsa` and `slh_dsa` crates and libcrux are named as the
+`provider`, and Go's `mlkem.GenerateKey768()` and its siblings give the parameter set
+([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md)).
+
 ### A control on your own tree
 
 ```
