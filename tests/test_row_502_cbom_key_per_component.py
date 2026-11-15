@@ -122,3 +122,15 @@ def test_cbom_with_keys_validates(tree):
     errors = list(jsonschema.Draft7Validator(schema, resolver=resolver).iter_errors(
         cyclonedx.build(scan_directory(tree))))
     assert not errors, [e.message for e in errors[:5]]
+
+
+def test_keys_whose_names_slug_alike_are_both_kept(tmp_path):
+    """`a_b.pem` and `a-b.pem` make one slug; neither key may be dropped."""
+    for name in ("a_b.pem", "a-b.pem"):
+        key = ec.generate_private_key(ec.SECP256R1())
+        (tmp_path / name).write_bytes(key.private_bytes(
+            PEM, serialization.PrivateFormat.PKCS8, NOENC))
+    doc = cyclonedx.build(scan_directory(tmp_path))
+    assert set(_by_location(doc)) == {"a_b.pem", "a-b.pem"}
+    refs = [c["bom-ref"] for c in doc["components"]]
+    assert len(refs) == len(set(refs))

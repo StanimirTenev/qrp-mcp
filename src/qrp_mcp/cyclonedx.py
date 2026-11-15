@@ -941,10 +941,13 @@ def _key_components(scan_result: dict[str, Any], components: list[dict[str, Any]
                 " private key" if kind == "private-key" else " public key")
         else:
             name = "Embedded private key material"
-        ref = _ref(kind, f"{k['path']}-{k['line']}")
-        if ref in seen:
+        # The slug alone folds `a_b.pem` and `a-b.pem` together; the exact place is hashed in.
+        place = f"{kind}|{k['path']}|{k['line']}"
+        if place in seen:
             continue
-        seen.add(ref)
+        seen.add(place)
+        ref = _ref(kind, f"{k['path']}-{k['line']}") + "-" + hashlib.sha256(
+            place.encode("utf-8", "backslashreplace")).hexdigest()[:8]
         properties = []
         if k.get("curve"):
             properties.append({"name": f"{NS}curve", "value": str(k["curve"])})

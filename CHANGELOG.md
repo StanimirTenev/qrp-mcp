@@ -10,7 +10,7 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   is largely safe"; probe `aes-proba`). `kek.public_key().encrypt(archive_key, padding.OAEP(...))`
   with `archive_key = AESGCM.generate_key(bit_length=256)` read RSA-4096 at lines 7 and 8 and
   nothing tied the RSA key to the AES key it protects. The RSA row of an OAEP `.encrypt(<name>,
-  ...)` now carries `wraps`: the name (masked below `--level full`, like a line), and where the
+  ...)` (on one line, or split over up to four as a formatter writes it) now carries `wraps`: the name (masked below `--level full`, like a line), and where the
   file assigns that name exactly once with `generate_key(bit_length=N)`, `os.urandom(n)`,
   `secrets.token_bytes(n)` or `get_random_bytes(n)`, `what: "symmetric key"`, `key_size` and
   `assigned_at`; otherwise `what: "not read"` with the reason in `basis`. In the scan JSON, the
@@ -30,7 +30,7 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   `qrp:key_unread`. On MCUboot: 21 private-key and 4 public-key components, every `algorithmRef`
   resolving. Validated against the vendored CycloneDX 1.6 schema. **Changed for readers:** the
   bom-ref `crypto:embedded-private-key-material` is gone; a reader that looked it up now finds
-  `private-key:<path>-<line>` refs. **Not done:** `qrp:classification` on the key components
+  `private-key:<path>-<line>-<hash>` refs. **Not done:** `qrp:classification` on the key components
   (D6's last sentence); the embedded-key finding in the scan JSON is unchanged
   (`algorithm_family: private_key`, `classification: unknown`).
 - **A public-key PEM was not read as a key, and key sizes were uneven** (row 503, D7 and D8 of
@@ -45,7 +45,12 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   gives the size. In the scan JSON, the MCP tools and the CBOM (through the size). Found by
   re-running the probe; on the MCUboot tree no row was added or lost, 50 rows gained a size (6 key
   files, 2 public keys, 42 imgtool `ECDSA256P1`/`ECDSA384P1` lines, which are P-256 and P-384
-  keys), the findings and `algorithm_key_sizes` are the same. **Not claimed:** a curve from
+  keys), and the findings list (family, raw value, classification, severity) and
+  `algorithm_key_sizes` are the same, on MCUboot (37) and U-Boot (188); U-Boot's
+  `lib/ecdsa/ecdsa-verify.c:178,184,190` now read 256/384/521. `findings_fingerprint` moves, since
+  occurrence key sizes are part of it. **Changes a finding:** a committed PKCS#1 `RSA PRIVATE KEY`
+  of 1024 bits, which read `RSA` (high, size undetermined), now reads `RSA-1024`, critical and
+  weak, as the same key in PKCS#8 already did. **Not claimed:** a curve from
   `ecdsaNNN` (the size only); `ecdsa-with-SHA256`, `SHA256withECDSA` and `ecdsa512` give no size.
   A public key is not an embedded (committed secret) key and is not counted as one. MCUboot's
   Kconfig `range 2048 3072` is not read.

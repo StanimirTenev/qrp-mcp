@@ -53,7 +53,7 @@ one "Embedded private key material" for all of them: `relatedCryptoMaterialPrope
 503), `size` where it is a number, `algorithmRef` to the algorithm component with an occurrence at
 the key's file and line, of its family, where there is exactly one, and `qrp:curve`. A private key
 that did not parse keeps the name "Embedded private key material" and says why in
-`qrp:key_unread`. The bom-ref is `private-key:<path>-<line>` or `public-key:<path>-<line>`.
+`qrp:key_unread`. The bom-ref is `private-key:<path>-<line>-<hash>` or `public-key:<path>-<line>-<hash>` (8 hex of the exact place, so two files whose names slug alike stay apart).
 From 0.47.0 (row 495) an RSA component whose occurrence encrypts a named value with OAEP carries
 `qrp:wraps`, one entry per occurrence (`null` where the line wraps nothing): `what` (`symmetric
 key` or `not read`), `name` (masked below `full`), `key_size` and `assigned_at` where the file
