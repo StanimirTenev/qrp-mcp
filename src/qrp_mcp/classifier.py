@@ -1036,6 +1036,24 @@ def extract_findings(request: FingerprintRequest) -> list[Finding]:
             command_type = item.get("command_type")
             if not (isinstance(command_type, str) and command_type.strip()):
                 continue
+            if item.get("operation") == "public_key_encryption":
+                # Row 479: encryption to a public key, not signing. Its family is the
+                # recipient key's, and only where that key is a file the scan read.
+                findings.append(Finding(
+                    source="repo_ci_pipeline",
+                    location=f"{item.get('path', '?')}:{item.get('line', '?')}",
+                    raw_value=command_type,
+                    algorithm_family="public_key_encryption",
+                    classification="unknown",
+                    quantum_vulnerable=False,
+                    weak_key=False,
+                    severity="info",
+                    reason=("Public-key encryption in a script: what it encrypts can be "
+                            "recorded now and opened by whoever later holds the recipient's "
+                            "private key (harvest now, decrypt later). "
+                            + str(item.get("description") or "")),
+                ))
+                continue
             findings.append(
                 Finding(
                     source="repo_ci_pipeline",

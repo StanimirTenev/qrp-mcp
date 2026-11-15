@@ -636,7 +636,7 @@ def _context(item: dict[str, Any]) -> str:
 
 # Findings that are not algorithms. Signing commands are counted in the document
 # properties; embedded keys become related-crypto-material below.
-_NOT_ALGORITHMS = {"signing_command", "private_key"}
+_NOT_ALGORITHMS = {"signing_command", "private_key", "public_key_encryption"}
 
 
 def _findings_digest(scan_result: dict[str, Any]) -> str:
@@ -1585,10 +1585,22 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # being a cryptographic asset the schema can hold. Counted here rather than
     # dropped: a tool that quietly discards a category of its own findings on
     # export is the behaviour this emitter was written to argue against.
-    ci = scan_result["evidence"]["ci_pipeline"]
+    ci = [c for c in scan_result["evidence"]["ci_pipeline"]
+          if c.get("operation") != "public_key_encryption"]
     document["properties"].append(
         {"name": f"{NS}evidence:ci_signing_commands", "value": str(len(ci))}
     )
+    # Row 479: encryption to a public key in a script, counted apart from signing.
+    encrypting = [c for c in scan_result["evidence"]["ci_pipeline"]
+                  if c.get("operation") == "public_key_encryption"]
+    if encrypting:
+        document["properties"].append({
+            "name": f"{NS}evidence:public_key_encryption_commands", "value": json.dumps(
+                [{"location": c["path"], "line": c["line"], "command": c["command_type"],
+                  "role": c["role"], "hndl_exposed": c["hndl_exposed"],
+                  "description": c["description"],
+                  **({"recipient_key": c["recipient_key"]} if c.get("recipient_key") else {})}
+                 for c in encrypting], ensure_ascii=False)})
     # The bound of the recoverable-key check, where it ran, found or not (row 154).
     check = scan_result.get("weak_key_check")
     if check:

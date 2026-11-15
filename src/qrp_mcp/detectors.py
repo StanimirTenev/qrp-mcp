@@ -1797,6 +1797,40 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("kernel_sign_file", re.compile(r"(?:^|[\s/])sign-file\s+(?:-\w+\s+)*\w+\s+\S+\s+\S+")),
 ]
 
+# Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
+# is a key or certificate the command names; gpg's is a user id. Symmetric `openssl enc` and
+# `gpg -c` encrypt with a passphrase and are not here. From each tool's manual: gpg(1)
+# `-e`/`--encrypt`, openssl-smime(1) and openssl-cms(1) `-encrypt` (recipients positional, or
+# `-recip`), openssl-pkeyutl(1) `-encrypt` with `-inkey`, age(1) `-r`/`-R`.
+ENCRYPTION_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
+    ("gpg_encrypt", re.compile(r"\bgpg2?\b[^|;&\n]*?\s(?:--encrypt|-e|-se|-es)(?=\s|$)")),
+    ("openssl_smime_encrypt", re.compile(r"\bopenssl\s+(?:smime|cms)\b[^|;&\n]*\s-encrypt\b")),
+    ("openssl_pkeyutl_encrypt", re.compile(r"\bopenssl\s+pkeyutl\b[^|;&\n]*\s-encrypt\b")),
+    ("age_encrypt", re.compile(
+        r"(?:^|[\s|;&(])age\s+(?:[^|;&\n]*\s)?(?:-r|--recipient|-R|--recipients-file)(?=[\s=])")),
+]
+PUBLIC_KEY_ENCRYPTION = "public-key encryption to a key not in these files"
+_OPTION_WITH_VALUE = re.compile(r"^-(?:in|out|inform|outform|passin|signer|inkey|certfile|"
+                                r"keyform|recip|o|i|R|r)$")
+_KEY_FILE = re.compile(r"\.(?:crt|pem|cer|der|pub|key|p7b)$", re.IGNORECASE)
+
+
+def _recipient_file(command_type: str, segment: str) -> str | None:
+    """The key or certificate file the encrypting command encrypts to, as written, or None."""
+    tokens = segment.split()
+    for i, token in enumerate(tokens[:-1]):
+        if (command_type == "openssl_pkeyutl_encrypt" and token == "-inkey") or (
+                command_type == "openssl_smime_encrypt" and token == "-recip") or (
+                command_type == "age_encrypt" and token in ("-R", "--recipients-file")):
+            return tokens[i + 1].strip("\"'")
+    if command_type == "openssl_smime_encrypt":
+        positional = [t for i, t in enumerate(tokens) if not t.startswith("-")
+                      and not (i and _OPTION_WITH_VALUE.match(tokens[i - 1]))]
+        files = [t.strip("\"'") for t in positional if _KEY_FILE.search(t.strip("\"'"))]
+        return files[-1] if files else None
+    return None
+
+
 # The key a signing step names, so it can be joined to a key the scan found at that path.
 # `openssl dgst -sign KEY` and `-inkey KEY`, `--key KEY` (sbsign, cosign, evmctl),
 # signtool's `/f FILE`, and the second positional argument of kmodsign and sign-file.
@@ -4267,6 +4301,9 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
     script's own directory. A path the step names that is not in the tree is said to be
     absent; a path written with a variable is left alone."""
     for step in ci_findings:
+        if step.get("operation") == "public_key_encryption":
+            _link_recipient_key(step, key_files)
+            continue
         # The first value that is not a flag: in `openssl cms -sign -in m -signer c
         # -inkey k` the bare -sign takes no argument, and the word after it is `-in`.
         values = [m.group(1) or m.group(2)
@@ -4283,6 +4320,22 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
                                    "algorithms": key_files[found]}
         else:
             step["signing_key"] = {"path": posixpath.normpath(written), "in_tree": False}
+
+
+def _link_recipient_key(step: dict[str, Any], key_files: dict[str, list[str]]) -> None:
+    """Row 479: the recipient key's families, only where it is a file the scan read."""
+    written = step.pop("_recipient", None)
+    if not written or "$" in written or "{" in written or "%" in written:
+        return
+    here = posixpath.dirname(step["path"])
+    candidates = [posixpath.normpath(written), posixpath.normpath(posixpath.join(here, written))]
+    found = next((c for c in candidates if c in key_files), None)
+    if found:
+        step["recipient_key"] = {"path": found, "in_tree": True, "algorithms": key_files[found]}
+        step["description"] = (f"public-key encryption to the key in {found} "
+                               f"({', '.join(key_files[found])})")
+    else:
+        step["recipient_key"] = {"path": posixpath.normpath(written), "in_tree": False}
 
 
 _SIGNTOOL_DIGEST = re.compile(r"\s/fd\s+\"?([A-Za-z0-9-]+)")
@@ -4306,6 +4359,21 @@ def scan_ci_file(path: Path, rel_path: str,
                           else None)
                 if digest:
                     findings[-1]["digest_algorithm"] = digest.group(1).upper()
+        if line.lstrip().startswith("#"):
+            continue
+        for command_type, pattern in ENCRYPTION_COMMAND_PATTERNS:
+            match = pattern.search(line)
+            if not match:
+                continue
+            segment = re.split(r"[|;&]", line[match.start():])[0]
+            item = {"path": rel_path, "line": line_no, "command_type": command_type,
+                    "operation": "public_key_encryption", "role": "key_establishment",
+                    "hndl_exposed": True, "description": PUBLIC_KEY_ENCRYPTION,
+                    "excerpt": line.strip()[:200]}
+            recipient = _recipient_file(command_type, segment)
+            if recipient:
+                item["_recipient"] = recipient
+            findings.append(item)
     return findings
 
 

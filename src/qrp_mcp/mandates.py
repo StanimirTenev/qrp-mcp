@@ -244,7 +244,9 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             if item.get("evidence_kind") in _NOT_USE:
                 continue
             family = _family(category, item)
-            signing = category == "ci_pipeline"
+            # Row 479: a public-key encryption command is not a signing step.
+            signing = (category == "ci_pipeline"
+                       and item.get("operation") != "public_key_encryption")
             in_vulnerable = family is not None and (
                 family in vulnerable or raw.get(family) in vulnerable
                 or any(r.startswith(f"{family}-") and v in vulnerable for r, v in raw.items()))
