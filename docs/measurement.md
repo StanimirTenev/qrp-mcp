@@ -178,11 +178,19 @@ survey was done, and it is corrected here:
 
 - **Coverage inside the document.** Several tools do report what they skipped: QuantaKrypto's
   `qscan` counts scanned and unread files, IBM Quantum Safe Explorer logs each excluded file
-  with a reason, SandboxAQ shows missed locations. What we have not found elsewhere is the
-  coverage travelling **inside the CycloneDX CBOM** — a reason per group of unread files, the
-  paths that could not be read, the directories that could not be entered, and
-  `accounts_for_every_file`. `qscan` computes the counts and drops them on export, so it is one
-  flag away from the same thing.
+  with a reason, SandboxAQ shows missed locations. Two more, checked in their code on 15 November
+  2026: QCI's `qci-pqc-scanner` names each skipped file with a reason, in a `scan-coverage.json`
+  written beside its CBOM, and fails its gate on a partial scan; PQBlocks' `cbom-scanner` prints
+  a `Scan error:` line for each file it could not read and exits 2 without writing a CBOM. So
+  per run, per file and with a reason is not ours alone. What we have not found in another
+  scanner, as of that date, is the coverage travelling **inside the CycloneDX CBOM** — a reason
+  per group of unread files, the paths that could not be read, the directories that could not be
+  entered, and `accounts_for_every_file`, a count in which the types the tool does not claim are
+  named too (QCI passes over some extensions and directories without naming them; PQBlocks reads
+  eight extensions and is silent on the rest). Inside the document is not a new idea either: the
+  Applied Quantum CBOM Profile (v1.0-RC, 2026) specifies a coverage property carried in the
+  CycloneDX document. `qscan` computes the counts and drops them on export, so it is one flag
+  away from the same thing.
 - This scanner separates **reading from finding** in the document itself, and refuses to say
   `complete` without a control that licenses the stronger claim. Reading is self-measurable;
   finding is not.
@@ -199,7 +207,8 @@ survey was done, and it is corrected here:
 ## Measured on a corpus this project did not write
 
 The nearest tool of the same kind is **QuantaKrypto's `qscan`** — lexical like this one by its
-own changelog, and the only other tool in this class that publishes a detection figure. In
+own changelog, and one of the few tools in this class that publish a detection figure (from
+November 2026 QCI's `qci-pqc-scanner` publishes one too, measured on QCI's own CBOM-Benchmark). In
 September 2026 both were run against **Cryben** (Näther & Hirsch, arXiv 2608.04857): an
 independent corpus with its own reference CBOM and its own scorer, written by neither of us.
 The scripts and the raw output are reproducible; the method matters more than the number.
