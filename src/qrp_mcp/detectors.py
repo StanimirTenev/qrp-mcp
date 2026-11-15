@@ -4812,6 +4812,111 @@ def scan_hybrid_names(line: str) -> list[str]:
     return out
 
 
+# Row 489: a KMS alias written anywhere, and Terraform's aws_kms_alias and aws_kms_key blocks,
+# so a composite declared beside two aliases can be tied to the keys they name (_link_kms_keys).
+_KMS_ALIAS = re.compile(r"(?<![\w/-])alias/[\w/+=,.@-]+")
+_TF_KMS_BLOCK = re.compile(r'^\s*resource\s+"(aws_kms_key|aws_kms_alias)"\s+"([\w-]+)"')
+_TF_BLOCK_START = re.compile(r"^\s*(?:resource|data|module|variable|output|locals)\b")
+_TF_KEY_SPEC = re.compile(r'^\s*(?:customer_master_key_spec|key_spec)\s*=\s*"(\w+)"')
+_TF_ALIAS_NAME = re.compile(r'^\s*name\s*=\s*"(alias/[^"]+)"')
+_TF_TARGET = re.compile(r"^\s*target_key_id\s*=\s*aws_kms_key\.([\w-]+)\.(?:key_id|arn|id)\b")
+# AWS KMS key specs, as the half of a composite they are (KeySpec, AWS KMS API reference).
+_KMS_SPEC_HALF = {"ML_DSA_44": ("ML-DSA", "44"), "ML_DSA_65": ("ML-DSA", "65"),
+                  "ML_DSA_87": ("ML-DSA", "87"), "ECC_NIST_P256": ("ECDSA", "P-256"),
+                  "ECC_NIST_P384": ("ECDSA", "P-384"), "ECC_NIST_P521": ("ECDSA", "P-521"),
+                  "RSA_2048": ("RSA", "2048"), "RSA_3072": ("RSA", "3072"),
+                  "RSA_4096": ("RSA", "4096")}
+
+
+def kms_references(rel_path: str, lines: list[str], terraform: bool) -> list[dict[str, Any]]:
+    """The KMS aliases a file writes, and in Terraform the aliases and keys it declares."""
+    out: list[dict[str, Any]] = []
+    block: dict[str, Any] | None = None
+    for number, line in enumerate(lines, 1):
+        if terraform:
+            start = _TF_KMS_BLOCK.match(line)
+            if start or _TF_BLOCK_START.match(line):
+                block = None
+            if start:
+                block = {"kind": "tf_" + start.group(1)[4:], "path": rel_path, "line": number,
+                         "name": start.group(2)}
+                out.append(block)
+                continue
+            if block is not None:
+                spec, name, target = (_TF_KEY_SPEC.match(line), _TF_ALIAS_NAME.match(line),
+                                      _TF_TARGET.match(line))
+                if block["kind"] == "tf_kms_key" and spec:
+                    block.update(spec=spec.group(1), line=number)
+                elif block["kind"] == "tf_kms_alias" and name:
+                    block.update(alias=name.group(1), line=number)
+                elif block["kind"] == "tf_kms_alias" and target:
+                    block["target"] = target.group(1)
+                continue
+        for match in _KMS_ALIAS.finditer(line):
+            out.append({"kind": "alias", "path": rel_path, "line": number,
+                        "alias": match.group(0)})
+    return out
+
+
+def _half_text(family: str, param: str | None) -> str:
+    return f"{family}-{param}" if family == "ML-DSA" else f"{family} {param}" if param else family
+
+
+def _link_kms_keys(hybrids: list[dict[str, Any]], refs: list[dict[str, Any]]) -> None:
+    """Row 489: a composite named in a file that also writes KMS aliases gets `kms_keys`. An
+    alias links a half only through a Terraform aws_kms_alias of that name whose target_key_id
+    is an aws_kms_key with that half's spec; anything else is named under `not_linked` with its
+    reason. Places, not alias text, so the field is the same at every level."""
+    composites = {name for name, _, _, _ in oids.COMPOSITE_ML_DSA.values()}
+    aliases: dict[str, list[dict[str, Any]]] = {}
+    keys: dict[str, list[dict[str, Any]]] = {}
+    for ref in refs:
+        if ref["kind"] == "tf_kms_alias" and ref.get("alias"):
+            aliases.setdefault(ref["alias"], []).append(ref)
+        elif ref["kind"] == "tf_kms_key":
+            keys.setdefault(ref["name"], []).append(ref)
+    for hybrid in hybrids:
+        if hybrid["name"] not in composites:
+            continue
+        written: dict[str, dict[str, Any]] = {}
+        for ref in refs:
+            if ref["kind"] == "alias" and ref["path"] == hybrid["path"]:
+                written.setdefault(ref["alias"], ref)
+        if not written:
+            continue
+        wanted = {tuple(h): _half_text(*h) for h in hybrid["halves"]}
+        halves: list[dict[str, Any]] = []
+        not_linked: list[dict[str, Any]] = []
+        for alias, ref in written.items():
+            at = f"{ref['path']}:{ref['line']}"
+            declared = aliases.get(alias, [])
+            target = keys.get(declared[0].get("target", ""), []) if len(declared) == 1 else []
+            if not declared:
+                reason = "no aws_kms_alias with this name in the files read"
+            elif len(declared) > 1:
+                reason = "more than one aws_kms_alias with this name"
+            elif len(target) != 1:
+                reason = ("its aws_kms_alias does not name exactly one aws_kms_key in the files "
+                          "read")
+            elif _KMS_SPEC_HALF.get(target[0].get("spec")) not in wanted:
+                reason = (f"resolves to an aws_kms_key of spec {target[0].get('spec')} "
+                          f"({target[0]['path']}:{target[0]['line']}), which is neither half")
+            else:
+                key = target[0]
+                halves.append({"half": wanted[_KMS_SPEC_HALF[key["spec"]]], "alias_at": at,
+                               "alias_resolved_at": f"{declared[0]['path']}:{declared[0]['line']}",
+                               "key_at": f"{key['path']}:{key['line']}",
+                               "key_spec": key["spec"]})
+                continue
+            not_linked.append({"alias_at": at, "reason": reason})
+        hybrid["kms_keys"] = {
+            "basis": ("a KMS alias written in the same file, resolved through a Terraform "
+                      "aws_kms_alias (target_key_id) to an aws_kms_key whose key spec is the "
+                      "half's"),
+            "linked": set(wanted.values()) <= {h["half"] for h in halves},
+            "halves": halves, "not_linked": not_linked}
+
+
 def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
     for item in items:
         rule = _PARAMETER_SETS.get(item.get("algorithm"))
@@ -4938,7 +5043,7 @@ _READING_LISTS = (
     "hybrid_names", "pinned_images", "ssh_kex_findings", "weak_key_findings", "fips_findings",
     "pins", "property_reads", "skipped_files", "left_out", "files_read", "markers",
     "excluded_by_config", "material_problems", "runtime_choices", "ec_points_checked",
-    "cipher_suite_findings", "oids_not_known",)
+    "cipher_suite_findings", "oids_not_known", "kms_refs",)
 _READING_COUNTS = ("files_scanned", "skipped_kinds", "present_kinds")
 _READING_MAPS = ("key_files", "file_digests", "codeowners", "file_digests_lf")
 _READING_LIST_MAPS = ("property_values",)
@@ -4955,7 +5060,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
      ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads, skipped_files,
      left_out, files_read, markers, excluded_by_config, material_problems, runtime_choices_found,
-     ec_points_checked, cipher_suite_findings, oids_not_known, files_scanned, skipped_kinds, present_kinds,
+     ec_points_checked, cipher_suite_findings, oids_not_known, kms_refs, files_scanned, skipped_kinds,
+     present_kinds,
      key_files, file_digests, codeowners, file_digests_lf, property_values) = (
         r[name] for name in _READING)
     # A walked file is not a link, so it can only resolve to an excluded path of its own
@@ -5079,6 +5185,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             declarations.append(rel_path)
         return
     files_read.append(rel_path)
+    terraform = path.suffix.lower() in (".tf", ".tfvars")
+    if b"alias/" in raw or (terraform and b"aws_kms_key" in raw):
+        kms_refs.extend(kms_references(rel_path, lines, terraform))
     if any(b in raw for b in _RUNTIME_BYTES):
         runtime_choices_found.extend(runtime_choices(rel_path, lines))
     if b"qrp:ignore" in raw:
@@ -5775,6 +5884,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     cipher_suite_findings: list[dict[str, Any]] = []
     # Row 477: OIDs under an arc where algorithms are assigned that the table does not hold.
     oids_not_known: list[dict[str, Any]] = []
+    # Row 489: KMS aliases written and the Terraform KMS aliases and keys (kms_references).
+    kms_refs: list[dict[str, Any]] = []
     reading = dict(zip(_READING, (
         source_findings, ci_findings, iac_findings, embedded_key_findings, unreadable, reports,
         declarations, undecoded, content_parts, protocol_findings, dependency_findings,
@@ -5782,7 +5893,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads,
         skipped_files, left_out, files_read, markers, excluded_by_config, material_problems,
         runtime_choices_found, ec_points_checked, cipher_suite_findings, oids_not_known,
-        files_scanned,
+        kms_refs, files_scanned,
         skipped_kinds, present_kinds, key_files,
         file_digests, codeowners, file_digests_lf, property_values)))
     reading["files_present"] = files_present
@@ -5854,6 +5965,10 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     _tag_parameter_sets(source_findings + iac_findings)
     _tag_curves(source_findings + iac_findings)
     _join_fips(source_findings + iac_findings, fips_findings)
+    hybrids = [{"path": p, "line": n, "name": name,
+                "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}
+               for p, n, name in hybrid_names]
+    _link_kms_keys(hybrids, kms_refs)
     return {
         "files_scanned": files_scanned,
         "files_read": sorted(files_read),
@@ -5903,9 +6018,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         # which is in the inventory at that line.
         "file_digests": file_digests,
         "file_digests_lf": file_digests_lf,
-        "hybrid_names": [{"path": p, "line": n, "name": name,
-                          "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}
-                         for p, n, name in hybrid_names],
+        "hybrid_names": hybrids,
         "protocol_findings": protocol_findings,
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,

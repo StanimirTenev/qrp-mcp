@@ -102,7 +102,9 @@ has no protocol component to carry its groups.
 A composite ML-DSA signature (RFC 10073: `id-MLDSA65-ECDSA-P256-SHA512`, its label
 `COMPSIG-MLDSA65-ECDSA-P256-SHA512` or its OID `1.3.6.1.5.5.7.6.45`) is one `combiner`
 component with `cryptoFunctions` `keygen`, `sign`, `verify`, its `oid`, `qrp:prehash`, and
-`dependencies` to the ML-DSA and the traditional component (rows 477, 478).
+`dependencies` to the ML-DSA and the traditional component (rows 477, 478). Where its file
+writes KMS aliases, `qrp:kms_keys` says which Terraform `aws_kms_key` each half was tied to through
+an `aws_kms_alias`, or why an alias was not (row 489, from 0.47.0).
 
 ## What kind of place a finding sits in
 

@@ -1369,6 +1369,14 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         if missing:
             properties.append({"name": f"{NS}half_not_in_inventory",
                                "value": ", ".join(missing)})
+        # Row 489: the KMS keys a composite's declaration was tied to, or why not.
+        kms = next((g["kms_keys"] for g in group if g.get("kms_keys")), None)
+        if kms:
+            said = [f"{h['half']} -> {h['key_at']} ({h['key_spec']}, alias at {h['alias_at']}, "
+                    f"resolved at {h['alias_resolved_at']})" for h in kms["halves"]]
+            said += [f"alias at {n['alias_at']}: {n['reason']}" for n in kms["not_linked"]]
+            properties.append({"name": f"{NS}kms_keys", "value": (
+                "linked: " if kms["linked"] else "not linked: ") + "; ".join(said)})
         component = {
             "type": "cryptographic-asset",
             "bom-ref": ref,

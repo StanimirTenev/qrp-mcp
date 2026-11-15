@@ -465,6 +465,11 @@ s2n-tls, rustls) every piece of evidence is identical before and after.
   names (`id-MLDSA65-ECDSA-P256-SHA512`) and labels (`COMPSIG-MLDSA65-ECDSA-P256-SHA512`) in code
   and configuration. Each is one `hybrid_names` entry with its ML-DSA parameter set and its
   traditional half (RSA size, curve, Ed25519 or Ed448), beside the two family rows.
+  From 0.47.0 (row 489), a composite in a file that also writes KMS aliases (`alias/...`) carries
+  `kms_keys`: each alias resolved through a Terraform `aws_kms_alias` (`name`, `target_key_id`) to an
+  `aws_kms_key` whose key spec is one of the halves, by place, and under `not_linked` each alias that
+  does not resolve, with why. The name of an alias is never read as its algorithm; readiness is
+  unchanged.
 - **Post-quantum OIDs as numbers**: ML-DSA `2.16.840.1.101.3.4.3.17`-`.19` and HashML-DSA
   `.32`-`.34`, SLH-DSA `.20`-`.31` and `.35`-`.46`, ML-KEM `2.16.840.1.101.3.4.4.1`-`.3`; and the
   classical rest of the arc, `.3`-`.16` (DSA, ECDSA, RSA with SHA-2/SHA-3), as OpenSSL's
