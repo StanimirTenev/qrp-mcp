@@ -170,10 +170,14 @@ PROFILES: dict[str, dict[str, Any]] = {
         # FrodoKEM and Classic McEliece with appropriate security parameters for PQC
         # applications in conjunction with a previously recommended asymmetric mechanism";
         # sections 2.4.1 and 2.4.2, Tables 2.5 and 2.6), which the reading of 27.09 missed.
-        "key_establishment": "ML-KEM-768 or ML-KEM-1024; FrodoKEM-976 or FrodoKEM-1344; or "
-                             "Classic McEliece (mceliece460896, mceliece6688128, "
-                             "mceliece8192128, or their 'f' variants) -- each in hybrid with a "
-                             "classical key agreement",
+        # Row 481: Classic McEliece is no longer offered. BSI, "Notes on recent developments
+        # concerning Classic McEliece", 29 September 2026: it "should currently no longer be
+        # used in new developments or when planning new cryptographic applications. For key
+        # agreement, it is advised to use FrodoKEM, ML-KEM or HQC (once the corresponding
+        # standard has been published) in accordance with the recommendations of TR-02102-1."
+        "key_establishment": "ML-KEM-768 or ML-KEM-1024; or FrodoKEM-976 or FrodoKEM-1344 -- "
+                             "each in hybrid with a classical key agreement; HQC once its "
+                             "standard is published (BSI note of 29 September 2026)",
         "signatures": "ML-DSA-65 or ML-DSA-87 in the 'hedged' variant, in hybrid with a "
                       "classical signature; or a hash-based signature alone",
         "firmware": "hash-based signatures: SLH-DSA, or stateful LMS/HSS or XMSS/XMSS^MT, which "
@@ -188,15 +192,27 @@ PROFILES: dict[str, dict[str, Any]] = {
                  "the end of 2026 (section 4.3); high-risk use cases quantum-safe by the end of "
                  "2030 and medium-risk ones by the end of 2035 (section 3).",
         "also_reads": "Leitlinie zur Umstellung auf PQC, joint guideline of BMDS, BMI and BSI, "
-                      "11 September 2026 (sections 3 and 4.3)",
+                      "11 September 2026 (sections 3 and 4.3); BSI, Notes on recent "
+                      "developments concerning Classic McEliece, 29 September 2026",
+        # Cited beside the guideline wherever its source is (row 481).
+        "also_sources": [{
+            "standard": "BSI: Notes on recent developments concerning Classic McEliece",
+            "what": "29 September 2026",
+            "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Crypto/"
+                   "Notes_Classic_McEliece.pdf"}],
         # Families the document recommends that NIST did not standardise: their finding
         # still says `candidate` (that is NIST's standing), and says this beside it.
         "recommends": {
             "FrodoKEM": "recommended (FrodoKEM-976, FrodoKEM-1344) in hybrid with a "
                         "classical key agreement, TR-02102-1 2026-01 section 2.4.1",
-            "Classic McEliece": "recommended (mceliece460896, mceliece6688128, "
-                                "mceliece8192128 and the 'f' variants) in hybrid with a "
-                                "classical key agreement, TR-02102-1 2026-01 section 2.4.2",
+            # Row 481: TR-02102-1 2026-01 section 2.4.2 recommended it in hybrid; the BSI note
+            # of 29 September 2026 withdraws it from new developments until the next edition.
+            "Classic McEliece": "under review: hybrid use in existing deployments only, not "
+                                "for new developments (BSI, Notes on recent developments "
+                                "concerning Classic McEliece, 29 September 2026), until the "
+                                "next TR-02102-1, expected early 2027; TR-02102-1 2026-01 "
+                                "section 2.4.2 had recommended it in hybrid with a classical "
+                                "key agreement",
         },
         "weak_hash": "SHA-256, SHA-512/256, SHA-384 or SHA-512; or SHA3-256, SHA3-384 or SHA3-512 "
                      "(TR-02102-1, Table 4.1)",
@@ -325,7 +341,8 @@ def names() -> list[str]:
 def source(profile: str) -> dict[str, str]:
     p = PROFILES[profile]
     return {"standard": f"{p['authority']}: {p['document']}", "what": p["version"],
-            "url": p["url"], "read_on": READ_ON}
+            "url": p["url"], "read_on": READ_ON,
+            **({"also": p["also_sources"]} if p.get("also_sources") else {})}
 
 
 def parameter_set_name(item: dict[str, Any]) -> str:

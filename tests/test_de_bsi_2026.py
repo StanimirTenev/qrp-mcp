@@ -11,10 +11,13 @@ from qrp_mcp.scan import scan_directory
 RSA = {"classification": "classical_vulnerable", "algorithm_family": "RSA"}
 
 
-def test_key_establishment_names_frodokem_and_mceliece():
+def test_key_establishment_names_frodokem_and_not_mceliece():
+    # Moved in 0.46.0 (row 481): the source changed. TR-02102-1 2026-01 recommended Classic
+    # McEliece in hybrid; BSI's note of 29 September 2026 says it "should currently no longer
+    # be used in new developments", so it is no longer offered as a replacement.
     out = remediation.suggest(RSA, None, "de-bsi")
     kem = next(o["use"] for o in out["options"] if o["for"].startswith("key establishment"))
-    assert "FrodoKEM-976" in kem and "mceliece460896" in kem and "ML-KEM-768" in kem
+    assert "FrodoKEM-976" in kem and "mceliece" not in kem.lower() and "ML-KEM-768" in kem
 
 
 def test_dates_carry_the_leitlinie():
@@ -22,7 +25,9 @@ def test_dates_carry_the_leitlinie():
     assert "end of 2026" in dates and "4.3" in dates and "2030" in dates
 
 
-def test_mceliece_says_bsi_recommends_it(tmp_path):
+def test_mceliece_cites_section_2_4_2(tmp_path):
+    # Renamed in 0.46.0 (row 481): the standing now says "under review" (test_row_481_*),
+    # and still names the section that had recommended it.
     (tmp_path / "kem.py").write_text(
         "from pqcrypto.kem.mceliece460896 import generate_keypair\n")
     finding = next(f for f in scan_directory(tmp_path, profile="de-bsi")["findings"]
