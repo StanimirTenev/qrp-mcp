@@ -465,6 +465,8 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   `default`, `default_family` and `overridable: true` (Python `os.environ.get`/`os.getenv`,
   Node `process.env.X || "..."` / `?? "..."`, shell `${X:-...}`). A default that names no
   algorithm (`us-east-1`) is not a place.
+  From 0.47.0, in a `CMakeLists.txt` or `*.cmake` file `${name}` is a CMake variable, set in the
+  build, and is not a place; `$ENV{name}` is (row 505).
 
 ### Very long lines
 

@@ -4938,12 +4938,21 @@ def _runtime_default(text: str) -> dict[str, Any] | None:
     return None
 
 
+# Row 505: in CMake `${name}` is a CMake variable, set in the build (MCUboot's
+# `set(key_size "${boot_enc_key_size}")`); the environment is `$ENV{name}` (cmake-language(7),
+# "Variable References", "Environment Variable References").
+_CMAKE_VARIABLE = re.compile(r"\$\{[^}]*\}")
+
+
 def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
+    cmake = rel_path.rsplit("/", 1)[-1] == "CMakeLists.txt" or rel_path.endswith(".cmake")
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
         if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
             continue
+        if cmake:
+            text = _CMAKE_VARIABLE.sub("", text)
         if not _RUNTIME_REFERENCE.search(text):
             continue
         # The reference must be the setting's value: right after it, past `=`, `:`, `(`, a

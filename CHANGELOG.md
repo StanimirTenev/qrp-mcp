@@ -6,6 +6,16 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **A CMake variable was read as the environment** (row 505, D10 of `boot-proba/REZULTAT.md`
+  §8). MCUboot's `boot/zephyr/CMakeLists.txt:748` `set(key_size "${boot_enc_key_size}")` and
+  `:752` `math(EXPR key_size "${key_size} * 2")` -- the byte length of the encrypted-key TLV,
+  computed in the build -- were the 2 places of `chosen_outside_files`. In CMake `${name}` is a
+  CMake variable and the environment is `$ENV{name}` (cmake-language(7)); in a `CMakeLists.txt`
+  or `*.cmake` the `${name}` form is no longer read as a run-time reference, `$ENV{name}` still
+  is. MCUboot: 2 places -> 0. Scan JSON, MCP tools, CBOM (`qrp:chosen_outside_files:*`). **Not
+  claimed:** a CMake cache variable can be set with `-D` on the command line; that is not read
+  as a place, before or now. MCUboot's real key-file path (`CONFIG_BOOT_SIGNATURE_KEY_FILE`) is
+  row 500's signing-step record, not this.
 - **Three names read as a family they are not** (row 506, D12 of `boot-proba/REZULTAT.md` §8).
   U-Boot's SH7722 register `#define MLDSA1R 0xFE940430` (`arch/sh/include/asm/cpu_sh7722.h:693`)
   was ML-DSA; a digit right after `mldsa` now has to start a FIPS 204 parameter set (44, 65,
