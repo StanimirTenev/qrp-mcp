@@ -34,7 +34,9 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   `mkimage -k/-G/-K`, `binman sign` or `imgtool sign`: both scans had
   `qrp:evidence:ci_signing_commands: 0`. They are now signing steps (`mkimage_sign`, `binman_sign`,
   `imgtool_sign`) in scripts and pipelines, with the key they name (`-k`, `-G`, `--key`); a key
-  written with a variable (`-k $1`) is named as written, where before it was dropped. Every
+  written as a whole variable (`-k $1`, `${KEY}`, `%KEY%`) is named as written, where before it
+  was dropped; a piece of an expression (`--key ${{ secrets.K }}`, `"$(dirname "$0")/k.pem"`) is
+  not named. Every
   signing step whose key is not a file the scan read now carries `key_algorithm`: the algorithm
   its line names (`binman sign -a sha256,rsa4096`: "RSA-4096, named on the line") or "not
   determined: key not in the files read". In the scan JSON, the MCP tools (the finding's reason

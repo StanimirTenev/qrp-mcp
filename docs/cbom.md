@@ -117,6 +117,10 @@ has no protocol component to carry its groups.
 - `qrp:layer_disagreements` (row 472) — see [What a TLS line does not establish](tls.md).
 - `qrp:evidence:public_key_encryption_commands` (row 479) — encryption to a public key in a
   script, apart from `qrp:evidence:ci_signing_commands`, which counts signing steps only.
+- `qrp:evidence:signing_commands` (row 500) — each signing step counted by
+  `qrp:evidence:ci_signing_commands`: its place, command, the key it names (`signing_key`) and,
+  where that key is not a file the scan read, `key_algorithm` -- the algorithm the line names
+  (`binman sign -a sha256,rsa4096`) or "not determined: key not in the files read".
 
 A composite ML-DSA signature (RFC 10073: `id-MLDSA65-ECDSA-P256-SHA512`, its label
 `COMPSIG-MLDSA65-ECDSA-P256-SHA512` or its OID `1.3.6.1.5.5.7.6.45`) is one `combiner`

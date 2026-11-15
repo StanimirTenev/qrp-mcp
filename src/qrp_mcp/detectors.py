@@ -1903,6 +1903,7 @@ _SIGNING_KEY_ARG = re.compile(
 _SIGNING_ALGO_ARG = re.compile(
     r"\s(?:-a|-o|--algo)(?:\s+|=)(sha(?:1|256|384|512)),(rsa|ecdsa)(\d{3,5})(?![\w,])")
 KEY_NOT_READ = "not determined: key not in the files read"
+_WHOLE_VARIABLE = re.compile(r"^(?:\$\d+|\$[A-Za-z_]\w*|\$\{[A-Za-z_]\w*\}|%[A-Za-z_]\w*%)$")
 
 # (algorithm, description, compiled regex) for key algorithms declared in IaC syntax
 # (Terraform tls_private_key/aws_kms_key resources, cert-manager Certificate manifests) --
@@ -4609,8 +4610,10 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
         written = next((v.strip("\"'") for v in values if not v.startswith("-")), "")
         found = None
         if written and ("$" in written or "{" in written or "%" in written):
-            # Row 500: a key the script is given (`-k $1`) is named as written, not looked up.
-            step["signing_key"] = {"path": written, "in_tree": False}
+            # Row 500: a key the script is given (`-k $1`, `${KEY}`, `%KEY%`) is named as
+            # written, not looked up; a piece of an expression (`${{`, `$(dirname`) is not.
+            if _WHOLE_VARIABLE.match(written):
+                step["signing_key"] = {"path": written, "in_tree": False}
         elif written:
             here = posixpath.dirname(step["path"])
             candidates = [posixpath.normpath(written),

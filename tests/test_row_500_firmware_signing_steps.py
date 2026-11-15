@@ -106,3 +106,20 @@ def test_a_key_in_the_tree_is_not_undetermined(tree):
         serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL,
         serialization.NoEncryption()))
     _check(scan_directory(tree)["evidence"], with_tree_key=True)
+
+
+@pytest.mark.parametrize("line, key", [
+    ("cosign sign --key ${{ secrets.COSIGN_KEY }} $IMG", None),
+    ('openssl dgst -sign "$(dirname "$0")/k.pem" f', None),
+    ("openssl dgst -sign $(KEY) f", None),
+    ("openssl dgst -sign ${KEY} f", "${KEY}"),
+    ("openssl dgst -sign %KEY% f", "%KEY%"),
+    ("binman sign -i f.bin -k $SIGN_KEY -a sha256,rsa2048 fit", "$SIGN_KEY"),
+])
+def test_a_variable_key_is_named_only_whole(tmp_path, line, key):
+    # A fragment of an expression (`${{`, `$(dirname`) is not a key's name.
+    (tmp_path / "s.sh").write_text(line + "\n")
+    steps = scan_directory(tmp_path)["evidence"]["ci_pipeline"]
+    assert len(steps) == 1, steps
+    assert steps[0].get("signing_key", {}).get("path") == key, steps[0]
+    assert steps[0]["key_algorithm"], steps[0]
