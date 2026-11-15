@@ -865,7 +865,7 @@
     },
     {
       "name": "qrp:coverage:corpus:target",
-      "value": "/tmp/claude-1000/-home-stenly/c50815b0-40ef-421f-b24d-62cc567c9e76/scratchpad/046/sample/server-configs-nginx"
+      "value": "/tmp/example/server-configs-nginx"
     },
     {
       "name": "qrp:coverage:corpus:pinned_at:pinned",

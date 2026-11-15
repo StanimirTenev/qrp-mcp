@@ -14,7 +14,7 @@ repository. It is meant as an import test for a CBOM reader.
 
   This uses the default `--level masked`: the quoted lines are starred except for the algorithm
   names. Files and line numbers are kept.
-- **sha256 of the file:** `9a3014859e8288086c4d7a31906c0c89a604e3782620470170c7cba098cbd406`
+- **sha256 of the file:** `e8938fef8532a57ee1febd858b374dd948071dce9c7395165c958e9423c65bdc`
 - **Validated** against the CycloneDX 1.6 JSON schema with zero errors. Two copies were used:
   `bom-1.6.schema.json` from the specification's `master` branch (the copy the qrp-mcp tests
   vendor) and the one from the `1.6` branch. Every `bom-ref` that the document points to resolves
@@ -48,3 +48,11 @@ ML-KEM and X25519 halves. This repository does not configure one.
 
 `compositions[0].aggregate` is `incomplete` because some files present were not read. The list of
 those files is in the `qrp:coverage:*` properties.
+
+## Rerunning it yourself
+
+Clone the repository at the commit above and run the command. Your file will differ from this one
+in one field, `qrp:coverage:corpus:target`, which records the absolute path of the scanned folder
+(here `/tmp/example/server-configs-nginx`). Compare `qrp:findings_fingerprint:sha256` instead; for
+this commit and 0.46.0 it is `efaeeeec2048349ac52feb9de26d7c2fbf8d5e4b820856d1737a1821a71bf91a`.
+Recording the folder by a relative path is planned.
