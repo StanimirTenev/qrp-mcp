@@ -754,6 +754,48 @@ def _load_private_key(pem: bytes) -> dict[str, Any]:
     return _key_fields(_key_info(key))
 
 
+# Row 507: two key formats no reader claimed. A public key written as a byte array, as
+# `imgtool getpub --lang rust` / `--lang c` writes one (`&[0x30, 0x59, ...]`): the DER
+# SubjectPublicKeyInfo, one `0x..` per byte. And a Chromium vboot private key (.vbprivk): an
+# 8-byte algorithm word, then the DER RSAPrivateKey; the size is read from the key itself.
+_HEX_BYTE = re.compile(rb"0x([0-9a-fA-F]{2})(?![0-9a-fA-F])")
+
+
+def byte_array_public_keys(raw: bytes) -> list[tuple[dict[str, Any], int]]:
+    """The fields of each public key a byte-array file holds, one DER element after the other
+    (MCUboot's ecdsa_pub_key-rs.txt holds a P-256 and a P-384 key), with the line of its first
+    byte; none where the bytes are not DER public keys from the first byte on."""
+    found = list(_HEX_BYTE.finditer(raw))
+    der = bytes(int(m.group(1), 16) for m in found)
+    out: list[tuple[dict[str, Any], int]] = []
+    i = 0
+    while i < len(der):
+        head = _der_header(der, i, 0x30)
+        if head is None or head[1] + head[0] > len(der):
+            break
+        end = head[1] + head[0]
+        try:
+            from cryptography.hazmat.primitives import serialization
+            fields = _key_fields(_key_info(serialization.load_der_public_key(der[i:end])))
+        except Exception:  # noqa: BLE001 -- never raises: the corpus is edge cases
+            break
+        if "key_algorithm" not in fields:
+            break
+        out.append((fields, raw.count(b"\n", 0, found[i].start()) + 1))
+        i = end
+    return out
+
+
+def vboot_private_key(raw: bytes) -> dict[str, Any] | None:
+    """The fields of a Chromium vboot private key (.vbprivk); None where it does not parse."""
+    try:
+        from cryptography.hazmat.primitives import serialization
+        fields = _key_fields(_key_info(serialization.load_der_private_key(raw[8:], None)))
+    except Exception:  # noqa: BLE001 -- never raises: the corpus is edge cases
+        return None
+    return fields if "key_algorithm" in fields else None
+
+
 # Row 469 (QCI CBOM-Benchmark 2.6.6): an OpenSSH private key gave "Embedded private key
 # material" with no family. The openssh-key-v1 format (OpenSSH PROTOCOL.key) keeps the public
 # key in the clear, ahead of the encrypted part: "openssh-key-v1\0", string ciphername, string

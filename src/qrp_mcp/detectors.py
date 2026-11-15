@@ -35,7 +35,7 @@ from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips, scan_openssl_cnf_keys,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions, yaml_list_settings)
-from .certificates import (BASE64_PEM_MARK, decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
+from .certificates import (BASE64_PEM_MARK, byte_array_public_keys, vboot_private_key, decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
                            looks_like_key_file, scan_certificate_file, small_scalar_keys,
                            unparsed_material, SMALL_SCALAR_BOUND)
 
@@ -125,6 +125,12 @@ CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
 # of them, and the TLS, IKE and IaC readers of a configuration file found nothing in them.
 DEVICE_TREE_EXTENSIONS = {".its", ".dts", ".dtsi", ".dtso"}
 DEFCONFIG_NAME = re.compile(r"^[\w.-]+_defconfig$")
+
+# Row 507: key files of two formats. Chromium vboot's keys (U-Boot doc/chromium/files/devkeys/):
+# a .vbprivk is read from its DER; a .vbpubk or .keyblock (vboot's packed-key layout) is claimed
+# and named as not decoded. And a public key as a byte array, MCUboot's `*_pub_key-rs.txt`.
+VBOOT_KEY_EXTENSIONS = {".vbprivk", ".vbpubk", ".keyblock"}
+BYTE_ARRAY_KEY_NAME = re.compile(r"^[\w.-]+-rs\.txt$")
 
 # .NET's configuration files, by name: web.config, app.config, machine.config, IIS's
 # applicationHost.config, and their transforms (Web.Release.config). Not every `.config`:
@@ -5447,7 +5453,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                or path.suffix.lower() in {".yaml", ".yml"} or is_config_file(path)
                or is_certificate_file(path) or is_manifest(path)
                or path.suffix.lower() == ".snk" or path.suffix.lower() in openpgp.KEY_EXTENSIONS
-               or path.name == "KEYS" or path.suffix.lower() == ".plist")
+               or path.name == "KEYS" or path.suffix.lower() == ".plist"
+               or path.suffix.lower() in VBOOT_KEY_EXTENSIONS
+               or bool(BYTE_ARRAY_KEY_NAME.match(path.name)))
     if template and not claimed and path.suffix.lower() not in TEMPLATE_DOCUMENTS:
         # Rendered to a name no type claims (`realm.provider.j2`): configuration, as
         # what Ansible and Salt render almost always is. Documentation stays unclaimed.
@@ -5674,6 +5682,32 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         key_files[rel_path] = sorted({f["algorithm"] for f in algo_findings})
         if not algo_findings:
             undecoded.append(rel_path)
+    elif path.suffix.lower() in VBOOT_KEY_EXTENSIONS or BYTE_ARRAY_KEY_NAME.match(path.name):
+        files_scanned["certificate"] += 1
+        public = path.suffix.lower() != ".vbprivk"
+        private = None if public else vboot_private_key(raw)
+        found = (byte_array_public_keys(raw) if BYTE_ARRAY_KEY_NAME.match(path.name)
+                 else [(private, 1)] if private else [])
+        if not found:
+            undecoded.append(rel_path)
+        said = ("a public key written as a byte array, parsed as a key" if public else
+                "a Chromium vboot private key (.vbprivk), its DER parsed as a key")
+        for fields, line_no in found:
+            family = fields["key_algorithm"]
+            source_findings.append({
+                "path": rel_path, "line": line_no, "algorithm": family,
+                "description": f"{family} in {said}",
+                "excerpt": (lines[line_no - 1].strip() if public else said)[:200],
+                "evidence_kind": "declaration", "in_test_code": in_test_code(rel_path),
+                **{k: fields[k] for k in ("key_size", "curve", "parameter_set") if k in fields},
+                **({"key_material": "public key"} if public else {})})
+        if private:
+            embedded_key_findings.append({
+                "path": rel_path, "line": 1, "type": "Chromium vboot private key",
+                "description": "private key material in a Chromium vboot private key (.vbprivk)",
+                **private})
+        if found:
+            key_files[rel_path] = sorted({fields["key_algorithm"] for fields, _ in found})
     elif (is_certificate_file(path) or peeked_key) and not dnssec.KEY_FILE_NAME.match(path.name):
         # Certificates and keys are read as bytes, not lines: a .der carries no
         # lines at all, and a .pem that fails to decode must still be counted.

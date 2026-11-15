@@ -6,6 +6,21 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Key material in three formats was not read** (row 507, D13 of `boot-proba/REZULTAT.md` §8).
+  MCUboot's `sim/src/*_pub_key-rs.txt` (public keys as a Rust byte array, `&[0x30, 0x59, ...]`)
+  and U-Boot's `doc/chromium/files/devkeys/kernel_data_key.vbprivk` and `kernel.keyblock` were
+  `type_not_claimed`. A `*-rs.txt` is now read as one DER public key after another (MCUboot's
+  `ecdsa_pub_key-rs.txt` holds a P-256 and a P-384 key), each a row at its line with family, size,
+  curve and `key_material: "public key"`; a `.vbprivk` is read from the DER after its 8-byte
+  algorithm word (the size is the key's, not the header's), as a row and an embedded private key;
+  `.vbpubk` and `.keyblock` (vboot's own packed-key layout) are claimed and named
+  `claimed_but_not_decoded`. In the scan JSON, the MCP tools and the CBOM (one key component
+  each, row 502). MCUboot: 7 keys in 6 files, `coverage_pct` 84.9% -> 85.6%; U-Boot: RSA-2048 in
+  the `.vbprivk`. **Not done:** MCUboot's `enc-aes128kw.b64` / `enc-aes256kw.b64` stay
+  `type_not_claimed` -- 16 or 32 bytes of base64 with nothing to read an algorithm from but the
+  file name, and symmetric keys are out of scope (docs/measurement.md); a C array of a key
+  (`cypress-test-ec-p256.pub`) is still `claimed_but_not_decoded`; the `.keyblock`'s key is not
+  decoded.
 - **Every directory named `vendor` was excluded, wherever it was** (row 507, D14). On U-Boot that
   removed `tools/binman/test/vendor/`, 35 test device trees for vendor image formats, before
   counting. `vendor/` is now excluded only at the root of the tree or beside a package manifest

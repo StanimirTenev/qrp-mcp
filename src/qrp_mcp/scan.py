@@ -229,7 +229,10 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             # Read as bytes rather than lines, and missing from this list while the
             # scan was reporting findings from them.
             "certificate": sorted(certificates.CERTIFICATE_EXTENSIONS | {".snk"}
-                                  | detectors.openpgp.KEY_EXTENSIONS),
+                                  | detectors.openpgp.KEY_EXTENSIONS
+                                  | detectors.VBOOT_KEY_EXTENSIONS),
+            # Row 507: a public key written as a byte array (MCUboot's `*_pub_key-rs.txt`).
+            "key_byte_array_filename_pattern": [detectors.BYTE_ARRAY_KEY_NAME.pattern],
             "openpgp_key_filenames": ["KEYS"],
             # Apple property lists, XML or binary (row 306).
             "plist": [".plist"],
