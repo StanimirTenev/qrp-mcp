@@ -182,6 +182,11 @@ its size and curve, and marked `key_material: "public key"`; it is not counted a
 private key. U-Boot's FIT names `ecdsa256`/`ecdsa384`/`ecdsa521` give the key size, as `rsa2048`
 already did.
 
+From 0.47.0 the CBOM has one `related-crypto-material` component per key -- `type` `private-key` or
+`public-key`, its `size`, `algorithmRef` and `qrp:curve` -- instead of one "Embedded private key
+material" component for all the keys in the tree
+([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/cbom.md)).
+
 ### A control on your own tree
 
 ```

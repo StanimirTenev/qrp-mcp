@@ -47,6 +47,13 @@ the provider's package, and `qrp:provider_configuration` where an `openssl.cnf` 
 activates the FIPS provider for a component whose provider is OpenSSL 3. A DNS size-budget asset
 carries `qrp:udp_setting`, `qrp:udp_size` and, for BIND's default, `qrp:default_applied`; a weak
 EC key is a `related-crypto-material` component with `qrp:curve`, `qrp:scalar` and `qrp:bound`.
+From 0.47.0 (row 502) each key found is its own `related-crypto-material` component, in place of
+one "Embedded private key material" for all of them: `relatedCryptoMaterialProperties.type`
+`private-key` (from `evidence.embedded_keys`) or `public-key` (a public-key PEM that parsed, row
+503), `size` where it is a number, `algorithmRef` to the algorithm component with an occurrence at
+the key's file and line, of its family, where there is exactly one, and `qrp:curve`. A private key
+that did not parse keeps the name "Embedded private key material" and says why in
+`qrp:key_unread`. The bom-ref is `private-key:<path>-<line>` or `public-key:<path>-<line>`.
 
 Output is deterministic where it matters. The serial number is derived from the two pins and a
 digest of what was found, so the same code over the same corpus that finds the same things gets

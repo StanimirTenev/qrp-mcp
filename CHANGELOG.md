@@ -6,6 +6,19 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **The CBOM put every private key into one component** (row 502, D6 of `boot-proba/REZULTAT.md`
+  §8). Both CBOMs had a single `crypto:embedded-private-key-material`, "Embedded private key
+  material", whose occurrences said only "private key material in a ... block", though the scan
+  JSON had each key's algorithm, size and curve. Each key is now its own `related-crypto-material`
+  component (`type: private-key`, or `public-key` for a public-key PEM that parsed, row 503) with
+  `size`, `algorithmRef` (the algorithm component at the key's own file and line, of its family,
+  where there is exactly one) and `qrp:curve`; a key that did not parse keeps the generic name and
+  `qrp:key_unread`. On MCUboot: 21 private-key and 4 public-key components, every `algorithmRef`
+  resolving. Validated against the vendored CycloneDX 1.6 schema. **Changed for readers:** the
+  bom-ref `crypto:embedded-private-key-material` is gone; a reader that looked it up now finds
+  `private-key:<path>-<line>` refs. **Not done:** `qrp:classification` on the key components
+  (D6's last sentence); the embedded-key finding in the scan JSON is unchanged
+  (`algorithm_family: private_key`, `classification: unknown`).
 - **A public-key PEM was not read as a key, and key sizes were uneven** (row 503, D7 and D8 of
   `boot-proba/REZULTAT.md` §8; MCUboot f30be48, U-Boot 6487c50). `enc-x25519-pub.pem` and
   `root-ed25519-2-pub.pem` gave "object identifier observed in the file; the file was not decoded

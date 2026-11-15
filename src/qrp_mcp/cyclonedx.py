@@ -897,6 +897,68 @@ def _parameter_components(family: str, finding: dict[str, Any],
     return out
 
 
+def _key_components(scan_result: dict[str, Any], components: list[dict[str, Any]],
+                    family_by_ref: dict[str, str]) -> list[dict[str, Any]]:
+    """Row 502: one related-crypto-material component per key, not one for all of them.
+
+    A private key from evidence.embedded_keys, and (row 503) a public-key PEM that parsed, from
+    its source row. `algorithmRef` is the algorithm component with an occurrence at the key's
+    own file and line, of the key's family, where there is exactly one; otherwise none. A key
+    that did not parse keeps the generic name and says why."""
+    at: dict[tuple[str, Any], list[str]] = {}
+    for c in components:
+        if c.get("cryptoProperties", {}).get("assetType") != "algorithm":
+            continue
+        for o in (c.get("evidence") or {}).get("occurrences", []):
+            at.setdefault((o["location"], o.get("line")), []).append(c["bom-ref"])
+    keys = [("private-key", k) for k in scan_result["evidence"]["embedded_keys"]] + [
+        ("public-key", k) for k in scan_result["evidence"].get("source_code", [])
+        if k.get("key_material") == "public key"]
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for kind, k in keys:
+        family = k.get("key_algorithm") if kind == "private-key" else k.get("algorithm")
+        size = k.get("key_size")
+        rcm: dict[str, Any] = {"type": kind}
+        if family:
+            refs = [r for r in at.get((k["path"], k["line"]), [])
+                    if family_by_ref.get(r) == family]
+            if len(set(refs)) == 1:
+                rcm["algorithmRef"] = refs[0]
+        if isinstance(size, int) and not isinstance(size, bool):
+            rcm["size"] = size
+        if family:
+            name = (f"{family}-{size}" if isinstance(size, int) else family) + (
+                " private key" if kind == "private-key" else " public key")
+        else:
+            name = "Embedded private key material"
+        ref = _ref(kind, f"{k['path']}-{k['line']}")
+        if ref in seen:
+            continue
+        seen.add(ref)
+        properties = []
+        if k.get("curve"):
+            properties.append({"name": f"{NS}curve", "value": str(k["curve"])})
+        if k.get("key_unread"):
+            properties.append({"name": f"{NS}key_unread", "value": str(k["key_unread"])})
+        elif kind == "private-key" and not family:
+            properties.append({"name": f"{NS}key_unread", "value": "family_not_named"})
+        component: dict[str, Any] = {
+            "type": "cryptographic-asset",
+            "bom-ref": ref,
+            "name": name,
+            "cryptoProperties": {"assetType": "related-crypto-material",
+                                 "relatedCryptoMaterialProperties": rcm},
+            "evidence": {"occurrences": [
+                {"location": k["path"], "line": k["line"],
+                 "additionalContext": k.get("excerpt") or k.get("description", "")}]},
+        }
+        if properties:
+            component["properties"] = properties
+        out.append(component)
+    return out
+
+
 # The TLS hybrid groups of HYBRIDS (detectors.py): the ones a TLS protocol component can name
 # as its key exchange. The SSH and IKE hybrids configure another protocol.
 # Rows 477, 478: a composite ML-DSA signature (RFC 10073) by its name, with its OID and pre-hash.
@@ -1117,19 +1179,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         family_by_ref[component["bom-ref"]] = family
         components.extend(children)
 
-    keys = scan_result["evidence"]["embedded_keys"]
-    if keys:
-        components.append({
-            "type": "cryptographic-asset",
-            "bom-ref": "crypto:embedded-private-key-material",
-            "name": "Embedded private key material",
-            "cryptoProperties": {"assetType": "related-crypto-material"},
-            "evidence": {"occurrences": [
-                {"location": k["path"], "line": k["line"],
-                 "additionalContext": k.get("excerpt") or k.get("description", "")}
-                for k in keys
-            ]},
-        })
+    components.extend(_key_components(scan_result, components, family_by_ref))
 
     components.extend(_certificate_components(located, {c["bom-ref"] for c in components}))
 
