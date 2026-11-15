@@ -598,7 +598,12 @@ def _scope(located: list[dict[str, Any]], family: str,
 # all -- `!RC4` in a cipher list is excluded upstream, not marked downstream -- so a
 # branch for it would be a line that can never run. Measured, not assumed: a fixture
 # whose only mention of RC4 is `!RC4` produces no RC4 component.
-_NOT_CODE = {"comment"}
+#
+# Row 470 (QCI CBOM-Benchmark 2.6.6): a name is not a use either. `qrp:evidence_kind` is a
+# list on the component, which no consumer filters an occurrence by; filtering by kind cut
+# that benchmark's false positives 85 -> 31. An identifier row (`mlkem_key`, `RSAUtil`) and a
+# family named but not used are now tagged on the occurrence as a comment is: `[identifier]`.
+_NOT_CODE = {"comment", "identifier", "named_but_not_used"}
 
 
 def _context(item: dict[str, Any]) -> str:
