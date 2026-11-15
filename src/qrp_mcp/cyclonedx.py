@@ -861,6 +861,62 @@ def _parameter_components(family: str, finding: dict[str, Any],
     return out
 
 
+# The TLS hybrid groups of HYBRIDS (detectors.py): the ones a TLS protocol component can name
+# as its key exchange. The SSH and IKE hybrids configure another protocol.
+_TLS_HYBRIDS = {"X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024",
+                "X25519Kyber768Draft00", "SecP256r1Kyber768Draft00", "curveSM2MLKEM768"}
+
+
+def _tls_links(scan_result: dict[str, Any], hybrid_built) -> dict[str, dict[str, Any]]:
+    """Rows 465, 475: by file, the TLS groups and the cipher suites the file configures.
+
+    The link is by file, and said so (`qrp:linked_by`): a protocol version pinned in a file is
+    joined to the groups and suites the same file sets, never to another file's. A group goes
+    to every version the file pins, a hybrid (a TLS 1.3 group) only to TLS 1.3 or an unversioned
+    pin; a TLS 1.3 suite (TLS_AES_*) only to TLS 1.3, the other suites to the other pins,
+    because nginx's `ssl_ciphers` and OpenSSL's CipherString do not set TLS 1.3 suites."""
+    out: dict[str, dict[str, Any]] = {}
+    for item in scan_result["evidence"].get("tls_groups", []):
+        groups = out.setdefault(item["path"], {"groups": [], "hybrids": [], "suites": []})
+        ref = _ref("tls-group", f"{item['group']}-offered-alone")
+        if ref not in groups["groups"]:
+            groups["groups"].append(ref)
+    for item in scan_result.get("hybrid_names", []):
+        if item["name"] in _TLS_HYBRIDS and hybrid_built(item):
+            links = out.setdefault(item["path"], {"groups": [], "hybrids": [], "suites": []})
+            ref = _ref("hybrid", item["name"])
+            if ref not in links["hybrids"]:
+                links["hybrids"].append(ref)
+    for item in scan_result.get("cipher_suites", []):
+        links = out.setdefault(item["path"], {"groups": [], "hybrids": [], "suites": []})
+        for suite in item["suites"]:
+            if all(s["name"] != suite["name"] for s in links["suites"]):
+                links["suites"].append(suite)
+    return out
+
+
+def _link_for(links: dict[str, Any] | None, version: str | None) -> dict[str, Any]:
+    """What one plain TLS version pin is linked to, from its file's links."""
+    if not links:
+        return {}
+    tls13 = version in (None, "TLSv1.3")
+    groups = links["hybrids"] + links["groups"] if tls13 else list(links["groups"])
+    suites = [s["name"] for s in links["suites"]
+              if version is None or s["tls13"] == (version == "TLSv1.3")]
+    return {k: v for k, v in (("groups", groups), ("suites", suites)) if v}
+
+
+def _resolve_refs(wanted: list[str], refs: set[str]) -> list[str]:
+    """The refs among `wanted` the document holds; a family component replaced by its parameter
+    children (release 3d) resolves to them. Never a ref to nothing."""
+    out: list[str] = []
+    for ref in wanted:
+        found = [ref] if ref in refs else (
+            sorted(r for r in refs if r.startswith(ref + "-")) if ref.startswith("crypto:") else [])
+        out.extend(r for r in found if r not in out)
+    return out
+
+
 def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     """A CycloneDX 1.6 document from one scan, with the coverage block inside it."""
     coverage = scan_result["coverage"]
@@ -1047,15 +1103,31 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # A named policy (OPC UA, AWS) or an IKE configuration is one component per policy
     # and per state: what it says is in the fields below, and two files that say
     # different things about the same policy are two facts.
-    by_protocol: dict[tuple[str, str | None, bool, str], list[dict[str, Any]]] = {}
+    # Rows 465, 475: a plain TLS version pin (no policy, listener or switch; not forbidden) is linked to
+    # the groups and suites its own file sets. The link is part of the key, so two files that
+    # pin the same version with different groups are two components, and a pin with nothing to
+    # link keeps the ref it had.
+    in_use_at = {(item.get("path"), item.get("line"),
+                  family_of.get(item.get("algorithm"), item.get("algorithm")))
+                 for item in located if item.get("evidence_kind") not in {"comment", "ban"}}
+    tls_links = _tls_links(scan_result, lambda h: any(
+        (h["path"], h["line"], family) in in_use_at for family, _ in h["halves"]))
+    suite_by_name = {s["name"]: s for links in tls_links.values() for s in links["suites"]}
+    by_protocol: dict[tuple[str, str | None, bool, str, str], list[dict[str, Any]]] = {}
     for asset in protocols:
         said = json.dumps({k: asset[k] for k in _PROTOCOL_FIELDS if k in asset},
                           sort_keys=True)
+        link = (_link_for(tls_links.get(asset["path"]), asset.get("version"))
+                if asset["protocol"] == "tls" and not asset.get("banned")
+                and set(json.loads(said)) <= {"key_exchange"}
+                else {})
         by_protocol.setdefault(
-            (asset["protocol"], asset.get("version"), bool(asset.get("banned")), said),
+            (asset["protocol"], asset.get("version"), bool(asset.get("banned")), said,
+             json.dumps(link, sort_keys=True) if link else ""),
             []).append(asset)
-    for (name, version, banned, said), group in sorted(by_protocol.items(),
-                                                       key=lambda kv: str(kv[0])):
+    linked_protocols: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for (name, version, banned, said, linked), group in sorted(by_protocol.items(),
+                                                               key=lambda kv: str(kv[0])):
         label = _protocol_label(group[0]) + (" (forbidden)" if banned else "")
         properties = [
             {"name": f"{NS}basis", "value": group[0].get("basis", "configured_protocol")},
@@ -1073,11 +1145,16 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             properties.append({"name": f"{NS}{key}", "value": (
                 json.dumps(value) if isinstance(value, (list, dict))
                 else ("true" if value is True else "false" if value is False else str(value)))})
-        components.append({
+        if linked:
+            properties.append({"name": f"{NS}linked_by", "value": (
+                "same file: the groups and cipher suites set in the file that pins this "
+                "version; which of them a connection negotiates is not stated by the files")})
+        component = {
             "type": "cryptographic-asset",
             # Stable across runs: the same policy in the same state gets the same ref.
             "bom-ref": _ref("protocol", label + (
-                "-" + hashlib.sha256(said.encode()).hexdigest()[:8] if said != "{}" else "")),
+                "-" + hashlib.sha256(said.encode()).hexdigest()[:8] if said != "{}" else "") + (
+                "-" + hashlib.sha256(linked.encode()).hexdigest()[:8] if linked else "")),
             "name": label,
             "cryptoProperties": {
                 "assetType": "protocol",
@@ -1092,7 +1169,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                  "additionalContext": a.get("excerpt", "")}
                 for a in group
             ]},
-        })
+        }
+        components.append(component)
+        if linked:
+            linked_protocols.append((component, json.loads(linked)))
 
     # A classical TLS group offered as a group of its own, beside or instead of a hybrid.
     # Its own component, so a document from before the fallback was removed and one from
@@ -1252,9 +1332,6 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # half is in use on the same line, so a hybrid named in a comment is not an asset.
     # A half the inventory does not hold is named, not pointed at: a ref to a component
     # that is not in the document would be a link to nothing.
-    in_use_at = {(item.get("path"), item.get("line"),
-                  family_of.get(item.get("algorithm"), item.get("algorithm")))
-                 for item in located if item.get("evidence_kind") not in {"comment", "ban"}}
     # A half's own family component, or -- where the family has none (release 3d) -- the
     # component of the parameter set the hybrid names.
     family_refs = {c["bom-ref"] for c in components}
@@ -1355,6 +1432,24 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # `hashes`. Not inventory: left out of the composition below.
     digests: dict[str, str] = scan_result.get("evidence_file_sha256") or {}
     folded: dict[str, str] = scan_result.get("evidence_file_sha256_crlf_as_lf") or {}
+    # Rows 465, 475: the links of each TLS pin, now that every component they may name exists,
+    # in the schema's own fields: the groups as `cryptoRefArray`, the suites as `cipherSuites`
+    # with the families each one names. A ref the document does not hold is left out.
+    held_refs = {c["bom-ref"] for c in components}
+    for component, link in linked_protocols:
+        pp = component["cryptoProperties"]["protocolProperties"]
+        suites = []
+        for name in link.get("suites", []):
+            wanted = [_ref("crypto", f) for f in suite_by_name[name]["families"]]
+            if "RSA" in suite_by_name[name]["families"] and name.startswith("TLS_RSA_"):
+                wanted.append(_ref("tls-kex", "RSA-static"))
+            algorithms = _resolve_refs(wanted, held_refs)
+            suites.append({"name": name, **({"algorithms": algorithms} if algorithms else {})})
+        if suites:
+            pp["cipherSuites"] = suites
+        groups = _resolve_refs(link.get("groups", []), held_refs)
+        if groups:
+            pp["cryptoRefArray"] = groups
     cited = sorted({o["location"] for c in components
                     for o in c.get("evidence", {}).get("occurrences", [])
                     if o.get("location") in digests})

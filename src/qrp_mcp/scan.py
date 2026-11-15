@@ -358,6 +358,10 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         # and their `dependencies`. Outside `evidence`: the halves are already there, and
         # counting the hybrid again would count one line twice.
         "hybrid_names": scan_result.get("hybrid_names", []),
+        # Each cipher-suite setting's suites by name, IANA where OpenSSL's table gives it
+        # (rows 465, 475), for the CBOM's protocolProperties.cipherSuites. Outside `evidence`
+        # for the same reason: the families of each suite are already there.
+        "cipher_suites": scan_result.get("cipher_suite_findings", []),
         # The SHA-256 of every file the evidence cites, as it was read (release A): what
         # lets a third party re-locate a finding and tell a moved line from another file.
         "evidence_file_sha256": _cited_digests(scan_result),

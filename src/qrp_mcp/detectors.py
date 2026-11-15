@@ -2024,6 +2024,52 @@ def scan_cipher_suites(line: str) -> list[tuple[str, int]]:
     return out + _cipher_string_parts(line) + _suite_table_entry(line)
 
 
+# Rows 465, 475: the suites a cipher-suite setting enables, by name, so the CBOM can put them
+# in `protocolProperties.cipherSuites`. scan_cipher_suites above splits a suite into its families
+# and keeps no name; the excerpt that held the name is masked on the way out, so the name is
+# carried here, before any level applies. IANA names from OpenSSL's own table
+# (data/tls_cipher_suites.json, openssl-ciphers(1) "CIPHER SUITE NAMES", OpenSSL 3.6.5). Only an
+# entry that is a suite: an OpenSSL name in that table or an IANA-shaped TLS_/SSL_..._WITH_ name.
+# Selectors (HIGH, EECDH+aRSA, kRSA) and entries struck out with `!` or `-` are not suites, and a
+# commented-out setting enables nothing.
+_SUITE_TABLE = json.loads((Path(__file__).with_name("data") / "tls_cipher_suites.json")
+                          .read_text(encoding="utf-8"))["openssl_to_iana"]
+_IANA_SUITE = re.compile(r"(?:TLS|SSL)_[A-Z0-9]+(?:_[A-Za-z0-9]+)*")
+# TLS 1.3 suites (RFC 8446 B.4, RFC 9150) name no key exchange and are set apart from the rest.
+_TLS13_SUITE = re.compile(r"TLS_(?:AES_\w+|CHACHA20_POLY1305_SHA256|SHA256_SHA256|SHA384_SHA384)$")
+_SUITE_ENTRY = re.compile(r"[^:,;\s'\"(){}\[\]]+")
+
+
+def scan_suite_names(line: str) -> list[dict[str, Any]]:
+    """Each cipher suite this cipher-suite setting enables: the name written, its IANA name where
+    known, the families it names, and whether it is a TLS 1.3 suite."""
+    if line.lstrip().startswith(_COMMENT_START) or not _cipher_setting(line):
+        return []
+    out: list[dict[str, Any]] = []
+    for entry in _SUITE_ENTRY.finditer(line):
+        text = entry.group(0)
+        if text[:1] in "!-":
+            continue
+        text = text.lstrip("+")
+        iana = _SUITE_TABLE.get(text.upper())
+        if iana is None and ((_IANA_SUITE.fullmatch(text) and "_WITH_" in text)
+                             or _TLS13_SUITE.match(text)):
+            iana = text
+        if iana is None or any(s["written"] == text for s in out):
+            continue
+        families: list[str] = []
+        for family in ([f for f, _ in scan_cipher_suites(text)]
+                       + _suite_families(re.split(r"[-_+]", text))):
+            if family not in families:
+                families.append(family)
+        # AES256-SHA names no key exchange and is TLS_RSA_WITH_AES_256_CBC_SHA (row 43).
+        if "RSA" not in families and static_rsa_positions("ssl_ciphers " + text):
+            families.append("RSA")
+        out.append({"name": iana, "written": text, "families": families,
+                    "tls13": bool(_TLS13_SUITE.match(iana))})
+    return out
+
+
 # A key type given as a value (ZA-OPRAVYANE row 126, decision 25.10): `key_type = 'rsa'`,
 # `private_key_type = "rsa"`, `'--key-type', 'rsa'`, `choices=['rsa', 'ecdsa']` beside a key
 # type (certbot). A bare 'rsa' is refused everywhere else -- it names logos, files and
@@ -4759,7 +4805,8 @@ _READING_LISTS = (
     "dependency_findings", "tls_group_findings", "static_rsa_findings", "hybrid_places",
     "hybrid_names", "pinned_images", "ssh_kex_findings", "weak_key_findings", "fips_findings",
     "pins", "property_reads", "skipped_files", "left_out", "files_read", "markers",
-    "excluded_by_config", "material_problems", "runtime_choices", "ec_points_checked",)
+    "excluded_by_config", "material_problems", "runtime_choices", "ec_points_checked",
+    "cipher_suite_findings",)
 _READING_COUNTS = ("files_scanned", "skipped_kinds", "present_kinds")
 _READING_MAPS = ("key_files", "file_digests", "codeowners", "file_digests_lf")
 _READING_LIST_MAPS = ("property_values",)
@@ -4776,8 +4823,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
      ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads, skipped_files,
      left_out, files_read, markers, excluded_by_config, material_problems, runtime_choices_found,
-     ec_points_checked, files_scanned, skipped_kinds, present_kinds, key_files, file_digests, codeowners,
-     file_digests_lf, property_values) = (r[name] for name in _READING)
+     ec_points_checked, cipher_suite_findings, files_scanned, skipped_kinds, present_kinds,
+     key_files, file_digests, codeowners, file_digests_lf, property_values) = (
+        r[name] for name in _READING)
     # A walked file is not a link, so it can only resolve to an excluded path of its own
     # name: the name is asked first, and the path resolved only then (release 3c).
     if resolved_exclude and path.name in {p.name for p in resolved_exclude}:
@@ -4927,6 +4975,10 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             item["line"] = number
             item["in_test_code"] = in_test_code(rel_path)
             static_rsa_findings.append(item)
+        suites = scan_suite_names(text_line)
+        if suites:
+            cipher_suite_findings.append({"path": rel_path, "line": number, "suites": suites,
+                                          "in_test_code": in_test_code(rel_path)})
         for kex in scan_ssh_kex(text_line):
             kex["path"] = rel_path
             kex["line"] = number
@@ -4952,6 +5004,11 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             for item in scan_static_rsa_kex(virtual):
                 item.update(path=rel_path, line=number, in_test_code=in_test_code(rel_path))
                 static_rsa_findings.append(item)
+            suites = scan_suite_names(virtual)
+            if suites:
+                cipher_suite_findings.append({"path": rel_path, "line": number,
+                                              "suites": suites,
+                                              "in_test_code": in_test_code(rel_path)})
             for group in scan_tls_groups(virtual):
                 group.update(path=rel_path, line=number, in_test_code=in_test_code(rel_path))
                 tls_group_findings.append(group)
@@ -5575,14 +5632,16 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     runtime_choices_found: list[dict[str, Any]] = []
     # One path per EC public point the small-scalar check compared (row 154).
     ec_points_checked: list[str] = []
+    # The suites each cipher-suite setting enables, by name (rows 465, 475).
+    cipher_suite_findings: list[dict[str, Any]] = []
     reading = dict(zip(_READING, (
         source_findings, ci_findings, iac_findings, embedded_key_findings, unreadable, reports,
         declarations, undecoded, content_parts, protocol_findings, dependency_findings,
         tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
         ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads,
         skipped_files, left_out, files_read, markers, excluded_by_config, material_problems,
-        runtime_choices_found, ec_points_checked, files_scanned, skipped_kinds, present_kinds,
-        key_files,
+        runtime_choices_found, ec_points_checked, cipher_suite_findings, files_scanned,
+        skipped_kinds, present_kinds, key_files,
         file_digests, codeowners, file_digests_lf, property_values)))
     reading["files_present"] = files_present
     excluded_dir_paths: dict[str, list[str]] = {}
@@ -5709,6 +5768,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         "dependency_findings": dependency_findings,
         "tls_group_findings": tls_group_findings,
         "static_rsa_kex_findings": static_rsa_findings,
+        "cipher_suite_findings": cipher_suite_findings,
         "library_support_findings": library_support(pinned_images, hybrid_places, files_read),
         "ssh_kex_findings": ssh_kex_findings,
         "weak_key_findings": weak_key_findings,
