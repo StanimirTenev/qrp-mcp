@@ -1131,6 +1131,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<=[\"'])(?i:sha-?1)(?=[\"'])|"
         r"(?<=[a-z])Sha1(?![0-9a-z])|(?<=[0-9])SHA1(?![0-9a-z])|"   # DH14SHA1, MD5SHA1
         r"(?<![A-Za-z0-9])SHA(?=(?:with|WITH|With)(?:RSA|DSA|ECDSA)|/(?:RSA|DSA|ECDSA)\b)")),
+    # Row 466 (QCI CBOM-Benchmark 2.6.6): SHA-1 quoted alone was a row (`TOKEN_DIGEST = "sha1"`,
+    # the third alternative above) and MD5 quoted alone was not: `digest("MD5", data)` into a
+    # wrapper over MessageDigest.getInstance, `static final String AUDIT_DIGEST = "MD5"`,
+    # `AUDIT_DIGEST = "md5"` gave nothing. The same rule for MD5.
+    ("MD5", "MD5 named as a quoted string", re.compile(r"(?<=[\"'])(?i:md5)(?=[\"'])")),
     # Row 377 (W1): a CNG algorithm identifier string, plain, wide (`L"MD5"`) or `TEXT("...")`,
     # as BCryptOpenAlgorithmProvider's second argument (Learn, "CNG Algorithm Identifiers").
     *[(family, f"{family} named by its CNG algorithm identifier string", re.compile(
