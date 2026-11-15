@@ -1555,6 +1555,12 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                                    if p.get("overridable")], ensure_ascii=False)}]
             if any(p.get("overridable") for p in
                    (scan_result.get("chosen_outside_files") or {}).get("places", [])) else []) + (
+            # Row 473: the lines closed as not a use, with the rule that closed each.
+            [{"name": f"{NS}named_but_not_used:lines", "value": json.dumps(
+                [{"family": r["family"], "location": r["path"], "line": r["line"],
+                  "rule": r["rule"]} for r in scan_result["named_but_not_used_lines"]],
+                ensure_ascii=False)}]
+            if scan_result.get("named_but_not_used_lines") else []) + (
             # Row 477: OIDs under a watched arc that this version does not know.
             [{"name": f"{NS}oids_not_known", "value": json.dumps(
                 [{"location": o["path"], "line": o["line"], "oid": o["oid"],

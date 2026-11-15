@@ -3292,6 +3292,46 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     return line[start:start + 1] in {"-", "!"}
 
 
+# Row 473: the rule that closed a line as not a use, kept on the row so the decision can be
+# reopened. Read in _is_banned_here's order, per line: a denial block or word and a struck-out
+# `!` entry ban; a `-` list (OpenSSH's removal list, `Groups = DEFAULT:-X448`) or a Disable-Tls
+# cmdlet removes; a switch set off switches off.
+NOT_A_USE_RULES = ("removal list", "ban list", "switch off", "comment", "identifier")
+
+
+def _ban_rule(line: str, in_denial: bool) -> str:
+    code = line
+    if in_denial or _has_denial_word(code):
+        return "ban list"
+    if _SWITCH_SET_OFF.match(code) or _SWITCH_ECHOED_OFF.match(code):
+        return "switch off"
+    if _DISABLE_CMDLET.match(code) or _SSH_REMOVAL_LIST.match(code):
+        return "removal list"
+    return "ban list" if re.search(r"(?:^|[\s,;:=(\[{\"'])!\s*[A-Za-z0-9]", code) else "removal list"
+
+
+def _name_not_a_use_rules(findings: list[dict[str, Any]], lines: list[str],
+                          denial_lines: set[int]) -> None:
+    for f in findings:
+        kind = f.get("evidence_kind")
+        if kind in ("comment", "identifier"):
+            f["not_a_use_rule"] = kind
+        elif kind == "ban" and 0 < f.get("line", 0) <= len(lines):
+            f["not_a_use_rule"] = _ban_rule(lines[f["line"] - 1], f["line"] in denial_lines)
+
+
+def named_but_not_used_lines(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Row 473: every line of a family the inventory does not count as used -- named but not
+    used, or named only by identifiers -- with the rule that closed it."""
+    closed = {f["algorithm"] for f in findings} - {
+        f["algorithm"] for f in findings
+        if f.get("evidence_kind") not in ("comment", "ban", "identifier")}
+    return [{"family": f["algorithm"], "path": f["path"], "line": f["line"],
+             "rule": f.get("not_a_use_rule") or (
+                 "ban list" if f.get("evidence_kind") == "ban" else f.get("evidence_kind"))}
+            for f in findings if f["algorithm"] in closed]
+
+
 def _families_named(findings: list[dict[str, Any]]) -> set[str]:
     return {f["algorithm"] for f in findings}
 
@@ -3650,6 +3690,7 @@ def scan_source_file(path: Path, rel_path: str,
     standing_alone: list[dict[str, Any]] = []   # release 3e: kept without that (stands_alone)
     rejection_tests = _rejection_tests(lines) if ext in _DOCSTRING_EXT else set()
     defined: list[frozenset[str]] = []  # row 463: the file's defined names, read on first need
+    denial_lines: set[int] = set()      # row 473: lines a denial block or rejection test governs
     # The lines visited: with a gate, those it marked and those a comment, docstring or Go
     # raw string opens or closes on, and the rejection tests' `def` lines; the others change
     # nothing below but the end of a denial block, which is looked for among them where one
@@ -3733,6 +3774,8 @@ def scan_source_file(path: Path, rel_path: str,
             denial_block_calls = bool(_REJECTION_TEST.search(code))
         if line_no - 1 in rejection_tests:
             in_denial, denial_block_indent, denial_block_calls = True, indent, True
+        if in_denial:
+            denial_lines.add(line_no)
         # One line, one finding per algorithm. Several patterns can carry the same
         # name -- ECDSA is matched both by its own name and by secp256k1, X448 by
         # its upper and lower case forms -- and counting each pattern separately
@@ -4126,6 +4169,7 @@ def scan_source_file(path: Path, rel_path: str,
     if by_identifier:
         findings = sorted(findings + by_identifier, key=lambda f: f["line"])
     _settle_names_defined_here(findings)
+    _name_not_a_use_rules(findings, lines, denial_lines)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
     findings = _drop_ecdh_named_only_by_the_setting(findings)
@@ -5286,6 +5330,7 @@ def _schannel_disabled(found: list[dict[str, Any]], lines: list[str]) -> None:
     for item in found:
         if item.get("line") in off and item.get("evidence_kind") != "comment":
             item["evidence_kind"] = "ban"
+            item["not_a_use_rule"] = "switch off"
 
 
 # Row 222: the JDK's disabled-algorithm lists, continuation lines (`\` at the end) included.
@@ -5312,6 +5357,7 @@ def _java_security_bans(found: list[dict[str, Any]], lines: list[str]) -> list[d
     for item in found:
         if item.get("line") in banned and item.get("evidence_kind") != "comment":
             item["evidence_kind"] = "ban"
+            item["not_a_use_rule"] = "ban list"
     out: list[dict[str, Any]] = []
     for number, kind in banned.items():
         if kind != "tls":
@@ -5406,6 +5452,7 @@ def _ssh_public_keys(found: list[dict[str, Any]], lines: list[str]) -> None:
             item["key_size"] = sizes[line]
         if line in revoked and item.get("evidence_kind") != "comment":
             item["evidence_kind"] = "ban"
+            item["not_a_use_rule"] = "ban list"
 
 
 def _device_grammar(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
@@ -5842,6 +5889,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         "named_but_not_used": sorted(
             _families_named(source_findings + iac_findings)
             - _families_in_use(source_findings + iac_findings)),
+        "named_but_not_used_lines": named_but_not_used_lines(source_findings + iac_findings),
         # The smallest size seen for a family, so a weak key anywhere is visible. A
         # size is a property of the key, not of the name, and without it every RSA
         # reads the same whether it is 1024 or 4096 bits.

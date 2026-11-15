@@ -306,6 +306,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         # it ran, found or not (ZA-OPRAVYANE row 154). None when no EC public key was read.
         "weak_key_check": scan_result.get("weak_key_check"),
         "named_but_not_used": scan_result["named_but_not_used"],
+        # Row 473: each line of those families, and of the identifier-only ones, with the rule
+        # that closed it (removal list, ban list, switch off, comment, identifier).
+        "named_but_not_used_lines": scan_result.get("named_but_not_used_lines", []),
         "unreadable_files": scan_result["unreadable_files"],
         "symlinks_not_followed": scan_result["symlinks_not_followed"],
         "claimed_but_not_decoded": scan_result["claimed_but_not_decoded"],
