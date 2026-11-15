@@ -9,14 +9,16 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 - **An Android Keystore key read with no curve, size or role** (row 484; probe `mobile-proba`).
   `KeyPairGenerator.getInstance(KEY_ALGORITHM_EC, "AndroidKeyStore")` initialised with
   `KeyGenParameterSpec.Builder(alias, PURPOSE_SIGN)` read EC, `key_size: undetermined`,
-  `role: undetermined`. Where the file holds one builder, its `PURPOSE_*` now set the role, and an
-  EC key's curve comes from `ECGenParameterSpec(...)` or `setKeySize(...)` in it; with neither,
-  P-256 with `curve_basis` saying it is the Keystore's default -- verified in AOSP
+  `role: undetermined`. Where the file holds one builder (read up to its `build()`, within 20
+  lines; the `getInstance` call may be split over lines, as in the developer documentation's
+  examples), its `PURPOSE_*` now set the role, and an EC key's curve comes from
+  `ECGenParameterSpec(...)` or `setKeySize(...)` in it; where the builder sets neither, P-256 with `curve_basis` saying it is the Keystore's default -- verified in AOSP
   (AndroidKeyStoreKeyPairGeneratorSpi.java, `EC_DEFAULT_KEY_SIZE = 256`), since the developer
   documentation gives no number. In the scan JSON, the MCP tools and the CBOM (`qrp:role`,
   the curve, and `qrp:curve_basis`). Found by re-running the probe. **Not claimed / not done:**
   where the key lives (StrongBox, TEE; with row 482); a file with two builders is not paired;
-  an RSA key's size from its builder is not read.
+  a curve or size set from a variable, or a non-NIST curve, gives no curve and no default; an
+  RSA key's size from its builder is not read.
 - **The implementation and the parameter set were not always recorded** (row 488, Adam
   Firestone; probe `impl-proba`). Rust `use ml_kem::{MlKem768, ...}` read ML-KEM 768 with no
   `provider`; Go `mlkem.GenerateKey768()` read ML-KEM with no `parameter_set`. RustCrypto's
@@ -24,8 +26,9 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   `libcrux_ml_dsa` (Rust paths and their C names) `libcrux`, and Go's crypto/mlkem names
   (GenerateKey, NewEncapsulationKey, NewDecapsulationKey, EncapsulationKey, DecapsulationKey with
   768 or 1024, read from the Go 1.26 source) give the parameter set -- which now also reaches the
-  CBOM component and the CNSA 2.0 parameter-set clause. Found by re-running the probe. OpenSSH's
-  vendored libcrux lines now carry `provider: libcrux`. **Not claimed:** any validation; the
+  CBOM component and the CNSA 2.0 parameter-set clause. Found by re-running the probe. On
+  openssh-portable 1,516 rows of the vendored libcrux code gained `provider: libcrux`, and on
+  liboqs and OpenSSH no row lost a provider (before/after against 0.46.0 + earlier 0.47.0 rows). **Not claimed:** any validation; the
   crate path names the API, and a fork that keeps it reads the same. The Rust `pqcrypto::kem::`
   umbrella path is not read (the `pqcrypto_mlkem`-style crate names already were).
 - **Where a KEM key is generated was not said** (row 494, Paarrthhh Birla, after Keyber, IACR
@@ -37,9 +40,11 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   mlkem-native's namespaced functions is now a row with `operation` (`keygen`, `encapsulate`,
   `decapsulate`, `sign`, `verify`), in the scan JSON, the MCP tools, SARIF and the CBOM
   (`qrp:operation`). Where the call does not name the scheme, the family is the only KEM (or
-  signature) family the same file names, said in `family_named_at`. Found by re-running the
-  probe; on liboqs `src/kem/ml_kem` 75 calls read, none of them a declaration. The finding count
-  and verdict do not move (one finding per family). **Not claimed:** that the step survives a
+  signature) family the same file names, said in `family_named_at`, and the row is as strong as
+  that line: a family the file names only in a comment stays not used (in the probe the keygen
+  row is `evidence_kind: comment`; ML-KEM is a finding from the Makefile, as before). Found by
+  re-running the probe; on liboqs `src/kem/ml_kem` 75 calls read, none of them a declaration;
+  on the whole liboqs tree and openssh-portable the findings and verdict are the same as before. **Not claimed:** that the step survives a
   fault -- only a fault test shows that; a call in a file naming no scheme (the scheme only in the
   Makefile or directory) or two gets no row; generic test code calling `OQS_SIG_STFL_verify` is
   given the one family its file names. BoringSSL, Go, Python and Rust KEM calls are not read

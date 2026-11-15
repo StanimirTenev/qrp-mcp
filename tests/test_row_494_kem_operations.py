@@ -13,7 +13,8 @@ row with `operation` -- `keygen` apart from `encapsulate` and `decapsulate` -- i
 the MCP tools, SARIF and the CBOM (`qrp:operation`); the same for `crypto_sign_keypair`,
 `crypto_sign_signature`/`crypto_sign`, `crypto_sign_verify`/`crypto_sign_open` and
 `OQS_SIG_keypair/sign/verify`. Where the call does not name the scheme, the family is the one
-KEM (or signature) family the same file names, and `family_named_at` says on which line.
+KEM (or signature) family the same file names, and `family_named_at` says on which line; the
+row is as strong as that line (a family named only in a comment stays not used).
 Not claimed: that the step survives a fault -- code shows where a key is generated, not whether
 that survives a glitch; a call in a file that names no scheme, or two, gets no row.
 """
@@ -68,7 +69,9 @@ def test_keygen_and_decapsulation_are_rows_in_the_scan_json(tree, tmp_path):
     assert ops[("fw/provision.c", 9)] == ("ML-KEM", "decapsulate")
     row = next(e for e in r["evidence"]["source_code"]
                if e["path"] == "fw/provision.c" and e["line"] == 6)
-    assert row["evidence_kind"] == "call"
+    # ML-KEM is named in this file only by the comment on line 1: the row is as strong as
+    # that, and the finding comes from the Makefile, as before.
+    assert row["evidence_kind"] == "comment"
     assert row["family_named_at"] == "fw/provision.c:1"
     assert row["parameter_set"] == "512"
     # One finding per family, as before: the verdict and the count do not move.
@@ -147,6 +150,58 @@ def test_signature_calls_too(tmp_path):
     assert ops[("s.c", 5)] == ("ML-DSA", "verify")
     assert ops[("s.c", 6)] == ("ML-DSA", "sign")
     assert ops[("s.c", 7)] == ("ML-DSA", "verify")
+
+
+@pytest.mark.parametrize("line", [
+    "    crypto_sign(sm, &smlen, (const unsigned char *)m, mlen, sk);",
+    "    rc = crypto_kem_enc(ct, ss, (uint8_t *)pk);",
+])
+def test_a_cast_argument_is_still_a_call(tmp_path, line):
+    t = tmp_path / "c"
+    t.mkdir()
+    (t / "c.c").write_text('static const char *a = "ML-KEM-768"; static const char *b = "ML-DSA-65";\n'
+                           f"{line}\n")
+    assert _ops(scan_directory(t)["evidence"]).get(("c.c", 2))
+
+
+def test_a_family_named_only_in_a_comment_stays_not_used(tmp_path):
+    """No finding where there was none: HQC in a comment and a generic liboqs call."""
+    t = tmp_path / "h"
+    t.mkdir()
+    (t / "k.c").write_text("/* uses HQC-128 */\n#include <oqs/oqs.h>\n"
+                           "void f(OQS_KEM *kem) {\n    OQS_KEM_keypair(kem, pk, sk);\n}\n")
+    r = scan_directory(t)
+    assert r["findings"] == [] and r["summary"]["total_findings"] == 0
+    assert "HQC" in r["named_but_not_used"]
+    row = next(e for e in r["evidence"]["source_code"] if e["line"] == 4)
+    assert (row["operation"], row["evidence_kind"]) == ("keygen", "comment")
+
+
+def test_verify_on_a_post_quantum_signature_is_not_legacy_use(tmp_path):
+    from datetime import date
+    from qrp_mcp import mandates
+    t = tmp_path / "v"
+    t.mkdir()
+    (t / "v.c").write_text('static const char *a = "ML-DSA-65";\n'
+                           "int f(void) { return crypto_sign_verify(sig, n, m, mlen, pk); }\n")
+    r = scan_directory(t)
+    mandates.apply(r, ["nist-ir-8547"], date(2026, 11, 15))
+    row = next(e for e in r["evidence"]["source_code"] if e["line"] == 2)
+    assert row["operation"] == "verify"
+    assert "legacy_use" not in json.dumps(row.get("mandates") or {})
+    assert r["mandates"]["nist-ir-8547"]["verify_or_decrypt_only"] == 0
+
+
+def test_a_shifted_line_is_not_closure(tree):
+    """`family_named_at` carries a line number; closure compares rows without it."""
+    from qrp_mcp import closure
+    def ids():
+        return sorted(closure._identity("source_code", e)
+                      for e in scan_directory(tree)["evidence"]["source_code"] if e.get("operation"))
+    before = ids()
+    p = tree / "fw/provision.c"
+    p.write_text("\n" + p.read_text())
+    assert len(before) == 2 and ids() == before
 
 
 def test_no_scheme_or_two_schemes_in_the_file_gives_no_row(tmp_path):

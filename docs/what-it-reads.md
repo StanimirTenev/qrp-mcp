@@ -223,7 +223,8 @@ initialises it, up to its `build()`. Where the file holds exactly one builder, i
 `PURPOSE_VERIFY` or `PURPOSE_ATTEST_KEY` read as a signature, `PURPOSE_AGREE_KEY` as key
 establishment, `PURPOSE_ENCRYPT`/`DECRYPT`/`WRAP_KEY` as encryption, and a mix as undetermined
 (`key_use_in_block`, then `role`); an EC key takes the curve from `ECGenParameterSpec("secp384r1")`
-or `setKeySize(384)`. With neither, the curve is P-256 and `curve_basis` says it is a default: the
+or `setKeySize(384)`. Where the builder sets neither (a variable or a non-NIST curve gives no
+curve at all), the curve is P-256 and `curve_basis` says it is a default: the
 developer documentation says only "an algorithm-specific default", and the value is AOSP's
 `EC_DEFAULT_KEY_SIZE = 256` in AndroidKeyStoreKeyPairGeneratorSpi.java. Two builders in one file
 are not paired. Not read: `setIsStrongBoxBacked`, so where the key lives (StrongBox, TEE).

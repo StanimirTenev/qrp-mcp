@@ -103,3 +103,69 @@ def test_two_builders_are_not_paired(tmp_path):
     row = _ec(scan_directory(_tree(tmp_path, text))["evidence"])[0]
     assert row["role"] == "undetermined"
     assert "curve" not in row and row["key_size"] == "undetermined"
+
+
+@pytest.mark.parametrize("setting", [
+    ".setKeySize(KEY_BITS)",
+    ".setAlgorithmParameterSpec(spec)",
+    '.setAlgorithmParameterSpec(ECGenParameterSpec("x25519"))',
+])
+def test_a_setting_not_read_gives_no_default(tmp_path, setting):
+    text = BINDING.replace(".setIsStrongBoxBacked(true)", setting)
+    row = _ec(scan_directory(_tree(tmp_path, text))["evidence"])[0]
+    assert row["role"] == "signature"
+    assert "curve" not in row and "curve_basis" not in row
+
+
+def test_no_build_within_reach_gives_nothing(tmp_path):
+    text = BINDING.replace(".setIsStrongBoxBacked(true)",
+                           ".setIsStrongBoxBacked(true)" + "\n            // ..." * 25)
+    row = _ec(scan_directory(_tree(tmp_path, text))["evidence"])[0]
+    assert row["role"] == "undetermined" and "curve" not in row
+
+
+# The two examples on developer.android.com/privacy-and-security/keystore (read 15.11.2026).
+DOC_KOTLIN = """import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import java.security.KeyPairGenerator
+
+fun gen(alias: String) {
+    val kpg: KeyPairGenerator = KeyPairGenerator.getInstance(
+            KeyProperties.KEY_ALGORITHM_EC,
+            "AndroidKeyStore"
+    )
+    val parameterSpec: KeyGenParameterSpec = KeyGenParameterSpec.Builder(
+            alias,
+            KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+    ).run {
+        setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
+        build()
+    }
+    kpg.initialize(parameterSpec)
+    val kp = kpg.generateKeyPair()
+}
+"""
+DOC_JAVA = """import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import java.security.KeyPairGenerator;
+
+class G { void gen(String alias) throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance(
+            KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore");
+    kpg.initialize(new KeyGenParameterSpec.Builder(
+            alias,
+            KeyProperties.PURPOSE_SIGN | KeyProperties.PURPOSE_VERIFY)
+            .setDigests(KeyProperties.DIGEST_SHA256,
+                KeyProperties.DIGEST_SHA512)
+            .build());
+    KeyPair kp = kpg.generateKeyPair();
+} }
+"""
+
+
+@pytest.mark.parametrize("name, text", [("G.kt", DOC_KOTLIN), ("G.java", DOC_JAVA)])
+def test_the_documented_forms(tmp_path, name, text):
+    rows = [e for e in scan_directory(_tree(tmp_path, text, name))["evidence"]["source_code"]
+            if e["algorithm"] == "EC"]
+    assert rows
+    assert {(e["role"], e.get("curve")) for e in rows} == {("signature", "P-256")}

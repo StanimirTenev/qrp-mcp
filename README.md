@@ -159,7 +159,8 @@ generates its own key is said with file and line: the NIST API of pqm4, PQClean 
 `crypto_sign_verify`/`crypto_sign_open`), liboqs (`OQS_KEM_keypair/encaps/decaps`,
 `OQS_SIG_keypair/sign/verify` and the per-scheme forms) and mlkem-native's namespaced
 functions. Where the call does not name the scheme, the family is the one the same file names
-(`family_named_at`); a file naming none or two gives no row. Declarations are not calls. Code
+(`family_named_at`), and a family named there only in a comment stays not used; a file naming
+none or two gives no row. Declarations are not calls. Code
 shows where a key is generated, not whether that step survives a fault.
 
 From 0.47.0 RustCrypto's `ml_kem`, `ml_dsa` and `slh_dsa` crates and libcrux are named as the
@@ -168,7 +169,7 @@ From 0.47.0 RustCrypto's `ml_kem`, `ml_dsa` and `slh_dsa` crates and libcrux are
 
 From 0.47.0 an Android Keystore key (`KeyPairGenerator.getInstance(..., "AndroidKeyStore")`) takes
 its role from the `PURPOSE_*` of the file's one `KeyGenParameterSpec.Builder`, and an EC key its
-curve from `ECGenParameterSpec(...)` or `setKeySize(...)` there; with neither, P-256 as the
+curve from `ECGenParameterSpec(...)` or `setKeySize(...)` there; where it sets neither, P-256 as the
 Keystore's default, marked as such in `curve_basis` (CBOM `qrp:curve_basis`). Where the key lives
 (StrongBox or TEE) is not read.
 

@@ -4256,8 +4256,9 @@ _PQ_OPERATION_NAME = {None: "sign", "keypair": "keygen", "enc": "encapsulate",
                       "signature": "sign", "sign": "sign", "verify": "verify", "open": "verify"}
 # What may stand before a call: nothing, an operator, `return`, or a cast (`(OQS_STATUS)`).
 _CALL_BEFORE = re.compile(r"(?:^|[=(,!{;?:&|.]|->|\breturn|\(\s*\w+\s*\**\s*\))$")
+# A parameter: a type, then a name (`uint8_t *pk,`); a cast (`(const unsigned char *)m`) has none.
 _TYPED_ARGUMENT = re.compile(r"\b(?:u?int\d+_t|size_t|char|void|OQS_KEM|OQS_SIG|unsigned)\b"
-                             r"[\s*]*\w*\s*[,)\[]|\*\s*\w+\s*[,)]")
+                             r"[\s*]*\w+\s*[,)\[]|\b\w+\s+\*+\s*\w+\s*[,)]")
 
 
 def _pq_operations(findings: list[dict[str, Any]], lines: list[str],
@@ -4296,11 +4297,18 @@ def _pq_operations(findings: list[dict[str, Any]], lines: list[str],
             if len(named) != 1:
                 break
             family, rows = next(iter(named.items()))
+            # The row is as strong as what names its family: a family the file names only in
+            # a comment (or an identifier) stays not used, as it was before the call was read.
+            uses = [f for f in rows if f.get("evidence_kind") not in ("comment", "identifier")]
+            basis = uses[0] if uses else rows[0]
             item = {"path": rel_path, "line": line_no, "algorithm": family,
                     "description": f"{family} {operation} call",
-                    "excerpt": line.strip()[:200], "evidence_kind": "call",
+                    "excerpt": line.strip()[:200],
+                    "evidence_kind": "call" if uses else basis["evidence_kind"],
                     "in_test_code": in_test_code(rel_path), "operation": operation,
-                    "family_named_at": f"{rel_path}:{rows[0]['line']}"}
+                    "family_named_at": f"{rel_path}:{basis['line']}"}
+            if not uses:
+                item["not_a_use_rule"] = basis.get("not_a_use_rule", basis["evidence_kind"])
             # The set the naming lines give, read as _tag_parameter_sets reads a line.
             rule = _PARAMETER_SETS.get(family)
             sets = {rule[1](m) for f in rows for m in rule[0].finditer(f.get("excerpt") or "")
@@ -4336,14 +4344,18 @@ def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> 
         return
     start = builders[0]
     end = next((i for i in range(start, min(start + 20, len(lines)))
-                if re.search(r"\bbuild\s*\(\s*\)", lines[i])), start)
+                if re.search(r"\bbuild\s*\(\s*\)", lines[i])), None)
+    if end is None:
+        return
     spec = "\n".join(lines[start:end + 1])
     uses = {_KEYSTORE_PURPOSE_USE[p] for p in _KEYSTORE_PURPOSE.findall(spec)}
     curves = {f"P-{next(g for g in m.groups() if g)}" for m in _NIST_CURVE.finditer(spec)}
     sizes = {int(n) for n in _KEYSTORE_KEY_SIZE.findall(spec)}
     for f in findings:
+        # The call may be split over lines, as in the developer documentation's examples.
+        around = "\n".join(lines[max(f["line"] - 2, 0):f["line"] + 2])
         if (f.get("algorithm") not in ("EC", "RSA") or f.get("evidence_kind") in ("comment", "ban")
-                or not _KEYSTORE_GENERATOR.search(lines[f["line"] - 1])):
+                or not _KEYSTORE_GENERATOR.search(around)):
             continue
         if uses and "key_use_in_block" not in f:
             f["key_use_in_block"] = " ".join(sorted(uses))
@@ -4353,7 +4365,7 @@ def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> 
             f["curve"] = curves.pop()
         elif not curves and len(sizes) == 1 and sizes <= {224, 256, 384, 521}:
             f["curve"] = f"P-{sizes.pop()}"
-        elif not curves and not sizes:
+        elif not re.search(r"\.set(?:AlgorithmParameterSpec|KeySize)\s*\(", spec):
             f["curve"], f["key_size"], f["curve_basis"] = "P-256", 256, _KEYSTORE_EC_DEFAULT
 
 
