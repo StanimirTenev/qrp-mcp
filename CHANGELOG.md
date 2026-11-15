@@ -6,6 +6,20 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **An RSA key that wraps a symmetric key did not say so** (row 495, Abhishek J., "AES-256 data
+  is largely safe"; probe `aes-proba`). `kek.public_key().encrypt(archive_key, padding.OAEP(...))`
+  with `archive_key = AESGCM.generate_key(bit_length=256)` read RSA-4096 at lines 7 and 8 and
+  nothing tied the RSA key to the AES key it protects. The RSA row of an OAEP `.encrypt(<name>,
+  ...)` now carries `wraps`: the name (masked below `--level full`, like a line), and where the
+  file assigns that name exactly once with `generate_key(bit_length=N)`, `os.urandom(n)`,
+  `secrets.token_bytes(n)` or `get_random_bytes(n)`, `what: "symmetric key"`, `key_size` and
+  `assigned_at`; otherwise `what: "not read"` with the reason in `basis`. In the scan JSON, the
+  MCP tools and the CBOM (`qrp:wraps`). Found by re-running the probe. **By design, unchanged:**
+  AES gives no row of its own -- symmetric cryptography is out of scope (docs/measurement.md),
+  now pinned by a test. **Not done:** ECIES, and AES key wrap under a DH-derived key (they need
+  the data flow across lines); PKCS#1 v1.5 encryption of a key; a size from any other
+  generator; SARIF does not carry `wraps`. The field is named `wraps`, not `protects`, which
+  already means what a PPK makes safe.
 - **The CBOM put every private key into one component** (row 502, D6 of `boot-proba/REZULTAT.md`
   §8). Both CBOMs had a single `crypto:embedded-private-key-material`, "Embedded private key
   material", whose occurrences said only "private key material in a ... block", though the scan

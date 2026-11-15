@@ -516,6 +516,8 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
     operations_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
     # Row 484: a curve that is a default, not written in the file (Android Keystore).
     curve_basis_at: dict[tuple[str, int], str] = {}
+    # Row 495: the key an RSA key wraps on this line.
+    wraps_at: dict[tuple[str, int], dict[str, Any]] = {}
     orders_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
     for items in scan_result["evidence"].values():
         for item in items:
@@ -531,6 +533,8 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                         (family_of.get(name, name), item["operation"]))
                 if item.get("curve_basis"):
                     curve_basis_at[(item["path"], item["line"])] = item["curve_basis"]
+                if isinstance(item.get("wraps"), dict) and family_of.get(name, name) == "RSA":
+                    wraps_at[(item["path"], item["line"])] = item["wraps"]
                 if item.get("order"):
                     orders_at.setdefault((item["path"], item["line"]), []).append(
                         (family_of.get(name, name), _order_text(item["order"])))
@@ -571,6 +575,11 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                 (o["location"], o.get("line")), []) if name == own})) or "not read"
                    for o in occurrences]
             component["properties"].append({"name": f"{NS}operation", "value": json.dumps(ops)})
+        if own == "RSA" and any((o["location"], o.get("line")) in wraps_at
+                                for o in occurrences):
+            component["properties"].append({"name": f"{NS}wraps", "value": json.dumps(
+                [wraps_at.get((o["location"], o.get("line"))) for o in occurrences],
+                ensure_ascii=False)})
         if any((o["location"], o.get("line")) in curve_basis_at for o in occurrences):
             component["properties"].append({"name": f"{NS}curve_basis", "value": json.dumps(
                 [curve_basis_at.get((o["location"], o.get("line")), "read from the file")

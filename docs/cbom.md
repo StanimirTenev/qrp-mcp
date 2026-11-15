@@ -54,6 +54,10 @@ one "Embedded private key material" for all of them: `relatedCryptoMaterialPrope
 the key's file and line, of its family, where there is exactly one, and `qrp:curve`. A private key
 that did not parse keeps the name "Embedded private key material" and says why in
 `qrp:key_unread`. The bom-ref is `private-key:<path>-<line>` or `public-key:<path>-<line>`.
+From 0.47.0 (row 495) an RSA component whose occurrence encrypts a named value with OAEP carries
+`qrp:wraps`, one entry per occurrence (`null` where the line wraps nothing): `what` (`symmetric
+key` or `not read`), `name` (masked below `full`), `key_size` and `assigned_at` where the file
+assigns the name once with a recognised generator, and `basis`.
 
 Output is deterministic where it matters. The serial number is derived from the two pins and a
 digest of what was found, so the same code over the same corpus that finds the same things gets

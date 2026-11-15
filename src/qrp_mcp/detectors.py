@@ -4219,6 +4219,7 @@ def scan_source_file(path: Path, rel_path: str,
     _name_not_a_use_rules(findings, lines, denial_lines)
     findings = _pq_operations(findings, lines, rel_path)
     _android_keystore_spec(findings, lines)
+    _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
     findings = _drop_ecdh_named_only_by_the_setting(findings)
@@ -4367,6 +4368,53 @@ def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> 
             f["curve"] = f"P-{sizes.pop()}"
         elif not re.search(r"\.set(?:AlgorithmParameterSpec|KeySize)\s*\(", spec):
             f["curve"], f["key_size"], f["curve_basis"] = "P-256", 256, _KEYSTORE_EC_DEFAULT
+
+
+# Row 495: an RSA key that wraps a symmetric key -- `pub.encrypt(archive_key, padding.OAEP(...))`
+# -- says so, with the wrapped value's name and, where the file assigns that name once with a
+# recognised generator, its size. Only an OAEP encrypt of a plain name on one line: ECIES and AES
+# key wrap under a DH-derived key need the data flow across lines and are not read.
+_OAEP_WRAP = re.compile(r"\.encrypt\(\s*([A-Za-z_]\w*)\s*,[^\n]*\bOAEP\b")
+_SYMMETRIC_KEY_SOURCES = (
+    (re.compile(r"\bgenerate_key\(\s*(?:bit_length\s*=\s*)?(\d+)\s*\)"), 1,
+     "generate_key(bit_length=N) (pyca AESGCM, AESCCM, AESOCB3, AESSIV, ChaCha20Poly1305)"),
+    (re.compile(r"\bos\.urandom\(\s*(\d+)\s*\)"), 8, "os.urandom(n), n bytes"),
+    (re.compile(r"\btoken_bytes\(\s*(\d+)\s*\)"), 8, "secrets.token_bytes(n), n bytes"),
+    (re.compile(r"\bget_random_bytes\(\s*(\d+)\s*\)"), 8, "get_random_bytes(n), n bytes"),
+)
+
+
+def _wrapped_key(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    for f in findings:
+        if f.get("algorithm") != "RSA" or f.get("evidence_kind") in ("comment", "ban"):
+            continue
+        m = _OAEP_WRAP.search(lines[f["line"] - 1])
+        if not m:
+            continue
+        name = m.group(1)
+        assign = re.compile(rf"^\s*{re.escape(name)}\s*(?::[^=]*)?=(?!=)\s*(.*)$")
+        assigned = [(i, a.group(1)) for i, line in enumerate(lines, start=1)
+                    if (a := assign.match(line))]
+        wraps: dict[str, Any] = {"what": "not read", "name": name}
+        basis = ("the value passed to an RSA-OAEP encrypt on this line; what it is is not read "
+                 "(assigned " + ("nowhere in the file" if not assigned else
+                                 f"{len(assigned)} times in the file") + ")")
+        if len(assigned) == 1:
+            line_no, value = assigned[0]
+            for pattern, unit, said in _SYMMETRIC_KEY_SOURCES:
+                g = pattern.search(value)
+                if g:
+                    wraps.update(what="symmetric key", key_size=int(g.group(1)) * unit,
+                                 assigned_at=line_no)
+                    basis = (f"the value passed to an RSA-OAEP encrypt on this line, assigned "
+                             f"once in the file, at line {line_no}, by {said}")
+                    break
+            else:
+                basis = (f"the value passed to an RSA-OAEP encrypt on this line, assigned once "
+                         f"in the file, at line {line_no}, by a call not read as a key "
+                         f"generator")
+        wraps["basis"] = basis
+        f["wraps"] = wraps
 
 
 # Row 424: `generateKeyPairSync(\n  'rsa',` and `getInstance(\n  "RSA");` were silent, while the

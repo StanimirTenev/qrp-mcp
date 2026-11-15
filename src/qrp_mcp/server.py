@@ -403,6 +403,12 @@ def _mask_owners(result: dict[str, Any]) -> None:
             for item in items:
                 if isinstance(item, dict) and item.get("owners"):
                     item["owners"] = [_mask_excerpt(str(o), "") for o in item["owners"]]
+    # Row 495: the name of the key an RSA key wraps is source text, masked as a line is.
+    for items in _evidence_lists(result):
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict) and isinstance(item.get("wraps"), dict):
+                    item["wraps"]["name"] = _mask_excerpt(str(item["wraps"]["name"]), "")
     # Row 490: a listener's server names are host names, masked as owners are.
     for place in (result.get("tls_listeners") or {}).get("places") or []:
         place["server_name"] = [_mask_excerpt(str(n), "") for n in place["server_name"]]

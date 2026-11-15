@@ -415,7 +415,9 @@ Stated rather than hidden, and each of these is a known gap rather than a suspic
 - **Symmetric cryptography, hashes for integrity, KDFs and random number generation are out of
   scope by design.** This tool reports what a cryptographically relevant quantum computer would
   break. On Cryben's full 197 findings — most of which are AES, SHA-256 and KDF — it scores 0.13,
-  and that is the scope working, not failing.
+  and that is the scope working, not failing. From 0.47.0 (row 495) an RSA-OAEP encrypt of a
+  named value says what it wraps (`wraps`), with the size where the file generates it on one
+  line; the symmetric key gives no row of its own.
 
 ## What an outside review found
 
