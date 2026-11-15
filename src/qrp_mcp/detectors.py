@@ -156,7 +156,13 @@ CONFIG_FILENAME_PATTERN = re.compile(
     r"^sdkconfig(?:\.[\w.-]+)?$|"
     # An alternate java.security, as `-Djava.security.properties=<URL>` applies one
     # (`java.security.override`; ZA-OPRAVYANE row 222).
-    r"^java\.security\.[\w.-]+$")
+    r"^java\.security\.[\w.-]+$|"
+    # Row 468 (QCI CBOM-Benchmark 2.6.6): `sshd_config_pq` was type_not_claimed and its
+    # mlkem768x25519 and sntrup761x25519 lines unread. A variant after the name
+    # (sshd_config_pq, sshd_config.bastion, ssh_config-prod) or before it (bastion.sshd_config).
+    # Not OpenSSH's own manual pages, sshd_config.5 / ssh_config.0, which describe every
+    # algorithm and configure none.
+    r"^(?!.*\.[0-9](?:\.gz)?$)(?:sshd|ssh)_config[-_.][\w.-]+$|^[\w.-]+\.(?:sshd|ssh)_config$")
 
 # Directories whose files are configuration without an extension: FreeRADIUS keeps its
 # EAP-TLS settings in raddb/mods-available/eap (ZA-OPRAVYANE row 103), and Debian's nginx
