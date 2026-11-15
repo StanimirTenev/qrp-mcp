@@ -52,7 +52,10 @@ Output is deterministic where it matters. The serial number is derived from the 
 digest of what was found, so the same code over the same corpus that finds the same things gets
 the same serial, and a different result gets a different one. From 0.43.0 the target path is not
 part of it, and `metadata.component` is named by the directory's own name with the commit as its
-`version`: one commit scanned at two places, or on two machines, is one document. Each evidence
+`version`: one commit scanned at two places, or on two machines, is one document. From 0.47.0
+`qrp:coverage:corpus:target` is that name too, not the absolute path (row 487), and
+`qrp:coverage:corpus:target_basis` says where the path is: the scan result's
+`coverage.corpus.target`. Each evidence
 file carries `qrp:sha256_crlf_as_lf` beside its raw hash, the same for a CRLF and an LF checkout. The whole CBOM is
 byte-identical across two runs over one unchanged tree: the timestamp is the tree's commit time
 (or `SOURCE_DATE_EPOCH`, or absent when neither exists), and the read window stays in the scan

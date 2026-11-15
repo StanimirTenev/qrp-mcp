@@ -430,6 +430,13 @@ WINDOW_NOT_CARRIED = (
     "not carried in the CBOM: the read time differs on every run and would make two "
     "documents of one unchanged tree differ; it is in the scan result's coverage.window")
 
+# Row 487: the scanned folder by its own name. Its absolute path named the machine it was
+# scanned on, and two CBOMs of one commit from two places differed in it.
+TARGET_BASIS = (
+    "the scanned folder's own name; its absolute path is not carried in the CBOM (it names "
+    "the machine and differs between two places that hold one tree); it is in the scan "
+    "result's coverage.corpus.target")
+
 
 def _timestamp(coverage: dict[str, Any]) -> tuple[str | None, str]:
     """A timestamp that is a function of the tree, and what it is.
@@ -1574,7 +1581,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         # not; it is named in its place rather than dropped.
         "properties": [
             {"name": f"{NS}coverage:{name}", "value": value}
-            for name, value in _flatten({**coverage, "window": WINDOW_NOT_CARRIED})
+            for name, value in _flatten({
+                **coverage, "window": WINDOW_NOT_CARRIED,
+                "corpus": {**coverage["corpus"], "target": _target_name(coverage),
+                           "target_basis": TARGET_BASIS}})
         ] + [{"name": f"{NS}timestamp_basis", "value": timestamp_basis}] + (
             # The fingerprint of the normalised findings (row 178), as the scan result has it.
             [{"name": f"{NS}findings_fingerprint:sha256",

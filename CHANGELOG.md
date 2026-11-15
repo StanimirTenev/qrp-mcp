@@ -6,6 +6,16 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **The CBOM carried the absolute path of the scanned folder** (row 487; own probe while
+  regenerating `docs/examples/h5bp-server-configs-nginx.cbom.json`). `qrp:coverage:corpus:target`
+  was the path on the machine that ran the scan, so two CBOMs of one commit from two places were
+  never the same bytes though `qrp:findings_fingerprint:sha256` was, and the 0.46.0 sample held a
+  local path. It is now the folder's own name, as `metadata.component` already was (row 430), with
+  `qrp:coverage:corpus:target_basis` saying so. Tested: the same tree under two parent folders
+  gives byte-identical CBOMs, and the parent path appears nowhere in the document. **Not
+  changed:** the scan JSON and the MCP `scan_repo` result keep the absolute path
+  (`coverage.corpus.target`; SARIF's SRCROOT and `compare_coverage` read it). The published
+  sample is still the 0.46.0 file and is not regenerated here.
 - **An Android Keystore key read with no curve, size or role** (row 484; probe `mobile-proba`).
   `KeyPairGenerator.getInstance(KEY_ALGORITHM_EC, "AndroidKeyStore")` initialised with
   `KeyGenParameterSpec.Builder(alias, PURPOSE_SIGN)` read EC, `key_size: undetermined`,

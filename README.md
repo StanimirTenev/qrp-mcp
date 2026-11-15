@@ -173,6 +173,10 @@ curve from `ECGenParameterSpec(...)` or `setKeySize(...)` there; where it sets n
 Keystore's default, marked as such in `curve_basis` (CBOM `qrp:curve_basis`). Where the key lives
 (StrongBox or TEE) is not read.
 
+From 0.47.0 the CBOM names the scanned folder in `qrp:coverage:corpus:target` by its own name, not
+its absolute path, so it no longer carries a path from your machine and one commit scanned in two
+places gives the same bytes; the scan result (`scan --out`, `scan_repo`) still has the absolute path.
+
 ### A control on your own tree
 
 ```

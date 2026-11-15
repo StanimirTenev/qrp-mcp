@@ -51,8 +51,13 @@ those files is in the `qrp:coverage:*` properties.
 
 ## Rerunning it yourself
 
-Clone the repository at the commit above and run the command. Your file will differ from this one
-in one field, `qrp:coverage:corpus:target`, which records the absolute path of the scanned folder
-(here `/tmp/example/server-configs-nginx`). Compare `qrp:findings_fingerprint:sha256` instead; for
-this commit and 0.46.0 it is `efaeeeec2048349ac52feb9de26d7c2fbf8d5e4b820856d1737a1821a71bf91a`.
-Recording the folder by a relative path is planned.
+Clone the repository at the commit above and run the command. With 0.46.0 your file will differ
+from this one in one field, `qrp:coverage:corpus:target`, which records the absolute path of the
+scanned folder (here `/tmp/example/server-configs-nginx`). Compare
+`qrp:findings_fingerprint:sha256` instead; for this commit and 0.46.0 it is
+`efaeeeec2048349ac52feb9de26d7c2fbf8d5e4b820856d1737a1821a71bf91a`.
+
+From 0.47.0 that field is the folder's own name (`server-configs-nginx`), and
+`qrp:coverage:corpus:target_basis` says so; the absolute path stays only in the scan result
+(`scan --out`, `coverage.corpus.target`). A CBOM of one commit made in two places is then the
+same bytes. This sample is still the 0.46.0 file.
