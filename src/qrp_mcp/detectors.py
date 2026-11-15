@@ -243,6 +243,7 @@ SSH_DSA_KEY_FILE = "DSA named by an SSH key file name (ssh_host_dsa_key, id_dsa)
 CONFIG_ONLY = frozenset({SSH_RSA_KEY_FILE, SSH_DSA_KEY_FILE})
 
 SHA1_COMPOUND_NAME = "SHA-1 named in a compound name"
+SECP256K1_RULE = "secp256k1 (ECDSA) usage"
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
         r"Crypto\.PublicKey\.RSA|Crypto\.PublicKey\s+import\s+RSA|"
@@ -679,9 +680,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # secp256k1 signature is ECDSA, and Shor breaks it like any other elliptic curve.
     # Not Node's `crypto.createECDH('secp256k1')`: "Creates an Elliptic Curve Diffie-Hellman
     # (ECDH) key exchange object" (https://nodejs.org/api/crypto.html), no signature (row 413).
-    ("ECDSA", "secp256k1 (ECDSA) usage", re.compile(
+    # Row 461: Ethereum's eth_keys (`keys.PrivateKey(...).sign_msg(...)`) and eth_account,
+    # both secp256k1 only, gave nothing; the import names them.
+    ("ECDSA", SECP256K1_RULE, re.compile(
         r"(?<!createECDH\(.)secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
-        r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|\bweb3\b|"
+        r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|\bweb3\b|\beth_(?:keys|account)\b|"
         # Whole method names: `personal_signature` is a form field, not the JSON-RPC
         # call (ZA-OPRAVYANE row 78).
         r"(?<![A-Za-z0-9])(?:eth_sign\w*|personal_sign)(?![A-Za-z0-9])|signTypedData",
@@ -4616,6 +4619,12 @@ _NIST_CURVE = re.compile(
 # 2.4.1: secp256k1, a Koblitz curve over a 256-bit prime field.
 _SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])", re.IGNORECASE)
 _CURVE_SIZE = {"P-256": 256, "P-384": 384, "P-521": 521, "secp256k1": 256}
+# Row 460: what the secp256k1 rule matched by a library that has no other curve -- ethers'
+# `Wallet.createRandom()`, btcec, bitcoinjs-lib, ECPair, ecrecover, eth_keys, the JSON-RPC
+# signing calls. Not `web3` alone: @solana/web3.js signs with Ed25519.
+_SECP256K1_ONLY = re.compile(
+    r"\bbtcec\b|bitcoinjs-lib|\bECPair\b|\becrecover\s*\(|\bethers\b|\beth_(?:keys|account)\b|"
+    r"(?<![A-Za-z0-9])(?:eth_sign\w*|personal_sign)(?![A-Za-z0-9])|signTypedData")
 
 
 def _tag_curves(items: list[dict[str, Any]]) -> None:
@@ -4626,7 +4635,8 @@ def _tag_curves(items: list[dict[str, Any]]) -> None:
             excerpt = item.get("excerpt") or ""
             found = {f"P-{next(g for g in m.groups() if g)}"
                      for m in _NIST_CURVE.finditer(excerpt)}
-            if _SECP256K1.search(excerpt):
+            if _SECP256K1.search(excerpt) or (item.get("description") == SECP256K1_RULE
+                                              and _SECP256K1_ONLY.search(excerpt)):
                 found.add("secp256k1")
             if len(found) == 1:
                 item["curve"] = found.pop()
