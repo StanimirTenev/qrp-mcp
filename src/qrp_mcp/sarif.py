@@ -63,7 +63,7 @@ def _result(category: str, item: dict[str, Any], keys: dict[int, str]) -> dict[s
         "locations": [_location(str(item["path"]), item.get("line"), item.get("excerpt"))],
         "partialFingerprints": {"qrpBaseline/v1": keys[id(item)]},
         "properties": {"evidence": category, "evidence_kind": kind,
-                       **{k: item[k] for k in ("in_test_code", "role", "key_size", "mandates",
+                       **{k: item[k] for k in ("in_test_code", "role", "operation", "key_size", "mandates",
                                                "hndl_exposed", "hndl", "confidence",
                                                "confidence_basis") if k in item}},
     }

@@ -505,6 +505,8 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
     # The role an RSA or EC line shows (row 184) and where ML-KEM stands in a configured
     # order (row 185): in the scan JSON and, until 0.39.0, not in the CBOM.
     roles_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
+    # Row 480: the call on the key (sign, verify, encrypt, decrypt), beside the role.
+    operations_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
     orders_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
     for items in scan_result["evidence"].values():
         for item in items:
@@ -513,6 +515,9 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                 if item.get("role") in ("signature", "key_establishment", "undetermined"):
                     roles_at.setdefault((item["path"], item["line"]), []).append(
                         (family_of.get(name, name), item["role"]))
+                if item.get("operation") in ("sign", "verify", "encrypt", "decrypt"):
+                    operations_at.setdefault((item["path"], item["line"]), []).append(
+                        (family_of.get(name, name), item["operation"]))
                 if item.get("order"):
                     orders_at.setdefault((item["path"], item["line"]), []).append(
                         (family_of.get(name, name), _order_text(item["order"])))
@@ -548,6 +553,10 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                                if name == own})
                 roles.append("+".join(said) or "not read")
             component["properties"].append({"name": f"{NS}role", "value": json.dumps(roles)})
+            ops = ["+".join(sorted({op for name, op in operations_at.get(
+                (o["location"], o.get("line")), []) if name == own})) or "not read"
+                   for o in occurrences]
+            component["properties"].append({"name": f"{NS}operation", "value": json.dumps(ops)})
         if own == "ML-KEM":
             orders = []
             for o in occurrences:

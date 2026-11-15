@@ -184,6 +184,21 @@ def role_of(item: dict[str, Any]) -> str | None:
     return "undetermined"
 
 
+# Row 480: the call a line makes on the key -- a method call (`.verify(`, Go `rsa.VerifyPSS(`,
+# Java `initVerify(`), never an argument or a setting (`verify=False`, `ssl_verify_client`).
+_OPERATION = re.compile(r"\.(?:init)?(sign|verify|encrypt|decrypt)(?:PSS|PKCS1v15|ASN1|OAEP)?\(",
+                        re.IGNORECASE)
+
+
+def operation_of(item: dict[str, Any]) -> str | None:
+    """`sign`, `verify`, `encrypt` or `decrypt` where an RSA or EC line calls exactly one of
+    them on a key; None otherwise."""
+    if item.get("algorithm") not in ROLE_FAMILIES:
+        return None
+    said = {m.lower() for m in _OPERATION.findall(str(item.get("excerpt") or ""))}
+    return said.pop() if len(said) == 1 else None
+
+
 def _cite(names: list[str]) -> list[dict[str, str]]:
     return [{"standard": n, "what": SOURCES[n][0], "url": SOURCES[n][1]} for n in names]
 

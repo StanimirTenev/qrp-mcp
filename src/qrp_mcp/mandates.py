@@ -160,6 +160,15 @@ def _nist(item: dict[str, Any], family: str, role: str, day: date) -> dict[str, 
     out["federal_high_value_assets"] = {
         **({"pqc_by": by_role[role]} if role in by_role else {"pqc_by_role": by_role}),
         "applies": fed["applies"], "source": fed["source"]}
+    # Row 480: a line that only verifies or decrypts is said, not exempted. IR 8547 section
+    # 4.1 (final.txt:778-780) defines legacy use; Tables 2 and 4 give these schemes none.
+    if item.get("operation") in ("verify", "decrypt"):
+        out["operation"] = item["operation"]
+        out["legacy_use"] = (
+            f"{item['operation']} only on this line: section 4.1 calls processing already "
+            f"protected information (to decrypt ciphertext or verify a signature) legacy use; "
+            f"whether what it processes is old is not established, and Tables 2 and 4 give "
+            f"these schemes no legacy-use status, so the dates above stand")
     return out
 
 
@@ -244,6 +253,7 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             blocks[name]["composite"] = 0
             blocks[name]["federal_high_value_assets"] = {
                 **m["federal_high_value_assets"], "counted_by_gate": False}
+            blocks[name]["verify_or_decrypt_only"] = 0
     hybrid_lines = _hybrid_halves(result)
     for category, items in result["evidence"].items():
         for item in items:
@@ -294,6 +304,8 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                 block["in_scope"] += 1
                 block["by_status"][clause["status"]] = block["by_status"].get(
                     clause["status"], 0) + 1
+                if "legacy_use" in clause:
+                    block["verify_or_decrypt_only"] += 1
                 # Row 160: the gate counts the date the headline gives, the deprecation for
                 # NIST IR 8547 (2030), not the disallowance five years later.
                 gate_date = clause.get("deprecated_after") or clause["deadline"]

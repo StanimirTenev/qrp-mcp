@@ -1171,6 +1171,10 @@ def _read_roles(scan_result: dict[str, Any]) -> dict[str, dict[str, int]]:
             if role is None:
                 continue
             item["role"] = role
+            # Row 480: verify beside sign. A ci_pipeline step's own `operation` is kept.
+            operation = remediation.operation_of(item)
+            if operation and "operation" not in item:
+                item["operation"] = operation
             if item.get("evidence_kind") not in ("comment", "identifier"):
                 fam = counts.setdefault(item["algorithm"], {
                     "signature": 0, "key_establishment": 0, "undetermined": 0})

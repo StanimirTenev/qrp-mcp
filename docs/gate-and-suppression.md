@@ -18,6 +18,11 @@ one place. The CHANGELOG entry named beside each item is the full text.
   federal high value assets and high impact systems (FIPS 199 high) only. A clause whose role
   was not read gives both (`pqc_by_role`). It is a condition the scan cannot check, so the gate,
   `deadline` and `next_deadline` do not count it (`counted_by_gate: false`) (0.47.0).
+- A line that only verifies or decrypts (`operation`, see
+  [the role of a line](closure-and-profiles.md)) gets `legacy_use` in its `nist-ir-8547` clause,
+  and the block counts such lines in `verify_or_decrypt_only`. IR 8547 section 4.1 calls
+  processing already protected information "legacy use", but Tables 2 and 4 give these schemes
+  no legacy-use status, so the dates stand and the line trips the gate like any other (0.47.0).
 - A gate over files that were not read is not a pass: `gate` reads `not_established` and
   `gate_not_established_because` gives the count; the exit code of that case stays 0 (0.41.0).
 - `--min-coverage PERCENT` (with `--mandate`) makes it a failure: when fewer than PERCENT of the

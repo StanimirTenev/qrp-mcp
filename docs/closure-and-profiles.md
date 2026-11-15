@@ -129,6 +129,12 @@ of code (comments carry a role but are not counted) in `roles_seen`, and drops a
 no line showed that role **and** no line was undetermined. Every path says how many lines it is for.
 From 0.39.0 the role is in the CBOM too, as `qrp:role` on RSA and EC components, one value per
 occurrence; before, it stopped at the scan JSON.
+From 0.47.0 an RSA or EC line that calls exactly one of `.sign(`, `.verify(`, `.encrypt(` or
+`.decrypt(` on a key (also `rsa.VerifyPSS(`, `initVerify(` and the like) carries `operation`, so
+checking a signature no longer reads the same as making one. It is read from the call only:
+`verify=False`, `ssl_verify_client` and a key generated on its own line give none. In the scan
+JSON, the MCP tools, SARIF and the CBOM (`qrp:operation`, one per occurrence, `not read` where
+no call was read).
 
 ⚠️ **Against this:** on every corpus measured, both paths stayed. Undetermined lines of code:
 certbot 208 of 229, OpenSSH 172 of 456, Vault 361 of 656, OpenSSL 3,354 of 3,893. The count is
