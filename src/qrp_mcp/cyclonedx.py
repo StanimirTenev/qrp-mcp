@@ -507,6 +507,8 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
     roles_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
     # Row 480: the call on the key (sign, verify, encrypt, decrypt), beside the role.
     operations_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
+    # Row 484: a curve that is a default, not written in the file (Android Keystore).
+    curve_basis_at: dict[tuple[str, int], str] = {}
     orders_at: dict[tuple[str, int], list[tuple[str, str]]] = {}
     for items in scan_result["evidence"].values():
         for item in items:
@@ -520,6 +522,8 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                                              "encapsulate", "decapsulate"):
                     operations_at.setdefault((item["path"], item["line"]), []).append(
                         (family_of.get(name, name), item["operation"]))
+                if item.get("curve_basis"):
+                    curve_basis_at[(item["path"], item["line"])] = item["curve_basis"]
                 if item.get("order"):
                     orders_at.setdefault((item["path"], item["line"]), []).append(
                         (family_of.get(name, name), _order_text(item["order"])))
@@ -560,6 +564,10 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                 (o["location"], o.get("line")), []) if name == own})) or "not read"
                    for o in occurrences]
             component["properties"].append({"name": f"{NS}operation", "value": json.dumps(ops)})
+        if any((o["location"], o.get("line")) in curve_basis_at for o in occurrences):
+            component["properties"].append({"name": f"{NS}curve_basis", "value": json.dumps(
+                [curve_basis_at.get((o["location"], o.get("line")), "read from the file")
+                 for o in occurrences])})
         if own == "ML-KEM":
             orders = []
             for o in occurrences:

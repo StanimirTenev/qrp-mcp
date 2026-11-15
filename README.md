@@ -166,6 +166,12 @@ From 0.47.0 RustCrypto's `ml_kem`, `ml_dsa` and `slh_dsa` crates and libcrux are
 `provider`, and Go's `mlkem.GenerateKey768()` and its siblings give the parameter set
 ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md)).
 
+From 0.47.0 an Android Keystore key (`KeyPairGenerator.getInstance(..., "AndroidKeyStore")`) takes
+its role from the `PURPOSE_*` of the file's one `KeyGenParameterSpec.Builder`, and an EC key its
+curve from `ECGenParameterSpec(...)` or `setKeySize(...)` there; with neither, P-256 as the
+Keystore's default, marked as such in `curve_basis` (CBOM `qrp:curve_basis`). Where the key lives
+(StrongBox or TEE) is not read.
+
 ### A control on your own tree
 
 ```

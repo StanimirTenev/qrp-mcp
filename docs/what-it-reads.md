@@ -217,6 +217,17 @@ From 0.47.0 the Rust crates too: RustCrypto (`ml_kem::`, `ml_dsa::`, `slh_dsa::`
 parameter set (`GenerateKey768`, `NewEncapsulationKey1024`, `DecapsulationKey768`…), which a line
 naming only the function did not.
 
+**Android Keystore keys** (from 0.47.0, row 484). The `getInstance(KEY_ALGORITHM_EC, "AndroidKeyStore")`
+line names the family; the use and the curve are in the `KeyGenParameterSpec.Builder(...)` that
+initialises it, up to its `build()`. Where the file holds exactly one builder, its `PURPOSE_SIGN`,
+`PURPOSE_VERIFY` or `PURPOSE_ATTEST_KEY` read as a signature, `PURPOSE_AGREE_KEY` as key
+establishment, `PURPOSE_ENCRYPT`/`DECRYPT`/`WRAP_KEY` as encryption, and a mix as undetermined
+(`key_use_in_block`, then `role`); an EC key takes the curve from `ECGenParameterSpec("secp384r1")`
+or `setKeySize(384)`. With neither, the curve is P-256 and `curve_basis` says it is a default: the
+developer documentation says only "an algorithm-specific default", and the value is AOSP's
+`EC_DEFAULT_KEY_SIZE = 256` in AndroidKeyStoreKeyPairGeneratorSpi.java. Two builders in one file
+are not paired. Not read: `setIsStrongBoxBacked`, so where the key lives (StrongBox, TEE).
+
 From 0.32.0 (raised by Paul J. Lilly, extending a point Solahuddin Shamsuddin made): Python's
 `cryptography` is a provider too (`pyca/cryptography`, by `from cryptography.hazmat…`), and **a
 version pinned in a manifest is joined to the provider whose package it is**: `cryptography==44.0.0`

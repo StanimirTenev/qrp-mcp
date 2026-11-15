@@ -4218,6 +4218,7 @@ def scan_source_file(path: Path, rel_path: str,
     _settle_names_defined_here(findings)
     _name_not_a_use_rules(findings, lines, denial_lines)
     findings = _pq_operations(findings, lines, rel_path)
+    _android_keystore_spec(findings, lines)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
     findings = _drop_ecdh_named_only_by_the_setting(findings)
@@ -4309,6 +4310,51 @@ def _pq_operations(findings: list[dict[str, Any]], lines: list[str],
             added.append(item)
             break
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 484: an Android Keystore key's use and curve are in the KeyGenParameterSpec.Builder that
+# initialises its generator, not on the getInstance line. Paired only where the file holds one
+# builder. With no curve or size written, the Keystore's default EC size is 256 bits: AOSP
+# AndroidKeyStoreKeyPairGeneratorSpi.java `EC_DEFAULT_KEY_SIZE = 256` (frameworks/base, main,
+# read 15.11.2026); the developer documentation says only "an algorithm-specific default".
+_KEYSTORE_GENERATOR = re.compile(r"\bgetInstance\([^)]*[\"']AndroidKeyStore[\"']\s*\)")
+_KEYGEN_SPEC_BUILDER = re.compile(r"\bKeyGenParameterSpec\.Builder\s*\(")
+_KEYSTORE_PURPOSE_USE = {"SIGN": "sign", "VERIFY": "sign", "ATTEST_KEY": "sign",
+                         "AGREE_KEY": "key agreement", "ENCRYPT": "encrypt",
+                         "DECRYPT": "encrypt", "WRAP_KEY": "encrypt"}
+_KEYSTORE_PURPOSE = re.compile(r"\bPURPOSE_(SIGN|VERIFY|ATTEST_KEY|AGREE_KEY|ENCRYPT|DECRYPT|WRAP_KEY)\b")
+_KEYSTORE_KEY_SIZE = re.compile(r"\.setKeySize\s*\(\s*(\d+)\s*\)")
+_KEYSTORE_EC_DEFAULT = ("default: no curve or key size in the KeyGenParameterSpec, and the "
+                        "Android Keystore's default EC key size is 256 bits (AOSP "
+                        "AndroidKeyStoreKeyPairGeneratorSpi.java, EC_DEFAULT_KEY_SIZE = 256); "
+                        "not written in the file")
+
+
+def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    builders = [i for i, line in enumerate(lines) if _KEYGEN_SPEC_BUILDER.search(line)]
+    if len(builders) != 1:
+        return
+    start = builders[0]
+    end = next((i for i in range(start, min(start + 20, len(lines)))
+                if re.search(r"\bbuild\s*\(\s*\)", lines[i])), start)
+    spec = "\n".join(lines[start:end + 1])
+    uses = {_KEYSTORE_PURPOSE_USE[p] for p in _KEYSTORE_PURPOSE.findall(spec)}
+    curves = {f"P-{next(g for g in m.groups() if g)}" for m in _NIST_CURVE.finditer(spec)}
+    sizes = {int(n) for n in _KEYSTORE_KEY_SIZE.findall(spec)}
+    for f in findings:
+        if (f.get("algorithm") not in ("EC", "RSA") or f.get("evidence_kind") in ("comment", "ban")
+                or not _KEYSTORE_GENERATOR.search(lines[f["line"] - 1])):
+            continue
+        if uses and "key_use_in_block" not in f:
+            f["key_use_in_block"] = " ".join(sorted(uses))
+        if f["algorithm"] != "EC" or f.get("curve"):
+            continue
+        if len(curves) == 1:
+            f["curve"] = curves.pop()
+        elif not curves and len(sizes) == 1 and sizes <= {224, 256, 384, 521}:
+            f["curve"] = f"P-{sizes.pop()}"
+        elif not curves and not sizes:
+            f["curve"], f["key_size"], f["curve_basis"] = "P-256", 256, _KEYSTORE_EC_DEFAULT
 
 
 # Row 424: `generateKeyPairSync(\n  'rsa',` and `getInstance(\n  "RSA");` were silent, while the

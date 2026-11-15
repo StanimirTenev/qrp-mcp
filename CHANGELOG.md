@@ -6,6 +6,17 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **An Android Keystore key read with no curve, size or role** (row 484; probe `mobile-proba`).
+  `KeyPairGenerator.getInstance(KEY_ALGORITHM_EC, "AndroidKeyStore")` initialised with
+  `KeyGenParameterSpec.Builder(alias, PURPOSE_SIGN)` read EC, `key_size: undetermined`,
+  `role: undetermined`. Where the file holds one builder, its `PURPOSE_*` now set the role, and an
+  EC key's curve comes from `ECGenParameterSpec(...)` or `setKeySize(...)` in it; with neither,
+  P-256 with `curve_basis` saying it is the Keystore's default -- verified in AOSP
+  (AndroidKeyStoreKeyPairGeneratorSpi.java, `EC_DEFAULT_KEY_SIZE = 256`), since the developer
+  documentation gives no number. In the scan JSON, the MCP tools and the CBOM (`qrp:role`,
+  the curve, and `qrp:curve_basis`). Found by re-running the probe. **Not claimed / not done:**
+  where the key lives (StrongBox, TEE; with row 482); a file with two builders is not paired;
+  an RSA key's size from its builder is not read.
 - **The implementation and the parameter set were not always recorded** (row 488, Adam
   Firestone; probe `impl-proba`). Rust `use ml_kem::{MlKem768, ...}` read ML-KEM 768 with no
   `provider`; Go `mlkem.GenerateKey768()` read ML-KEM with no `parameter_set`. RustCrypto's
