@@ -6,6 +6,14 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Checked, not changed: the ECDH row beside X25519 on `ssl_ecdh_curve X25519MLKEM768`** (row 492;
+  probe `dos-proba`). The line gives X25519, ML-KEM-768 and an ECDH row that comes from the
+  directive's name. That is the rule as row 172a set it and the README states it: on a group
+  setting, ECDH is dropped only when the values name no classical elliptic-curve group, and
+  X25519 counts as one ("`secp384r1` and `X25519MLKEM768` keep it"). It is the same in
+  `ssl_ecdh_curve X25519;`. Whether X25519 alone should still yield ECDH is left for a decision;
+  narrowing it would remove ECDH from every X25519-only or X448-only group line and needs the
+  corpus regression.
 - **Per TLS listener, for nginx: which server block pays for what** (row 490, Bogomil Atanasov;
   probe `dos-proba`). Two `server` blocks -- 443 with `X25519MLKEM768` and an `mldsa65_srv.crt`,
   8443 with `X25519` and an `ecdsa_p256.crt` -- gave their algorithms for the whole tree, so the
