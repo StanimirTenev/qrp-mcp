@@ -111,7 +111,17 @@ CONFIG_EXTENSIONS = {".conf", ".cnf", ".ini", ".toml", ".properties", ".cfg",
                      # Helm's template partials: "_helpers.tpl" is "the default location
                      # for template partials" (helm.sh named templates; row 309). Read as
                      # the configuration they render into, as Jinja templates are.
-                     ".tpl", ".gotmpl"}
+                     ".tpl", ".gotmpl",
+                     # Row 498: see DEVICE_TREE_EXTENSIONS.
+                     ".its", ".dts", ".dtsi", ".dtso"}
+
+# Row 498: U-Boot's FIT image sources and device trees, where a signature node names its
+# algorithm (`algo = "sha256,rsa3072"`; doc/usage/fit/signature.rst) and the key it is checked
+# with (`key-name-hint`), and a board's `configs/<board>_defconfig` (`CONFIG_RSA=y`). Claimed
+# as configuration and read by the algorithm rules only (see _read_one): U-Boot holds 11,500
+# of them, and the TLS, IKE and IaC readers of a configuration file found nothing in them.
+DEVICE_TREE_EXTENSIONS = {".its", ".dts", ".dtsi", ".dtso"}
+DEFCONFIG_NAME = re.compile(r"^[\w.-]+_defconfig$")
 
 # .NET's configuration files, by name: web.config, app.config, machine.config, IIS's
 # applicationHost.config, and their transforms (Web.Release.config). Not every `.config`:
@@ -154,6 +164,8 @@ CONFIG_FILENAME_PATTERN = re.compile(
     # ESP-IDF's project configuration: sdkconfig, sdkconfig.defaults and
     # sdkconfig.defaults.TARGET_NAME (ESP-IDF build system guide; ZA-OPRAVYANE row 304).
     r"^sdkconfig(?:\.[\w.-]+)?$|"
+    # Row 498: a U-Boot or Linux board configuration, `configs/<board>_defconfig`.
+    r"^[\w.-]+_defconfig$|"
     # An alternate java.security, as `-Djava.security.properties=<URL>` applies one
     # (`java.security.override`; ZA-OPRAVYANE row 222).
     r"^java\.security\.[\w.-]+$|"
@@ -316,6 +328,14 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # The EVP control calls and the size accessor (include/openssl/rsa.h), and the
         # header itself (ZA-OPRAVYANE row 65).
         r"\bEVP_PKEY_CTX_set_rsa_\w+|\bRSA_size\s*\(|[<\"]openssl/rsa\.h[>\"]|"
+        # Row 499: U-Boot's own RSA header (include/u-boot/rsa.h), and its FIT signature
+        # algorithm names, `<hash>,rsa<bits>` (doc/usage/fit/sign-images.rst: "sha256,rsa2048";
+        # tools/fdt_add_pubkey.c, `binman sign -a sha256,rsa4096`).
+        r"[<\"]u-boot/rsa\.h[>\"]|(?<![A-Za-z0-9])sha(?:1|256|384|512),rsa(?:1024|2048|3072|4096)(?![0-9])|"
+        # Row 498: U-Boot's RSA switched on in a defconfig, `CONFIG_RSA=y`, `CONFIG_SPL_RSA=y`
+        # (lib/rsa/Kconfig); `# CONFIG_RSA is not set` is a switch off. Not the options under it
+        # (`CONFIG_RSA_VERIFY=y` stays an identifier, row 203).
+        r"^\s*CONFIG_(?:SPL_|TPL_|VPL_)?RSA=y\s*$|"
         # .NET / PowerShell: a Windows estate keeps its certificate handling here.
         r"\bRSACryptoServiceProvider\b|\bRSACng\b|\bRSAOpenSsl\b|\bRSA\.Create\b|"
         r"\bRSACertificateExtensions\b|\bGetRSAPublicKey\b|\bGetRSAPrivateKey\b|"
@@ -710,7 +730,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # "X25519MLKEM768" reports the post-quantum half only, and the component Shor
     # actually breaks disappears from the inventory.
     ("X25519", "X25519 key agreement usage", re.compile(
-        r"(?<![A-Za-z])x25519|(?<![A-Za-z])curve25519|"
+        # Not a hex word, `0x25519f22` (row 498: a microcode blob in a .dtsi).
+        r"(?<![A-Za-z])(?<!\b0)x25519|(?<![A-Za-z])curve25519|"
         # NaCl/libsodium never name it: crypto_box is curve25519xsalsa20poly1305,
         # crypto_kx is x25519blake2b, crypto_scalarmult is curve25519 (their own
         # *_PRIMITIVE, include/sodium/*.h); PyNaCl's nacl.public is the same box
@@ -2199,6 +2220,8 @@ _KEY_SIZE = re.compile(
     # Rows 205, 196 (a): Kconfig `..._RSA_LEN=2048`; Yocto's `FIT_SIGN_ALG = "rsa2048"`, only as
     # a whole quoted value (`rsa512_key.pem` is a fixture's file name, as for the key specs).
     r"(?<![A-Za-z])rsa_(?:len|bits|size)\s*=\s*(\d{3,5})\b|[\"'](?i:rsa)(\d{3,5})[\"']|"
+    # Row 499: U-Boot's FIT signature algorithm, `<hash>,rsa<bits>` (`"sha1,rsa2048"`).
+    r"(?<![A-Za-z0-9])sha(?:1|256|384|512),rsa(\d{3,5})(?![0-9])|"
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
     # phpseclib 3: `RSA::createKey(4096)` (row 303).
     r"(?<![\w\\])RSA::createKey\(\s*(\d{3,5})\s*\)|"
@@ -2795,6 +2818,8 @@ _SLASH_COMMENT_EXT = {
     ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".go", ".rs", ".swift", ".kt",
     ".kts", ".scala", ".sc", ".php", ".m", ".mm", ".groovy", ".dart", ".proto",
     ".json5", ".fs", ".fsx",
+    # Row 498: device tree source (dtc) takes C comments.
+    ".its", ".dts", ".dtsi", ".dtso",
 }
 _HASH_COMMENT_EXT = {
     ".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".pm", ".ps1", ".psm1",
@@ -3260,7 +3285,16 @@ _SSH_REMOVAL_LIST = re.compile(
     r"(?:\s*=\s*|\s+)\"?-", re.IGNORECASE)
 
 
+# Row 498: Kconfig writes a switch set off as `# CONFIG_DSA is not set` in a .config, a
+# defconfig and an sdkconfig (U-Boot scripts/kconfig/confdata.c, "# %s%s is not set\n").
+# The line is the value `n`, not a comment about it.
+_KCONFIG_NOT_SET = re.compile(r"^\s*#\s*(CONFIG_\w+)\s+is not set\s*$")
+
+
 def _switched_off(code: str, position: int) -> bool:
+    unset = _KCONFIG_NOT_SET.match(code)
+    if unset and position < unset.end(1):
+        return True
     m = _SWITCH_SET_OFF.match(code) or _SWITCH_ECHOED_OFF.match(code)
     if not m or position >= m.end(1) or not (_SWITCH_NAME.search(m.group(1))
                                              or _SWITCH_NAME_CAMEL.search(m.group(1))):
@@ -5597,6 +5631,15 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         if is_undecoded(algo_findings, key_findings):
             undecoded.append(rel_path)
         material_problems.extend(unparsed_material(path, rel_path, raw))
+    elif path.suffix.lower() in DEVICE_TREE_EXTENSIONS or DEFCONFIG_NAME.match(path.name):
+        # Row 498: a FIT image source, a device tree or a defconfig, by the algorithm rules.
+        # Not by an identifier's EC or DSA: over U-Boot's defconfigs all 25 such rows were
+        # error-correcting memory (CONFIG_DDR_ECC, CONFIG_SPL_NAND_ECC) or the switch layer
+        # (CONFIG_DM_DSA). ECDSA, and RSA by its Kconfig symbol, are read by their own rules.
+        files_scanned["config"] += 1
+        source_findings.extend(
+            f for f in scan_source_file(path, rel_path, lines, cipher_exclusions=True, hot=hot)
+            if not (f.get("evidence_kind") == "identifier" and f["algorithm"] in ("EC", "DSA")))
     elif is_ci:
         files_scanned["ci_config"] += 1
         ci_findings.extend(scan_ci_file(path, rel_path, lines))

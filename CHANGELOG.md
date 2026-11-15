@@ -6,6 +6,31 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **U-Boot's FIT image sources, device trees and defconfigs were not read** (row 498, D2 of
+  `boot-proba/REZULTAT.md` §8; U-Boot 6487c50). `.its` (32), `.dts` (5053), `.dtsi` (4437), `.dtso`
+  (379) and `configs/*_defconfig` (1599) were all `type_not_claimed`, so the files that say how
+  the firmware is signed -- `algo = "sha256,rsa3072"`, `CONFIG_RSA=y` -- were the ones not read.
+  They are now claimed as configuration and read by the algorithm rules (not by the TLS, IKE and
+  IaC readers, which found nothing in them and cost U-Boot 17 s). `CONFIG_RSA=y` /
+  `CONFIG_SPL_RSA=y` is an RSA row (none of the 20 U-Boot defconfigs with it gave one: the
+  identifier alone was not read), and Kconfig's `# CONFIG_X is not set` is a switch off, in an
+  `sdkconfig` too. On U-Boot: `coverage_pct` 60.28% -> 89.50%, 236 rows in these files (RSA 111,
+  SHA-1 79 of which 10 switched off, ECDSA 29, MD5 15, 3DES 2 -- OMAP's DES accelerator clock),
+  findings 188 -> 188; scan 40.5 s -> 48.9 s on this machine. Two false positives the new files
+  showed are closed: an EC or DSA carried by a defconfig identifier is not read (all 25 were `CONFIG_DDR_ECC`, `CONFIG_SPL_NAND_ECC` or
+  `CONFIG_DM_DSA`), and a hex word `0x25519f22` is no longer X25519. **Not claimed:**
+  `key-name-hint`, `required` and `keyfile` name a key, not an algorithm, and give no row;
+  `CONFIG_FIT_SIGNATURE=y` names no family and gives none; a plain `defconfig` (no board name) is
+  not claimed.
+- **U-Boot's FIT algorithm names and RSA header gave no row** (row 499, D3 of
+  `boot-proba/REZULTAT.md` §8). `"sha1,rsa2048"` (tools/fdt_add_pubkey.c:7), `-a sha256,rsa4096`
+  (tools/iot2050-sign-fw.sh:49), `#include <u-boot/rsa.h>` and, in a file with nothing else,
+  `RSA_DEFAULT_PUBEXP` and `struct rsa_public_key` (lib/rsa/rsa-mod-exp.c) were read and silent,
+  while `"rsa2048"` and `<openssl/rsa.h>` were rows. `<hash>,rsa<1024|2048|3072|4096>` is now an
+  RSA row with its size, and `<u-boot/rsa.h>` is RSA as `<openssl/rsa.h>` is (so the file's RSA
+  identifiers are read). Reproduced from the probe's files, one per case. On U-Boot: 84 more RSA
+  rows in `.c`, 25 in `.py` and `.sh`. **Not claimed:** the SHA-1 half of `sha1,rsa2048` is not made a row; the ECDSA names
+  (`sha256,ecdsa384`) were already read with their size (row 503).
 - **An RSA key that wraps a symmetric key did not say so** (row 495, Abhishek J., "AES-256 data
   is largely safe"; probe `aes-proba`). `kek.public_key().encrypt(archive_key, padding.OAEP(...))`
   with `archive_key = AESGCM.generate_key(bit_length=256)` read RSA-4096 at lines 7 and 8 and
