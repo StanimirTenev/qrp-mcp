@@ -6,6 +6,18 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **MCUboot's EC256 naming was not read** (row 501, D5 of `boot-proba/REZULTAT.md` §8; MCUboot
+  f30be48). `MCUBOOT_SIGN_EC256`, `BOOTUTIL_SIGN_EC256: 1`, `CONFIG_ESP_SIGN_EC256=1` and the
+  signing key `CONFIG_ESP_SIGN_KEY_FILE=root-ec-p256.pem` gave no row, while the RSA and Ed25519
+  lines beside them did. MCUboot's `SIGN_EC256` / `SIGNATURE_TYPE_EC256` is ECDSA P-256 and
+  `SIGN_EC384` P-384 (image_validate.c expects IMAGE_TLV_ECDSA_SIG for them); `ENC_EC256`,
+  `ENCRYPT_EC256` and the TLV `ENCEC256` are its ECIES-P256 (docs/encrypted_images.md), read as
+  ECDH P-256; each row carries the curve and size. `ec-p256` is read as the value of a
+  `SIGN_KEY_FILE` / `SIGNATURE_KEY_FILE` setting, as `root-rsa-2048.pem` already was. On MCUboot:
+  lines naming EC256 or ec-p256 without any row 161 -> 24 of 198, source rows 4547 -> 4736,
+  findings 37 -> 37. **Not claimed:** `ec-p256` in any other file name (a script's
+  `../../root-ec-p256.pem`), `EC256` without SIGN or ENC before it (`EC256_PUBK_LEN`, a make
+  variable `BOOT_EC256`) stay unread.
 - **U-Boot's FIT image sources, device trees and defconfigs were not read** (row 498, D2 of
   `boot-proba/REZULTAT.md` §8; U-Boot 6487c50). `.its` (32), `.dts` (5053), `.dtsi` (4437), `.dtso`
   (379) and `configs/*_defconfig` (1599) were all `type_not_claimed`, so the files that say how

@@ -375,6 +375,22 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?<![A-Za-z0-9])ECDSAP256SHA256(?![A-Za-z0-9])", re.IGNORECASE)),
     ("ECDSA", "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)", re.compile(
         r"(?<![A-Za-z0-9])ECDSAP384SHA384(?![A-Za-z0-9])", re.IGNORECASE)),
+    # Row 501: MCUboot's names. `SIGN_EC256` is its ECDSA P-256 signature, and `SIGN_EC384` P-384
+    # (boot/bootutil/src/image_validate.c: either expects IMAGE_TLV_ECDSA_SIG); `MCUBOOT_SIGN_EC256`,
+    # `BOOTUTIL_SIGN_EC256`, `CONFIG_ESP_SIGN_EC256`, mbed's `SIGNATURE_TYPE_EC256`. Its signing
+    # key is `root-ec-p256.pem`, read only as the value of a signing-key file setting
+    # (`CONFIG_ESP_SIGN_KEY_FILE`, `CONFIG_BOOT_SIGNATURE_KEY_FILE`), as `root-rsa-2048.pem`
+    # already was by "RSA usage".
+    ("ECDSA", "ECDSA P-256 named by MCUboot (SIGN_EC256, a root-ec-p256 signing key)", re.compile(
+        r"(?<![A-Za-z0-9])SIGN(?:ATURE_TYPE)?_EC256(?![A-Za-z0-9])|"
+        r"(?<![A-Za-z0-9])SIGN(?:ATURE)?_KEY_FILE\s*[=:]\s*[\"']?[\w./-]*(?<![A-Za-z0-9])ec-p256(?![0-9])")),
+    ("ECDSA", "ECDSA P-384 named by MCUboot (SIGN_EC384)", re.compile(
+        r"(?<![A-Za-z0-9])SIGN_EC384(?![A-Za-z0-9])")),
+    # `ENC_EC256`: "The implemenation of ECIES-P256 is named ENC_EC256 in the source code"
+    # (docs/encrypted_images.md); `MCUBOOT_ENCRYPT_EC256`, `CONFIG_BOOT_ENCRYPT_EC256`, and the
+    # TLV `ENCEC256` (docs/design.md: IMAGE_TLV_ENC_EC256 0x32).
+    ("ECDH", "ECDH P-256 named by MCUboot (ENC_EC256, ECIES-P256 key encryption)", re.compile(
+        r"(?<![A-Za-z0-9])ENC(?:RYPT)?_?EC256(?![A-Za-z0-9])")),
     # Row 344: OpenSSL's signature-algorithm pairs, "algorithm+hash"
     # (https://docs.openssl.org/3.0/man3/SSL_CONF_cmd/, SignatureAlgorithms); mod_ssl's own
     # example is `SSLOpenSSLConfCmd SignatureAlgorithms RSA+SHA384:ECDSA+SHA256`
@@ -1509,6 +1525,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
 DNSSEC_CURVES = {
     "ECDSA P-256 named by a DNSSEC algorithm (13, ECDSAP256SHA256)": ("P-256", 256),
     "ECDSA P-384 named by a DNSSEC algorithm (14, ECDSAP384SHA384)": ("P-384", 384),
+    # Row 501: the curve of an MCUboot name, the same way.
+    "ECDSA P-256 named by MCUboot (SIGN_EC256, a root-ec-p256 signing key)": ("P-256", 256),
+    "ECDSA P-384 named by MCUboot (SIGN_EC384)": ("P-384", 384),
+    "ECDH P-256 named by MCUboot (ENC_EC256, ECIES-P256 key encryption)": ("P-256", 256),
 }
 
 
