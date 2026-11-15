@@ -6,6 +6,18 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Per TLS listener, for nginx: which server block pays for what** (row 490, Bogomil Atanasov;
+  probe `dos-proba`). Two `server` blocks -- 443 with `X25519MLKEM768` and an `mldsa65_srv.crt`,
+  8443 with `X25519` and an `ecdsa_p256.crt` -- gave their algorithms for the whole tree, so the
+  result could not say which port pays an ML-KEM encapsulation and an ML-DSA signature per
+  handshake. `tls_listeners` now lists each nginx `server` block that listens with `ssl` or `quic`:
+  ports, server names (masked below `--level full`), the groups set (each with its families and
+  `post_quantum`) and the certificates (families from the line, or from the parsed file when a file
+  of that name was read; ML-DSA with its parameter set). In the scan JSON, the MCP tools and the
+  CBOM (`qrp:tls_listeners`). Found by re-running the probe. **Not claimed / not changed:** what a
+  connection negotiates; `include` is not followed; a setting outside the block is reported as set
+  outside it, not resolved through nginx inheritance; Apache, HAProxy and other terminators are not
+  listed; findings and components are unchanged.
 - **An algorithm read only from a certificate's file name is marked so, one confidence level
   lower** (row 491; probe `dos-proba`). `ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;` gave
   ML-DSA at `medium`, the level of a directive that names the algorithm, although only the file's

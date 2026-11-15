@@ -187,6 +187,14 @@ _GROUP_SIZE = re.compile(
 _SSH_MODP = {"1": 1024, "14": 2048, "15": 3072, "16": 4096, "17": 6144, "18": 8192}
 
 
+def _listener_algorithm(a: dict[str, Any]) -> str:
+    """Row 490: ML-DSA-65, ECDSA 256; `(named in a path)` where only a file's name says it."""
+    size = a.get("parameter_set") or a.get("key_size")
+    name = (f"{a['family']}-{size}" if size and a["family"] in ("ML-DSA", "ML-KEM", "SLH-DSA")
+            else f"{a['family']} {size}" if size else a["family"])
+    return name + (" (named in a path)" if a.get("named_in_a_path") else "")
+
+
 def _group_size(name: str) -> str | None:
     m = _GROUP_SIZE.match(name.strip())
     if not m:
@@ -1576,6 +1584,17 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                              for x in d["layers"]]}
                  for d in scan_result["layer_disagreements"]], ensure_ascii=False)}]
             if scan_result.get("layer_disagreements") else []) + (
+            # Row 490: each nginx TLS server block with its groups and certificates.
+            [{"name": f"{NS}tls_listeners", "value": json.dumps(
+                [{"location": x["path"], "line": x["line"],
+                  "ports": [p["port"] for p in x["listen"]],
+                  "groups": [f"{g['name']} ({' + '.join(g['families']) or 'not in table'})"
+                             for g in x["groups"]["groups"]],
+                  "certificates": [_listener_algorithm(a) for c in x["certificates"]
+                                   for a in c["algorithms"]
+                                   if c["setting"] == "ssl_certificate"]}
+                 for x in scan_result["tls_listeners"]["places"]], ensure_ascii=False)}]
+            if scan_result.get("tls_listeners") else []) + (
             # Row 473: the lines closed as not a use, with the rule that closed each.
             [{"name": f"{NS}named_but_not_used:lines", "value": json.dumps(
                 [{"family": r["family"], "location": r["path"], "line": r["line"],

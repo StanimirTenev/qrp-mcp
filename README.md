@@ -135,6 +135,11 @@ From 0.47.0 an algorithm read only from the name of a certificate or key file a 
 (`ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;`) is marked `named_in_a_path: true` and is one
 confidence level lower: the file's name is a label, not the certificate.
 
+From 0.47.0 `tls_listeners` lists each nginx `server` block that listens with `ssl` or `quic`: its
+ports, server names (masked below `--level full`), the groups and the certificates set for it, with
+each one's family, so two servers in one file no longer read as one inventory. The CBOM carries it
+as `qrp:tls_listeners` ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/tls.md)).
+
 ### A control on your own tree
 
 ```

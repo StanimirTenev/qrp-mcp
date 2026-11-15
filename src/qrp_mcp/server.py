@@ -403,6 +403,9 @@ def _mask_owners(result: dict[str, Any]) -> None:
             for item in items:
                 if isinstance(item, dict) and item.get("owners"):
                     item["owners"] = [_mask_excerpt(str(o), "") for o in item["owners"]]
+    # Row 490: a listener's server names are host names, masked as owners are.
+    for place in (result.get("tls_listeners") or {}).get("places") or []:
+        place["server_name"] = [_mask_excerpt(str(n), "") for n in place["server_name"]]
 
 
 def _at_level(result: dict[str, Any], level: str) -> dict[str, Any]:

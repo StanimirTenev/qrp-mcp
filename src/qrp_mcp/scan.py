@@ -424,6 +424,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         "count": len(places), "places": places}
     _library_default_key_exchange(result)
     _authentication_not_read(result, repo_path)
+    result["tls_listeners"] = _tls_listeners(result, repo_path)
     _readiness_by_role(result)
     _unowned(result)
     result["layer_disagreements"] = _layer_disagreements(result)
@@ -636,6 +637,131 @@ def _authentication_not_read(result: dict[str, Any], root: Path) -> None:
         part["pqc_readiness"] = "not_established"
         part["because"] = because
         _not_established(summary, because)
+
+
+# Row 490: an nginx `server` block that listens with ssl or quic, with the groups and the
+# certificates set in it. Read from the block's own lines; a setting outside every block in the
+# same file is said to be there, not resolved through nginx's inheritance; `include` is not read.
+_NGINX_SERVER = re.compile(r"^\s*server\s*\{")
+_NGINX_LISTEN = re.compile(r"^\s*listen\s+([^;]+);")
+_NGINX_SERVER_NAME = re.compile(r"^\s*server_name\s+([^;]+);")
+_NGINX_GROUPS = re.compile(r"^\s*ssl_ecdh_curve\s+[\"']?([^;\"'\s]+)")
+_STANDALONE_MLKEM = re.compile(r"mlkem(512|768|1024)")
+_PQ_HALVES = {"ML-KEM", "Kyber", "NTRU"}
+LISTENERS_MEANING = (
+    "nginx server blocks that listen with ssl or quic, each with the key-exchange groups "
+    "(ssl_ecdh_curve) and the certificates (ssl_certificate[_key]) set for it in the files read: "
+    "what each server asks for, not what a connection gets (tls_termination.statement). A setting "
+    "outside every server block of the same file is reported as set there; `include` is not "
+    "followed and other terminators are not listed here")
+
+
+def _group_entry(name: str) -> dict[str, Any]:
+    low = name.lower()
+    key = low.replace("-", "").replace("_", "")
+    if low in detectors.HYBRIDS:
+        halves = detectors.HYBRIDS[low][1]
+        return {"name": name, "families": [
+            f"{f}-{p}" if p and f in ("ML-KEM", "Kyber") else f"{f} {p}" if p else f
+            for f, p in halves], "post_quantum": any(f in _PQ_HALVES for f, _ in halves)}
+    if key in assets.CLASSICAL_GROUPS:
+        return {"name": name, "families": [assets.CLASSICAL_GROUPS[key]], "post_quantum": False}
+    m = _STANDALONE_MLKEM.fullmatch(key)
+    if m:
+        return {"name": name, "families": [f"ML-KEM-{m.group(1)}"], "post_quantum": True}
+    return {"name": name, "families": [], "post_quantum": None}
+
+
+def _row_algorithms(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{"family": r["algorithm"],
+             **{k: r[k] for k in ("parameter_set", "key_size", "curve") if k in r},
+             "confidence": r.get("confidence"),
+             "named_in_a_path": bool(r.get("named_in_a_path"))}
+            for r in rows if r.get("algorithm")]
+
+
+def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
+    rows: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    for category in ("source_code", "iac"):
+        for r in result["evidence"].get(category, []):
+            rows.setdefault((r["path"], r["line"]), []).append(r)
+            if r.get("certificate"):
+                by_name.setdefault(r["path"].rsplit("/", 1)[-1], []).append(r)
+    places = []
+    for rel in result.get("files_read") or []:
+        if not confidence._is_config(rel):
+            continue
+        try:
+            lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        if not any(_NGINX_SERVER.match(line) for line in lines):
+            continue
+        blocks: list[dict[str, Any]] = []
+        outside: dict[str, list[int]] = {"groups": [], "certificates": []}
+        depth, current = 0, None
+        for n, raw in enumerate(lines, 1):
+            line = raw.split("#", 1)[0]
+            if current is None and _NGINX_SERVER.match(line):
+                current = {"line": n, "depth": depth, "listen": [], "server_name": [],
+                           "groups": [], "certificates": []}
+            target = current
+            listen = _NGINX_LISTEN.match(line)
+            if target and listen:
+                words = listen.group(1).split()
+                if any(w in ("ssl", "quic") for w in words[1:]):
+                    port = words[0].rsplit(":", 1)[-1] if ":" in words[0] or \
+                        words[0].isdigit() else "443"
+                    target["listen"].append({"line": n, "port": port})
+            name = _NGINX_SERVER_NAME.match(line)
+            if target and name:
+                target["server_name"].extend(name.group(1).split())
+            kind = ("groups" if _NGINX_GROUPS.match(line) else
+                    "certificates" if _AUTHENTICATION_FILE.match(line)
+                    and not line.lstrip().startswith("bind") else None)
+            if kind:
+                (target[kind] if target else outside[kind]).append(n)
+            depth += line.count("{") - line.count("}")
+            if current is not None and depth <= current["depth"]:
+                blocks.append(current)
+                current = None
+        for block in blocks:
+            if not block["listen"]:
+                continue
+            group_lines, where = block["groups"], "in this block"
+            if not group_lines and outside["groups"]:
+                group_lines, where = outside["groups"], (
+                    "in this file, outside the server block: nginx applies it unless the "
+                    "block or an included file sets its own")
+            if group_lines:
+                at = group_lines[-1]
+                value = _NGINX_GROUPS.match(lines[at - 1].split("#", 1)[0]).group(1)
+                groups = {"line": at, "set": where,
+                          "groups": [_group_entry(g) for g in value.split(":") if g]}
+            else:
+                groups = {"line": None, "groups": [], "set": (
+                    "not in this file: an included file or the TLS library's default applies, "
+                    "not resolved")}
+            cert_lines, where = block["certificates"], "in this block"
+            if not cert_lines and outside["certificates"]:
+                cert_lines, where = outside["certificates"], (
+                    "in this file, outside the server block")
+            certificates = []
+            for at in cert_lines:
+                m = _AUTHENTICATION_FILE.match(lines[at - 1])
+                named = (m.group(2) or "").rsplit("/", 1)[-1]
+                parsed = by_name.get(named, [])
+                certificates.append({
+                    "line": at, "setting": m.group(1), "set": where,
+                    "file_read": sorted({r["path"] for r in parsed}),
+                    "algorithms": _row_algorithms(parsed or rows.get((rel, at), []))})
+            places.append({"path": rel, "line": block["line"], "listen": block["listen"],
+                           "server_name": block["server_name"], "groups": groups,
+                           "certificates": certificates})
+    if not places:
+        return None
+    return {"meaning": LISTENERS_MEANING, "count": len(places), "places": places}
 
 
 def _readiness_by_role(result: dict[str, Any]) -> None:
