@@ -8,8 +8,8 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 - **Verifying a signature read the same as signing one** (row 480, Paul Snow; probe
   `verify-proba`). `public_key.verify(...PSS...)` in `archive_verify.py` and `key.sign(...)` in
-  `issue_record.py` gave the same row: RSA, signature, deprecated after 2030, "due". An RSA or EC
-  line that calls exactly one of `.sign(`, `.verify(`, `.encrypt(`, `.decrypt(` on a key (also Go
+  `issue_record.py` gave the same row: RSA, signature, deprecated after 2030, "due". An RSA, EC,
+  ECDSA, EdDSA or DSA line that calls exactly one of `.sign(`, `.verify(`, `.encrypt(`, `.decrypt(` on a key (also Go
   `rsa.VerifyPSS(` and Java `initVerify(` forms) now carries `operation`, in the scan JSON, the
   MCP tools, SARIF and the CBOM (`qrp:operation`). Under `--mandate nist-ir-8547` a verify-only or
   decrypt-only line gets `legacy_use` and is counted in `verify_or_decrypt_only`. Found by
@@ -18,7 +18,8 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   permitted" outside the gate, but IR 8547 final only defines legacy use (section 4.1, and the
   glossary) and Tables 2 and 4 give these schemes no such status, so the dates and the gate stand
   and a verify-only line still trips it; a decrypt-only line stays `hndl_exposed`. Arguments and
-  settings (`verify=False`, `ssl_verify_client`) are not calls and give no operation.
+  settings (`verify=False`, `ssl_verify_client`) are not calls and give no operation; a call on a
+  key whose family is not on the same line is not read.
 - **The federal dates by role under `--mandate nist-ir-8547`** (row 493, Tuta; probe
   `ir8547-proba`). An RSA-3072 signature and a P-256 ECDH exchange read "deprecated after
   2030-12-31", which the final text says, but the dates section 4 of the same text restates from

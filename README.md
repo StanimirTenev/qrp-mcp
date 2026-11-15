@@ -146,9 +146,9 @@ establishment by 2030-12-31, signatures by 2031-12-31 -- for federal high value 
 impact systems only. The scan cannot tell which systems those are, so the gate does not count it
 ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
 
-From 0.47.0 an RSA or EC line that calls `.sign(`, `.verify(`, `.encrypt(` or `.decrypt(` on a key
-carries `operation`, so verifying an old signature no longer reads the same as signing a new one;
-in the CBOM as `qrp:operation`. Under `--mandate nist-ir-8547` a verify-only or decrypt-only line
+From 0.47.0 an RSA, EC, ECDSA, EdDSA or DSA line that calls `.sign(`, `.verify(`, `.encrypt(` or
+`.decrypt(` on a key carries `operation`, so verifying an old signature no longer reads the same
+as signing a new one; in the CBOM as `qrp:operation`. Under `--mandate nist-ir-8547` a verify-only or decrypt-only line
 says what IR 8547 calls legacy use, with no exemption: the dates and the gate are unchanged
 ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/closure-and-profiles.md)).
 

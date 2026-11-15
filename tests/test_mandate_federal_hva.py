@@ -91,3 +91,24 @@ def test_the_gate_does_not_count_the_federal_dates(tmp_path):
         assert block["next_deadline"] == "2030-12-31"
         # 2030-12-31 is 49 months from 2026-11-15: the gate trips on the deprecation only.
         assert failed is (lead >= 50), (lead, block["within_lead"])
+
+
+def test_in_sarif_and_not_on_a_composite(tmp_path):
+    t = _tree(tmp_path)
+    (t / "nginx.conf").write_text("server {\n    listen 443 ssl;\n"
+                                  "    ssl_ecdh_curve X25519MLKEM768;\n}\n")
+    out = tmp_path / "r.sarif"
+    assert server.scan_to_file([str(t), "--mandate", "nist-ir-8547", "--as-of", AS_OF,
+                                "--format", "sarif", "--out", str(out)]) == 0
+    results = [res for run in json.loads(out.read_text())["runs"] for res in run["results"]]
+    feds = [res["properties"]["mandates"]["nist-ir-8547"].get("federal_high_value_assets")
+            for res in results if "nist-ir-8547" in res["properties"].get("mandates", {})]
+    assert any(f and f.get("pqc_by") == "2031-12-31" for f in feds)
+    assert any(f and f.get("pqc_by") == "2030-12-31" for f in feds)
+    r = scan_directory(t)
+    mandates.apply(r, ["nist-ir-8547"], date.fromisoformat(AS_OF))
+    composites = [e["mandates"]["nist-ir-8547"] for e in r["evidence"]["source_code"]
+                  if e["path"] == "nginx.conf"
+                  and e.get("mandates", {}).get("nist-ir-8547", {}).get("status")
+                  == "composite_allowed"]
+    assert composites and all("federal_high_value_assets" not in c for c in composites)

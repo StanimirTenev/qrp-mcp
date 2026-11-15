@@ -142,3 +142,26 @@ def test_operation_reaches_the_mcp_tool_sarif_and_the_cbom(tree, tmp_path):
         assert got[("RSA", "unwrap.py", 2)] == "decrypt"
         # The key generated on its own line is its own component (RSA-3072); no call read.
         assert got[("RSA-3072", "issue_record.py", 4)] == "not read"
+
+
+def test_ecdsa_eddsa_and_dsa_verify_too(tmp_path):
+    t = tmp_path / "sig"
+    t.mkdir()
+    (t / "v.py").write_text(
+        "from cryptography.hazmat.primitives.asymmetric import ec, ed25519, dsa\n"
+        "from cryptography.hazmat.primitives import hashes\n"
+        "pub.verify(sig, data, ec.ECDSA(hashes.SHA256()))\n"
+        "ed_pub = ed25519.Ed25519PublicKey.from_public_bytes(b); ed_pub.verify(sig, data)\n"
+        "dsa_pub.verify(sig, data, hashes.SHA256())  # DSA\n"
+        "s = ed25519.Ed25519PrivateKey.generate().sign(data)\n")
+    r = scan_directory(t)
+    got = {(e["line"], e["algorithm"]): e.get("operation") for e in r["evidence"]["source_code"]}
+    assert got[(3, "ECDSA")] == "verify"
+    assert got[(4, "Ed25519")] == "verify"
+    assert got[(5, "DSA")] == "verify"
+    assert got[(6, "Ed25519")] == "sign"
+    mandates.apply(r, ["nist-ir-8547"], date.fromisoformat(AS_OF))
+    assert r["mandates"]["nist-ir-8547"]["verify_or_decrypt_only"] == 2  # DSA is in no table
+    props = {(c["name"], p["name"]): p["value"] for c in cyclonedx.build(scan_directory(t))[
+        "components"] for p in c.get("properties", [])}
+    assert "verify" in json.loads(props[("ECDSA", "qrp:operation")])

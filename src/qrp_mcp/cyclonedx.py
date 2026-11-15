@@ -553,6 +553,7 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                                if name == own})
                 roles.append("+".join(said) or "not read")
             component["properties"].append({"name": f"{NS}role", "value": json.dumps(roles)})
+        if own in remediation.OPERATION_FAMILIES:
             ops = ["+".join(sorted({op for name, op in operations_at.get(
                 (o["location"], o.get("line")), []) if name == own})) or "not read"
                    for o in occurrences]

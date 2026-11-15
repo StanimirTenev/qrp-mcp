@@ -129,7 +129,7 @@ of code (comments carry a role but are not counted) in `roles_seen`, and drops a
 no line showed that role **and** no line was undetermined. Every path says how many lines it is for.
 From 0.39.0 the role is in the CBOM too, as `qrp:role` on RSA and EC components, one value per
 occurrence; before, it stopped at the scan JSON.
-From 0.47.0 an RSA or EC line that calls exactly one of `.sign(`, `.verify(`, `.encrypt(` or
+From 0.47.0 an RSA, EC, ECDSA, EdDSA or DSA line that calls exactly one of `.sign(`, `.verify(`, `.encrypt(` or
 `.decrypt(` on a key (also `rsa.VerifyPSS(`, `initVerify(` and the like) carries `operation`, so
 checking a signature no longer reads the same as making one. It is read from the call only:
 `verify=False`, `ssl_verify_client` and a key generated on its own line give none. In the scan
