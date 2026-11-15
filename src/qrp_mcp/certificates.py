@@ -758,6 +758,56 @@ def _load_private_key(pem: bytes) -> dict[str, Any]:
     return _key_fields(_key_info(key))
 
 
+# Row 469 (QCI CBOM-Benchmark 2.6.6): an OpenSSH private key gave "Embedded private key
+# material" with no family. The openssh-key-v1 format (OpenSSH PROTOCOL.key) keeps the public
+# key in the clear, ahead of the encrypted part: "openssh-key-v1\0", string ciphername, string
+# kdfname, string kdfoptions, uint32 number of keys, then each public key, whose first string
+# is the key type (RFC 4253 section 6.6). Read from the header, so a passphrase does not hide it.
+_OPENSSH_KEY_TYPES = {
+    "ssh-ed25519": ("Ed25519", 256, None), "sk-ssh-ed25519@openssh.com": ("Ed25519", 256, None),
+    "ssh-ed448": ("Ed448", 456, None), "ssh-dss": ("DSA", None, None),
+    "ecdsa-sha2-nistp256": ("EC", 256, "P-256"), "ecdsa-sha2-nistp384": ("EC", 384, "P-384"),
+    "ecdsa-sha2-nistp521": ("EC", 521, "P-521"),
+    "sk-ecdsa-sha2-nistp256@openssh.com": ("EC", 256, "P-256"), "ssh-rsa": ("RSA", None, None)}
+
+
+def _openssh_key_fields(body: str) -> dict[str, Any]:
+    try:
+        blob = base64.b64decode(body, validate=False)
+        magic = b"openssh-key-v1\0"
+        if not blob.startswith(magic):
+            return {"key_unread": "body_not_a_key"}
+        at = len(magic)
+
+        def string() -> bytes:
+            nonlocal at
+            size = int.from_bytes(blob[at:at + 4], "big")
+            if at + 4 + size > len(blob):
+                raise ValueError("short")
+            at += 4 + size
+            return blob[at - size:at]
+
+        string(), string(), string()          # ciphername, kdfname, kdfoptions
+        at += 4                               # number of keys
+        public = string()
+        at = 0
+        blob = public
+        kind = string().decode("ascii")
+        family, size, curve = _OPENSSH_KEY_TYPES[kind]
+        if family == "RSA":
+            string()                          # e
+            n = string().lstrip(b"\0")
+            size = len(n) * 8 - (8 - n[0].bit_length()) if n else None
+    except Exception:  # noqa: BLE001 -- never raises: a corpus is edge cases
+        return {"key_unread": "family_not_named"}
+    out: dict[str, Any] = {"key_algorithm": family}
+    if size:
+        out["key_size"] = size
+    if curve:
+        out["curve"] = curve
+    return out
+
+
 # Base64, padding, and what RFC 1421 headers carry (`Proc-Type: 4,ENCRYPTED`).
 _NOT_A_BODY = re.compile(r"[^A-Za-z0-9+/=:,\-]")
 
@@ -829,7 +879,9 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
             parsed_blocks.add(n)
             add(line, f"-----BEGIN {label}-----", "PKCS#7" if label == "PKCS7" else "PEM",
                 found)
-        elif _PRIVATE_KEY_LABEL.search(label) and label != "OPENSSH PRIVATE KEY":
+        elif label == "OPENSSH PRIVATE KEY":
+            keys[line] = _openssh_key_fields(_bare_body(match.group(2)))
+        elif _PRIVATE_KEY_LABEL.search(label):
             keys[line] = _load_private_key(match.group(0).encode())
             if keys[line].get("key_unread") == "body_not_a_key":
                 # Inside a JSON string (`\n` escapes) or an indented YAML block scalar: the
@@ -1022,6 +1074,16 @@ def scan_certificate_file(path: Path, rel_path: str,
                 "description": f"private key material in a {label.lower()} block",
                 **material["keys"].get(line_no, {}),
             })
+            # Row 469: the family an openssh-key-v1 header names, as a row of its own (no
+            # object identifier inside to find it by, as a PKCS#8 key has).
+            fields = material["keys"].get(line_no, {})
+            if label == "OPENSSH PRIVATE KEY" and fields.get("key_algorithm"):
+                family = fields["key_algorithm"]
+                record(family, f"{family} key in an openssh private key block (key type from "
+                               f"its openssh-key-v1 header)", line_no, f"-----BEGIN {label}-----")
+                if algorithms and algorithms[-1]["algorithm"] == family:
+                    algorithms[-1].update({k: fields[k] for k in ("key_size", "curve")
+                                           if k in fields})
         try:
             blobs.append(base64.b64decode(_bare_body(match.group(2)), validate=False))
         except (ValueError, TypeError):
