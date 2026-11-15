@@ -101,6 +101,12 @@ now also carries `directories`: each excluding directory from the root (`tier5/j
 `.git` is not listed. In the CBOM each directory's paths are one property holding a JSON array.
 The counts by name are unchanged.
 
+From 0.47.0 a `vendor` directory is excluded only at the root of the tree or beside a package
+manifest (`go.mod`, `composer.json`, `Gemfile`, `Cargo.toml`, `package.json`, …), where a package
+manager vendors; any other `vendor/` is read (row 507: U-Boot's `tools/binman/test/vendor/`, 35
+test device trees, was dropped). `instrument.excluded_dirs` says so: `vendor (at the root, or
+beside a package manifest)`. The other names still exclude wherever they are.
+
 ## Read in part (from 0.42.0)
 
 - `coverage.scope.read_in_part` — the files that were opened but read only in part or gave

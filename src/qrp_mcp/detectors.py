@@ -84,6 +84,9 @@ EXCLUDED_DIRS = {
     ".pytest_cache", ".mypy_cache", ".ruff_cache",
 }
 
+# Row 507: how `vendor` is excluded, as the coverage block declares it (iter_repo_files).
+VENDOR_RULE = "vendor (at the root, or beside a package manifest)"
+
 CI_CONFIG_FILENAMES = {".gitlab-ci.yml", "Jenkinsfile", "azure-pipelines.yml"}
 
 IAC_EXTENSIONS = {".tf", ".tfvars"}
@@ -2510,10 +2513,19 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
     found: list[Path] = []
     found_posix: list[str] = []
     posix = os.name == "posix"
+    # Row 507: a `vendor/` below the root and with no package manifest beside it is not what a
+    # package manager vendors (U-Boot's tools/binman/test/vendor/ holds 35 test device trees),
+    # and is read like any other directory.
+    kept_vendor: set[tuple[str, ...]] = set()
     for dirpath, dirnames, filenames in os.walk(repo_path, onerror=onerror):
         dirnames.sort()
         dir_parts = Path(dirpath).relative_to(repo_path).parts
-        hit = next((part for part in dir_parts if part in EXCLUDED_DIRS), None)
+        at = next((i for i, part in enumerate(dir_parts) if part in EXCLUDED_DIRS
+                   and not (part == "vendor" and dir_parts[:i + 1] in kept_vendor)), None)
+        hit = None if at is None else dir_parts[at]
+        if (hit is None and dir_parts and "vendor" in dirnames
+                and not any(is_manifest(Path(name)) for name in filenames)):
+            kept_vendor.add((*dir_parts, "vendor"))
         # os.walk already declines to descend into a linked directory; without this
         # it simply vanished, and the scan still said it had read every file.
         if hit is None:
@@ -2533,7 +2545,7 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
                     excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
                 if excluded_paths is not None:
                     # Row 471: by the directory that removed it, from the tree's root.
-                    root = display_path("/".join(dir_parts[:dir_parts.index(hit) + 1]))
+                    root = display_path("/".join(dir_parts[:at + 1]))
                     excluded_paths.setdefault(root, []).append(
                         display_path("/".join((*dir_parts, name))))
                 continue

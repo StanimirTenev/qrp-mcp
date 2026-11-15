@@ -6,6 +6,14 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Every directory named `vendor` was excluded, wherever it was** (row 507, D14). On U-Boot that
+  removed `tools/binman/test/vendor/`, 35 test device trees for vendor image formats, before
+  counting. `vendor/` is now excluded only at the root of the tree or beside a package manifest
+  (`go.mod`, `composer.json`, `Gemfile`, `Cargo.toml`, `package.json`, ...); any other is read, and
+  `instrument.excluded_dirs` names the rule (`vendor (at the root, or beside a package
+  manifest)`), so a closure against an older result says the filter differs, as it does. Go's
+  `vendor/modules.txt` is read as before. U-Boot: the 35 files read, none gives a row. **Not
+  changed:** `build/` and the other names still exclude anywhere (U-Boot's `doc/build/`, 10 files).
 - **Firmware signing steps were not read, and a step never said its key was out of reach**
   (row 500, D4 of `boot-proba/REZULTAT.md` §8). `SIGNING_COMMAND_PATTERNS` had nothing for
   `mkimage -k/-G/-K`, `binman sign` or `imgtool sign`: both scans had

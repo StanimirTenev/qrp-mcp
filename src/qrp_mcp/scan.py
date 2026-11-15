@@ -249,7 +249,8 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             # A file no type claims is still read when its first bytes are a key.
             "any_type_beginning_with_key_material": ["*"],
         },
-        excluded_dirs=list(detectors.EXCLUDED_DIRS),
+        excluded_dirs=[detectors.VENDOR_RULE if d == "vendor" else d
+                       for d in detectors.EXCLUDED_DIRS],
     )
 
     _withhold_reassurance(summary, coverage_block, scan_result, response.findings)
