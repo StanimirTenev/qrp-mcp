@@ -2315,7 +2315,8 @@ def _is_link(path: Path) -> bool:
 
 
 def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = None,
-                    problems: list[tuple[str, str]] | None = None):
+                    problems: list[tuple[str, str]] | None = None,
+                    excluded_paths: dict[str, list[str]] | None = None):
     """Every file under the path, minus the vendored and generated directories.
 
     The exclusion is counted rather than silent. A directory name dropped here
@@ -2369,6 +2370,11 @@ def iter_repo_files(repo_path: Path, excluded_counter: dict[str, int] | None = N
                                         and sum(p in EXCLUDED_DIRS for p in dir_parts) == 1):
                 if excluded_counter is not None:
                     excluded_counter[hit] = excluded_counter.get(hit, 0) + 1
+                if excluded_paths is not None:
+                    # Row 471: by the directory that removed it, from the tree's root.
+                    root = display_path("/".join(dir_parts[:dir_parts.index(hit) + 1]))
+                    excluded_paths.setdefault(root, []).append(
+                        display_path("/".join((*dir_parts, name))))
                 continue
             if posix:
                 # One lstat of the path as a string answers both questions below where
@@ -5544,7 +5550,9 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         key_files,
         file_digests, codeowners, file_digests_lf, property_values)))
     reading["files_present"] = files_present
-    walked = list(iter_repo_files(repo_path, excluded_dir_counts, walk_problems))
+    excluded_dir_paths: dict[str, list[str]] = {}
+    walked = list(iter_repo_files(repo_path, excluded_dir_counts, walk_problems,
+                                  excluded_dir_paths))
     stubs = _git_link_stubs(repo_path)
     if stubs:
         kept = []
@@ -5687,6 +5695,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         "files_excluded_by_dir": dict(
             sorted(excluded_dir_counts.items(), key=lambda kv: kv[1], reverse=True)
         ),
+        "files_excluded_by_dir_path": excluded_dir_paths,
         "source_code_findings": source_findings,
         "ci_pipeline_findings": ci_findings,
         "iac_findings": iac_findings,

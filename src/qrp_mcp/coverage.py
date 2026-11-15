@@ -563,6 +563,13 @@ def build(
             "files_excluded_before_counting": {
                 "total": sum(excluded.values()),
                 "by_directory": excluded,
+                # Row 471 (QCI CBOM-Benchmark 2.6.6): counted, not named -- `dist 3` with no
+                # path, while those files held 13 findings another scanner read. Each
+                # directory that removed files, from the root, with its files up to
+                # EXCLUDED_PATHS_LISTED; past that, the count of those not listed. `.git` is
+                # not listed: git metadata is not part of the estate (verdict_line).
+                "directories": _excluded_directories(
+                    scan_result.get("files_excluded_by_dir_path") or {}),
             },
             "files_present": present,
             # Beside the size, so a reader can tell whether a figure describes the
@@ -801,6 +808,23 @@ def compare(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
         "targets": [_pin_of(first, "corpus").get("target"),
                     _pin_of(second, "corpus").get("target")],
     }
+
+
+EXCLUDED_PATHS_LISTED = 50
+
+
+def _excluded_directories(by_path: dict[str, list[str]]) -> list[dict[str, Any]]:
+    out = []
+    for root in sorted(by_path):
+        if root.rsplit("/", 1)[-1] == ".git":
+            continue
+        files = sorted(by_path[root])
+        entry: dict[str, Any] = {"directory": root, "files": len(files),
+                                 "paths": files[:EXCLUDED_PATHS_LISTED]}
+        if len(files) > EXCLUDED_PATHS_LISTED:
+            entry["paths_not_listed"] = len(files) - EXCLUDED_PATHS_LISTED
+        out.append(entry)
+    return out
 
 
 def _read_in_part(problems: list[dict[str, Any]], undecoded: list[str]) -> list[str]:
