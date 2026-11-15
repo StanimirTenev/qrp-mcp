@@ -4022,6 +4022,12 @@ def scan_source_file(path: Path, rel_path: str,
                     del by_pattern[family]
                 continue
             if family in seen_on_line:
+                # Row 477: `ML_DSA_65 = "2.16.840.1.101.3.4.3.18"` -- the OID names the
+                # algorithm, so the name beside it is not all the line says (row 463's settle).
+                for held in findings[first_on_line:]:
+                    if (held["algorithm"] == family and "_kind_if_used" in held
+                            and not _in_spans(pos, spans)):
+                        held["evidence_kind"] = held.pop("_kind_if_used")
                 continue
             seen_on_line.add(family)
             findings.append({
@@ -4640,6 +4646,11 @@ HYBRIDS: dict[str, tuple[str, tuple[tuple[str, str | None], ...]]] = {
         # page: "prefixing the algorithm keyword with keX_"; ecp256 is IANA group 19).
         ("ecp256-ke1_mlkem768", (("ECDH", "P-256"), ("ML-KEM", "768"))),
     )}
+# Rows 477, 478: a composite ML-DSA signature (RFC 10073) is a hybrid too, named by its name,
+# its label or its OID; one table (oids.COMPOSITE_ML_DSA), the name as the entry's name.
+for _oid, (_name, _label, _halves, _) in oids.COMPOSITE_ML_DSA.items():
+    for _key in (_name, _label, _oid):
+        HYBRIDS[_key.lower()] = (_name, _halves)
 _HYBRID_NAME = re.compile(
     r"(?<![A-Za-z0-9])(" + "|".join(re.escape(n) for n in sorted(HYBRIDS, key=len, reverse=True))
     + r")(?:@openssh\.com)?(?![A-Za-z0-9])", re.IGNORECASE)
@@ -4670,7 +4681,9 @@ LINE_GATE = line_gate()
 
 def scan_hybrid_names(line: str) -> list[str]:
     """The hybrids this line names, by their registered spelling."""
-    if "kem" not in line.lower() and "sntrup" not in line.lower() and "wing" not in line.lower():
+    lowered = line.lower()
+    if ("kem" not in lowered and "sntrup" not in lowered and "wing" not in lowered
+            and "mldsa" not in lowered and "5.5.7.6." not in lowered):
         return []
     out: list[str] = []
     for match in _HYBRID_NAME.finditer(line):
@@ -4806,7 +4819,7 @@ _READING_LISTS = (
     "hybrid_names", "pinned_images", "ssh_kex_findings", "weak_key_findings", "fips_findings",
     "pins", "property_reads", "skipped_files", "left_out", "files_read", "markers",
     "excluded_by_config", "material_problems", "runtime_choices", "ec_points_checked",
-    "cipher_suite_findings",)
+    "cipher_suite_findings", "oids_not_known",)
 _READING_COUNTS = ("files_scanned", "skipped_kinds", "present_kinds")
 _READING_MAPS = ("key_files", "file_digests", "codeowners", "file_digests_lf")
 _READING_LIST_MAPS = ("property_values",)
@@ -4823,7 +4836,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
      ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads, skipped_files,
      left_out, files_read, markers, excluded_by_config, material_problems, runtime_choices_found,
-     ec_points_checked, cipher_suite_findings, files_scanned, skipped_kinds, present_kinds,
+     ec_points_checked, cipher_suite_findings, oids_not_known, files_scanned, skipped_kinds, present_kinds,
      key_files, file_digests, codeowners, file_digests_lf, property_values) = (
         r[name] for name in _READING)
     # A walked file is not a link, so it can only resolve to an excluded path of its own
@@ -4979,6 +4992,10 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         if suites:
             cipher_suite_findings.append({"path": rel_path, "line": number, "suites": suites,
                                           "in_test_code": in_test_code(rel_path)})
+        for oid, arc in oids.not_known(text_line):
+            oids_not_known.append({"path": rel_path, "line": number, "oid": oid, "arc": arc,
+                                   "statement": oids.NOT_KNOWN,
+                                   "in_test_code": in_test_code(rel_path)})
         for kex in scan_ssh_kex(text_line):
             kex["path"] = rel_path
             kex["line"] = number
@@ -5634,13 +5651,16 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     ec_points_checked: list[str] = []
     # The suites each cipher-suite setting enables, by name (rows 465, 475).
     cipher_suite_findings: list[dict[str, Any]] = []
+    # Row 477: OIDs under an arc where algorithms are assigned that the table does not hold.
+    oids_not_known: list[dict[str, Any]] = []
     reading = dict(zip(_READING, (
         source_findings, ci_findings, iac_findings, embedded_key_findings, unreadable, reports,
         declarations, undecoded, content_parts, protocol_findings, dependency_findings,
         tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
         ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads,
         skipped_files, left_out, files_read, markers, excluded_by_config, material_problems,
-        runtime_choices_found, ec_points_checked, cipher_suite_findings, files_scanned,
+        runtime_choices_found, ec_points_checked, cipher_suite_findings, oids_not_known,
+        files_scanned,
         skipped_kinds, present_kinds, key_files,
         file_digests, codeowners, file_digests_lf, property_values)))
     reading["files_present"] = files_present
@@ -5769,6 +5789,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         "tls_group_findings": tls_group_findings,
         "static_rsa_kex_findings": static_rsa_findings,
         "cipher_suite_findings": cipher_suite_findings,
+        "oids_not_known": oids_not_known,
         "library_support_findings": library_support(pinned_images, hybrid_places, files_read),
         "ssh_kex_findings": ssh_kex_findings,
         "weak_key_findings": weak_key_findings,

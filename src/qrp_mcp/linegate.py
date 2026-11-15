@@ -78,8 +78,8 @@ LITERALS: set[str] = {
     # assets.scan_protocols: `SSLProtocol all` (_SSL_PROTOCOL_ALL) enables versions without
     # naming one. _BARE_TLS_VERSION_SETTING and _VERSION_MACRO are a part below.
     "sslprotocol",
-    # oids.scan: nothing without one of these three.
-    "840", "1.3.1", "3, 1",
+    # oids.scan: nothing without one of these three; the composite arc (row 477) has none.
+    "840", "1.3.1", "3, 1", "5.5.7.6.",
     # switches.scan: nothing without one of switches.LITERALS.
     *switches.LITERALS,
     # dnssec.scan_records / unnamed_records: RRSIG; DNSKEY (the other spellings are below).

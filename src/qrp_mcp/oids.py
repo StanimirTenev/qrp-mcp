@@ -64,6 +64,65 @@ OIDS: dict[str, tuple[tuple[str, ...], str]] = {
     "1.2.840.113549.1.9.16.3.6": (("3DES",), "id-alg-CMS3DESwrap"),
 }
 
+# Rows 477, 478: the 18 composite ML-DSA signatures of RFC 10073 section 7 (read 15.11.2026 from
+# the RFC text): OID -> (name, label, (ML-DSA half, traditional half), pre-hash). A half is
+# (family, parameter set, curve or RSA size, or None). The certificate parser reads the same
+# table (certificates.COMPOSITE_SIGNATURES).
+COMPOSITE_ML_DSA: dict[str, tuple[str, str, tuple[tuple[str, str | None], ...], str]] = {
+    f"1.3.6.1.5.5.7.6.{arc}": (name, label, (("ML-DSA", mldsa), (family, param)), prehash)
+    for arc, name, label, mldsa, family, param, prehash in (
+        (37, "id-MLDSA44-RSA2048-PSS-SHA256", "COMPSIG-MLDSA44-RSA2048-PSS-SHA256", "44", "RSA", "2048", "SHA256"),
+        (38, "id-MLDSA44-RSA2048-PKCS15-SHA256", "COMPSIG-MLDSA44-RSA2048-PKCS15-SHA256", "44", "RSA", "2048", "SHA256"),
+        (39, "id-MLDSA44-Ed25519-SHA512", "COMPSIG-MLDSA44-Ed25519-SHA512", "44", "Ed25519", None, "SHA512"),
+        (40, "id-MLDSA44-ECDSA-P256-SHA256", "COMPSIG-MLDSA44-ECDSA-P256-SHA256", "44", "ECDSA", "P-256", "SHA256"),
+        (41, "id-MLDSA65-RSA3072-PSS-SHA512", "COMPSIG-MLDSA65-RSA3072-PSS-SHA512", "65", "RSA", "3072", "SHA512"),
+        (42, "id-MLDSA65-RSA3072-PKCS15-SHA512", "COMPSIG-MLDSA65-RSA3072-PKCS15-SHA512", "65", "RSA", "3072", "SHA512"),
+        (43, "id-MLDSA65-RSA4096-PSS-SHA512", "COMPSIG-MLDSA65-RSA4096-PSS-SHA512", "65", "RSA", "4096", "SHA512"),
+        (44, "id-MLDSA65-RSA4096-PKCS15-SHA512", "COMPSIG-MLDSA65-RSA4096-PKCS15-SHA512", "65", "RSA", "4096", "SHA512"),
+        (45, "id-MLDSA65-ECDSA-P256-SHA512", "COMPSIG-MLDSA65-ECDSA-P256-SHA512", "65", "ECDSA", "P-256", "SHA512"),
+        (46, "id-MLDSA65-ECDSA-P384-SHA512", "COMPSIG-MLDSA65-ECDSA-P384-SHA512", "65", "ECDSA", "P-384", "SHA512"),
+        (47, "id-MLDSA65-ECDSA-brainpoolP256r1-SHA512", "COMPSIG-MLDSA65-ECDSA-BP256-SHA512", "65", "ECDSA", "brainpoolP256r1", "SHA512"),
+        (48, "id-MLDSA65-Ed25519-SHA512", "COMPSIG-MLDSA65-Ed25519-SHA512", "65", "Ed25519", None, "SHA512"),
+        (49, "id-MLDSA87-ECDSA-P384-SHA512", "COMPSIG-MLDSA87-ECDSA-P384-SHA512", "87", "ECDSA", "P-384", "SHA512"),
+        (50, "id-MLDSA87-ECDSA-brainpoolP384r1-SHA512", "COMPSIG-MLDSA87-ECDSA-BP384-SHA512", "87", "ECDSA", "brainpoolP384r1", "SHA512"),
+        (51, "id-MLDSA87-Ed448-SHAKE256", "COMPSIG-MLDSA87-Ed448-SHAKE256", "87", "Ed448", None, "SHAKE256/64"),
+        (52, "id-MLDSA87-RSA3072-PSS-SHA512", "COMPSIG-MLDSA87-RSA3072-PSS-SHA512", "87", "RSA", "3072", "SHA512"),
+        (53, "id-MLDSA87-RSA4096-PSS-SHA512", "COMPSIG-MLDSA87-RSA4096-PSS-SHA512", "87", "RSA", "4096", "SHA512"),
+        (54, "id-MLDSA87-ECDSA-P521-SHA512", "COMPSIG-MLDSA87-ECDSA-P521-SHA512", "87", "ECDSA", "P-521", "SHA512"),
+    )}
+OIDS.update({oid: (tuple(family for family, _ in halves), name)
+             for oid, (name, _, halves, _) in COMPOSITE_ML_DSA.items()})
+
+# Row 477: the post-quantum OIDs of the NIST CSOR arcs (as classifier._OID_FAMILIES and
+# cyclonedx._PQC_OID): sigAlgs 2.16.840.1.101.3.4.3.17-19 ML-DSA (FIPS 204, RFC 9881),
+# .20-.31 SLH-DSA and .35-.46 HashSLH-DSA (FIPS 205, RFC 9909), kems 2.16.840.1.101.3.4.4.1-3
+# ML-KEM (FIPS 203). Until 0.46.0 a number among them, alone in code, gave nothing.
+OIDS.update({
+    **{f"2.16.840.1.101.3.4.3.{17 + i}": (("ML-DSA",), f"id-ml-dsa-{n}")
+       for i, n in enumerate((44, 65, 87))},
+    **{f"2.16.840.1.101.3.4.3.{20 + i}": (("SLH-DSA",), f"id-slh-dsa-{h}-{n}{v}")
+       for i, (h, n, v) in enumerate((h, n, v) for h in ("sha2", "shake")
+                                     for n in (128, 192, 256) for v in "sf")},
+    **{f"2.16.840.1.101.3.4.3.{n}": (("SLH-DSA",), "id-hash-slh-dsa") for n in range(35, 47)},
+    **{f"2.16.840.1.101.3.4.4.{1 + i}": (("ML-KEM",), f"id-alg-ml-kem-{n}")
+       for i, n in enumerate((512, 768, 1024))},
+})
+
+# Row 477: an arc where new algorithm OIDs are assigned. An OID one component below it that
+# this version has no entry for is said ("an OID this version does not know"), not passed over.
+WATCHED_ARCS = ("1.3.6.1.5.5.7.6", "2.16.840.1.101.3.4.3")
+NOT_KNOWN = "an OID this version does not know"
+_WATCHED = re.compile(r"(?<![\d.])(1\.3\.6\.1\.5\.5\.7\.6|2\.16\.840\.1\.101\.3\.4\.3)"
+                      r"\.(\d+)(?![\d.])")
+
+
+def not_known(line: str) -> list[tuple[str, str]]:
+    """(OID, arc) for each OID one component under a watched arc that the table does not hold."""
+    if "5.5.7.6." not in line and "101.3.4.3." not in line:
+        return []
+    return [(m.group(0), m.group(1)) for m in _WATCHED.finditer(line) if m.group(0) not in OIDS]
+
+
 # Dotted, or comma-separated inside braces (Go's asn1.ObjectIdentifier, Java int arrays).
 # The whole dotted run (a longer OID is another OID), not the tail of a version number.
 _DOTTED = re.compile(r"(?<![\d.])[12]\.\d+(?:\.\d+){2,}")
@@ -73,7 +132,8 @@ _BRACED = re.compile(r"\{\s*([12](?:\s*,\s*\d+){3,})\s*\}")
 def scan(line: str) -> list[tuple[str, int, str]]:
     """(family, position, description) for each family a well-known OID in the line names."""
     # Every OID in the table has one of these in it; most lines have none.
-    if "840" not in line and "1.3.1" not in line and "3, 1" not in line:
+    if ("840" not in line and "1.3.1" not in line and "3, 1" not in line
+            and "5.5.7.6." not in line):
         return []
     found = [(m.group(0), m.start()) for m in _DOTTED.finditer(line)]
     found += [(re.sub(r"\s*,\s*", ".", m.group(1)), m.start(1)) for m in _BRACED.finditer(line)]

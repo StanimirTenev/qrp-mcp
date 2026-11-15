@@ -51,7 +51,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from . import baseline as baseline_mod, confidence, remediation
+from . import baseline as baseline_mod, confidence, oids, remediation
 from .classifier import SIZED_FAMILIES, classical_status
 from .assets import TLS_SETTING_NOTE
 from .detectors import in_test_code
@@ -863,6 +863,9 @@ def _parameter_components(family: str, finding: dict[str, Any],
 
 # The TLS hybrid groups of HYBRIDS (detectors.py): the ones a TLS protocol component can name
 # as its key exchange. The SSH and IKE hybrids configure another protocol.
+# Rows 477, 478: a composite ML-DSA signature (RFC 10073) by its name, with its OID and pre-hash.
+_COMPOSITES = {name: (oid, prehash) for oid, (name, _, _, prehash) in oids.COMPOSITE_ML_DSA.items()}
+
 _TLS_HYBRIDS = {"X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024",
                 "X25519Kyber768Draft00", "SecP256r1Kyber768Draft00", "curveSM2MLKEM768"}
 
@@ -1352,12 +1355,16 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         ref = _ref("hybrid", name)
         held = [half_ref(family, pset) for family, pset in halves if half_ref(family, pset)]
         missing = [family for family, pset in halves if not half_ref(family, pset)]
+        composite = _COMPOSITES.get(name)
         properties = [
-            {"name": f"{NS}basis", "value": "named_hybrid"},
+            {"name": f"{NS}basis", "value": "named_composite_signature" if composite
+             else "named_hybrid"},
             {"name": f"{NS}halves", "value": " + ".join(
-                f"{family}-{pset}" if pset and family in {"ML-KEM", "Kyber"} else
+                f"{family}-{pset}" if pset and family in {"ML-KEM", "Kyber", "ML-DSA"} else
                 f"{family} ({pset})" if pset else family for family, pset in halves)},
         ]
+        if composite:
+            properties.append({"name": f"{NS}prehash", "value": composite[1]})
         if missing:
             properties.append({"name": f"{NS}half_not_in_inventory",
                                "value": ", ".join(missing)})
@@ -1365,9 +1372,12 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "type": "cryptographic-asset",
             "bom-ref": ref,
             "name": name,
+            # A composite signs; the key-exchange hybrids encapsulate.
             "cryptoProperties": {"assetType": "algorithm", "algorithmProperties": {
                 "primitive": "combiner",
-                "cryptoFunctions": ["keygen", "encapsulate", "decapsulate"]}},
+                "cryptoFunctions": (["keygen", "sign", "verify"] if composite else
+                                    ["keygen", "encapsulate", "decapsulate"])},
+                **({"oid": composite[0]} if composite else {})},
             "properties": properties,
             "evidence": {"occurrences": [
                 {"location": g["path"], "line": g["line"],
@@ -1544,7 +1554,13 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                                    for p in scan_result["chosen_outside_files"]["places"]
                                    if p.get("overridable")], ensure_ascii=False)}]
             if any(p.get("overridable") for p in
-                   (scan_result.get("chosen_outside_files") or {}).get("places", [])) else []),
+                   (scan_result.get("chosen_outside_files") or {}).get("places", [])) else []) + (
+            # Row 477: OIDs under a watched arc that this version does not know.
+            [{"name": f"{NS}oids_not_known", "value": json.dumps(
+                [{"location": o["path"], "line": o["line"], "oid": o["oid"],
+                  "statement": o["statement"]} for o in scan_result["oids_not_known"]],
+                ensure_ascii=False)}]
+            if scan_result.get("oids_not_known") else []),
     }
 
     # Signing commands found in CI are evidence of cryptography being used without

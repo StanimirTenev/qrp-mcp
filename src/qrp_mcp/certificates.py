@@ -25,6 +25,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from .oids import COMPOSITE_ML_DSA
 
 # The extensions the material is kept under. .key and .pub are included because a
 # deployment writes them far more often than it writes .pem.
@@ -437,28 +438,12 @@ def _read_bytes_once(path: Path) -> bytes | None:
 # line, with the subject key, the signature, the validity and the names. What the library
 # will not parse falls back to the identifier walk below, and is named in the coverage.
 
-# Composite ML-DSA signatures, draft-ietf-lamps-pq-composite-sigs-19 section 6 (fetched
-# 25.10.2026). Earlier drafts used other arcs; these are the ones the draft now assigns. The
-# same identifier is the key's and the signature's: a composite key signs only as itself.
+# Composite ML-DSA signatures, RFC 10073 section 7 (oids.COMPOSITE_ML_DSA, one table for the
+# code reader and this parser). The same identifier is the key's and the signature's: a
+# composite key signs only as itself.
 COMPOSITE_SIGNATURES: dict[str, tuple[str, tuple[str, str]]] = {
-    "1.3.6.1.5.5.7.6.37": ("id-MLDSA44-RSA2048-PSS-SHA256", ("ML-DSA", "RSA")),
-    "1.3.6.1.5.5.7.6.38": ("id-MLDSA44-RSA2048-PKCS15-SHA256", ("ML-DSA", "RSA")),
-    "1.3.6.1.5.5.7.6.39": ("id-MLDSA44-Ed25519-SHA512", ("ML-DSA", "Ed25519")),
-    "1.3.6.1.5.5.7.6.40": ("id-MLDSA44-ECDSA-P256-SHA256", ("ML-DSA", "ECDSA")),
-    "1.3.6.1.5.5.7.6.41": ("id-MLDSA65-RSA3072-PSS-SHA512", ("ML-DSA", "RSA")),
-    "1.3.6.1.5.5.7.6.42": ("id-MLDSA65-RSA3072-PKCS15-SHA512", ("ML-DSA", "RSA")),
-    "1.3.6.1.5.5.7.6.43": ("id-MLDSA65-RSA4096-PSS-SHA512", ("ML-DSA", "RSA")),
-    "1.3.6.1.5.5.7.6.44": ("id-MLDSA65-RSA4096-PKCS15-SHA512", ("ML-DSA", "RSA")),
-    "1.3.6.1.5.5.7.6.45": ("id-MLDSA65-ECDSA-P256-SHA512", ("ML-DSA", "ECDSA")),
-    "1.3.6.1.5.5.7.6.46": ("id-MLDSA65-ECDSA-P384-SHA512", ("ML-DSA", "ECDSA")),
-    "1.3.6.1.5.5.7.6.47": ("id-MLDSA65-ECDSA-brainpoolP256r1-SHA512", ("ML-DSA", "ECDSA")),
-    "1.3.6.1.5.5.7.6.48": ("id-MLDSA65-Ed25519-SHA512", ("ML-DSA", "Ed25519")),
-    "1.3.6.1.5.5.7.6.49": ("id-MLDSA87-ECDSA-P384-SHA512", ("ML-DSA", "ECDSA")),
-    "1.3.6.1.5.5.7.6.50": ("id-MLDSA87-ECDSA-brainpoolP384r1-SHA512", ("ML-DSA", "ECDSA")),
-    "1.3.6.1.5.5.7.6.51": ("id-MLDSA87-Ed448-SHAKE256", ("ML-DSA", "Ed448")),
-    "1.3.6.1.5.5.7.6.52": ("id-MLDSA87-RSA3072-PSS-SHA512", ("ML-DSA", "RSA")),
-    "1.3.6.1.5.5.7.6.53": ("id-MLDSA87-RSA4096-PSS-SHA512", ("ML-DSA", "RSA")),
-    "1.3.6.1.5.5.7.6.54": ("id-MLDSA87-ECDSA-P521-SHA512", ("ML-DSA", "ECDSA")),
+    oid: (name, (halves[0][0], halves[1][0]))
+    for oid, (name, _, halves, _) in COMPOSITE_ML_DSA.items()
 }
 
 _ML_DSA_SETS = {"2.16.840.1.101.3.4.3.17": "ML-DSA-44", "2.16.840.1.101.3.4.3.18": "ML-DSA-65",

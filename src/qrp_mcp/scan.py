@@ -362,6 +362,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
         # (rows 465, 475), for the CBOM's protocolProperties.cipherSuites. Outside `evidence`
         # for the same reason: the families of each suite are already there.
         "cipher_suites": scan_result.get("cipher_suite_findings", []),
+        # Row 477: an OID under 1.3.6.1.5.5.7.6 or 2.16.840.1.101.3.4.3 that this version has
+        # no entry for, said rather than passed over: what it names is not read.
+        "oids_not_known": scan_result.get("oids_not_known", []),
         # The SHA-256 of every file the evidence cites, as it was read (release A): what
         # lets a third party re-locate a finding and tell a moved line from another file.
         "evidence_file_sha256": _cited_digests(scan_result),
