@@ -1486,6 +1486,10 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # A recognised report (row 144) holds no asset this list could be missing.
     unread = scope["files_not_examined"] - sum(
         r["count"] for r in coverage["not_examined"] if r["reason"] == "report_document")
+    # Row 476: a file left out by its directory's name (vendor/, dist/) is not read either, and
+    # a reader of the standard fields has only this word to learn it. `.git` is not the tree.
+    excluded = scope.get("files_excluded_before_counting") or {}
+    unread += excluded.get("total", 0) - (excluded.get("by_directory") or {}).get(".git", 0)
     if unread == 0:
         aggregate = "complete" if control_held else "unknown"
     else:
