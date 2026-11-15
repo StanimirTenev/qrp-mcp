@@ -732,6 +732,17 @@ def _key_fields(info: dict[str, Any]) -> dict[str, Any]:
                if info.get(name)}}
 
 
+_PUBLIC_KEY_LABELS = {"PUBLIC KEY", "RSA PUBLIC KEY"}
+
+
+def _load_public_key(pem: bytes) -> dict[str, Any]:
+    from cryptography.hazmat.primitives import serialization
+    try:
+        return _key_fields(_key_info(serialization.load_pem_public_key(pem)))
+    except Exception:  # noqa: BLE001 -- never raises: the corpus is edge cases
+        return {}
+
+
 def _load_private_key(pem: bytes) -> dict[str, Any]:
     from cryptography.hazmat.primitives import serialization
     try:
@@ -826,6 +837,7 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
 
     certs: list[tuple[int, str, dict[str, Any], list[str]]] = []
     keys: dict[int, dict[str, Any]] = {}
+    public_keys: dict[int, dict[str, Any]] = {}
     problems: list[dict[str, Any]] = []
     parsed_blocks: set[int] = set()
 
@@ -866,6 +878,13 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
                 found)
         elif label == "OPENSSH PRIVATE KEY":
             keys[line] = _openssh_key_fields(_bare_body(match.group(2)))
+        elif label in _PUBLIC_KEY_LABELS:
+            # Row 503 (D7): a public key, parsed like a private one; only what parsed is kept.
+            fields = _load_public_key(
+                f"-----BEGIN {label}-----\n{_bare_body(match.group(2))}\n"
+                f"-----END {label}-----\n".encode())
+            if "key_algorithm" in fields:
+                public_keys[line] = fields
         elif _PRIVATE_KEY_LABEL.search(label):
             keys[line] = _load_private_key(match.group(0).encode())
             if keys[line].get("key_unread") == "body_not_a_key":
@@ -927,8 +946,8 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
                         add(1, "PKCS#12 file", "PKCS#12", found)
                 elif suffix in _CERTIFICATE_SUFFIXES and not _other_x509(raw):
                     problem(1, "DER", "not_parsed_as_certificate")
-    return {"certificates": certs, "keys": keys, "problems": problems,
-            "parsed_blocks": parsed_blocks}
+    return {"certificates": certs, "keys": keys, "public_keys": public_keys,
+            "problems": problems, "parsed_blocks": parsed_blocks}
 
 
 _LAST_MATERIAL: list[Any] = [None, None, None]
@@ -944,7 +963,8 @@ def _material_once(rel_path: str, raw: bytes) -> dict[str, Any]:
     try:
         result = _material(rel_path, raw)
     except Exception:  # noqa: BLE001 -- never raises
-        result = {"certificates": [], "keys": {}, "problems": [], "parsed_blocks": set()}
+        result = {"certificates": [], "keys": {}, "public_keys": {}, "problems": [],
+                  "parsed_blocks": set()}
     _LAST_MATERIAL[:] = [rel_path, raw, result]
     return result
 
@@ -1034,6 +1054,8 @@ def scan_certificate_file(path: Path, rel_path: str,
     pkcs1_public: set[int] = set()
     # Row 350: a private-key block that parsed, by its blob's index: the line of its BEGIN.
     parsed_key_blobs: dict[int, int] = {}
+    # Row 503 (D7): a public-key block that parsed, the same way.
+    parsed_public_blobs: dict[int, int] = {}
     text = decode_text(raw)
     # What `cryptography` read (release C). A block it parsed as certificates is reported
     # from the parse, at its own line, and kept out of the identifier walk below.
@@ -1049,8 +1071,15 @@ def scan_certificate_file(path: Path, rel_path: str,
 
         named = _LABEL_ALGORITHMS.get(label)
         if named:
+            before = len(algorithms)
             record(named, f"{named} in a {label.lower()} block", line_no,
                    f"-----BEGIN {label}-----")
+            # Row 503 (D7): a PKCS#1 `RSA PRIVATE KEY` row read `undetermined` while its key
+            # parsed to 2048; the size the key parsed to, on the row the label made.
+            parsed = material["keys"].get(line_no, {})
+            if (len(algorithms) > before and parsed.get("key_algorithm") == named
+                    and isinstance(parsed.get("key_size"), int)):
+                algorithms[-1]["key_size"] = parsed["key_size"]
         if _PRIVATE_KEY_LABEL.search(label):
             keys.append({
                 "path": rel_path,
@@ -1077,6 +1106,8 @@ def scan_certificate_file(path: Path, rel_path: str,
             parsed_key_blobs[len(blobs) - 1] = line_no
         if label == "RSA PUBLIC KEY":
             pkcs1_public.add(len(blobs) - 1)
+        if line_no in material["public_keys"]:
+            parsed_public_blobs[len(blobs) - 1] = line_no
 
     # A .der or .p12 is the same content without the armour -- unless it was parsed.
     if not blobs and not found_blocks and not material["certificates"] \
@@ -1122,6 +1153,25 @@ def scan_certificate_file(path: Path, rel_path: str,
                     if (algorithms and algorithms[-1]["algorithm"] == fields["key_algorithm"]
                             and isinstance(fields.get("key_size"), int)):
                         algorithms[-1]["key_size"] = fields["key_size"]
+            continue
+        if index in parsed_public_blobs:
+            line_at = parsed_public_blobs[index]
+            fields = material["public_keys"][line_at]
+            for oid in sorted(_iter_oids(blob)):
+                entry = _find_oid_family(oid)
+                if entry is not None:
+                    record(entry[1], f"{entry[1]} object identifier {oid} in a public key "
+                           f"block that parsed as a key", line_at, oid, kind="reference")
+            for item in algorithms:
+                if (item["line"] == line_at and item["algorithm"] == fields["key_algorithm"]
+                        and "key_material" not in item):
+                    item["key_material"] = "public key"
+                    if "parsed as a key" not in item["description"]:
+                        item["description"] += "; the public key block parsed as a key"
+                    if isinstance(fields.get("key_size"), int):
+                        item["key_size"] = fields["key_size"]
+                    if fields.get("curve"):
+                        item["curve"] = fields["curve"]
             continue
         # Sorted: _iter_oids returns a set, so the order of the evidence list
         # changed between interpreters with different hash seeds. A report whose

@@ -177,6 +177,11 @@ From 0.47.0 the CBOM names the scanned folder in `qrp:coverage:corpus:target` by
 its absolute path, so it no longer carries a path from your machine and one commit scanned in two
 places gives the same bytes; the scan result (`scan --out`, `scan_repo`) still has the absolute path.
 
+From 0.47.0 a public-key PEM (`PUBLIC KEY`, `RSA PUBLIC KEY`) that parses is read as a key, with
+its size and curve, and marked `key_material: "public key"`; it is not counted as a committed
+private key. U-Boot's FIT names `ecdsa256`/`ecdsa384`/`ecdsa521` give the key size, as `rsa2048`
+already did.
+
 ### A control on your own tree
 
 ```

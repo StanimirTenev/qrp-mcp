@@ -5099,6 +5099,7 @@ _NIST_CURVE = re.compile(
 # 2.4.1: secp256k1, a Koblitz curve over a 256-bit prime field.
 _SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])", re.IGNORECASE)
 _CURVE_SIZE = {"P-256": 256, "P-384": 384, "P-521": 521, "secp256k1": 256}
+_ECDSA_SIZE_NAME = re.compile(r"(?<![A-Za-z0-9])ecdsa(256|384|521)(?![0-9])", re.IGNORECASE)
 # Row 460: what the secp256k1 rule matched by a library that has no other curve -- ethers'
 # `Wallet.createRandom()`, btcec, bitcoinjs-lib, ECPair, ecrecover, eth_keys, the JSON-RPC
 # signing calls. Not `web3` alone: @solana/web3.js signs with Ed25519.
@@ -5124,6 +5125,12 @@ def _tag_curves(items: list[dict[str, Any]]) -> None:
         # `algorithm_key_sizes` as the suite rows' P-256 already did.
         if item.get("curve") in _CURVE_SIZE and "key_size" not in item:
             item["key_size"] = _CURVE_SIZE[item["curve"]]
+        # Row 503 (D8): U-Boot's FIT names `"ecdsa256"`/`"ecdsa384"`/`"ecdsa521"` give the
+        # size, as `"rsa2048"` does; the curve is not said. One size on the line, or none.
+        if not item.get("curve") and "key_size" not in item:
+            named = set(_ECDSA_SIZE_NAME.findall(item.get("excerpt") or ""))
+            if len(named) == 1:
+                item["key_size"] = int(named.pop())
 
 
 # ZA-OPRAVYANE row 200 (b): the certificate and key a TLS server is told to load. nginx

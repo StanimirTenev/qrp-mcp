@@ -6,6 +6,22 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **A public-key PEM was not read as a key, and key sizes were uneven** (row 503, D7 and D8 of
+  `boot-proba/REZULTAT.md` §8; MCUboot f30be48, U-Boot 6487c50). `enc-x25519-pub.pem` and
+  `root-ed25519-2-pub.pem` gave "object identifier observed in the file; the file was not decoded
+  as a certificate" with no size, while their private keys read 256; a PKCS#1 `RSA PRIVATE KEY`
+  file's row read `key_size: undetermined` while its embedded-key row read 2048; U-Boot's FIT names
+  `"ecdsa256"`/`"ecdsa384"`/`"ecdsa521"` read `undetermined` where `"rsa2048"` read 2048. A
+  `PUBLIC KEY` or `RSA PUBLIC KEY` block that `cryptography` parses now says "in a public key block
+  that parsed as a key", carries the size (and curve) it parsed to and `key_material: "public
+  key"`; the PKCS#1 private key's row takes its parsed size; `ecdsa256|384|521` as a whole token
+  gives the size. In the scan JSON, the MCP tools and the CBOM (through the size). Found by
+  re-running the probe; on the MCUboot tree no row was added or lost, 50 rows gained a size (6 key
+  files, 2 public keys, 42 imgtool `ECDSA256P1`/`ECDSA384P1` lines, which are P-256 and P-384
+  keys), the findings and `algorithm_key_sizes` are the same. **Not claimed:** a curve from
+  `ecdsaNNN` (the size only); `ecdsa-with-SHA256`, `SHA256withECDSA` and `ecdsa512` give no size.
+  A public key is not an embedded (committed secret) key and is not counted as one. MCUboot's
+  Kconfig `range 2048 3072` is not read.
 - **The CBOM carried the absolute path of the scanned folder** (row 487; own probe while
   regenerating `docs/examples/h5bp-server-configs-nginx.cbom.json`). `qrp:coverage:corpus:target`
   was the path on the machine that ran the scan, so two CBOMs of one commit from two places were
