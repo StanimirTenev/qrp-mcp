@@ -1,0 +1,1307 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:226faef9-5631-5420-9fd6-1798ff21a2b5",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-20T17:26:16+02:00",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "qrp-mcp",
+          "version": "0.46.0",
+          "properties": [
+            {
+              "name": "qrp:revision",
+              "value": "89cb4e3ecf1b63720506c7f448644d65fdde4afb (built from)"
+            }
+          ]
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "target:server-configs-nginx",
+      "name": "server-configs-nginx",
+      "version": "d2f2c3e2fac76f429adb738894499b8fb756d2f3"
+    }
+  },
+  "components": [
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:ec",
+      "name": "EC",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "unknown",
+          "nistQuantumSecurityLevel": 0
+        },
+        "oid": "1.2.840.10045.2.1"
+      },
+      "properties": [
+        {
+          "name": "qrp:classification",
+          "value": "classical_vulnerable"
+        },
+        {
+          "name": "qrp:quantum_vulnerable",
+          "value": "true"
+        },
+        {
+          "name": "qrp:key_size",
+          "value": "undetermined"
+        },
+        {
+          "name": "qrp:classical_status",
+          "value": "undetermined"
+        },
+        {
+          "name": "qrp:classical_status_source",
+          "value": "key size not read on the lines that name it; NIST SP 800-131A Rev. 2 (March 2019), Table 2 (ECDSA: len(n) < 224 disallowed for signature generation) and Table 4 (EC DH: len(n) < 224 disallowed) not applied"
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"low\", \"low\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"comment\", \"comment\"]"
+        },
+        {
+          "name": "qrp:role",
+          "value": "[\"undetermined\", \"undetermined\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 8,
+            "additionalContext": "[comment][owners: @****/******-*******-***** per .github/CODEOWNERS:3] # (*) *** **** ****** (**********, *ec******, *ec******) *** ***** ** ** ****"
+          },
+          {
+            "location": "h5bp/tls/policy_strict.conf",
+            "line": 18,
+            "additionalContext": "[comment][owners: @****/******-*******-***** per .github/CODEOWNERS:3] # (*) *** **** ****** (**********, *ec******, *ec******) *** ***** ** ** ****"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:ec-p-256",
+      "name": "EC-P-256",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "parameterSetIdentifier": "256",
+          "curve": "P-256",
+          "cryptoFunctions": [
+            "keygen",
+            "keyderive"
+          ],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 0
+        },
+        "oid": "1.2.840.10045.2.1"
+      },
+      "properties": [
+        {
+          "name": "qrp:classification",
+          "value": "classical_vulnerable"
+        },
+        {
+          "name": "qrp:quantum_vulnerable",
+          "value": "true"
+        },
+        {
+          "name": "qrp:family",
+          "value": "EC"
+        },
+        {
+          "name": "qrp:key_size",
+          "value": "256"
+        },
+        {
+          "name": "qrp:classical_status",
+          "value": "meets_minimum_length"
+        },
+        {
+          "name": "qrp:classical_status_source",
+          "value": "meets the 224-bit minimum length of NIST SP 800-131A Rev. 2 (March 2019), Table 2 (ECDSA: len(n) < 224 disallowed for signature generation) and Table 4 (EC DH: len(n) < 224 disallowed); whether the curve is one SP 800-56A or SP 800-186 lists is not checked"
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"declaration\"]"
+        },
+        {
+          "name": "qrp:role",
+          "value": "[\"key_establishment\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 20,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] ***_ec**_***** ******:**********:*ec******:*ec******;"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:ecdh",
+      "name": "ECDH",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "cryptoFunctions": [
+            "keygen",
+            "keyderive"
+          ],
+          "nistQuantumSecurityLevel": 0
+        }
+      },
+      "properties": [
+        {
+          "name": "qrp:classification",
+          "value": "classical_vulnerable"
+        },
+        {
+          "name": "qrp:quantum_vulnerable",
+          "value": "true"
+        },
+        {
+          "name": "qrp:key_size",
+          "value": "undetermined"
+        },
+        {
+          "name": "qrp:classical_status",
+          "value": "undetermined"
+        },
+        {
+          "name": "qrp:classical_status_source",
+          "value": "key size not read on the lines that name it; NIST SP 800-131A Rev. 2 (March 2019), Table 2 (ECDSA: len(n) < 224 disallowed for signature generation) and Table 4 (EC DH: len(n) < 224 disallowed) not applied"
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\", \"high\", \"low\", \"high\", \"medium\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"declaration\", \"configured_group+declaration\", \"comment\", \"declaration\", \"reference\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 17,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] ***_******* *ECDH+********:*ECDH+***;"
+          },
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 20,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] ***_ecdh_***** ******:**********:*********:*********;"
+          },
+          {
+            "location": "h5bp/tls/policy_strict.conf",
+            "line": 21,
+            "additionalContext": "[comment][owners: @****/******-*******-***** per .github/CODEOWNERS:3] #     *** **** **** ** *** ********* `***_ecdh_*****` ***** ** *******"
+          },
+          {
+            "location": "h5bp/tls/policy_strict.conf",
+            "line": 44,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] ***_******* *ECDH+********:*ECDH+***;"
+          },
+          {
+            "location": "h5bp/tls/policy_strict.conf",
+            "line": 47,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] ***_ecdh_***** ******;"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "crypto:x25519",
+      "name": "X25519",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "parameterSetIdentifier": "256",
+          "curve": "Curve25519",
+          "cryptoFunctions": [
+            "keygen",
+            "keyderive"
+          ],
+          "classicalSecurityLevel": 128,
+          "nistQuantumSecurityLevel": 0
+        },
+        "oid": "1.3.101.110"
+      },
+      "properties": [
+        {
+          "name": "qrp:classification",
+          "value": "classical_vulnerable"
+        },
+        {
+          "name": "qrp:quantum_vulnerable",
+          "value": "true"
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\", \"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"configured_group+declaration\", \"configured_group+reference\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 20,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] ***_****_***** X25519:**********:*********:*********;"
+          },
+          {
+            "location": "h5bp/tls/policy_strict.conf",
+            "line": 47,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] ***_****_***** X25519;"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "protocol:tlsv1-2-7908671d",
+      "name": "TLSv1.2",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "tls",
+          "version": "TLSv1.2",
+          "cryptoRefArray": [
+            "tls-group:x25519-offered-alone",
+            "tls-group:prime256v1-offered-alone",
+            "tls-group:secp521r1-offered-alone",
+            "tls-group:secp384r1-offered-alone"
+          ]
+        }
+      },
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "configured_protocol"
+        },
+        {
+          "name": "qrp:deprecated",
+          "value": "false"
+        },
+        {
+          "name": "qrp:forbidden",
+          "value": "false"
+        },
+        {
+          "name": "qrp:tls_termination",
+          "value": "Configured, not negotiated: a terminator outside the files can negotiate otherwise. See tls_termination.statement."
+        },
+        {
+          "name": "qrp:linked_by",
+          "value": "same file: the groups and cipher suites set in the file that pins this version; which of them a connection negotiates is not stated by the files"
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"configured_protocol\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 16,
+            "additionalContext": "***_********* *****.*;"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "protocol:tlsv1-2-2f63c590",
+      "name": "TLSv1.2",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "tls",
+          "version": "TLSv1.2",
+          "cryptoRefArray": [
+            "tls-group:x25519-offered-alone"
+          ]
+        }
+      },
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "configured_protocol"
+        },
+        {
+          "name": "qrp:deprecated",
+          "value": "false"
+        },
+        {
+          "name": "qrp:forbidden",
+          "value": "false"
+        },
+        {
+          "name": "qrp:tls_termination",
+          "value": "Configured, not negotiated: a terminator outside the files can negotiate otherwise. See tls_termination.statement."
+        },
+        {
+          "name": "qrp:linked_by",
+          "value": "same file: the groups and cipher suites set in the file that pins this version; which of them a connection negotiates is not stated by the files"
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"configured_protocol\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_strict.conf",
+            "line": 43,
+            "additionalContext": "***_********* *****.* *****.*;"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "protocol:tlsv1-3-2f63c590",
+      "name": "TLSv1.3",
+      "cryptoProperties": {
+        "assetType": "protocol",
+        "protocolProperties": {
+          "type": "tls",
+          "version": "TLSv1.3",
+          "cryptoRefArray": [
+            "tls-group:x25519-offered-alone"
+          ]
+        }
+      },
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "configured_protocol"
+        },
+        {
+          "name": "qrp:deprecated",
+          "value": "false"
+        },
+        {
+          "name": "qrp:forbidden",
+          "value": "false"
+        },
+        {
+          "name": "qrp:tls_termination",
+          "value": "Configured, not negotiated: a terminator outside the files can negotiate otherwise. See tls_termination.statement."
+        },
+        {
+          "name": "qrp:linked_by",
+          "value": "same file: the groups and cipher suites set in the file that pins this version; which of them a connection negotiates is not stated by the files"
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"configured_protocol\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_strict.conf",
+            "line": 43,
+            "additionalContext": "***_********* *****.* *****.*;"
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "tls-group:prime256v1-offered-alone",
+      "name": "prime256v1 (TLS group offered alone)",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "parameterSetIdentifier": "256"
+        }
+      },
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "configured_group"
+        },
+        {
+          "name": "qrp:offered",
+          "value": "alone"
+        },
+        {
+          "name": "qrp:family",
+          "value": "ECDH"
+        },
+        {
+          "name": "qrp:tls_termination",
+          "value": "Configured, not negotiated: a terminator outside the files can negotiate otherwise. See tls_termination.statement."
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"configured_group+declaration\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 20,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] prime256v1 is offered here as a group of its own, without a post-quantum half. What a connection negotiates is not stated by this line."
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "tls-group:secp384r1-offered-alone",
+      "name": "secp384r1 (TLS group offered alone)",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "parameterSetIdentifier": "384"
+        }
+      },
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "configured_group"
+        },
+        {
+          "name": "qrp:offered",
+          "value": "alone"
+        },
+        {
+          "name": "qrp:family",
+          "value": "ECDH"
+        },
+        {
+          "name": "qrp:tls_termination",
+          "value": "Configured, not negotiated: a terminator outside the files can negotiate otherwise. See tls_termination.statement."
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"configured_group+declaration\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 20,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] secp384r1 is offered here as a group of its own, without a post-quantum half. What a connection negotiates is not stated by this line."
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "tls-group:secp521r1-offered-alone",
+      "name": "secp521r1 (TLS group offered alone)",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "parameterSetIdentifier": "521"
+        }
+      },
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "configured_group"
+        },
+        {
+          "name": "qrp:offered",
+          "value": "alone"
+        },
+        {
+          "name": "qrp:family",
+          "value": "ECDH"
+        },
+        {
+          "name": "qrp:tls_termination",
+          "value": "Configured, not negotiated: a terminator outside the files can negotiate otherwise. See tls_termination.statement."
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"configured_group+declaration\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 20,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] secp521r1 is offered here as a group of its own, without a post-quantum half. What a connection negotiates is not stated by this line."
+          }
+        ]
+      }
+    },
+    {
+      "type": "cryptographic-asset",
+      "bom-ref": "tls-group:x25519-offered-alone",
+      "name": "X25519 (TLS group offered alone)",
+      "cryptoProperties": {
+        "assetType": "algorithm",
+        "algorithmProperties": {
+          "primitive": "key-agree",
+          "parameterSetIdentifier": "256"
+        }
+      },
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "configured_group"
+        },
+        {
+          "name": "qrp:offered",
+          "value": "alone"
+        },
+        {
+          "name": "qrp:family",
+          "value": "X25519"
+        },
+        {
+          "name": "qrp:tls_termination",
+          "value": "Configured, not negotiated: a terminator outside the files can negotiate otherwise. See tls_termination.statement."
+        },
+        {
+          "name": "qrp:confidence",
+          "value": "[\"high\", \"high\"]"
+        },
+        {
+          "name": "qrp:evidence_kind",
+          "value": "[\"configured_group+declaration\", \"configured_group+reference\"]"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "h5bp/tls/policy_balanced.conf",
+            "line": 20,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] X25519 is offered here as a group of its own, without a post-quantum half. What a connection negotiates is not stated by this line."
+          },
+          {
+            "location": "h5bp/tls/policy_strict.conf",
+            "line": 47,
+            "additionalContext": "[owners: @****/******-*******-***** per .github/CODEOWNERS:3] X25519 is offered here as a group of its own, without a post-quantum half. What a connection negotiates is not stated by this line."
+          }
+        ]
+      }
+    },
+    {
+      "type": "file",
+      "bom-ref": "file:h5bp/tls/policy_balanced.conf",
+      "name": "h5bp/tls/policy_balanced.conf",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "98a7eed58643571dc9f94d1f46d98267660cbc8b37522fcdf8ecf10fa3707b00"
+        }
+      ],
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "evidence_file"
+        },
+        {
+          "name": "qrp:sha256_crlf_as_lf",
+          "value": "98a7eed58643571dc9f94d1f46d98267660cbc8b37522fcdf8ecf10fa3707b00"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "bom-ref": "file:h5bp/tls/policy_strict.conf",
+      "name": "h5bp/tls/policy_strict.conf",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "67b1846f7cdb30bb9edd82ccfa197179102f425c1b5043a5c9f221e07d4a30aa"
+        }
+      ],
+      "properties": [
+        {
+          "name": "qrp:basis",
+          "value": "evidence_file"
+        },
+        {
+          "name": "qrp:sha256_crlf_as_lf",
+          "value": "67b1846f7cdb30bb9edd82ccfa197179102f425c1b5043a5c9f221e07d4a30aa"
+        }
+      ]
+    }
+  ],
+  "compositions": [
+    {
+      "aggregate": "incomplete",
+      "assemblies": [
+        "crypto:ec",
+        "crypto:ec-p-256",
+        "crypto:ecdh",
+        "crypto:x25519",
+        "protocol:tlsv1-2-7908671d",
+        "protocol:tlsv1-2-2f63c590",
+        "protocol:tlsv1-3-2f63c590",
+        "tls-group:prime256v1-offered-alone",
+        "tls-group:secp384r1-offered-alone",
+        "tls-group:secp521r1-offered-alone",
+        "tls-group:x25519-offered-alone"
+      ]
+    }
+  ],
+  "properties": [
+    {
+      "name": "qrp:coverage:instrument:tool",
+      "value": "qrp-mcp"
+    },
+    {
+      "name": "qrp:coverage:instrument:version",
+      "value": "0.46.0"
+    },
+    {
+      "name": "qrp:coverage:instrument:revision",
+      "value": "89cb4e3ecf1b63720506c7f448644d65fdde4afb (built from)"
+    },
+    {
+      "name": "qrp:coverage:instrument:source_commit:pinned",
+      "value": "true"
+    },
+    {
+      "name": "qrp:coverage:instrument:source_commit:commit",
+      "value": "89cb4e3ecf1b63720506c7f448644d65fdde4afb"
+    },
+    {
+      "name": "qrp:coverage:instrument:source_commit:dirty",
+      "value": "false"
+    },
+    {
+      "name": "qrp:coverage:instrument:source_commit:basis",
+      "value": "built_from"
+    },
+    {
+      "name": "qrp:coverage:instrument:source_commit:meaning",
+      "value": "installed from a wheel built from this commit; the commit was recorded at build time, and the installed files were not compared with it"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:algorithm_patterns",
+      "value": "282"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:iac_algorithm_patterns",
+      "value": "2"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:signing_command_patterns",
+      "value": "11"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:certificate_oid_names",
+      "value": "43"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:pem_labels",
+      "value": "8"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:cipher_suite_components",
+      "value": "27"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:openssl3_fetch_names",
+      "value": "32"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:jca_names",
+      "value": "54"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:tls_group_names",
+      "value": "53"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:opcua_security_policies",
+      "value": "30"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:aws_tls_policies",
+      "value": "45"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:ike_fragmentation_products",
+      "value": "7"
+    },
+    {
+      "name": "qrp:coverage:instrument:ruleset:dnssec_algorithm_numbers",
+      "value": "16"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:source",
+      "value": ".bash,.bat,.c,.cairo,.cc,.cjs,.cmake,.cmd,.cpp,.cs,.cts,.cxx,.fs,.fsx,.go,.groovy,.h,.hh,.hpp,.in,.inc,.java,.js,.jsx,.ksh,.kt,.kts,.mjs,.move,.mts,.php,.pl,.pm,.ps1,.psd1,.psm1,.py,.rb,.rs,.sc,.scala,.sh,.sol,.t,.ts,.tsx,.vb,.zsh"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:iac",
+      "value": ".tf,.tfvars"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:config",
+      "value": ".cfg,.cnf,.conf,.gotmpl,.hcl,.inf,.ini,.json,.mk,.mqsc,.properties,.props,.reg,.targets,.toml,.tpl,.vcxproj,.wxs,.zone"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:config_filenames",
+      "value": "CMakeLists.txt,Caddyfile,Containerfile,Dockerfile,GNUmakefile,Kconfig,Makefile,authorized_keys,java.policy,java.security,known_hosts,krb5.conf,main.cf,makefile,master.cf,openid-configuration,ssh_config,sshd_config,ssl.conf"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:config_filename_pattern",
+      "value": "^(?:Dockerfile|Containerfile|Kconfig)[-.][\\w.-]+$|^[\\w.-]+\\.(?:Dockerfile|Containerfile)$|^sdkconfig(?:\\.[\\w.-]+)?$|^java\\.security\\.[\\w.-]+$|^(?!.*\\.(?i:[0-9]|adoc|bash|bat|bz2|c|cairo|cc|cfg|cjs|cmake|cmd|cnf|conf|cpp|cs|cts|cxx|fs|fsx|go|gotmpl|groovy|gz|h|hcl|hh|hpp|htm|html|in|inc|inf|ini|java|js|json|jsx|ksh|kt|kts|markdown|md|mjs|mk|move|mqsc|mts|pdf|php|pl|pm|pod|properties|props|ps1|psd1|psm1|py|rb|reg|rs|rst|sc|scala|sh|sol|t|targets|toml|tpl|ts|tsx|txt|vb|vcxproj|wxs|xz|zip|zone|zsh)$)(?:sshd|ssh)_config[-_.][\\w.-]+$|^[\\w.-]+\\.(?:sshd|ssh)_config$,^(?:web|app|machine|applicationhost)(?:\\.[\\w-]+)?\\.config$,^dsset-[\\w.-]+$|^db\\.[\\w.-]+$,^K[\\w.-]*\\+\\d{3}\\+\\d{5}\\.(?:key|private)$"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:config_when_a_zone_file",
+      "value": ".db"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:config_extensionless_in_directories",
+      "value": "mods-available,mods-enabled,sites-available,sites-enabled"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:codeowners",
+      "value": ".github/CODEOWNERS,CODEOWNERS,docs/CODEOWNERS,.gitlab/CODEOWNERS"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:ci_filenames",
+      "value": ".gitlab-ci.yml,Jenkinsfile,azure-pipelines.yml"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:certificate",
+      "value": ".asc,.cer,.cert,.crt,.csr,.der,.gpg,.jks,.key,.keystore,.p12,.p7b,.p7c,.pem,.pfx,.pgp,.pub,.snk"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:openpgp_key_filenames",
+      "value": "KEYS"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:plist",
+      "value": ".plist"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:config_when_naming_opcua_security_policy",
+      "value": ".json5,.xml"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:yaml",
+      "value": ".yaml,.yml"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:manifest",
+      "value": ".csproj,.fsproj,.gemspec,.gradle,.gradle.kts,.podspec,.vbproj"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:manifest_filenames",
+      "value": "Cargo.lock,Cargo.toml,Directory.Packages.props,Gemfile,Gemfile.lock,Package.resolved,Pipfile,Pipfile.lock,build.gradle,build.gradle.kts,composer.json,composer.lock,go.mod,package-lock.json,package.json,packages.config,pnpm-lock.yaml,poetry.lock,pom.xml,pyproject.toml,requirements.txt,yarn.lock"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:jinja_template",
+      "value": ".j2,.jinja2,.jinja"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:any_type_beginning_with_key_material",
+      "value": "*"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs",
+      "value": ".git,.mypy_cache,.pytest_cache,.ruff_cache,.tox,.venv,__pycache__,build,dist,node_modules,target,vendor,venv"
+    },
+    {
+      "name": "qrp:coverage:corpus:target",
+      "value": "/tmp/claude-1000/-home-stenly/c50815b0-40ef-421f-b24d-62cc567c9e76/scratchpad/046/sample/server-configs-nginx"
+    },
+    {
+      "name": "qrp:coverage:corpus:pinned_at:pinned",
+      "value": "true"
+    },
+    {
+      "name": "qrp:coverage:corpus:pinned_at:kind",
+      "value": "git"
+    },
+    {
+      "name": "qrp:coverage:corpus:pinned_at:commit",
+      "value": "d2f2c3e2fac76f429adb738894499b8fb756d2f3"
+    },
+    {
+      "name": "qrp:coverage:corpus:pinned_at:committed_at",
+      "value": "2026-06-20T17:26:16+02:00"
+    },
+    {
+      "name": "qrp:coverage:corpus:pinned_at:dirty",
+      "value": "false"
+    },
+    {
+      "name": "qrp:coverage:corpus:pinned_at:shallow",
+      "value": "false"
+    },
+    {
+      "name": "qrp:coverage:corpus:content_digest",
+      "value": "sha256:4014cfc06bb12044c9ca3ecce6029316b74e31523a04af0ea57e0cd418ae5084"
+    },
+    {
+      "name": "qrp:coverage:window",
+      "value": "not carried in the CBOM: the read time differs on every run and would make two documents of one unchanged tree differ; it is in the scan result's coverage.window"
+    },
+    {
+      "name": "qrp:coverage:scope:files_excluded_before_counting:total",
+      "value": "28"
+    },
+    {
+      "name": "qrp:coverage:scope:files_excluded_before_counting:by_directory:.git",
+      "value": "28"
+    },
+    {
+      "name": "qrp:coverage:scope:files_excluded_before_counting:directories",
+      "value": ""
+    },
+    {
+      "name": "qrp:coverage:scope:files_present",
+      "value": "53"
+    },
+    {
+      "name": "qrp:coverage:scope:files_present_by_extension:.conf",
+      "value": "38"
+    },
+    {
+      "name": "qrp:coverage:scope:files_present_by_extension:.yml",
+      "value": "5"
+    },
+    {
+      "name": "qrp:coverage:scope:files_present_by_extension:(no extension)",
+      "value": "4"
+    },
+    {
+      "name": "qrp:coverage:scope:files_present_by_extension:.md",
+      "value": "4"
+    },
+    {
+      "name": "qrp:coverage:scope:files_present_by_extension:.txt",
+      "value": "1"
+    },
+    {
+      "name": "qrp:coverage:scope:files_present_by_extension:.types",
+      "value": "1"
+    },
+    {
+      "name": "qrp:coverage:scope:concentration:partition",
+      "value": "files by extension"
+    },
+    {
+      "name": "qrp:coverage:scope:concentration:distinct_kinds",
+      "value": "6"
+    },
+    {
+      "name": "qrp:coverage:scope:concentration:largest:kind",
+      "value": ".conf"
+    },
+    {
+      "name": "qrp:coverage:scope:concentration:largest:files",
+      "value": "38"
+    },
+    {
+      "name": "qrp:coverage:scope:concentration:largest:share_pct",
+      "value": "71.7"
+    },
+    {
+      "name": "qrp:coverage:scope:concentration:largest_group:kinds",
+      "value": ".conf,.yml"
+    },
+    {
+      "name": "qrp:coverage:scope:concentration:largest_group:files",
+      "value": "43"
+    },
+    {
+      "name": "qrp:coverage:scope:concentration:largest_group:share_pct",
+      "value": "81.13"
+    },
+    {
+      "name": "qrp:coverage:scope:files_examined",
+      "value": "44"
+    },
+    {
+      "name": "qrp:coverage:scope:files_not_examined",
+      "value": "9"
+    },
+    {
+      "name": "qrp:coverage:scope:coverage_pct",
+      "value": "83.02"
+    },
+    {
+      "name": "qrp:coverage:scope:read_in_part",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:scope:read_in_full_pct",
+      "value": "83.02"
+    },
+    {
+      "name": "qrp:coverage:claims:axis",
+      "value": "reached"
+    },
+    {
+      "name": "qrp:coverage:claims:meaning",
+      "value": "whether the instrument opened the file; measurable by the instrument about itself, and confessed when it fails"
+    },
+    {
+      "name": "qrp:coverage:claims:second_axis_not_claimed",
+      "value": "whether what was present was found; NOT measurable by the instrument about itself, because a silent rule and an absent algorithm produce the same output. Only a control licenses a figure on this axis"
+    },
+    {
+      "name": "qrp:coverage:claims:control:held",
+      "value": "false"
+    },
+    {
+      "name": "qrp:coverage:claims:control:reason",
+      "value": "none_held"
+    },
+    {
+      "name": "qrp:coverage:claims:control:meaning",
+      "value": "no corpus with independently established contents exists for this instrument; nothing here claims the second axis"
+    },
+    {
+      "name": "qrp:coverage:claims:self_seeded_control:ran",
+      "value": "false"
+    },
+    {
+      "name": "qrp:coverage:claims:self_seeded_control:name",
+      "value": "robustness on known patterns"
+    },
+    {
+      "name": "qrp:coverage:claims:self_seeded_control:feeds",
+      "value": "nothing: claims.control.held and the CBOM's compositions[].aggregate are not read from this block"
+    },
+    {
+      "name": "qrp:coverage:claims:self_seeded_control:how",
+      "value": "qrp-mcp control PATH --seed N, or qrp-mcp scan PATH --control-seed N"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:reason",
+      "value": "type_not_claimed"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:meaning",
+      "value": "the tool does not claim this file type; a declared boundary, not a failure"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:count",
+      "value": "9"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:by_extension:.md",
+      "value": "4"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:by_extension:(no extension)",
+      "value": "3"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:by_extension:.txt",
+      "value": "1"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:by_extension:.types",
+      "value": "1"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:concentration:partition",
+      "value": "unread files by extension"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:concentration:distinct_kinds",
+      "value": "4"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:concentration:largest:kind",
+      "value": ".md"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:concentration:largest:files",
+      "value": "4"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:concentration:largest:share_pct",
+      "value": "44.44"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:concentration:largest_group:kinds",
+      "value": ".md,(no extension),.txt"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:concentration:largest_group:files",
+      "value": "8"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:concentration:largest_group:share_pct",
+      "value": "88.89"
+    },
+    {
+      "name": "qrp:coverage:not_examined:0:paths",
+      "value": "[\".editorconfig\", \".gitattributes\", \".github/CODE_OF_CONDUCT.md\", \".github/CONTRIBUTING.md\", \".gitignore\", \"CHANGELOG.md\", \"LICENSE.txt\", \"README.md\", \"mime.types\"]"
+    },
+    {
+      "name": "qrp:coverage:not_examined:1:reason",
+      "value": "unreadable"
+    },
+    {
+      "name": "qrp:coverage:not_examined:1:meaning",
+      "value": "opened and could not be read; attempted and failed"
+    },
+    {
+      "name": "qrp:coverage:not_examined:1:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:not_examined:1:paths",
+      "value": "[]"
+    },
+    {
+      "name": "qrp:coverage:examined_without_result:reason",
+      "value": "claimed_but_not_decoded"
+    },
+    {
+      "name": "qrp:coverage:examined_without_result:meaning",
+      "value": "a claimed file type that was read and gave up no algorithm: encrypted content, or a structure this tool does not parse"
+    },
+    {
+      "name": "qrp:coverage:examined_without_result:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:examined_without_result:paths",
+      "value": "[]"
+    },
+    {
+      "name": "qrp:coverage:examined_partly:reason",
+      "value": "material_not_parsed"
+    },
+    {
+      "name": "qrp:coverage:examined_partly:meaning",
+      "value": "read, and a certificate, key or bundle in it did not parse; each such block is named with its line and reason, and what the rest of the file gave is reported"
+    },
+    {
+      "name": "qrp:coverage:examined_partly:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:examined_partly:items",
+      "value": ""
+    },
+    {
+      "name": "qrp:coverage:symlinks_not_followed:reason",
+      "value": "a symbolic link, not followed: its target is chosen by the scanned tree rather than by the caller"
+    },
+    {
+      "name": "qrp:coverage:symlinks_not_followed:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:symlinks_not_followed:files",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:symlinks_not_followed:directories",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:symlinks_not_followed:directories_into_tree",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:symlinks_not_followed:paths",
+      "value": "[]"
+    },
+    {
+      "name": "qrp:coverage:directories_not_entered:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:directories_not_entered:paths",
+      "value": "[]"
+    },
+    {
+      "name": "qrp:coverage:directories_not_entered:meaning",
+      "value": "could not be entered or listed; the files inside are unknown and are not in files_present"
+    },
+    {
+      "name": "qrp:coverage:accounts_for_every_file",
+      "value": "true"
+    },
+    {
+      "name": "qrp:coverage:suppressed:meaning",
+      "value": "suppressed by the owner in the code, with a reason: not in `evidence`, not dropped, and still in the inventory"
+    },
+    {
+      "name": "qrp:coverage:suppressed:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:suppressed:items",
+      "value": ""
+    },
+    {
+      "name": "qrp:coverage:suppressed:markers_not_applied:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:suppressed:markers_not_applied:items",
+      "value": ""
+    },
+    {
+      "name": "qrp:coverage:suppressed:markers_flagged:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:suppressed:markers_flagged:items",
+      "value": ""
+    },
+    {
+      "name": "qrp:coverage:confidence:meaning",
+      "value": "how sure the scan is of an occurrence, from what the line is (call, parsed material or setting > declaration or reference > import, signature type or declared package) and whether the family was read whole or inferred; comments and bans are low and are not uses"
+    },
+    {
+      "name": "qrp:coverage:confidence:occurrences:high",
+      "value": "13"
+    },
+    {
+      "name": "qrp:coverage:confidence:occurrences:medium",
+      "value": "2"
+    },
+    {
+      "name": "qrp:coverage:confidence:occurrences:low",
+      "value": "0"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:measured_on",
+      "value": "Cryben (authors' ground truth, location mode) + OWASP Benchmark 1.2 crypto/hash with benchmark.properties"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:date",
+      "value": "2026-10-25"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:note",
+      "value": "both corpora were used to choose the mapping: a regression figure, not a blind one"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:high:cryben",
+      "value": "60/60"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:high:owasp",
+      "value": "348/348"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:high:precision",
+      "value": "1.000"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:medium:cryben",
+      "value": "2/3"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:medium:owasp",
+      "value": "73/73"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:medium:precision",
+      "value": "0.987"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:low:cryben",
+      "value": "7/13"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:low:owasp",
+      "value": "0/0"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:levels:low:precision",
+      "value": "0.538"
+    },
+    {
+      "name": "qrp:coverage:confidence:precision_by_level:limits",
+      "value": "small medium and low buckets on Cryben (3 and 13 rows); OWASP is Java only and separates nothing (every graded row right); Cryben's truth does not label Go signature lines, which decides part of low"
+    },
+    {
+      "name": "qrp:timestamp_basis",
+      "value": "the commit time of the scanned tree's commit (a clean checkout), not the time of the run"
+    },
+    {
+      "name": "qrp:findings_fingerprint:sha256",
+      "value": "efaeeeec2048349ac52feb9de26d7c2fbf8d5e4b820856d1737a1821a71bf91a"
+    },
+    {
+      "name": "qrp:findings_fingerprint:format",
+      "value": "qrp-mcp findings fingerprint 1"
+    },
+    {
+      "name": "qrp:chosen_outside_files:count",
+      "value": "0"
+    },
+    {
+      "name": "qrp:chosen_outside_files:places",
+      "value": ""
+    },
+    {
+      "name": "qrp:evidence:ci_signing_commands",
+      "value": "0"
+    }
+  ]
+}
