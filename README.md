@@ -125,6 +125,12 @@ it is the document built to be sent. `closure` writes the `prove_closure` verdic
 scans, and names both inputs by their SHA-256, so the three files can be tied together by
 whoever receives them. Both print the SHA-256 of what they wrote.
 
+From 0.46.0 a TLS version a file pins is linked, in CycloneDX's own fields, to what the same file
+configures: the TLS groups in `protocolProperties.cryptoRefArray`, and the cipher suites in
+`protocolProperties.cipherSuites` by their IANA names, each pointing at the algorithms it names. A
+reader that skips `qrp:` properties can resolve the key exchange of `TLS 1.3`
+([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/cbom.md)).
+
 ### A control on your own tree
 
 ```
@@ -160,7 +166,7 @@ rules, file types and their limits is in [What it looks at](https://github.com/S
 | --- | --- |
 | Source code | C and C++, C#, Visual Basic and F#, Go, Rust, Java, Kotlin, Scala and Groovy, Python, JavaScript and TypeScript, Ruby, PHP, Perl, Solidity, Move and Cairo |
 | Scripts | `.sh`/`.bash`/`.zsh`/`.ksh`, `.bat`/`.cmd`, PowerShell `.ps1`/`.psm1`/`.psd1` — algorithms, and signing commands as a pipeline's are |
-| CI/CD pipelines | signing commands (`gpg --sign`, `cosign sign`, `signtool`, `jarsigner`, `codesign`, Secure Boot and kernel-module signing), with the key they name |
+| CI/CD pipelines | signing commands (`gpg --sign`, `cosign sign`, `signtool`, `jarsigner`, `codesign`, Secure Boot and kernel-module signing), with the key they name; encryption to a public key (`gpg --encrypt`, `openssl smime`/`cms`/`pkeyutl -encrypt`, `age -r`), with the recipient key where it is in the tree |
 | Infrastructure as code | Terraform/HCL, Kubernetes manifests and Helm (`.tpl`, `.gotmpl`), Dockerfiles (including the crypto libraries a `RUN` installs) |
 | TLS, SSH and VPN configuration | nginx, Apache, HAProxy, Caddy, Envoy, Istio, Traefik, Ingress-NGINX, Postfix, Dovecot, MySQL, PostgreSQL, Kafka, ZooKeeper, OpenVPN, WireGuard, strongSwan, OpenSSH (`sshd_config` and its variants), `openssl.cnf` (keys, digest and protocol bounds), `java.security`, Vault, IBM MQ (`.mqsc`), AWS load-balancer policies, OPC UA |
 | Device configuration | FortiOS backups, Cisco IOS and Junos — read in part, and named as read in part with what was and was not read |

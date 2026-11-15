@@ -138,3 +138,21 @@ server offers, and an sshd built without a hybrid, or a jump host in front, is n
 front. The scanner cannot see a connection; the field says that, not what the connection is.
 Raised in public on 1 October 2026, where a measurement at the front door met the same gap
 from the other side.
+
+### Two layers that disagree (from 0.46.0)
+
+Where one repository configures TLS key exchange in two layers that disagree -- a terminator's
+group setting (nginx `ssl_ecdh_curve X25519MLKEM768:X25519`) offers a post-quantum hybrid and a
+load balancer's policy (`aws_lb_listener` `ssl_policy = "ELBSecurityPolicy-TLS13-1-2-2021-06"`)
+offers none, or the other way round -- the scan result carries one open finding in
+`layer_disagreements` (row 472): both lines with their values, the weaker one, the statement that
+the weaker value applies until the connection is measured on the wire, and the CODEOWNERS owner
+of the load balancer (masked below `--level full`, as every owner is). The CBOM carries it as
+`qrp:layer_disagreements`.
+
+No link between the two layers is claimed. Nothing in the files says this nginx sits behind that
+listener, and both naming port 443 would join any two HTTPS services in a monorepo, so the link is
+`{"established": false, "basis": "link not established: ..."}` and the finding stands at
+repository level. Layers that agree make no finding, and no link can clear one. Only the
+post-quantum key exchange is compared, and only an AWS load-balancer policy is a policy layer.
+

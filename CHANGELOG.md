@@ -4,6 +4,82 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.46.0
+
+**A TLS protocol component now says what it is linked to, in CycloneDX's own fields** (rows 475
+and 465, first in this release because a CBOM consumer depends on it). A reader of the standard
+fields saw `TLS 1.3` with nothing under it: the groups the same file configures
+(`X25519MLKEM768`, `X25519`) were algorithm components of their own, linked to no protocol, and
+Conscious (Shivansh Khari, 15.11.2026) classed the key exchange as "unknown". The suites of an
+`ssl_ciphers` line were split into RSA, ECDH and 3DES on the right line, but the suite itself never
+reached `protocolProperties.cipherSuites` (found by running qrp-mcp over QCI's CBOM-Benchmark
+2.6.6). Now a TLS version pin carries `protocolProperties.cryptoRefArray` (the bom-refs of the
+groups its file sets) and `protocolProperties.cipherSuites` (each suite by its IANA name from
+OpenSSL 3.6.5's openssl-ciphers table, with `algorithms` pointing at the families it names). The
+suite name is carried from the detector, so it is the same at the default `masked` level. Every
+output is validated against the CycloneDX 1.6 schema in the tests, and every ref is checked to
+resolve. **Not claimed:** the link is by file, not by `server` block, and says what the file
+configures, not what a connection negotiates. A protocol component with links has a new bom-ref
+(a suffix from its links); one with nothing to link keeps the one it had.
+
+Each row below was reproduced as a failing test before the fix, tested through `scan --out`, the
+MCP tools and the CBOM export where the row reaches them, and each fix was reverted once to see its
+test fail.
+
+- **Composite ML-DSA (RFC 10073) is read, and is one hybrid** (rows 477, 478):
+  `{"1.3.6.1.5.5.7.6.45", "1.3.6.1.5.5.7.6.37"}` gave 0 findings while the verdict said every file
+  was read, and `COMPSIG-MLDSA65-ECDSA-P256-SHA512` split into ML-DSA and ECDSA with
+  `hybrid_names: []`. The 18 OIDs .37-.54, their names and labels are one table, taken from the RFC
+  text and shared with the certificate parser; a composite by OID, name or label is one
+  `hybrid_names` entry with both halves and their parameters, and in the CBOM one `combiner`
+  component that signs and verifies, with its OID and `dependencies` to both halves. Readiness
+  reads it as the TLS hybrids read (`hybrid_partial`). The NIST CSOR post-quantum OIDs (ML-DSA,
+  SLH-DSA, ML-KEM) written as numbers are read too, and a name such as `ML_DSA_65` beside such an
+  OID no longer settles the line as an identifier. An OID one component under
+  `1.3.6.1.5.5.7.6` or `2.16.840.1.101.3.4.3` that this version does not know is listed in
+  `oids_not_known` ("an OID this version does not know") and in the CBOM, not passed over.
+- **de-bsi no longer recommends Classic McEliece** (row 481, wrong advice). BSI's "Notes on recent
+  developments concerning Classic McEliece" (29 September 2026) says it "should currently no
+  longer be used in new developments"; the profile offered it as a replacement for RSA and called a
+  McEliece finding "recommended". The replacement now names ML-KEM and FrodoKEM in hybrid, and HQC
+  once its standard is published; a McEliece finding says it is under review, hybrid in existing
+  use only, until the next TR-02102-1; the note is cited beside TR-02102-1 2026-01. No other
+  profile named Classic McEliece. Two expectations in `tests/test_de_bsi_2026.py` moved with the
+  source: the key-establishment option no longer names McEliece, and the standing test checks the
+  section it cites rather than the word "recommended".
+- **Public-key encryption in a script is a row** (row 479): `gpg --encrypt --recipient`,
+  `openssl smime -encrypt ... vault-rsa4096.crt`, `openssl pkeyutl -encrypt` and `age -r` gave 0
+  findings, while `openssl dgst -sign` gave a pipeline row. Each is now a `ci_pipeline` row with
+  `operation: public_key_encryption`, role `key_establishment` and `hndl_exposed: true`, "public-key
+  encryption to a key not in these files" unless the recipient key or certificate is a file the
+  scan read, whose families it then names. `openssl enc` with a passphrase stays silent. The CBOM
+  counts these apart from signing commands, and a `--mandate` does not date them as signatures.
+- **Two TLS layers that disagree are one open finding** (row 472): an nginx group setting with a
+  post-quantum hybrid and an AWS load-balancer policy without one were two findings in two
+  sections. `layer_disagreements` names both lines, says the weaker value applies until measured on
+  the wire, and carries the load balancer's CODEOWNERS owner. No link is claimed: a shared port 443
+  is not a basis, so the finding is made at repository level with "link not established".
+- **A line closed as not a use keeps its basis** (row 473): `named_but_not_used_lines` (and
+  `qrp:named_but_not_used:lines`) gives file, line and the rule -- removal list, ban list, switch
+  off, comment, identifier -- for every line of a family the inventory does not count.
+  `named_but_not_used` is unchanged.
+- **The self-seeded control names what it does not cover** (row 474): `not_covered_by_control`
+  lists the file types that carry the tree's own findings and had no planted style, and the
+  sentence says the figure does not cover them.
+- **`compositions[].aggregate` is `incomplete` where a file was left out by its directory's name**
+  (row 476). Checked first: a file the scan does not claim already gave `incomplete`, but the same
+  file under `vendor/` gave `unknown`. This changes the word for most real repositories that hold
+  a `vendor/`, `node_modules/` or `dist/` directory; `.git` does not count. No field was added, and
+  the file list stays in `properties`.
+
+Left open, with the reason unchanged from 0.45.0: row 462 (a QKD key source over ETSI GS QKD
+014/004 needs a new evidence category with no family, a design decision) and row 459 (a DER key
+written as a C byte array needs a multi-line assembler and a DER parse per array, whose cost on
+C test-vector headers was not measured).
+
+The findings fingerprint changes on a tree where these rows add a finding (an OID, a composite, an
+encryption command); it does not change for the protocol links, which are CBOM structure.
+
 ## 0.45.0
 
 **A post-quantum name is no longer read as post-quantum code** (row 463, the most important of

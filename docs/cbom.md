@@ -8,7 +8,8 @@
 0.20.0 `qrp-mcp cbom PATH --out FILE` writes the same document to a file. Three things travel in
 it that a component list alone cannot say:
 
-- `compositions.aggregate` — `incomplete` where files were not examined, and `unknown` where
+- `compositions.aggregate` — `incomplete` where files were not examined (from 0.46.0 also where a
+  file was left out by its directory's name, `vendor/` or `dist/`; `.git` is not counted), and `unknown` where
   the tool cannot account for its own reading. Reading every file is *not* enough for
   `complete`: that word claims every asset present was found, which is the second axis, and
   only a held control licenses it. The document used to say `complete` on the strength of the
@@ -51,6 +52,55 @@ file carries `qrp:sha256_crlf_as_lf` beside its raw hash, the same for a CRLF an
 byte-identical across two runs over one unchanged tree: the timestamp is the tree's commit time
 (or `SOURCE_DATE_EPOCH`, or absent when neither exists), and the read window stays in the scan
 result's `coverage.window`, named in the CBOM rather than carried.
+
+## A TLS protocol, its groups and its suites (from 0.46.0)
+
+A TLS version a file pins (`ssl_protocols TLSv1.3`, `MinProtocol`) is linked to the groups and
+cipher suites **the same file** sets, in the schema's own fields, so a reader that skips `qrp:`
+properties can resolve the key exchange (rows 465, 475):
+
+- `protocolProperties.cryptoRefArray` — the bom-refs of the TLS groups: a hybrid such as
+  `hybrid:x25519mlkem768` (whose `dependencies` point at its two halves) and each classical group
+  offered alone (`tls-group:x25519-offered-alone`).
+- `protocolProperties.cipherSuites[]` — each suite the file enables, `name` its IANA name where
+  OpenSSL's table gives one (openssl-ciphers(1), "CIPHER SUITE NAMES", OpenSSL 3.6.5:
+  `ECDHE-RSA-AES128-GCM-SHA256` is `TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256`), and `algorithms` the
+  bom-refs of the families it names (ECDH, RSA, 3DES, ...).
+
+The rules: the link is by file, and `qrp:linked_by` says so; it does not say which group or suite a
+connection negotiates. A hybrid (a TLS 1.3 group) goes to TLS 1.3 or an unversioned pin, a
+classical group to every version. A TLS 1.3 suite (`TLS_AES_*`, `TLS_CHACHA20_POLY1305_SHA256`)
+goes to TLS 1.3 only and the others to the other versions, because nginx's `ssl_ciphers` and
+OpenSSL's `CipherString` do not set TLS 1.3 suites. A commented-out setting, an entry struck out
+with `!` or `-`, and a selector (`HIGH`, `EECDH+aRSA`) are not suites. Only plain version pins
+are linked (not an AWS policy, a listener or a switch), and a ref is written only where its
+component is in the document. Two files that pin the same version with different groups are two
+components; a pin with nothing to link keeps the ref it had. The scan result carries the same
+suites, by name and as written, in `cipher_suites`.
+
+**Not claimed:** a file with two `server` blocks links both blocks' groups to both pins; a group or
+suite set in one file and a version in another are not joined; a TLS version that no file pins
+has no protocol component to carry its groups.
+
+## Other document properties added in 0.46.0
+
+- `qrp:named_but_not_used:lines` (row 473) — a JSON array: every line of a family the inventory
+  does not count (named but not used, or read only from identifiers), with `location`, `line` and
+  the `rule` that closed it: `removal list` (OpenSSH `-ssh-rsa`, `Groups = DEFAULT:-X448`, a
+  `Disable-Tls*` cmdlet), `ban list` (`!` entries, a denial list or block, `java.security`
+  disabled algorithms), `switch off` (`USE_ML_KEM_768 = False`), `comment`, `identifier`. The scan
+  result has it as `named_but_not_used_lines`; `named_but_not_used` stays the list of families. A
+  cipher-list exclusion such as `!RC4` made no row before and makes none now, so it is not listed.
+- `qrp:oids_not_known` (row 477) — an OID one component under `1.3.6.1.5.5.7.6` or
+  `2.16.840.1.101.3.4.3` that this version has no entry for: "an OID this version does not know".
+- `qrp:layer_disagreements` (row 472) — see [What a TLS line does not establish](tls.md).
+- `qrp:evidence:public_key_encryption_commands` (row 479) — encryption to a public key in a
+  script, apart from `qrp:evidence:ci_signing_commands`, which counts signing steps only.
+
+A composite ML-DSA signature (RFC 10073: `id-MLDSA65-ECDSA-P256-SHA512`, its label
+`COMPSIG-MLDSA65-ECDSA-P256-SHA512` or its OID `1.3.6.1.5.5.7.6.45`) is one `combiner`
+component with `cryptoFunctions` `keygen`, `sign`, `verify`, its `oid`, `qrp:prehash`, and
+`dependencies` to the ML-DSA and the traditional component (rows 477, 478).
 
 ## What kind of place a finding sits in
 

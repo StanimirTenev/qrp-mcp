@@ -91,7 +91,7 @@ profile; only `replacement` changes, and the result names the profile in `replac
 | `uk-ncsc` | NCSC · Next steps v2.0 (Aug 2024) | ML-KEM-768 recommended | ML-DSA-65 recommended | allowed, at a cost |
 | `au-ism` | ASD · ISM (Sep 2026) | ML-KEM-1024; 768 not beyond 2030 | ML-DSA-87; 65 not beyond 2030; no hash-based | not recommended, not prohibited |
 | `ca-cccs` | CCCS · ITSP.40.111 v5 (May 2026) | ML-KEM-512/768/1024 | ML-DSA-44/65/87, SLH-DSA; LMS/HSS/XMSS/XMSS^MT | not addressed |
-| `de-bsi` | BSI · TR-02102-1 (2026-01) | ML-KEM-768/1024, **hybrid** | ML-DSA-65/87 hedged, **hybrid**; hash-based alone | lattice schemes recommended only in hybrid form |
+| `de-bsi` | BSI · TR-02102-1 (2026-01); Notes on Classic McEliece (29 Sep 2026) | ML-KEM-768/1024 or FrodoKEM-976/1344, **hybrid**; HQC once published; not Classic McEliece | ML-DSA-65/87 hedged, **hybrid**; hash-based alone | lattice schemes recommended only in hybrid form |
 | `fr-anssi` | ANSSI · PG-083 v3.00 (Mar 2026) | ML-KEM-768 (512 conformant), **hybrid** | ML-DSA **hybrid** only; SLH-DSA alone | required for ML-KEM, ML-DSA |
 | `nl-ncsc` | AIVD/CWI/TNO · PQC Migration Handbook, 2nd ed. (Dec 2024) | ML-KEM-1024/768 | ML-DSA-87/65 | recommended |
 | `eu-eccg` | ECCG · Agreed Cryptographic Mechanisms v2.0 (Apr 2025) | ML-KEM-1024/768, combined | ML-DSA-87/65 combined; hash-based alone | lattice not standalone |

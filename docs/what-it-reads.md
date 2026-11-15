@@ -458,3 +458,20 @@ and a scan of BoringSSL (12,921 lines over 2,000 characters) did not finish. Now
 blob is blanked before searching — positions and the blob's edge characters stay — and BoringSSL
 takes 18 minutes. On nine corpora (certbot, OpenSSH, Vault, OpenSSL, curl, Mbed TLS, wolfSSL,
 s2n-tls, rustls) every piece of evidence is identical before and after.
+
+### Readings added in 0.46.0
+
+- **Composite ML-DSA** (RFC 10073, rows 477, 478): the 18 OIDs `1.3.6.1.5.5.7.6.37`-`.54`, their
+  names (`id-MLDSA65-ECDSA-P256-SHA512`) and labels (`COMPSIG-MLDSA65-ECDSA-P256-SHA512`) in code
+  and configuration. Each is one `hybrid_names` entry with its ML-DSA parameter set and its
+  traditional half (RSA size, curve, Ed25519 or Ed448), beside the two family rows.
+- **Post-quantum OIDs as numbers**: ML-DSA `2.16.840.1.101.3.4.3.17`-`.19`, SLH-DSA `.20`-`.31`
+  and `.35`-`.46`, ML-KEM `2.16.840.1.101.3.4.4.1`-`.3`. An OID one component under
+  `1.3.6.1.5.5.7.6` or `2.16.840.1.101.3.4.3` that the table does not hold is listed in
+  `oids_not_known` with "an OID this version does not know"; what it names is not read.
+- **Public-key encryption in scripts and pipelines** (row 479): `gpg -e`/`--encrypt`,
+  `openssl smime -encrypt` and `openssl cms -encrypt` (recipients positional or `-recip`),
+  `openssl pkeyutl -encrypt -inkey`, `age -r`/`-R`. A `ci_pipeline` row with role
+  `key_establishment` and `hndl_exposed: true`; the recipient key's families only where it is a
+  file the scan read. A commented line, `openssl enc` and `gpg -c` (a passphrase) are not here.
+- **Cipher suites by name** (rows 465, 475): see [The CBOM it emits](cbom.md).

@@ -90,6 +90,7 @@ The shape is published for other tools to read. Keys are added, never renamed or
 | `styles`, `decoy_classes` | list | the names, in planting order |
 | `key_size_on_another_line` | object | `{planted, read}`: split calls whose size sits on its own line |
 | `indirect_name_line` | object | `{planted, found}`: the family found on the alias or constant line itself |
+| `not_covered_by_control` | list | from 0.46.0 (row 474): each file type that carries findings of the tree's own and in which no style was planted, as `{file_type, files, findings, paths}` (up to 20 paths); empty when every such type had a style. The figure says nothing about these |
 | `sentence` | string | the sentence a report carries with the figure |
 
 The `control` command's document is `{"self_seeded_control": <block>, "items": [...]}`; each
@@ -106,6 +107,10 @@ Built from the block alone, for example (pyjwt at `16231ab`, seed 1, 0.42.0's ru
 > reported 5 of the 18 non-uses as uses (3 variable_name, 2 switched_off_setting). This says
 > what the instrument does on those styles. It does not say what this tree contains, how much
 > of it was found, or that the inventory lists everything, and it is for this version only.
+
+From 0.46.0, where `not_covered_by_control` is not empty, the sentence ends: "The tree's own
+findings also sit in file types no style was planted in (.conf: 1 file, .sh: 1 file); the figure
+does not cover them." A file type is the extension, or the file name where there is none.
 
 ## Limits
 
