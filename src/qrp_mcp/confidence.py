@@ -115,6 +115,10 @@ def assess(category: str, item: dict[str, Any]) -> tuple[str, str]:
     for marker, why in _INFERRED:
         if marker in description:
             return _down(level), f"{basis}; {why}"
+    # Row 491: a certificate or key file loaded by the line, its family read from its name.
+    if item.get("named_in_a_path"):
+        return _down(level), (f"{basis}; family read from the name of a file the line loads, "
+                              f"not from the file")
     return level, basis
 
 

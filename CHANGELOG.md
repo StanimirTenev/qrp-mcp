@@ -6,6 +6,19 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **An algorithm read only from a certificate's file name is marked so, one confidence level
+  lower** (row 491; probe `dos-proba`). `ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;` gave
+  ML-DSA at `medium`, the level of a directive that names the algorithm, although only the file's
+  name says ML-DSA and the certificate is not in the tree. A row whose rule matches inside the path
+  of a certificate or key file a TLS setting loads (nginx `ssl_certificate[_key]`, Apache
+  `SSLCertificate[Key]File`, HAProxy `crt`), and nowhere else on the line, now carries
+  `named_in_a_path: true` and is one step lower, with "family read from the name of a file the line
+  loads, not from the file" in `confidence_basis`; the CBOM's `qrp:confidence` follows. Found by
+  re-running the probe. The row's other half did not reproduce: the parameter set was already
+  taken from the name (`parameter_set: "65"`, component `ML-DSA-65`); `key_size` is not a field
+  ML-DSA uses. **Not claimed / not changed:** the findings, families and components are the same;
+  a parsed certificate is still `high`; a row another reader made on the same line (a cipher suite
+  on a HAProxy `bind`) keeps its level.
 - **A composite declared beside two KMS aliases is tied to the Terraform keys, where the files
   link them** (row 489, Peter Davis, ZeroVaultID; probe `kms-oid-proba`). A signer configuration
   with `algorithm_oid: 1.3.6.1.5.5.7.6.49` beside `alias/...` key names was found as a composite,

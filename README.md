@@ -131,6 +131,10 @@ configures: the TLS groups in `protocolProperties.cryptoRefArray`, and the ciphe
 reader that skips `qrp:` properties can resolve the key exchange of `TLS 1.3`
 ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/cbom.md)).
 
+From 0.47.0 an algorithm read only from the name of a certificate or key file a TLS setting loads
+(`ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;`) is marked `named_in_a_path: true` and is one
+confidence level lower: the file's name is a label, not the certificate.
+
 ### A control on your own tree
 
 ```

@@ -592,11 +592,8 @@ def _library_default_key_exchange(result: dict[str, Any]) -> None:
         "default applies and is not resolved (tls_termination.key_exchange)"])
 
 
-# ZA-OPRAVYANE row 200 (b): the certificate and key a TLS server is told to load. nginx
-# `ssl_certificate[_key]`, Apache `SSLCertificate[Key]File`, HAProxy `crt` on a bind line.
-_AUTHENTICATION_FILE = re.compile(
-    r"^\s*(?:(ssl_certificate(?:_key)?|SSLCertificate(?:Key)?File)\s+[\"']?([^\s;\"']+)"
-    r"|bind\s.*?\bcrt\s+[\"']?([^\s;\"']+))")
+# ZA-OPRAVYANE row 200 (b); one pattern with row 491's mark (detectors).
+_AUTHENTICATION_FILE = detectors.CERTIFICATE_FILE_SETTING
 
 
 def _authentication_not_read(result: dict[str, Any], root: Path) -> None:

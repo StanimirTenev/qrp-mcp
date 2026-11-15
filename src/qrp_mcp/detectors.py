@@ -4975,6 +4975,32 @@ def _tag_curves(items: list[dict[str, Any]]) -> None:
             item["key_size"] = _CURVE_SIZE[item["curve"]]
 
 
+# ZA-OPRAVYANE row 200 (b): the certificate and key a TLS server is told to load. nginx
+# `ssl_certificate[_key]`, Apache `SSLCertificate[Key]File`, HAProxy `crt` on a bind line.
+CERTIFICATE_FILE_SETTING = re.compile(
+    r"^\s*(?:(ssl_certificate(?:_key)?|SSLCertificate(?:Key)?File)\s+[\"']?([^\s;\"']+)"
+    r"|bind\s.*?\bcrt\s+[\"']?([^\s;\"']+))")
+
+
+def _tag_named_in_a_path(items: list[dict[str, Any]]) -> None:
+    """Row 491: `ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;` names ML-DSA only in the
+    file's name. A row of a rule that matches in that path and nowhere else on the line is
+    marked, and confidence.assess puts it one step lower. A row another reader made (a cipher
+    suite on a HAProxy bind line) is not this rule's and is left as it is."""
+    for item in items:
+        excerpt = item.get("excerpt") or ""
+        m = CERTIFICATE_FILE_SETTING.match(excerpt)
+        if not m:
+            continue
+        g = 2 if m.group(2) else 3
+        rest = excerpt[:m.start(g)] + " " + excerpt[m.end(g):]
+        rules = [pattern for family, description, pattern in ALGORITHM_PATTERNS
+                 if family == item.get("algorithm") and description == item.get("description")]
+        if (any(p.search(m.group(g)) for p in rules)
+                and not any(p.search(rest) for p in rules)):
+            item["named_in_a_path"] = True
+
+
 # baseline.FORMAT and config.FILENAME, written out here so this module imports neither.
 BASELINE_FORMAT = "qrp-mcp baseline 1"
 CONFIG_FILENAME = ".qrp.toml"
@@ -5969,6 +5995,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     _join_pins(source_findings + iac_findings, pins)
     _tag_parameter_sets(source_findings + iac_findings)
     _tag_curves(source_findings + iac_findings)
+    _tag_named_in_a_path(source_findings + iac_findings)
     _join_fips(source_findings + iac_findings, fips_findings)
     hybrids = [{"path": p, "line": n, "name": name,
                 "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}

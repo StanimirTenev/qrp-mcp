@@ -184,7 +184,11 @@ reason in words. It is derived from what the scan read, not from a score it make
   (`EC_KEY_free`), from an object identifier in a file that was not decoded, through a properties
   file, or through an alias, a constant in another file or literals concatenated on the line is
   one step lower. The fallback of a `getProperty` lookup, read because no properties file in the
-  tree sets the key, is `low` whatever the line.
+  tree sets the key, is `low` whatever the line. From 0.47.0 so is a family read from the name of
+  a certificate or key file a TLS setting loads (nginx `ssl_certificate[_key]`, Apache
+  `SSLCertificate[Key]File`, HAProxy `crt`): `ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;`
+  gives ML-DSA (parameter set 65, from the name) at `low`, not `medium`, and the row carries
+  `named_in_a_path: true`. The name is someone's label for the file, not the file.
 - Comments and bans are `low` and are not uses anywhere. The role is **not** an input. A row
   with a role is one that carries the `role` field (`signature`, `key_establishment` or
   `undetermined`). On Cryben, comments and bans left out, rows with one were 27/31 on a truth line
