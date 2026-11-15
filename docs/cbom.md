@@ -108,7 +108,7 @@ has no protocol component to carry its groups.
 - `qrp:named_but_not_used:lines` (row 473) — a JSON array: every line of a family the inventory
   does not count (named but not used, or read only from identifiers), with `location`, `line` and
   the `rule` that closed it: `removal list` (OpenSSH `-ssh-rsa`, `Groups = DEFAULT:-X448`, a
-  `Disable-Tls*` cmdlet), `ban list` (`!` entries, a denial list or block, `java.security`
+  `Disable-Tls*` cmdlet, from 0.47.0 an Mbed TLS `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES`), `ban list` (`!` entries, a denial list or block, `java.security`
   disabled algorithms), `switch off` (`USE_ML_KEM_768 = False`), `comment`, `identifier`. The scan
   result has it as `named_but_not_used_lines`; `named_but_not_used` stays the list of families. A
   cipher-list exclusion such as `!RC4` made no row before and makes none now, so it is not listed.

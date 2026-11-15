@@ -6,6 +6,19 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Three names read as a family they are not** (row 506, D12 of `boot-proba/REZULTAT.md` §8).
+  U-Boot's SH7722 register `#define MLDSA1R 0xFE940430` (`arch/sh/include/asm/cpu_sh7722.h:693`)
+  was ML-DSA; a digit right after `mldsa` now has to start a FIPS 204 parameter set (44, 65,
+  87). tinycrypt's ECDSA file `ecc_dsa` (`#include <tinycrypt/ecc_dsa.h>`, `ecc_dsa.c` in CMake
+  and in MCUboot's `sim/mcuboot-sys/build.rs`) was DSA with severity high -- 5 rows, MCUboot's
+  whole DSA finding; ECC + DSA (and tinycrypt's ECC + DH) is now joined as EC + DSA was, and the
+  Rust DSA word skips `ecc_dsa`. `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES` and
+  `MBEDTLS_REMOVE_ARC4_CIPHERSUITES` were a declaration, a use; a `#define` whose name has a
+  `REMOVE_` word is now a not-a-use, rule `removal list` (`keys.remove(rsa_key)` is still a use).
+  Scan JSON, MCP tools, CBOM. **Not claimed:** `ecc_dsa` does not become an ECDSA row of its own
+  -- it now reads as `ec_dsa` always did, one family word the identifier rule does not read
+  alone; MCUboot's ECDSA rows come from elsewhere in the same files. Found on MCUboot f30be48
+  and U-Boot 6487c50 with 0.46.0; not re-measured on the corpus.
 - **Key material in three formats was not read** (row 507, D13 of `boot-proba/REZULTAT.md` §8).
   MCUboot's `sim/src/*_pub_key-rs.txt` (public keys as a Rust byte array, `&[0x30, 0x59, ...]`)
   and U-Boot's `doc/chromium/files/devkeys/kernel_data_key.vbprivk` and `kernel.keyblock` were

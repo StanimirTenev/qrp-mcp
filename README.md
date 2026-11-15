@@ -244,6 +244,9 @@ A name is not a use. A post-quantum name that only names something the file defi
 (`self.mlkem_key = ec.generate_private_key(...)`, `def kyber_exchange`) is an identifier row and
 does not make a file post-quantum ready; a file that also calls the library keeps every row as it
 was ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md)).
+A name that only spells like a family is not one: `MLDSA1R` (an SH7722 register) is not ML-DSA,
+tinycrypt's `ecc_dsa` is ECDSA, not DSA, and `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES` is a
+removal, not a use.
 
 ## Coverage on three public repositories
 

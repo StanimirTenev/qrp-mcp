@@ -1284,7 +1284,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", RUST_RSA_WORD,
      re.compile(r"(?<![A-Za-z0-9])rsa(?![A-Za-z0-9])")),
     ("DSA", RUST_DSA_WORD,
-     re.compile(r"(?<![A-Za-z0-9])(?<!ml_)(?<!slh_)(?<!fn_)(?<!ml-)(?<!slh-)(?<!fn-)dsa"
+     # Nor tinycrypt's ECDSA, ecc_dsa.c (row 506).
+     re.compile(r"(?<![A-Za-z0-9])(?<!ml_)(?<!slh_)(?<!fn_)(?<!ml-)(?<!slh-)(?<!fn-)(?<!ecc_)dsa"
                 r"(?![A-Za-z0-9])")),
     # Post-quantum schemes. Without these, a codebase that has already adopted
     # ML-KEM scans as having no post-quantum cryptography at all, which reads as
@@ -1334,7 +1335,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"PrivateKeyParameters|PublicKeyParameters|Parameters)\b")),
     ("ML-DSA", "ML-DSA (Dilithium) usage", re.compile(
         # CIRCL's eddilithium2/3 hybrids carry Dilithium after "ed" (row 77).
-        r"(?<![A-Za-z])ml[-_]?dsa|(?<![A-Za-z])(?:ed)?dilithium|pqcrystals[-_]?dilithium",
+        # Row 506: a digit right after the name starts a parameter set (44, 65, 87; FIPS 204)
+        # or another name -- U-Boot's SH7722 register `MLDSA1R`.
+        r"(?<![A-Za-z])ml[-_]?dsa(?:(?![0-9])|(?=44|65|87))|(?<![A-Za-z])(?:ed)?dilithium|"
+        r"pqcrystals[-_]?dilithium",
         re.IGNORECASE,
     )),
     # Their classical halves (sign/eddilithium2/eddilithium.go: "Ed25519-Dilithium2",
@@ -3345,6 +3349,13 @@ _SSH_REMOVAL_LIST = re.compile(
 _KCONFIG_NOT_SET = re.compile(r"^\s*#\s*(CONFIG_\w+)\s+is not set\s*$")
 
 
+# Row 506: Mbed TLS 2.x's `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES` / `..._ARC4_...` -- "Remove
+# 3DES ciphersuites by default in SSL / TLS" (its config.h). A macro defined with a REMOVE word
+# in its name removes what it names. Only the name of a `#define`: `keys.remove(rsa_key)` is
+# still a use.
+_REMOVE_DEFINE = re.compile(r"^\s*#\s*define\s+(\w*?(?<![A-Za-z0-9])REMOVE_\w+)")
+
+
 def _switched_off(code: str, position: int) -> bool:
     unset = _KCONFIG_NOT_SET.match(code)
     if unset and position < unset.end(1):
@@ -3396,6 +3407,9 @@ def _is_banned_here(line: str, position: int, in_denial_block: bool = False,
     if _switched_off(searchable, position):
         return True
     if _DISABLE_CMDLET.match(searchable):
+        return True
+    removed = _REMOVE_DEFINE.match(searchable)
+    if removed and position < removed.end(1):
         return True
     removal = _SSH_REMOVAL_LIST.match(searchable)
     if removal and position >= removal.end() - 1:

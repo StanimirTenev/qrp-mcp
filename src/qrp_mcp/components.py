@@ -109,7 +109,8 @@ def components(name: str) -> list[str]:
             out[-1] = "SHA3_224"
         elif last == "DES" and p in {"EDE", "EDE2", "EDE3"}:
             out[-1] = "DES3"
-        elif last == "EC" and p in {"DH", "DHE", "DSA"}:
+        # Row 506: tinycrypt spells them ECC + DSA and ECC + DH (ecc_dsa.h, ecc_dh.h).
+        elif last in {"EC", "ECC"} and p in {"DH", "DHE", "DSA"}:
             out[-1] = "EC" + p
         elif last in {"ML", "SLH", "FN", "ED"} and p == "DSA":
             out[-1] = last + p
