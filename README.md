@@ -140,6 +140,12 @@ ports, server names (masked below `--level full`), the groups and the certificat
 each one's family, so two servers in one file no longer read as one inventory. The CBOM carries it
 as `qrp:tls_listeners` ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/tls.md)).
 
+From 0.47.0 `--mandate nist-ir-8547` also gives each clause `federal_high_value_assets`: the date
+by role that NIST IR 8547 (section 4) restates from EO 14412 and OMB M-26-15 -- post-quantum key
+establishment by 2030-12-31, signatures by 2031-12-31 -- for federal high value assets and high
+impact systems only. The scan cannot tell which systems those are, so the gate does not count it
+([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
+
 ### A control on your own tree
 
 ```

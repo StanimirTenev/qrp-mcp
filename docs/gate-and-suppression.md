@@ -12,6 +12,12 @@ one place. The CHANGELOG entry named beside each item is the full text.
   time (0.37.0).
 - `--mandate nist-ir-8547` follows the final NIST IR 8547; the gate counts the deprecation date
   (2030), named in `gate_counts` and `next_gate_deadline` beside `next_deadline` (0.38.0, 0.41.0).
+- `--mandate nist-ir-8547` also says, in `federal_high_value_assets` on each clause and on the
+  block, the federal dates by role from section 4 of the final text (EO 14412, OMB M-26-15 as
+  IR 8547 states them): key establishment by 2030-12-31, digital signatures by 2031-12-31, for
+  federal high value assets and high impact systems (FIPS 199 high) only. A clause whose role
+  was not read gives both (`pqc_by_role`). It is a condition the scan cannot check, so the gate,
+  `deadline` and `next_deadline` do not count it (`counted_by_gate: false`) (0.47.0).
 - A gate over files that were not read is not a pass: `gate` reads `not_established` and
   `gate_not_established_because` gives the count; the exit code of that case stays 0 (0.41.0).
 - `--min-coverage PERCENT` (with `--mandate`) makes it a failure: when fewer than PERCENT of the

@@ -332,6 +332,24 @@ NIST_IR_8547: dict[str, Any] = {
     "composite": "section 3.2.1, Hybrid Key-Establishment Techniques: the generic composite "
                  "key-establishment technique of SP 800-56C is allowed even if one input is "
                  "derived from a disallowed algorithm",
+    # Row 493. Section 4 (final text, read 2026-11-15, lines 734-737; also 251-254, 843-846,
+    # 944-946): "federal agencies must transition high value assets and high impact systems
+    # (i.e., systems for which at least one FIPS 199 security objective is assigned a
+    # potential impact value of 'high') on an accelerated schedule. These systems must adopt
+    # post-quantum cryptography for key establishment by December 31, 2030, and for digital
+    # signatures by December 31, 2031." Lines 747-748: the 2030-2035 window "does not alter"
+    # these. As IR 8547 states them; OMB M-26-15 itself was not read.
+    "federal_high_value_assets": {
+        "key_establishment": "2030-12-31",
+        "signature": "2031-12-31",
+        "applies": "only if the system is a federal high value asset or high impact system "
+                   "(FIPS 199: at least one security objective high), or another system "
+                   "prioritised under OMB M-26-15; the scan cannot tell which systems are",
+        "source": "NIST IR 8547 (final, October 2026), section 4 and sections 4.1.1, 4.1.2, "
+                  "restating EO 14412 and OMB M-26-15: post-quantum cryptography for key "
+                  "establishment by December 31, 2030, and for digital signatures by "
+                  "December 31, 2031",
+    },
 }
 
 

@@ -6,6 +6,19 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **The federal dates by role under `--mandate nist-ir-8547`** (row 493, Tuta; probe
+  `ir8547-proba`). An RSA-3072 signature and a P-256 ECDH exchange read "deprecated after
+  2030-12-31", which the final text says, but the dates section 4 of the same text restates from
+  EO 14412 and OMB M-26-15 were missing: federal high value assets and high impact systems "must
+  adopt post-quantum cryptography for key establishment by December 31, 2030, and for digital
+  signatures by December 31, 2031". Each NIST IR 8547 clause now carries
+  `federal_high_value_assets` (`pqc_by` by role, both dates in `pqc_by_role` where the role was
+  not read; a composite clause none) and the block the two dates with `counted_by_gate: false`.
+  Found by re-running the probe against the final text. **Not claimed / not changed:** the
+  general deprecated-after-2030 / disallowed-after-2035 dates and the gate are unchanged; whether
+  a scanned system is a federal high value asset is not known to the scan; OMB M-26-15 itself
+  was not read, the dates are as IR 8547 states them; mandates are in the scan JSON (and SARIF),
+  not in the MCP tools or the CBOM, as before.
 - **Checked, not changed: the ECDH row beside X25519 on `ssl_ecdh_curve X25519MLKEM768`** (row 492;
   probe `dos-proba`). The line gives X25519, ML-KEM-768 and an ECDH row that comes from the
   directive's name. That is the rule as row 172a set it and the README states it: on a group

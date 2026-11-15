@@ -154,6 +154,12 @@ def _nist(item: dict[str, Any], family: str, role: str, day: date) -> dict[str, 
     passed_dep = day > date.fromisoformat(m["deprecated_after"])
     out["status"] = "disallowed" if passed_dis else "deprecated" if passed_dep else "due"
     out["months_until"] = _months_until(day, date.fromisoformat(out["deadline"]))
+    # Row 493: the federal date by role, said as a condition; not a deadline the gate counts.
+    fed = m["federal_high_value_assets"]
+    by_role = {"key_establishment": fed["key_establishment"], "signature": fed["signature"]}
+    out["federal_high_value_assets"] = {
+        **({"pqc_by": by_role[role]} if role in by_role else {"pqc_by_role": by_role}),
+        "applies": fed["applies"], "source": fed["source"]}
     return out
 
 
@@ -236,6 +242,8 @@ def apply(result: dict[str, Any], names: list[str], day: date,
         else:
             blocks[name]["hndl_source"] = m["hndl"]
             blocks[name]["composite"] = 0
+            blocks[name]["federal_high_value_assets"] = {
+                **m["federal_high_value_assets"], "counted_by_gate": False}
     hybrid_lines = _hybrid_halves(result)
     for category, items in result["evidence"].items():
         for item in items:
