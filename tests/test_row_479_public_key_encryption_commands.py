@@ -97,7 +97,11 @@ def test_a_mandate_does_not_read_them_as_signatures(tmp_path):
     root = _tree(tmp_path)
     out = tmp_path / "m.json"
     subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "scan",
-                    str(root), "--mandate", "nist-ir-8547", "--out", str(out)],
+                    str(root), "--mandate", "nist-ir-8547", "--mandate", "cnsa-2.0",
+                    "--out", str(out)],
                    capture_output=True)
-    for r in _rows(json.loads(out.read_text())):
-        assert r["hndl_exposed"] is True
+    rows = _rows(json.loads(out.read_text()))
+    assert len(rows) == 4
+    for r in rows:
+        # CNSA 2.0 dates every signing step; an encryption step is not one.
+        assert r["hndl_exposed"] is True and "mandates" not in r
