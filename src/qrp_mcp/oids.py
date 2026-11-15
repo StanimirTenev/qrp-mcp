@@ -112,6 +112,19 @@ OIDS.update({
        for i, n in enumerate((512, 768, 1024))},
 })
 
+# The classical rest of the NIST CSOR sigAlgs arc, which the watched-arc rule below would
+# otherwise call unknown (asn1crypto's algos.py lists them; read on the corpus, 15.11.2026):
+# .3/.4 dsa-with-sha384/512, .5-.8 DSA, .9-.12 ECDSA and .13-.16 RSA PKCS #1 v1.5, with SHA3-224,
+# -256, -384 and -512, as the NIST CSOR sigAlgs arc assigns them.
+OIDS.update({
+    "2.16.840.1.101.3.4.3.3": (("DSA",), "dsa-with-sha384"),
+    "2.16.840.1.101.3.4.3.4": (("DSA",), "dsa-with-sha512"),
+    **{f"2.16.840.1.101.3.4.3.{base + i}": ((family,), f"{name}-with-sha3-{bits}")
+       for base, family, name in ((5, "DSA", "id-dsa"), (9, "ECDSA", "id-ecdsa"),
+                                  (13, "RSA", "id-rsassa-pkcs1-v1_5"))
+       for i, bits in enumerate((224, 256, 384, 512))},
+})
+
 # Row 477: an arc where new algorithm OIDs are assigned. An OID one component below it that
 # this version has no entry for is said ("an OID this version does not know"), not passed over.
 WATCHED_ARCS = ("1.3.6.1.5.5.7.6", "2.16.840.1.101.3.4.3")

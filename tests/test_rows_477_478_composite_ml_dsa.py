@@ -178,3 +178,11 @@ def test_the_mandate_dates_a_composite_s_classical_half_as_a_composite(tmp_path)
     for item in result["evidence"]["source_code"]:
         if item["algorithm"] in ("ECDSA", "RSA"):
             assert item["mandates"]["nist-ir-8547"]["status"] == "composite_allowed"
+
+
+
+def test_the_classical_sigalgs_of_the_arc_are_known():
+    # Read on the corpus (asn1crypto algos.py): ecdsa-with-SHA3 and friends are assigned OIDs.
+    assert oids.not_known('X = "2.16.840.1.101.3.4.3.10"  # ecdsa-with-sha3-256') == []
+    assert [f for f, _, _ in oids.scan('X = "2.16.840.1.101.3.4.3.10"')] == ["ECDSA"]
+    assert [f for f, _, _ in oids.scan('X = "2.16.840.1.101.3.4.3.16"')] == ["RSA"]
