@@ -4380,6 +4380,32 @@ _RUNTIME_BYTES = (b"environ", b"getenv", b"process.env", b"System.getenv",
                   b"GetEnvironmentVariable", b"${", b"$")
 
 
+# Row 440 (06.11.2026): `mech = os.environ.get("HSM_SIGN_MECH", "RSA-PSS")` gave RSA and no
+# place, so the report read as if RSA-PSS were fixed in the files, while the environment can
+# replace it. A value read from the environment with a default that names an algorithm is a
+# place too: the default's family stays a finding (it is what runs when nothing is set), and
+# the place carries the default and `overridable: true`. Python's os.environ.get / os.getenv,
+# Node's `process.env.X || "..."` / `?? "..."`, a shell `${X:-...}`.
+_RUNTIME_DEFAULT = re.compile(
+    r"(?:os\.environ\.get|os\.getenv|System\.getenv\(\)\.getOrDefault)\s*\(\s*[\"']"
+    r"([A-Za-z_][\w.-]*)[\"']\s*,\s*[\"']([^\"'\n]{2,80})[\"']\s*\)|"
+    r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])\s*(?:\|\||\?\?)\s*"
+    r"[\"'`]([^\"'`\n]{2,80})[\"'`]|"
+    r"\$\{([A-Za-z_]\w*):?-([^}\n]{2,80})\}")
+
+
+def _runtime_default(text: str) -> dict[str, Any] | None:
+    from .classifier import classify_algorithm  # local: classifier is imported lazily here
+    for m in _RUNTIME_DEFAULT.finditer(text):
+        groups = [g for g in m.groups() if g is not None]
+        name, default = groups[0], groups[-1].strip()
+        family = classify_algorithm(default, "explicit", source="", location="").algorithm_family
+        if family and family != "unknown":
+            return {"setting": name, "read_from": m.group(0).strip(), "default": default,
+                    "default_family": family, "overridable": True}
+    return None
+
+
 def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for number, text in enumerate(lines, 1):
@@ -4391,11 +4417,16 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         # The reference must be the setting's value: right after it, past `=`, `:`, `(`, a
         # comma or a space and an optional quote -- not merely on the same line.
         found = _RUNTIME_ASSIGNMENT.search(text) or _RUNTIME_CRYPTO_CALL.search(text)
-        if not found:
+        default = _runtime_default(text)
+        if not found and not default:
             continue
-        out.append({"path": rel_path, "line": number, "setting": found.group(1),
-                    "read_from": found.group(2).strip(), "excerpt": stripped[:200],
-                    "in_test_code": in_test_code(rel_path)})
+        place = {"path": rel_path, "line": number,
+                 "setting": found.group(1) if found else default["setting"],
+                 "read_from": found.group(2).strip() if found else default["read_from"],
+                 "excerpt": stripped[:200], "in_test_code": in_test_code(rel_path)}
+        if default:
+            place.update({k: default[k] for k in ("default", "default_family", "overridable")})
+        out.append(place)
     return out
 
 

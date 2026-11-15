@@ -1432,7 +1432,15 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
              {"name": f"{NS}chosen_outside_files:places",
               "value": ", ".join(f"{p['path']}:{p['line']}"
                                  for p in scan_result["chosen_outside_files"]["places"])}]
-            if scan_result.get("chosen_outside_files") else []),
+            if scan_result.get("chosen_outside_files") else []) + (
+            # Row 440: a default written beside the read, which the environment can replace.
+            [{"name": f"{NS}chosen_outside_files:overridable_defaults",
+              "value": json.dumps([{"place": f"{p['path']}:{p['line']}", "default": p["default"],
+                                    "family": p["default_family"]}
+                                   for p in scan_result["chosen_outside_files"]["places"]
+                                   if p.get("overridable")], ensure_ascii=False)}]
+            if any(p.get("overridable") for p in
+                   (scan_result.get("chosen_outside_files") or {}).get("places", [])) else []),
     }
 
     # Signing commands found in CI are evidence of cryptography being used without

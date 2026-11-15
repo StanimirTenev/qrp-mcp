@@ -395,7 +395,10 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     result["chosen_outside_files"] = {
         "meaning": ("cryptographic settings whose value is read at run time -- from the "
                     "environment, a CI variable or a secrets store: the algorithm is not in "
-                    "the files read, and no family is claimed for these lines"),
+                    "the files read, and no family is claimed for these lines -- except a "
+                    "default written beside the read (`os.environ.get(NAME, \"RSA-PSS\")`): "
+                    "its family is a finding, and the place says `default` and "
+                    "`overridable: true`, since the environment can replace it"),
         "count": len(places), "places": places}
     _library_default_key_exchange(result)
     _authentication_not_read(result, repo_path)
