@@ -1713,6 +1713,14 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     document["properties"].append(
         {"name": f"{NS}evidence:ci_signing_commands", "value": str(len(ci))}
     )
+    # Row 500: each step, with the key it names and what is known of the key's algorithm.
+    if ci:
+        document["properties"].append({
+            "name": f"{NS}evidence:signing_commands", "value": json.dumps(
+                [{"location": c["path"], "line": c["line"], "command": c["command_type"],
+                  **({"signing_key": c["signing_key"]} if c.get("signing_key") else {}),
+                  **({"key_algorithm": c["key_algorithm"]} if c.get("key_algorithm") else {})}
+                 for c in ci], ensure_ascii=False)})
     # Row 479: encryption to a public key in a script, counted apart from signing.
     encrypting = [c for c in scan_result["evidence"]["ci_pipeline"]
                   if c.get("operation") == "public_key_encryption"]

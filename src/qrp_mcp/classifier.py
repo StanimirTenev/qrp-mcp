@@ -1064,8 +1064,11 @@ def extract_findings(request: FingerprintRequest) -> list[Finding]:
                     quantum_vulnerable=False,
                     weak_key=False,
                     severity="info",
-                    reason="CI/CD signing command detected; the signing key's algorithm is not "
-                    "visible from the pipeline config alone and should be reviewed manually.",
+                    reason=("CI/CD signing command detected; the signing key's algorithm is not "
+                            "visible from the pipeline config alone and should be reviewed manually."
+                            # Row 500: `binman sign -a sha256,rsa4096` names it on the line.
+                            if "named on the line" not in str(item.get("key_algorithm") or "")
+                            else f"CI/CD signing command detected; key {item['key_algorithm']}."),
                 )
             )
 

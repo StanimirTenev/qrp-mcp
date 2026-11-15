@@ -52,7 +52,9 @@ _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signi
                    # Said from the rest of the tree, not the line (rows 164, 174).
                    "key_exchange", "unowned_by", "imported_in", "imported_count", "imported",
                    # Rows 494, 484: read from another line of the file.
-                   "family_named_at", "curve_basis")
+                   "family_named_at", "curve_basis",
+                   # Row 500: read from whether the signing key is a file of the tree.
+                   "key_algorithm")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

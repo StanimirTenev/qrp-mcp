@@ -6,6 +6,22 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Firmware signing steps were not read, and a step never said its key was out of reach**
+  (row 500, D4 of `boot-proba/REZULTAT.md` §8). `SIGNING_COMMAND_PATTERNS` had nothing for
+  `mkimage -k/-G/-K`, `binman sign` or `imgtool sign`: both scans had
+  `qrp:evidence:ci_signing_commands: 0`. They are now signing steps (`mkimage_sign`, `binman_sign`,
+  `imgtool_sign`) in scripts and pipelines, with the key they name (`-k`, `-G`, `--key`); a key
+  written with a variable (`-k $1`) is named as written, where before it was dropped. Every
+  signing step whose key is not a file the scan read now carries `key_algorithm`: the algorithm
+  its line names (`binman sign -a sha256,rsa4096`: "RSA-4096, named on the line") or "not
+  determined: key not in the files read". In the scan JSON, the MCP tools (the finding's reason
+  says the named algorithm) and the CBOM (`qrp:evidence:signing_commands`, each step with its key
+  and `key_algorithm`, beside the count). On U-Boot: tools/iot2050-sign-fw.sh:49,50, RSA-4096,
+  key `$1`; on MCUboot none -- its tree holds no `imgtool sign` line in a script, and the CMake
+  site D4 names (boot/zephyr/CMakeLists.txt:386-401) is `imgtool getpub`, which is not signing.
+  **Not done:** a step written as a Python argument list (`[mkimage, '-F', '-k', tmpdir, ...]`,
+  U-Boot test/py/tests/test_vboot.py:256) or a CMake `COMMAND` split over lines is not read as a
+  step.
 - **MCUboot's EC256 naming was not read** (row 501, D5 of `boot-proba/REZULTAT.md` §8; MCUboot
   f30be48). `MCUBOOT_SIGN_EC256`, `BOOTUTIL_SIGN_EC256: 1`, `CONFIG_ESP_SIGN_EC256=1` and the
   signing key `CONFIG_ESP_SIGN_KEY_FILE=root-ec-p256.pem` gave no row, while the RSA and Ed25519
