@@ -11,22 +11,23 @@ this release). QCI's CBOM-Benchmark 2.6.6 carries PQC-washing decoys: `class Mlk
 `self.mlkem_key = ec.generate_private_key(ec.SECP256R1())`, `def kyber_exchange(...)` over
 `exchange(ec.ECDH(), ...)`, a Java `KeyPair mlKemKeyPair` field. 0.44.0 reported ML-KEM and Kyber
 there as calls at high, and the file alone read `pqc_readiness: hybrid_partial` with ML-KEM
-`pqc_ready`, for code that does ECDH on P-256. Found by running qrp-mcp on that benchmark with its
-own scorer (15.11.2026). Now, for the post-quantum families only, a match that is a piece of a
+`pqc_ready`, for code that does ECDH on P-256. Found by running qrp-mcp over that outside
+benchmark (15.11.2026). Now, for the post-quantum families only, a match that is a piece of a
 name the file itself defines (def, class, function, method, field, `let`/`const`/`var`, a
 `self.`/`this.` assignment, a `NAME =` at the start of a line), outside any string literal, is
 an `identifier` row where the family has no other use in that file. Such a family is
-`identifier_only`: still listed, not counted in `pqc_readiness`, `by_role` or the mandates, and
-its CBOM component says `qrp:identifier_only: true`. Where the file also uses the family for real
+`identifier_only`: still listed, not counted in `pqc_readiness`, `by_role` or the mandates. A
+post-quantum family read from names alone no longer carries `pqc_ready` or `pqc_pre_standard`:
+its `classification` is `identifier_only` in the scan result, the MCP tools and the CBOM
+(`qrp:classification`), with what it would be if used in `classification_if_used`, and its CBOM
+component says `qrp:identifier_only: true`. A classical family read from names alone keeps its
+class: a name may over-report a risk, never readiness. Where the file also uses the family for real
 (a library call, a string naming the algorithm, a configuration value), every row keeps its kind:
 on OpenSSH no post-quantum row changed kind. **Not claimed:** a washing name defined in one file
 and only used in another still reads as a use there; and in a file that also names the family in
 a string or an import, the washing names keep their kind (`call` at high), since the rule is
-settled per family and file. The washing ML-KEM component still says `qrp:classification:
-pqc_ready` (the family's class); `qrp:identifier_only` is what says it was not counted. The benchmark's own over-claim count did not
-move (26 before and after): its scorer counts every CBOM component, and the ML-KEM component is
-still there, marked; a consumer has to filter on `qrp:identifier_only` or on the occurrence tag
-below.
+settled per family and file. The ML-KEM component itself stays in the CBOM, so a consumer that
+counts components by name alone, without reading `qrp:classification`, still sees it.
 
 Each row below was reproduced as a failing test before the fix, tested through `scan --out`, the
 MCP tools and the CBOM export, and each fix was reverted once to see its test fail.
@@ -40,9 +41,8 @@ MCP tools and the CBOM export, and each fix was reverted once to see its test fa
   silent before; now RSA with its size ([req] only), the digest where it is one reported elsewhere,
   and the TLS bound as a configured protocol.
 - **MD5 quoted alone** (row 466): `digest("MD5", ...)`, `AUDIT_DIGEST = "md5"` gave nothing while
-  `TOKEN_DIGEST = "sha1"` gave SHA-1. The two agree now. Cost, measured: on the benchmark's
-  negatives one more line reads MD5 (a test-vector tuple `("MD5", "", ...)`, a dict key `"md5"`),
-  86 false positives against 85; on the corpus, an icon theme's `name = "md5"` and test enums
+  `TOKEN_DIGEST = "sha1"` gave SHA-1. The two agree now. Cost: a test-vector tuple
+  `("MD5", "", ...)` and a dict key `"md5"` now read MD5 too, and on the corpus an icon theme's `name = "md5"` and test enums
   (`MD5 = "MD5"`) now read MD5, beside HTTP Digest authentication (guzzle, requests, httprb), which
   is MD5 in use.
 - **A base64 certificate in a Kubernetes TLS Secret is decoded** (row 467), and so is any base64
@@ -66,15 +66,15 @@ MCP tools and the CBOM export, and each fix was reverted once to see its test fa
 **What this changes for an existing pipeline.** Rows 458, 460, 461, 464 and 466-469 add rows or
 families, so a tree with such lines gets a new `findings_fingerprint`, new entries against an
 existing baseline (marked `new`), and can newly fail a `--mandate` gate (an RSA-1024 from
-`default_bits`, an OpenSSH test key). Row 463 changes `pqc_readiness` and the evidence kind of
-the washing rows but not the findings list, so `findings_fingerprint` stays the same there.
+`default_bits`, an OpenSSH test key). Row 463 changes the washing family's classification to
+`identifier_only`, which is part of `findings_fingerprint`, so a washing tree's fingerprint
+changes too.
 
 Also checked, no change needed: `--mandate nist-ir-8547` already follows the final text
 (October 2026): RSA-3072 and P-384 get `deprecated_after: 2030-12-31` (row 168, since 0.39.0),
 and `--lead-months 50` from 15.11.2026 fails on them.
 
-On QCI's CBOM-Benchmark 2.6.6 with its own scorer, unscoped: 214/410 detected with 0.44.0, 228/410
-with this release (52.2% -> 55.6%); false positives 85 -> 86. Positive controls against 0.44.0:
+Positive controls against 0.44.0:
 OpenSSH 7fe3b24 coverage 84.88% and certbot 68.00%, the same files read (741, 850) and the same
 findings (70, 39; 39 is also what the v0.44.0 tag gives on this checkout today, against the 40
 in the 0.44.0 entry); OpenSSH gains 26 family rows from its OpenSSH-format test keys (row 469) and one
@@ -82,9 +82,9 @@ MD5 table entry; certbot is identical.
 
 Corpus regression against 0.44.0 (185 repositories, labels of an independent model): the same in
 every family of both splits except RSA in `obuchenie`, 30 -> 31 rows where the scanner reports and
-the labeller does not; the script exits 1. That row was read: `WithTestData.groovy` in NCANode
-holds an RSA-2048 certificate as base64 (row 467 decodes it), which the labeller, reading the
-text, cannot see. It counts the classical families only, so rows 463 and 466 do not show in it.
+the labeller does not, so the script exits 1. That one row is a correct finding the labeller
+cannot see, and it is accepted as such: `WithTestData.groovy` in NCANode holds a real RSA-2048
+certificate as base64, which row 467 now decodes and which a reader of the text does not see. It counts the classical families only, so rows 463 and 466 do not show in it.
 It is disagreement with a model, never recall or precision.
 
 Left open: rows 459 (a DER key as a C byte array), 462 (a QKD key source) and 465

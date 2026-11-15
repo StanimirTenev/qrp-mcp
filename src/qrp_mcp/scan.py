@@ -162,6 +162,18 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     for f in response.findings:
         if detected_by_name.get(f.raw_value) in by_name_only:
             notes.setdefault(f.algorithm_family, {})["identifier_only"] = True
+            # Row 463, decided 15.11.2026: a post-quantum family read from names alone does
+            # not carry `pqc_ready` / `pqc_pre_standard` -- a CBOM consumer reads the
+            # classification, not a side property. What it would be if used stays beside it.
+            # A classical family keeps its class: a name over-reports a risk, never readiness.
+            if f.classification in ("pqc_ready", "pqc_pre_standard"):
+                notes[f.algorithm_family].update({
+                    "classification": "identifier_only",
+                    "classification_if_used": f.classification,
+                    "reason": (f"{f.algorithm_family} is named only in identifiers this scan "
+                               f"read as names, not uses (`mlkem_key`, `kyber_exchange`): "
+                               f"not counted as post-quantum. Were it used, it would be "
+                               f"{f.classification}. {f.reason}")})
     counted = [f for f in response.findings
                if detected_by_name.get(f.raw_value) not in by_name_only]
     summary = summarize(counted, set_aside, protected)

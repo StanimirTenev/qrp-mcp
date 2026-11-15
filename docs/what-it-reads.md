@@ -165,7 +165,10 @@ field. Until 0.45.0 those names gave ML-KEM and Kyber as calls at high, and the 
 is a piece of a name **the file itself defines** (a def, class, function, method, field,
 `let`/`const`/`var`, a `self.`/`this.` assignment or a `NAME =` at the start of a line), outside
 any string literal, is an `identifier` row — low, and a family whose every use is such a row is
-`identifier_only`, not counted in `pqc_readiness`, `by_role` or the mandates. It is settled per
+`identifier_only`, not counted in `pqc_readiness`, `by_role` or the mandates. Its
+`classification` is then `identifier_only`, not `pqc_ready` or `pqc_pre_standard`, everywhere the
+finding leaves (`classification_if_used` says what it would be); a classical family read from
+names alone keeps its class. It is settled per
 family and file: where the same file also uses the family for real — a library call
 (`ml_kem_768.generate_keypair()`, `mlkem.GenerateKey768()`), a string naming the algorithm
 (`KeyEncapsulation("ML-KEM-768")`), a configuration value — every row keeps its kind, so an

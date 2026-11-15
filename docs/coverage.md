@@ -95,7 +95,7 @@ The published measurement, with the raw artefacts:
 
 `scope.files_excluded_before_counting` counted the files the directory exclusions (`dist`,
 `build`, `node_modules`, `vendor`, …) removed by directory name — `dist: 3` — and named none of
-them; on QCI's CBOM-Benchmark those files held 13 findings another scanner read (row 471). It
+them, while on an outside benchmark such files held findings another scanner read (row 471). It
 now also carries `directories`: each excluding directory from the root (`tier5/javascript/dist`,
 `svc/build`), its file count, and its `paths`, up to 50, with `paths_not_listed` for the rest.
 `.git` is not listed. In the CBOM each directory's paths are one property holding a JSON array.

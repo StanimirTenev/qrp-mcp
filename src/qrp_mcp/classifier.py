@@ -25,6 +25,9 @@ CONTRACT_VERSION = "cfp-v1"
 #   hash                  -> hash primitive of acceptable strength.
 #   deprecated_weak       -> broken/deprecated primitive regardless of quantum.
 #   unknown               -> could not be classified.
+#   identifier_only       -> (set by scan.py, never here) a post-quantum family named only
+#                            in identifiers the scan read as names, not uses (row 463);
+#                            `classification_if_used` says what it would be.
 
 Classification = Literal[
     # Not an algorithm: a mechanism that confers quantum resistance without one.

@@ -1,7 +1,7 @@
 """Row 471 (15.11.2026, QCI CBOM-Benchmark 2.6.6 cross-run): files removed by a directory
 exclusion before counting were counted, not named -- `files_excluded_before_counting:
 by_directory:dist 3` with no path, while those files (minified JS under
-tier5/javascript/dist/, a jar under build/libs/) held 13 findings that another scanner read.
+tier5/javascript/dist/, a jar under build/libs/) held findings that another scanner read.
 Row 49 stopped the silence and row 3 named type_not_claimed files; this names each excluding
 directory from the root with its files (up to 50, then the count of the rest), as a JSON array
 in the CBOM (row 6: no comma-joined lists). `.git` is not listed.

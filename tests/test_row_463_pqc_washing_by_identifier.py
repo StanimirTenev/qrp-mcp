@@ -82,6 +82,9 @@ def _assert_washing_not_believed(result):
     for f in result["findings"]:
         if f["algorithm_family"] in PQ:
             assert f.get("identifier_only") is True, f
+            # Coordinator, 15.11: the classification itself must not assert readiness.
+            assert f["classification"] == "identifier_only", f
+            assert f["classification_if_used"] in ("pqc_ready", "pqc_pre_standard"), f
     # The provisional marker never leaves the detector.
     assert not any(k.startswith("_") for o in result["evidence"]["source_code"] for k in o)
 
@@ -137,6 +140,8 @@ def test_washing_in_the_cbom_is_marked_identifier_only(tmp_path):
         for c in pq:
             props = {p["name"]: p["value"] for p in c.get("properties", [])}
             assert props.get("qrp:identifier_only") == "true", (c["name"], props)
+            assert props.get("qrp:classification") == "identifier_only", (c["name"], props)
+            assert props.get("qrp:classification_if_used") in ("pqc_ready", "pqc_pre_standard")
             kinds = json.loads(props["qrp:evidence_kind"])
             assert set(kinds) <= {"comment", "identifier"}, kinds
 
@@ -149,7 +154,8 @@ def test_cbom_cli_marks_identifier_only(tmp_path):
     cli("cbom", str(src), "--out", str(out), "--no-config")
     pq = _ml_kem_component(json.loads(out.read_text()))
     assert pq and all({"name": "qrp:identifier_only", "value": "true"} in c["properties"]
-                      for c in pq)
+                      and {"name": "qrp:classification", "value": "identifier_only"}
+                      in c["properties"] for c in pq)
 
 
 # -- the other side: real post-quantum use stays a use ---------------------------------------
@@ -184,6 +190,7 @@ def test_real_ml_kem_use_is_still_a_use_and_counted(tmp_path):
         assert uses, (name, result["evidence"]["source_code"])
         ml_kem = [f for f in result["findings"] if f["algorithm_family"] == "ML-KEM"]
         assert ml_kem and not ml_kem[0].get("identifier_only"), name
+        assert ml_kem[0]["classification"] == "pqc_ready", name
         assert result["summary"]["pqc_ready_count"] >= 1, name
 
 

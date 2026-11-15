@@ -564,7 +564,7 @@ def build(
                 "total": sum(excluded.values()),
                 "by_directory": excluded,
                 # Row 471 (QCI CBOM-Benchmark 2.6.6): counted, not named -- `dist 3` with no
-                # path, while those files held 13 findings another scanner read. Each
+                # path, while those files held findings another scanner read. Each
                 # directory that removed files, from the root, with its files up to
                 # EXCLUDED_PATHS_LISTED; past that, the count of those not listed. `.git` is
                 # not listed: git metadata is not part of the estate (verdict_line).

@@ -600,8 +600,7 @@ def _scope(located: list[dict[str, Any]], family: str,
 # whose only mention of RC4 is `!RC4` produces no RC4 component.
 #
 # Row 470 (QCI CBOM-Benchmark 2.6.6): a name is not a use either. `qrp:evidence_kind` is a
-# list on the component, which no consumer filters an occurrence by; filtering by kind cut
-# that benchmark's false positives 85 -> 31. An identifier row (`mlkem_key`, `RSAUtil`) is now
+# list on the component, which no consumer filters an occurrence by. An identifier row (`mlkem_key`, `RSAUtil`) is now
 # tagged on the occurrence as a comment is: `[identifier]`. (`named_but_not_used` is a list of
 # families in the scan result, never an occurrence's kind, so it has no tag here.)
 _NOT_CODE = {"comment", "identifier"}
@@ -765,7 +764,8 @@ def _certificate_components(located: list[dict[str, Any]],
 # What a family's own component says that its parameter-set components do not (release 3d).
 _CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_pins",
                                  "provider_configuration", "not_negotiable_by", "not_enabled",
-                                 "fallback_beside_hybrid", "identifier_only")}
+                                 "fallback_beside_hybrid", "identifier_only",
+                                 "classification_if_used")}
 
 
 # The order of a named curve's base point, in bits: SEC 2 v2.0 section 2 (secp*), FIPS 186-4
@@ -963,6 +963,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         # another identifier row: the summary does not count it, and the component says so.
         if finding.get("identifier_only"):
             component["properties"].append({"name": f"{NS}identifier_only", "value": "true"})
+        if finding.get("classification_if_used"):
+            component["properties"].append({"name": f"{NS}classification_if_used",
+                                            "value": finding["classification_if_used"]})
         # The modules the evidence names, one JSON array like every other list here.
         # Not `certificationLevel`: that field states a validation, and nothing in a
         # file establishes one. Not `implementationPlatform`: that is a CPU.

@@ -72,9 +72,10 @@ now says `[comment]`.
 
 From 0.45.0 an occurrence whose evidence is an identifier row (a family read from a name,
 `RSAUtil`, `mlkem_key`) says `[identifier]` in the same place: `qrp:evidence_kind` is a list on the component, which no consumer filters an
-occurrence by (row 470; on QCI's CBOM-Benchmark, filtering by kind took false positives from 85
-to 31). A family whose every use is an identifier row carries `qrp:identifier_only: true` on its
-component, as the scan result carries `identifier_only` on the finding (row 463). A default
+occurrence by (row 470). A family whose every use is an identifier row carries
+`qrp:identifier_only: true` on its component, as the scan result carries `identifier_only` on the
+finding (row 463); a post-quantum one also has `qrp:classification: identifier_only` instead of
+`pqc_ready` / `pqc_pre_standard`, with `qrp:classification_if_used` beside it. A default
 written beside an environment read is listed in the document's
 `qrp:chosen_outside_files:overridable_defaults` (a JSON array of place, default, family; row 440).
 
