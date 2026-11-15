@@ -64,12 +64,13 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   (379) and `configs/*_defconfig` (1599) were all `type_not_claimed`, so the files that say how
   the firmware is signed -- `algo = "sha256,rsa3072"`, `CONFIG_RSA=y` -- were the ones not read.
   They are now claimed as configuration and read by the algorithm rules (not by the TLS, IKE and
-  IaC readers, which found nothing in them and cost U-Boot 17 s). `CONFIG_RSA=y` /
+  IaC readers, which found nothing in them and cost U-Boot about 16 s more in one run). `CONFIG_RSA=y` /
   `CONFIG_SPL_RSA=y` is an RSA row (none of the 20 U-Boot defconfigs with it gave one: the
   identifier alone was not read), and Kconfig's `# CONFIG_X is not set` is a switch off, in an
   `sdkconfig` too. On U-Boot: `coverage_pct` 60.28% -> 89.50%, 236 rows in these files (RSA 111,
   SHA-1 79 of which 10 switched off, ECDSA 29, MD5 15, 3DES 2 -- OMAP's DES accelerator clock),
-  findings 188 -> 188; scan 40.5 s -> 48.9 s on this machine. Two false positives the new files
+  findings 188 -> 188. Scan time on U-Boot, rows 498-507 together, two back-to-back runs each on
+  this machine: 40.8 / 41.1 s before, 48.1 / 48.5 s after. Two false positives the new files
   showed are closed: an EC or DSA carried by a defconfig identifier is not read (all 25 were `CONFIG_DDR_ECC`, `CONFIG_SPL_NAND_ECC` or
   `CONFIG_DM_DSA`), and a hex word `0x25519f22` is no longer X25519. **Not claimed:**
   `key-name-hint`, `required` and `keyfile` name a key, not an algorithm, and give no row;

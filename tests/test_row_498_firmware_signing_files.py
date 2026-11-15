@@ -108,3 +108,11 @@ def test_microcode_hex_is_not_x25519(tmp_path):
     (tmp_path / "kex.dtsi").write_text('kex = "x25519";\n')
     rows = scan_directory(tmp_path)["evidence"]["source_code"]
     assert {(e["path"], e["algorithm"]) for e in rows} == {("kex.dtsi", "X25519")}, rows
+
+
+def test_not_set_in_an_sdkconfig_is_a_switch_off(tmp_path):
+    # ESP-IDF's sdkconfig is written by the same Kconfig code: `# CONFIG_X is not set`.
+    (tmp_path / "sdkconfig").write_text("CONFIG_ECDSA_VERIFY=y\n# CONFIG_ESP_SIGN_RSA is not set\n")
+    rows = {(e["line"], e["algorithm"]): e["evidence_kind"]
+            for e in scan_directory(tmp_path)["evidence"]["source_code"]}
+    assert rows.get((2, "RSA")) == "ban", rows
