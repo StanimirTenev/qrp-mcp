@@ -6,6 +6,22 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Where a KEM key is generated was not said** (row 494, Paarrthhh Birla, after Keyber, IACR
+  ePrint 2026/2766; probe `keyber-proba`). A pqm4-style `provision.c` generating the device's
+  ML-KEM-512 key once with `crypto_kem_keypair` (line 6) and decapsulating with `crypto_kem_dec`
+  (line 9) read ML-KEM-512 `pqc_ready` from the comment and the Makefile, and gave neither call a
+  row. A call into the NIST KEM and signature API (pqm4, PQClean, SUPERCOP: `crypto_kem_*`,
+  `crypto_sign_*`, `crypto_sign`), liboqs (`OQS_KEM_*`, `OQS_SIG_*`, per-scheme forms) or
+  mlkem-native's namespaced functions is now a row with `operation` (`keygen`, `encapsulate`,
+  `decapsulate`, `sign`, `verify`), in the scan JSON, the MCP tools, SARIF and the CBOM
+  (`qrp:operation`). Where the call does not name the scheme, the family is the only KEM (or
+  signature) family the same file names, said in `family_named_at`. Found by re-running the
+  probe; on liboqs `src/kem/ml_kem` 75 calls read, none of them a declaration. The finding count
+  and verdict do not move (one finding per family). **Not claimed:** that the step survives a
+  fault -- only a fault test shows that; a call in a file naming no scheme (the scheme only in the
+  Makefile or directory) or two gets no row; generic test code calling `OQS_SIG_STFL_verify` is
+  given the one family its file names. BoringSSL, Go, Python and Rust KEM calls are not read
+  for an operation.
 - **Verifying a signature read the same as signing one** (row 480, Paul Snow; probe
   `verify-proba`). `public_key.verify(...PSS...)` in `archive_verify.py` and `key.sign(...)` in
   `issue_record.py` gave the same row: RSA, signature, deprecated after 2030, "due". An RSA, EC,

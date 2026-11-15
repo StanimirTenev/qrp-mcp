@@ -32,6 +32,8 @@ From 0.39.0 an RSA, DSA, DH or EC component carries `qrp:key_size` (never left o
 `qrp:classical_status_source`; RSA and EC components carry `qrp:role`, one per occurrence;
 from 0.47.0 RSA, EC, ECDSA, EdDSA and DSA components carry `qrp:operation` (`sign`, `verify`,
 `encrypt`, `decrypt`, or `not read`), one per occurrence;
+post-quantum KEM and signature components too (`keygen`, `encapsulate`, `decapsulate`, `sign`,
+`verify`, or `not read`);
 ML-KEM components `qrp:negotiation`, one per occurrence; and a family compiled only under a build
 switch nothing in the tree defines, `qrp:not_enabled` (see *From 0.39.0*).
 

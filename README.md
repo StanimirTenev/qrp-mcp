@@ -152,6 +152,16 @@ as signing a new one; in the CBOM as `qrp:operation`. Under `--mandate nist-ir-8
 says what IR 8547 calls legacy use, with no exemption: the dates and the gate are unchanged
 ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/closure-and-profiles.md)).
 
+From 0.47.0 a call into a post-quantum KEM or signature API is a row with `operation` --
+`keygen` apart from `encapsulate`, `decapsulate`, `sign` and `verify` -- so where a device
+generates its own key is said with file and line: the NIST API of pqm4, PQClean and SUPERCOP
+(`crypto_kem_keypair/enc/dec`, `crypto_sign_keypair`, `crypto_sign_signature`/`crypto_sign`,
+`crypto_sign_verify`/`crypto_sign_open`), liboqs (`OQS_KEM_keypair/encaps/decaps`,
+`OQS_SIG_keypair/sign/verify` and the per-scheme forms) and mlkem-native's namespaced
+functions. Where the call does not name the scheme, the family is the one the same file names
+(`family_named_at`); a file naming none or two gives no row. Declarations are not calls. Code
+shows where a key is generated, not whether that step survives a fault.
+
 ### A control on your own tree
 
 ```

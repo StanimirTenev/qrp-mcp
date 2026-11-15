@@ -4211,6 +4211,7 @@ def scan_source_file(path: Path, rel_path: str,
         findings = sorted(findings + by_identifier, key=lambda f: f["line"])
     _settle_names_defined_here(findings)
     _name_not_a_use_rules(findings, lines, denial_lines)
+    findings = _pq_operations(findings, lines, rel_path)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
     findings = _drop_ecdh_named_only_by_the_setting(findings)
@@ -4219,6 +4220,89 @@ def scan_source_file(path: Path, rel_path: str,
     if len(lines) > 1:
         findings = _split_call_names(path, rel_path, lines, findings, cipher_exclusions)
     return findings
+
+
+# Row 494 (Keyber, IACR ePrint 2026/2766): where a post-quantum key is generated, apart from
+# where it is used. The NIST API of pqm4, PQClean and SUPERCOP (`crypto_kem_keypair/enc/dec`,
+# `crypto_sign_keypair/signature/verify`, `crypto_sign`/`crypto_sign_open`, also namespaced
+# `PQCLEAN_..._crypto_kem_keypair`), liboqs (`OQS_KEM_keypair/encaps/decaps`, `OQS_SIG_keypair/
+# sign/verify`, and the per-scheme `OQS_KEM_ml_kem_768_keypair`), and mlkem-native's namespaced
+# functions (`PQCP_MLKEM_NATIVE_MLKEM768_C_keypair/enc/dec`, liboqs kem_ml_kem_768.c). Calls
+# only: a line with a type before the name, or a typed argument, is a declaration.
+_KEM_SCHEMES = frozenset({"ML-KEM", "Kyber", "FrodoKEM", "Classic McEliece", "NTRU", "BIKE",
+                          "HQC", "SIKE", "SMAUG-T", "CSIDH/CTIDH", "MIKE"})
+_SIG_SCHEMES = frozenset(_PQC_SCHEMES) - _KEM_SCHEMES
+PQ_OPERATION_FAMILIES = _KEM_SCHEMES | _SIG_SCHEMES
+_PQ_OPERATION_CALLS: list[tuple[re.Pattern[str], frozenset[str]]] = [
+    (re.compile(r"\b\w*?crypto_kem_(keypair|enc|dec)(?:_derand)?\s*\("), _KEM_SCHEMES),
+    (re.compile(r"\bOQS_KEM_(?:\w+?_)?(keypair|encaps|decaps)(?:_derand)?\s*\("), _KEM_SCHEMES),
+    (re.compile(r"\b\w*?MLKEM(?:512|768|1024)(?:_\w+?)?_(keypair|enc|dec)(?:_derand)?\s*\(",
+                re.IGNORECASE), _KEM_SCHEMES),
+    (re.compile(r"\b\w*?crypto_sign(?:_(keypair|signature|verify|open))?\s*\("), _SIG_SCHEMES),
+    (re.compile(r"\bOQS_SIG_(?:\w+?_)?(keypair|sign|verify)(?:_with_ctx_str)?\s*\("),
+     _SIG_SCHEMES),
+]
+_PQ_OPERATION_ANY = re.compile(r"crypto_kem_|crypto_sign|OQS_KEM_|OQS_SIG_|mlkem(?:512|768|1024)",
+                               re.IGNORECASE)
+_PQ_OPERATION_NAME = {None: "sign", "keypair": "keygen", "enc": "encapsulate",
+                      "encaps": "encapsulate", "dec": "decapsulate", "decaps": "decapsulate",
+                      "signature": "sign", "sign": "sign", "verify": "verify", "open": "verify"}
+# What may stand before a call: nothing, an operator, `return`, or a cast (`(OQS_STATUS)`).
+_CALL_BEFORE = re.compile(r"(?:^|[=(,!{;?:&|.]|->|\breturn|\(\s*\w+\s*\**\s*\))$")
+_TYPED_ARGUMENT = re.compile(r"\b(?:u?int\d+_t|size_t|char|void|OQS_KEM|OQS_SIG|unsigned)\b"
+                             r"[\s*]*\w*\s*[,)\[]|\*\s*\w+\s*[,)]")
+
+
+def _pq_operations(findings: list[dict[str, Any]], lines: list[str],
+                   rel_path: str) -> list[dict[str, Any]]:
+    """Row 494: `operation` (keygen, encapsulate, decapsulate, sign, verify) on a call into a
+    post-quantum KEM or signature API. The row of the line's family gets it; a line with none
+    gets a row of the one KEM (or signature) family the file names elsewhere, with
+    `family_named_at`. A file naming none or two gives nothing: not guessed."""
+    if not _PQ_OPERATION_ANY.search("\n".join(lines)):
+        return findings
+    added: list[dict[str, Any]] = []
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+        if not _PQ_OPERATION_ANY.search(line) or stripped.startswith(("//", "/*", "*", "#")):
+            continue
+        code = re.sub(r"/\*.*?\*/", lambda m: " " * len(m.group(0)), line).split("//")[0]
+        for pattern, schemes in _PQ_OPERATION_CALLS:
+            match = pattern.search(code)
+            if not match:
+                continue
+            if (not _CALL_BEFORE.search(code[:match.start()].rstrip())
+                    or _TYPED_ARGUMENT.search(code[match.end():])):
+                break
+            operation = _PQ_OPERATION_NAME[match.group(1)]
+            line_no = index + 1
+            here = [f for f in findings if f["line"] == line_no and f["algorithm"] in schemes
+                    and f.get("evidence_kind") not in ("comment", "ban")]
+            if here:
+                for f in here:
+                    f.setdefault("operation", operation)
+                break
+            named = {}
+            for f in findings:
+                if f["algorithm"] in schemes and f.get("evidence_kind") != "ban":
+                    named.setdefault(f["algorithm"], []).append(f)
+            if len(named) != 1:
+                break
+            family, rows = next(iter(named.items()))
+            item = {"path": rel_path, "line": line_no, "algorithm": family,
+                    "description": f"{family} {operation} call",
+                    "excerpt": line.strip()[:200], "evidence_kind": "call",
+                    "in_test_code": in_test_code(rel_path), "operation": operation,
+                    "family_named_at": f"{rel_path}:{rows[0]['line']}"}
+            # The set the naming lines give, read as _tag_parameter_sets reads a line.
+            rule = _PARAMETER_SETS.get(family)
+            sets = {rule[1](m) for f in rows for m in rule[0].finditer(f.get("excerpt") or "")
+                    } if rule else set()
+            if len(sets) == 1:
+                item["parameter_set"] = sets.pop()
+            added.append(item)
+            break
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 # Row 424: `generateKeyPairSync(\n  'rsa',` and `getInstance(\n  "RSA");` were silent, while the

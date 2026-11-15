@@ -54,7 +54,7 @@ from typing import Any
 from . import baseline as baseline_mod, confidence, oids, remediation
 from .classifier import SIZED_FAMILIES, classical_status
 from .assets import TLS_SETTING_NOTE
-from .detectors import in_test_code
+from .detectors import PQ_OPERATION_FAMILIES, in_test_code
 from .classifier import known_algorithms
 
 SPEC_VERSION = "1.6"
@@ -515,7 +515,9 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                 if item.get("role") in ("signature", "key_establishment", "undetermined"):
                     roles_at.setdefault((item["path"], item["line"]), []).append(
                         (family_of.get(name, name), item["role"]))
-                if item.get("operation") in ("sign", "verify", "encrypt", "decrypt"):
+                # Row 494: and a post-quantum KEM's or signature's keygen, encapsulate, decapsulate.
+                if item.get("operation") in ("sign", "verify", "encrypt", "decrypt", "keygen",
+                                             "encapsulate", "decapsulate"):
                     operations_at.setdefault((item["path"], item["line"]), []).append(
                         (family_of.get(name, name), item["operation"]))
                 if item.get("order"):
@@ -553,7 +555,7 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
                                if name == own})
                 roles.append("+".join(said) or "not read")
             component["properties"].append({"name": f"{NS}role", "value": json.dumps(roles)})
-        if own in remediation.OPERATION_FAMILIES:
+        if own in remediation.OPERATION_FAMILIES or own in PQ_OPERATION_FAMILIES:
             ops = ["+".join(sorted({op for name, op in operations_at.get(
                 (o["location"], o.get("line")), []) if name == own})) or "not read"
                    for o in occurrences]
