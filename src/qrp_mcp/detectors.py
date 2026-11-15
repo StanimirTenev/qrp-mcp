@@ -32,7 +32,7 @@ from .assets import _DEPRECATED_TLS, _TLS_VERSION, _tls_version_name, GROUP_CONS
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
                      os_packages,
                      dockerfile_pins, library_support, names_none_of, pinned_versions,
-                     scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips,
+                     scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips, scan_openssl_cnf_keys,
                      scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions, yaml_list_settings)
 from .certificates import (decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
@@ -5069,6 +5069,17 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             protocol_findings.append(asset)
         if path.suffix.lower() == ".cnf":
             fips_findings.extend(scan_openssl_fips(rel_path, lines))
+            # Row 464: every line, not behind the line gate (`default_bits` names no family).
+            cnf_rows, cnf_protocols = scan_openssl_cnf_keys(rel_path, lines)
+            held = {(f["line"], f["algorithm"]) for f in source_findings if f["path"] == rel_path}
+            for item in cnf_rows:
+                if (item["line"], item["algorithm"]) not in held:
+                    item["in_test_code"] = in_test_code(rel_path)
+                    source_findings.append(item)
+            held_versions = {(a.get("line"), a.get("version")) for a in protocol_findings
+                             if a.get("path") == rel_path}
+            protocol_findings.extend(a for a in cnf_protocols
+                                     if (a["line"], a["version"]) not in held_versions)
         if path.suffix.lower() in SIGNING_SCRIPT_EXTENSIONS:
             ci_findings.extend(scan_ci_file(path, rel_path, lines))
         # HAProxy listeners and unverified backends (HAProxy, nginx): see

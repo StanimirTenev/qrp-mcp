@@ -990,6 +990,57 @@ def scan_openssl_fips(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     return sorted(out, key=lambda item: item["line"])
 
 
+# Row 464 (QCI CBOM-Benchmark 2.6.6): an openssl.cnf was read and said nothing about the keys
+# and protocol it sets. From OpenSSL's own manuals: req(1) `default_bits` "Specifies the default
+# key size in bits" (the RSA key `openssl req -newkey` makes when no size is given, req section
+# only), req(1) and ca(1) `default_md` the digest used to sign, and SSL_CONF_cmd(3)
+# `MinProtocol` / `MaxProtocol` "the minimum / maximum supported protocol" (`None` sets no
+# limit). Only digests this scanner reports anywhere else are named (sha256 is not).
+_CNF_DIGESTS = {"sha1": "SHA1", "md5": "MD5", "md4": "MD4", "md2": "MD2", "sha224": "SHA224"}
+_CNF_PROTOCOL = re.compile(r"^(?:D?TLSv1(?:\.([0-3]))?|SSLv3)$")
+
+
+def scan_openssl_cnf_keys(rel_path: str, lines: list[str]
+                          ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """(source rows, protocol assets) for default_bits, default_md and Min/MaxProtocol."""
+    rows: list[dict[str, Any]] = []
+    protocols: list[dict[str, Any]] = []
+    current = ""
+    for number, text in enumerate(lines, 1):
+        head = _CNF_SECTION.match(text)
+        if head:
+            current = head.group(1).lower()
+            continue
+        setting = _CNF_SETTING.match(text)
+        if not setting:
+            continue
+        name, value = setting.group(1), setting.group(2).strip()
+        base = {"path": rel_path, "line": number, "excerpt": text.strip()[:200],
+                "evidence_kind": "declaration"}
+        if name == "default_bits" and current == "req" and value.isdigit():
+            rows.append({**base, "algorithm": "RSA", "key_size": int(value),
+                         "description": "RSA key size `openssl req` uses when none is given "
+                                        "(req(1) default_bits)"})
+        elif name == "default_md" and value.lower() in _CNF_DIGESTS:
+            rows.append({**base, "algorithm": _CNF_DIGESTS[value.lower()],
+                         "description": f"{value} as the signing digest of `openssl "
+                                        f"{'req' if current == 'req' else 'ca'}` "
+                                        f"(default_md, req(1) and ca(1))"})
+        elif name in ("MinProtocol", "MaxProtocol") and _CNF_PROTOCOL.match(value):
+            m = _CNF_PROTOCOL.match(value)
+            version = ("SSLv3" if value == "SSLv3" else
+                       f"{'DTLS' if value.startswith('D') else 'TLS'}v1.{m.group(1) or 0}")
+            bound = "lowest" if name == "MinProtocol" else "highest"
+            protocols.append({
+                "path": rel_path, "line": number, "excerpt": text.strip()[:200],
+                "protocol": "tls", "version": version, "banned": False,
+                "basis": "configured_protocol", "deprecated": version in _DEPRECATED_TLS,
+                "description": (f"{version} is the {bound} version allowed here ({name}, "
+                                f"SSL_CONF_cmd(3)). Which algorithms it negotiates is not "
+                                f"stated by the version.")})
+    return rows, protocols
+
+
 # -- An HAProxy listener that terminates TLS, and peer verification switched off ----------
 #
 # `bind :8443 ssl crt edge.pem` terminates TLS and was not a TLS place: with no
