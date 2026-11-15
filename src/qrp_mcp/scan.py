@@ -426,8 +426,71 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     _authentication_not_read(result, repo_path)
     _readiness_by_role(result)
     _unowned(result)
+    result["layer_disagreements"] = _layer_disagreements(result)
     result["findings_fingerprint"] = findings_fingerprint(result)
     return result
+
+
+# The TLS hybrid groups (detectors.HYBRIDS): what makes a group setting post-quantum.
+_TLS_HYBRID_GROUPS = {"X25519MLKEM768", "SecP256r1MLKEM768", "SecP384r1MLKEM1024",
+                      "X25519Kyber768Draft00", "SecP256r1Kyber768Draft00", "curveSM2MLKEM768"}
+LAYERS_GOVERN = ("the weaker value applies until the connection is measured on the wire: "
+                 "which layer terminates the client's TLS, and what it negotiates, is not "
+                 "stated by the files")
+
+
+def _layer_disagreements(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Row 472: one repository configures TLS key exchange in two layers that disagree -- a
+    terminator's group setting (nginx, HAProxy, Apache) offers a post-quantum hybrid and a load
+    balancer's policy offers none, or the other way round. One open finding naming both, the
+    weaker governing until measured, with the CODEOWNERS owner of the load balancer.
+
+    No link between the two is claimed: nothing in the files says this nginx sits behind that
+    listener, and a shared port 443 is not a basis. So the finding is made at repository level
+    and says the link is not established. Whatever a link could say, it never clears one."""
+    in_use = {(i["path"], i["line"]) for i in result["evidence"]["source_code"]
+              if i.get("evidence_kind") not in ("comment", "ban")}
+    groups: dict[str, dict[str, Any]] = {}
+    for h in result.get("hybrid_names") or []:
+        if h["name"] in _TLS_HYBRID_GROUPS and (h["path"], h["line"]) in in_use:
+            layer = groups.setdefault(h["path"], {"path": h["path"], "line": h["line"],
+                                                  "setting": "TLS group setting", "value": [],
+                                                  "post_quantum": True})
+            layer["post_quantum"] = True
+            layer["value"].append(h["name"])
+    for g in result["evidence"].get("tls_groups") or []:
+        layer = groups.setdefault(g["path"], {"path": g["path"], "line": g["line"],
+                                              "setting": g.get("setting") or "TLS group setting",
+                                              "value": [], "post_quantum": False})
+        if g["group"] not in layer["value"]:
+            layer["value"].append(g["group"])
+    policies = [{"path": p["path"], "line": p["line"], "setting": "load balancer TLS policy",
+                 "value": [p["policy"]], "post_quantum": bool(p["post_quantum"]),
+                 "owners": p.get("owners"), "owners_source": p.get("owners_source")}
+                for p in result["evidence"].get("protocols") or []
+                if p.get("protocol") == "tls" and p.get("policy") and "post_quantum" in p]
+    layers = list(groups.values()) + policies
+    if not policies or not groups or len({layer["post_quantum"] for layer in layers}) < 2:
+        return []
+    weaker = next(layer for layer in sorted(layers, key=lambda x: (x["path"], x["line"]))
+                  if not layer["post_quantum"])
+    owner = next((p for p in policies if p.get("owners")), None)
+    group_paths = ", ".join(sorted(groups))
+    policy_paths = ", ".join(sorted({p["path"] for p in policies}))
+    return [{
+        "status": "open",
+        "question": "post-quantum key exchange",
+        "layers": [{k: v for k, v in layer.items() if k not in ("owners", "owners_source")}
+                   for layer in sorted(layers, key=lambda x: (x["path"], x["line"]))],
+        "weaker": {"path": weaker["path"], "line": weaker["line"],
+                   "value": weaker["value"], "post_quantum": False},
+        "governs": LAYERS_GOVERN,
+        "owners": owner["owners"] if owner else [],
+        "owners_source": owner["owners_source"] if owner else None,
+        "link": {"established": False,
+                 "basis": f"link not established: nothing in the files ties {group_paths} to "
+                          f"{policy_paths} (both naming port 443 is not a basis)"},
+    }]
 
 
 # ZA-OPRAVYANE rows 164 and 167: a TLS server that sets no group negotiates

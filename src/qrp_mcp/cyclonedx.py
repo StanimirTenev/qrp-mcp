@@ -1559,6 +1559,14 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                                    if p.get("overridable")], ensure_ascii=False)}]
             if any(p.get("overridable") for p in
                    (scan_result.get("chosen_outside_files") or {}).get("places", [])) else []) + (
+            # Row 472: two TLS layers that disagree, as one open finding.
+            [{"name": f"{NS}layer_disagreements", "value": json.dumps(
+                [{**{k: v for k, v in d.items() if k != "layers"},
+                  "layers": [{"location": x["path"], "line": x["line"], "setting": x["setting"],
+                              "value": x["value"], "post_quantum": x["post_quantum"]}
+                             for x in d["layers"]]}
+                 for d in scan_result["layer_disagreements"]], ensure_ascii=False)}]
+            if scan_result.get("layer_disagreements") else []) + (
             # Row 473: the lines closed as not a use, with the rule that closed each.
             [{"name": f"{NS}named_but_not_used:lines", "value": json.dumps(
                 [{"family": r["family"], "location": r["path"], "line": r["line"],

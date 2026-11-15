@@ -337,6 +337,8 @@ def _evidence_lists(result: dict[str, Any]):
     yield from ((result.get("suppressed") or {}).get("evidence") or {}).values()
     # The lines that read a setting at run time quote the line too (rows 156, 176).
     yield (result.get("chosen_outside_files") or {}).get("places") or []
+    # Row 472: the open finding where two layers disagree carries the terminator's owner.
+    yield result.get("layer_disagreements") or []
 
 
 def _strip_excerpts(result: dict[str, Any]) -> dict[str, Any]:
