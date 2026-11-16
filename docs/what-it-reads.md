@@ -20,6 +20,12 @@
 BIP340/Taproot Schnorr. Solidity (`.sol`), Rust (`.rs`), Move and Cairo are scanned alongside
 Python, Go, Java, Kotlin, Scala, Groovy, JS/TS, Ruby, PHP, C/C++/C# — headers included — PowerShell,
 Perl and shell.
+From 0.47.0 Swift (`.swift`) is read too, with Apple's names: CryptoKit's `P256`/`P384`/`P521`
+`.Signing` (ECDSA, the curve from the name) and `.KeyAgreement` (ECDH), also under
+`SecureEnclave.`, `Curve25519.Signing` (Ed25519; `Curve25519.KeyAgreement` is X25519), and the
+Security framework's EC key type `kSecAttrKeyTypeECSECPrimeRandom` / `kSecAttrKeyTypeEC`. The size a
+Security-framework key gets from `kSecAttrKeySizeInBits` on another line is not read, nor where the
+key lives (Secure Enclave). Objective-C (`.m`) is still not read.
 
 **Classical crypto anywhere else** — RSA, DSA, DH, ECDSA and elliptic-curve usage, plus MD5,
 SHA-1, RC4 and DES/3DES. Not only through library calls: the names the protocols themselves use

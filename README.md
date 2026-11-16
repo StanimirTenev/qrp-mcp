@@ -229,7 +229,7 @@ rules, file types and their limits is in [What it looks at](https://github.com/S
 
 | Kind | Read as |
 | --- | --- |
-| Source code | C and C++, C#, Visual Basic and F#, Go, Rust, Java, Kotlin, Scala and Groovy, Python, JavaScript and TypeScript, Ruby, PHP, Perl, Solidity, Move and Cairo |
+| Source code | C and C++, C#, Visual Basic and F#, Go, Rust, Java, Kotlin, Scala and Groovy, Swift (from 0.47.0: CryptoKit's `P256.Signing`/`.KeyAgreement`, `Curve25519.Signing`, the Security framework's `kSecAttrKeyTypeECSECPrimeRandom`), Python, JavaScript and TypeScript, Ruby, PHP, Perl, Solidity, Move and Cairo |
 | Scripts | `.sh`/`.bash`/`.zsh`/`.ksh`, `.bat`/`.cmd`, PowerShell `.ps1`/`.psm1`/`.psd1` — algorithms, and signing commands as a pipeline's are |
 | CI/CD pipelines | signing commands (`gpg --sign`, `cosign sign`, `signtool`, `jarsigner`, `codesign`, Secure Boot and kernel-module signing, firmware signing with `mkimage -k`/`-G`/`-K`, `binman sign` and `imgtool sign`), with the key they name, and where that key is not a file the scan read, `key_algorithm`: the algorithm the line names (`-a sha256,rsa4096`) or "not determined: key not in the files read"; encryption to a public key (`gpg --encrypt`, `openssl smime`/`cms`/`pkeyutl -encrypt`, `age -r`), with the recipient key where it is in the tree |
 | Infrastructure as code | Terraform/HCL (an `aws_kms_alias` and its `aws_kms_key` tie a composite signature declared beside KMS aliases to its two keys), Kubernetes manifests and Helm (`.tpl`, `.gotmpl`), Dockerfiles (including the crypto libraries a `RUN` installs) |

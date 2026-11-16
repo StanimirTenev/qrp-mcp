@@ -6,6 +6,18 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Swift was not read** (row 483, Fatima Khan; probe `mobile-proba`, 0.45.0).
+  `ios/DeviceBinding.swift` (`kSecAttrKeyTypeECSECPrimeRandom`, 256 bits, Secure Enclave) was
+  `type_not_claimed`: 1 of 2 files read. `.swift` is now a source type, and Apple's names are
+  rules: the Security framework's EC key type (`kSecAttrKeyTypeECSECPrimeRandom`,
+  `kSecAttrKeyTypeEC`) and CryptoKit's `P256/P384/P521.Signing` (ECDSA, curve from the name),
+  `.KeyAgreement` (ECDH) and `Curve25519.Signing` (Ed25519 -- the X25519 rule took it before).
+  CryptoKit's `MLKEM768` / `MLDSA65` and the Security framework's `.rsa*` / `.ecdh*` algorithm
+  names were already read by the existing rules once the file is opened. Scan JSON, MCP tools,
+  CBOM. Found by re-running the probe. **Not claimed / not done:** the probe's key size (256, on
+  the `kSecAttrKeySizeInBits` line) is not read, so the EC row has no curve; where the key lives
+  (Secure Enclave; with row 482, which does not cover it either); `Insecure.MD5` and the
+  `kSecKeyAlgorithmRSASignature...` C constants give no row; Objective-C (`.m`) is not read.
 - **An SLH-DSA name in liboqs's spelling gave no parameter set** (row 486, probe `hbs-proba`,
   0.45.0). `oqs.Signature("SLH_DSA_PURE_SHA2_128S")` read SLH-DSA with `parameter_set: None`:
   liboqs puts `PURE_` or `<hash>_PREHASH_` between `SLH_DSA_` and the FIPS 205 set (src/sig/sig.h,

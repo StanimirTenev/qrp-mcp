@@ -67,6 +67,9 @@ SOURCE_EXTENSIONS = {
     # React's JSX and TSX: a WebCrypto call in a component was "type not claimed"
     # (ZA-OPRAVYANE row 96), though the comment rules already knew both.
     ".jsx", ".tsx",
+    # Row 483: an iOS app's Swift was "type not claimed" (mobile-proba), though the comment
+    # rules already knew it.
+    ".swift",
     # Batch 0.42.0 (ZA-OPRAVYANE rows 308, 387, 388), measured on real trees where each was
     # "type not claimed": the other shells' spellings and Windows batch files carry the
     # same `openssl genrsa` and `signtool` lines as .sh; Visual Basic and F# call the same
@@ -595,6 +598,17 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("EC", "EC named by a TPM 2.0 API", re.compile(
         r"\bTPM2_ALG(?:_ID)?[._]ECC\b|\bTPM2_ECC(?:_CURVE)?[._](?:NIST|BN)_P\d+\b|"
         r"\btpm2_\w+\b[^\n]*\s(?:-G\s*|--key-algorithm[=\s]\s*)ecc(?:\d+|_nist_p\d+)?\b")),
+    # Apple (row 483): CryptoKit's key types by curve and purpose -- `P256.Signing` is ECDSA,
+    # `P256.KeyAgreement` ECDH, `Curve25519.Signing` Ed25519 (`Curve25519.KeyAgreement` is the
+    # X25519 rule's), also under `SecureEnclave.` -- and the Security framework's EC key type
+    # (`kSecAttrKeyTypeECSECPrimeRandom`, the older `kSecAttrKeyTypeEC`). The curve of a
+    # CryptoKit name is its P-number; a Security-framework key's size, set by
+    # kSecAttrKeySizeInBits on another line, is not read. Case-sensitive, as Apple writes them.
+    ("ECDSA", "ECDSA named by Apple CryptoKit", re.compile(r"\bP(?:256|384|521)\.Signing\b")),
+    ("ECDH", "ECDH named by Apple CryptoKit", re.compile(r"\bP(?:256|384|521)\.KeyAgreement\b")),
+    ("Ed25519", "Ed25519 named by Apple CryptoKit", re.compile(r"\bCurve25519\.Signing\b")),
+    ("EC", "EC named by the Apple Security framework", re.compile(
+        r"\bkSecAttrKeyType(?:ECSECPrimeRandom|EC)\b")),
     # wolfCrypt, wolfSSL's crypto library: its classical API names the family only inside
     # a wc_ identifier, and a whole wolfSSL program scanned as empty (ZA-OPRAVYANE row 72).
     # Every prefix checked against wolfssl/wolfcrypt/{rsa,ecc,dh,md5,sha,hash,des3,falcon}.h
@@ -756,7 +770,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # actually breaks disappears from the inventory.
     ("X25519", "X25519 key agreement usage", re.compile(
         # Not a hex word, `0x25519f22` (row 498: a microcode blob in a .dtsi).
-        r"(?<![A-Za-z])(?<!\b0)x25519|(?<![A-Za-z])curve25519|"
+        # Row 483: CryptoKit's `Curve25519.Signing` is Ed25519 (below), not X25519.
+        r"(?<![A-Za-z])(?<!\b0)x25519|(?<![A-Za-z])curve25519(?!\.Signing\b)|"
         # NaCl/libsodium never name it: crypto_box is curve25519xsalsa20poly1305,
         # crypto_kx is x25519blake2b, crypto_scalarmult is curve25519 (their own
         # *_PRIMITIVE, include/sodium/*.h); PyNaCl's nacl.public is the same box
