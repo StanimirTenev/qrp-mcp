@@ -4,7 +4,7 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
-## 0.47.0 (unreleased)
+## 0.47.0 (2026-11-16)
 
 - **Where the signing key lives was not said** (row 482, Richard Blech; probe `hw-sign-proba`,
   0.45.0). `tpm2_sign -c ...ctx` and `pkcs11-tool --sign --mechanism ECDSA-SHA256` gave only
@@ -369,6 +369,14 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   quantum-vulnerable), and `readiness_by_role.signature` still reads `hybrid_partial` for a linked
   composite, as a TLS hybrid group does. What a linked composite should read is left open: the
   label has no value for a complete hybrid, and changing it would change the TLS hybrids too.
+
+Left open in this release: row 504 (U-Boot reads `hybrid_partial` for signatures with
+`hybrid_names: []`, carried by ML-DSA in libavb and HSS/LMS in vendored Mbed TLS; whether code in
+the tree that the build does not configure should count, or the label should say where the
+post-quantum rows are, is a decision on what the label means, and the label is unchanged); row
+492 (above, checked, not changed); rows 459 and 462 with the reasons given under 0.46.0; the ideas
+485 (a weak random source feeding key material) and 496 (the limits in fields a narrow CBOM reader
+does not skip).
 
 ## 0.46.0
 
