@@ -6,6 +6,18 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **A docstring word made a nested helper's key generation a ban** (row 505, D11 of
+  `boot-proba/REZULTAT.md` §8). U-Boot `test/py/tests/test_vboot.py`: `test_vboot_ext_data_bounds`
+  ("Test that malformed external-data properties are rejected.") is a rejection test by its
+  docstring (rel3-rules), so every line in it was a ban -- including `openssl genpkey -algorithm
+  RSA` (:792-793) inside the nested `create_rsa_pair` that makes the key the test signs with.
+  A function defined inside a rejection test now runs what it calls, as a library function
+  already did: its body is outside the rejection. U-Boot `test_vboot.py`: :792 and :793 `ban` ->
+  `registry_name`, nothing else moved. Repro `boot-proba/repro/ban-docstring/a` now gives what
+  `b` gives. Scan JSON, MCP tools, CBOM. **Not changed:** the test's own lines stay in the
+  rejection (`def create_rsa_pair` at :785 and the call `create_rsa_pair('dev')` at :834 are
+  still `ban`); the rule still reads only the docstring's first line, and cannot tell what the
+  test rejects (here malformed data, not RSA) from what it does.
 - **A negative test set MCUboot's headline to "RSA-1024 critical"** (row 497, D1 of
   `boot-proba/REZULTAT.md` §8). `scripts/tests/keys/test_rsa.py:39` `RSA.generate(key_size=1024)`
   sits in `with self.assertRaises(RSAUsageError):` -- a test that 1024 is refused -- and was a
@@ -35,8 +47,8 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   and in MCUboot's `sim/mcuboot-sys/build.rs`) was DSA with severity high -- 5 rows, MCUboot's
   whole DSA finding; ECC + DSA (and tinycrypt's ECC + DH) is now joined as EC + DSA was, and the
   Rust DSA word skips `ecc_dsa`. The EC identifier rows on the same `ecc_dsa`/`ecc_dh` lines
-  (11 on MCUboot, never counted as uses) go with them. `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES` and
-  `MBEDTLS_REMOVE_ARC4_CIPHERSUITES` were a declaration, a use; a `#define` whose name has a
+  (8 on MCUboot, never counted as uses) go with them. `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES`
+  and `MBEDTLS_REMOVE_ARC4_CIPHERSUITES` were a declaration, a use; a `#define` whose name has a
   `REMOVE_` word is now a not-a-use, rule `removal list` (`keys.remove(rsa_key)` is still a use).
   Scan JSON, MCP tools, CBOM. **Not claimed:** `ecc_dsa` does not become an ECDSA row of its own
   -- it now reads as `ec_dsa` always did, one family word the identifier rule does not read

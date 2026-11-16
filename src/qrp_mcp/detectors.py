@@ -3263,6 +3263,37 @@ def _rejection_tests(lines: list[str]) -> set[int]:
     return out
 
 
+# Row 505 (D11): a function defined inside such a test is a function -- what it calls it runs.
+# U-Boot's test_vboot_ext_data_bounds ("... are rejected.") makes its signing key in a nested
+# `create_rsa_pair`, and that was a ban. Its body is outside the test's rejection; the test's own
+# lines stay in it.
+_NESTED_DEF = re.compile(r"^(\s*)(?:async\s+)?def\s+\w+\s*\(")
+
+
+def _helpers_in_rejection_tests(lines: list[str], tests: set[int]) -> dict[int, int]:
+    """{index: the test's indent} for the body lines of a def nested in a rejection test."""
+    out: dict[int, int] = {}
+    for i in tests:
+        test_indent = len(lines[i]) - len(lines[i].lstrip())
+        helper: int | None = None
+        for j in range(i + 1, len(lines)):
+            text = lines[j]
+            if not text.strip():
+                continue
+            indent = len(text) - len(text.lstrip())
+            if indent <= test_indent:
+                break
+            if helper is not None and indent <= helper:
+                helper = None
+            if helper is None:
+                nested = _NESTED_DEF.match(text)
+                if nested:
+                    helper = indent
+                continue
+            out[j] = test_indent
+    return out
+
+
 # Row 497: the `with` block of a rejection test is one whatever it expects -- MCUboot's
 # `with self.assertRaises(RSAUsageError):` over `RSA.generate(key_size=1024)` tests that 1024 is
 # refused, and set the headline to RSA-1024 critical. Row 91 caught it only when the line also
@@ -3847,7 +3878,9 @@ def scan_source_file(path: Path, rel_path: str,
     # Release 3b: rows from identifiers alone, kept only if the file turns out to hold crypto.
     by_identifier: list[dict[str, Any]] = []
     standing_alone: list[dict[str, Any]] = []   # release 3e: kept without that (stands_alone)
-    rejection_tests = ((_rejection_tests(lines) | _rejection_blocks(lines))
+    docstring_tests = _rejection_tests(lines) if ext in _DOCSTRING_EXT else set()
+    helpers = _helpers_in_rejection_tests(lines, docstring_tests) if docstring_tests else {}
+    rejection_tests = (docstring_tests | _rejection_blocks(lines)
                        if ext in _DOCSTRING_EXT else set())
     defined: list[frozenset[str]] = []  # row 463: the file's defined names, read on first need
     denial_lines: set[int] = set()      # row 473: lines a denial block or rejection test governs
@@ -3934,6 +3967,8 @@ def scan_source_file(path: Path, rel_path: str,
             denial_block_calls = bool(_REJECTION_TEST.search(code))
         if line_no - 1 in rejection_tests:
             in_denial, denial_block_indent, denial_block_calls = True, indent, True
+        if in_denial and helpers.get(index, -1) == denial_block_indent:
+            in_denial = False
         if in_denial:
             denial_lines.add(line_no)
         # One line, one finding per algorithm. Several patterns can carry the same

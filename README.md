@@ -247,7 +247,8 @@ was ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-r
 A name that only spells like a family is not one: `MLDSA1R` (an SH7722 register) is not ML-DSA,
 tinycrypt's `ecc_dsa` is ECDSA, not DSA, and `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES` is a
 removal, not a use. A call inside `with pytest.raises(...)` or `with self.assertRaises(...)` is
-attempted in order to fail, and is not a use either.
+attempted in order to fail, and is not a use either; a function defined inside a test whose
+docstring makes it a rejection test ("... is rejected.") still runs what it calls.
 
 ## Coverage on three public repositories
 
