@@ -120,7 +120,8 @@ has no protocol component to carry its groups.
 - `qrp:evidence:signing_commands` (row 500) — each signing step counted by
   `qrp:evidence:ci_signing_commands`: its place, command, the key it names (`signing_key`) and,
   where that key is not a file the scan read, `key_algorithm` -- the algorithm the line names
-  (`binman sign -a sha256,rsa4096`) or "not determined: key not in the files read".
+  (`binman sign -a sha256,rsa4096`) or "not determined: key not in the files read"; from 0.47.0
+  `key_location` (row 482) -- `file`, `tpm`, `pkcs11_token`, `kms` or "not determined from the line".
 
 A composite ML-DSA signature (RFC 10073: `id-MLDSA65-ECDSA-P256-SHA512`, its label
 `COMPSIG-MLDSA65-ECDSA-P256-SHA512` or its OID `1.3.6.1.5.5.7.6.45`) is one `combiner`

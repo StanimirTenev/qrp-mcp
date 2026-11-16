@@ -6,6 +6,23 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **Where the signing key lives was not said** (row 482, Richard Blech; probe `hw-sign-proba`,
+  0.45.0). `tpm2_sign -c ...ctx` and `pkcs11-tool --sign --mechanism ECDSA-SHA256` gave only
+  `source_code` ECDSA rows, not signing steps; a key URI was cut or rewritten -- cosign `--key
+  "pkcs11:token=a;object=b"` became `pkcs11:token=a` (the value stopped at `;`) and `--key
+  awskms:///alias/x` became `awskms:/alias/x` (a path normalisation). `tpm2_sign`, `pkcs11-tool
+  --sign`/`-s` and `openssl pkeyutl -sign` are now signing steps, and every step carries
+  `key_location`: `file`, `tpm`, `pkcs11_token`, `kms` or "not determined from the line"; a
+  quoted key value is read whole, a key URI is kept as written without its query (an RFC 7512
+  `pin-value` is not copied into `signing_key`; at `--level full` the excerpt still holds
+  the line as written); tpm2_sign's `-s` and pkcs11-tool's `-m`
+  give `key_algorithm`. Sources: tpm2-tools man/tpm2_sign.1.md and man/common/alg.md, OpenSC
+  pkcs11-tool(1), cosign doc/cosign_sign.md (at 6181e75). Scan JSON, MCP tools, CBOM
+  (`qrp:evidence:signing_commands`). **Not claimed / not done:** a key in a Kubernetes secret
+  (`k8s://`), `env://`, a gpg keyring or a Java keystore is "not determined"; Android StrongBox
+  and Apple Secure Enclave keys in code (rows 484, 483) are still not given a location; cosign's
+  `openbao://` and `ovhcloud://` are not in the KMS list; whether the token or TPM is the one the
+  line implies is not visible from the file.
 - **Swift was not read** (row 483, Fatima Khan; probe `mobile-proba`, 0.45.0).
   `ios/DeviceBinding.swift` (`kSecAttrKeyTypeECSECPrimeRandom`, 256 bits, Secure Enclave) was
   `type_not_claimed`: 1 of 2 files read. `.swift` is now a source type, and Apple's names are

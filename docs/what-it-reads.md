@@ -411,7 +411,14 @@ only in the pipeline files — a pipeline often only calls the release script. A
 its key (`openssl dgst -sign KEY`, `-inkey KEY`, `--key KEY`, signtool's `/f FILE`, the key
 argument of `kmodsign` and `sign-file`) carries `signing_key`: the path, `in_tree` — whether the
 scan read a key or certificate file there, from the tree's root or the script's directory — and
-the families it found in it. A path written with a variable is left alone. In the CBOM the steps
+the families it found in it. A path written with a variable is left alone. From 0.47.0 (row 482)
+`tpm2_sign`, `pkcs11-tool --sign`/`-s` and `openssl pkeyutl -sign` are signing steps too, and every
+step carries `key_location`: `tpm` (tpm2_sign, or `-engine`/`-provider tpm2`), `pkcs11_token`
+(pkcs11-tool, `-engine`/`-provider pkcs11`, or an RFC 7512 `pkcs11:` key URI), `kms` (cosign's
+`awskms://`, `gcpkms://`, `azurekms://`, `hashivault://`), `file` (a path), or "not determined from
+the line" (a keyring, a keystore, a variable, `k8s://`, `env://`). A key URI is named as written,
+without its query, so a `pin-value` is not copied out. tpm2_sign's `-s/--scheme` and pkcs11-tool's
+`-m/--mechanism` give `key_algorithm` (`ECDSA, named on the line (ECDSA-SHA256)`). In the CBOM the steps
 are still only counted. Raised by Ken Camp. Whether a trust anchor can be rotated in the field is
 not in any file and is not inferred: that is the platform owner's statement.
 

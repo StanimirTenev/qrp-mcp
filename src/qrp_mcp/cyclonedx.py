@@ -1719,7 +1719,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             "name": f"{NS}evidence:signing_commands", "value": json.dumps(
                 [{"location": c["path"], "line": c["line"], "command": c["command_type"],
                   **({"signing_key": c["signing_key"]} if c.get("signing_key") else {}),
-                  **({"key_algorithm": c["key_algorithm"]} if c.get("key_algorithm") else {})}
+                  **({"key_algorithm": c["key_algorithm"]} if c.get("key_algorithm") else {}),
+                  # Row 482: file, tpm, pkcs11_token or kms.
+                  **({"key_location": c["key_location"]} if c.get("key_location") else {})}
                  for c in ci], ensure_ascii=False)})
     # Row 479: encryption to a public key in a script, counted apart from signing.
     encrypting = [c for c in scan_result["evidence"]["ci_pipeline"]

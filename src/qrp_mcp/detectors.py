@@ -1872,6 +1872,11 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
         r"\bmkimage\b[^|;&\n]*\s(?:-[kKG]|--key-(?:dir|file|dest))(?=[\s=]|$)|\bmkimage\b[^|;&\n]*\s-G\S")),
     ("binman_sign", re.compile(r"\bbinman\s+sign\b")),
     ("imgtool_sign", re.compile(r"\bimgtool(?:\.py)?\s+sign\b")),
+    # Row 482: keys in hardware. tpm2-tools' tpm2_sign (man/tpm2_sign.1.md), OpenSC's
+    # `pkcs11-tool --sign`/`-s` (pkcs11-tool(1)), and openssl-pkeyutl(1) `-sign`.
+    ("tpm2_sign", re.compile(r"\btpm2_sign\b")),
+    ("pkcs11_tool_sign", re.compile(r"\bpkcs11-tool\b[^|;&\n]*\s(?:--sign|-s)(?=\s|$)")),
+    ("openssl_sign", re.compile(r"\bopenssl\s+pkeyutl\b[^|;&\n]*\s-sign\b")),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
@@ -1915,13 +1920,28 @@ def _recipient_file(command_type: str, segment: str) -> str | None:
 # Row 500: mkimage's `-k DIR` / `-G FILE` (`--key-dir`, `--key-file`), binman's and imgtool's
 # `-k KEY`.
 _SIGNING_KEY_ARG = re.compile(
-    r"(?:\s-sign|\s-inkey|\s--key(?:-dir|-file)?|\s/f|\s-k|\s-G)(?:\s+|=)([^\s;|&)]+)|"
+    # Row 482: a quoted value whole, so a `pkcs11:` URI is not cut at its `;`.
+    r"(?:\s-sign|\s-inkey|\s--key(?:-dir|-file)?|\s/f|\s-k|\s-G)(?:\s+|=)"
+    r"(\"[^\"\n]*\"|'[^'\n]*'|[^\s;|&)]+)|"
     r"(?:\bkmodsign|(?:^|[\s/])sign-file)\s+(?:-\w+\s+)*\w+\s+([^\s;|&)]+)")
 # Row 500: the FIT algorithm a firmware signer is given on its line, `binman sign -a
 # sha256,rsa4096`, `mkimage -o sha256,rsa2048`.
 _SIGNING_ALGO_ARG = re.compile(
     r"\s(?:-a|-o|--algo)(?:\s+|=)(sha(?:1|256|384|512)),(rsa|ecdsa)(\d{3,5})(?![\w,])")
 KEY_NOT_READ = "not determined: key not in the files read"
+# Row 482: where the signing key lives -- `file`, `tpm`, `pkcs11_token` or `kms` -- from the
+# command, the engine or provider it loads, or the URI it is given: RFC 7512 `pkcs11:`, and
+# cosign's KMS URIs (doc/cosign_sign.md: awskms://, gcpkms://, azurekms://, hashivault://).
+# `k8s://` and `env://` are none of these.
+KEY_LOCATION_UNKNOWN = "not determined from the line"
+_KEY_URI = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]+):")
+_KMS_SCHEMES = {"awskms", "gcpkms", "azurekms", "hashivault"}
+_KEY_ENGINE = re.compile(r"\s-(?:engine|provider)(?:\s+|=)(pkcs11|tpm2)", re.IGNORECASE)
+# The family the line names: tpm2_sign `-s/--scheme` (tpm2-tools man/common/alg.md) and
+# pkcs11-tool `-m/--mechanism` (a PKCS #11 mechanism name, `ECDSA-SHA256`, `SHA256-RSA-PKCS`).
+_TPM2_SCHEME = re.compile(r"\s(?:-s|--scheme)(?:\s+|=)(rsassa|rsapss|ecdsa|sm2)\b", re.IGNORECASE)
+_TPM2_FAMILY = {"rsassa": "RSA", "rsapss": "RSA", "ecdsa": "ECDSA", "sm2": "SM2"}
+_P11_MECHANISM = re.compile(r"\s(?:-m|--mechanism)(?:\s+|=)([A-Za-z0-9_-]+)")
 _WHOLE_VARIABLE = re.compile(r"^(?:\$\d+|\$[A-Za-z_]\w*|\$\{[A-Za-z_]\w*\}|%[A-Za-z_]\w*%)$")
 
 # (algorithm, description, compiled regex) for key algorithms declared in IaC syntax
@@ -4687,7 +4707,13 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
                   for m in _SIGNING_KEY_ARG.finditer(step.get("excerpt", ""))]
         written = next((v.strip("\"'") for v in values if not v.startswith("-")), "")
         found = None
-        if written and ("$" in written or "{" in written or "%" in written):
+        uri = _KEY_URI.match(written)
+        if uri:
+            # Row 482: a key URI is named as written, without its query (an RFC 7512
+            # `pin-value` stays in the file), and not looked up as a path.
+            written = written.split("?", 1)[0]
+            step["signing_key"] = {"path": written, "in_tree": False}
+        elif written and ("$" in written or "{" in written or "%" in written):
             # Row 500: a key the script is given (`-k $1`, `${KEY}`, `%KEY%`) is named as
             # written, not looked up; a piece of an expression (`${{`, `$(dirname`) is not.
             if _WHOLE_VARIABLE.match(written):
@@ -4708,6 +4734,37 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
             step["key_algorithm"] = (
                 f"{named.group(2).upper()}-{named.group(3)}, named on the line "
                 f"({named.group(1)},{named.group(2)}{named.group(3)})" if named else KEY_NOT_READ)
+            excerpt = step.get("excerpt", "")
+            scheme = (_TPM2_SCHEME.search(excerpt) if step["command_type"] == "tpm2_sign"
+                      else None)
+            mechanism = (_P11_MECHANISM.search(excerpt)
+                         if step["command_type"] == "pkcs11_tool_sign" else None)
+            family = (_TPM2_FAMILY[scheme.group(1).lower()] if scheme else
+                      next((f for w, f in (("ECDSA", "ECDSA"), ("EDDSA", "EdDSA"), ("RSA", "RSA"))
+                            if w in mechanism.group(1).upper()), None) if mechanism else None)
+            if family:
+                step["key_algorithm"] = (f"{family}, named on the line "
+                                         f"({(scheme or mechanism).group(1)})")
+        step["key_location"] = _key_location(step, written if uri else "")
+
+
+def _key_location(step: dict[str, Any], uri: str) -> str:
+    """Row 482: where a signing step's key lives, from its command, engine/provider or URI."""
+    if step["command_type"] == "tpm2_sign":
+        return "tpm"
+    if step["command_type"] == "pkcs11_tool_sign":
+        return "pkcs11_token"
+    if uri:
+        scheme = uri.split(":", 1)[0].lower()
+        return ("pkcs11_token" if scheme == "pkcs11" else
+                "kms" if scheme in _KMS_SCHEMES else KEY_LOCATION_UNKNOWN)
+    engine = _KEY_ENGINE.search(step.get("excerpt", ""))
+    if engine:
+        return "pkcs11_token" if engine.group(1).lower() == "pkcs11" else "tpm"
+    key = step.get("signing_key") or {}
+    if key.get("path") and not _WHOLE_VARIABLE.match(key["path"]):
+        return "file"
+    return KEY_LOCATION_UNKNOWN
 
 
 def _link_recipient_key(step: dict[str, Any], key_files: dict[str, list[str]]) -> None:
