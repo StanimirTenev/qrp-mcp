@@ -165,7 +165,8 @@ shows where a key is generated, not whether that step survives a fault.
 
 From 0.47.0 RustCrypto's `ml_kem`, `ml_dsa` and `slh_dsa` crates and libcrux are named as the
 `provider`, and Go's `mlkem.GenerateKey768()` and its siblings give the parameter set
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md)).
+([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md)); so do
+liboqs's SLH-DSA names (`SLH_DSA_PURE_SHA2_128S`, `SLH_DSA_SHA2_224_PREHASH_SHAKE_128F`).
 
 From 0.47.0 an Android Keystore key (`KeyPairGenerator.getInstance(..., "AndroidKeyStore")`) takes
 its role from the `PURPOSE_*` of the file's one `KeyGenParameterSpec.Builder`, and an EC key its

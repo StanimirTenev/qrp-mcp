@@ -5107,8 +5107,11 @@ _PARAMETER_SETS: dict[str, tuple[re.Pattern[str], Any]] = {
                lambda m: m.group(1) or m.group(2)),
     "ML-DSA": (re.compile(r"(?<![a-z])ml[-_]?dsa[-_]?(44|65|87)(?!\d)", re.I),
                lambda m: m.group(1)),
-    "SLH-DSA": (re.compile(r"(?<![a-z])slh[-_]?dsa[-_]?(sha2|shake)[-_]?(128|192|256)([sf])"
-                           r"(?![a-z0-9])", re.I),
+    # Row 486: liboqs puts `PURE_` or `<hash>_PREHASH_` before the set (src/sig/sig.h:
+    # SLH_DSA_PURE_SHA2_128S, SLH_DSA_SHA2_512_224_PREHASH_SHAKE_128F).
+    "SLH-DSA": (re.compile(r"(?<![a-z])slh[-_]?dsa[-_]?"
+                           r"(?:pure[-_]?|(?:sha2|sha3|shake)(?:[-_]?\d{3}){1,2}[-_]?prehash[-_]?)?"
+                           r"(sha2|shake)[-_]?(128|192|256)([sf])(?![a-z0-9])", re.I),
                 lambda m: f"{m.group(1).upper()}-{m.group(2)}{m.group(3).lower()}"),
     # Streamlined NTRU Prime's parameter sets (NTRU Prime round 3 specification, sntrup653
     # ... sntrup1277; OpenSSH's sntrup761x25519-sha512), release 3d.

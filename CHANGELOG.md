@@ -6,6 +6,16 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **An SLH-DSA name in liboqs's spelling gave no parameter set** (row 486, probe `hbs-proba`,
+  0.45.0). `oqs.Signature("SLH_DSA_PURE_SHA2_128S")` read SLH-DSA with `parameter_set: None`:
+  liboqs puts `PURE_` or `<hash>_PREHASH_` between `SLH_DSA_` and the FIPS 205 set (src/sig/sig.h,
+  e.g. `SLH_DSA_SHA2_512_224_PREHASH_SHAKE_128F`), and the set was read only from
+  `SLH-DSA-SHA2-128s` with nothing in between. It now reads `SHA2-128s` from both. Scan JSON, MCP
+  tools, CBOM (`parameterSetIdentifier`). Found by re-running the probe. **Not done:** pure vs
+  pre-hash is not recorded; pyspx (`import pyspx.shake_128f`) is round-3 SPHINCS+, not FIPS 205,
+  and its set is on the import line, not the call; the names leanSPHINCS and leanSig wait for a
+  primary source, as the row says. Seen and not fixed: in the probe the pyspx call rows carry
+  `provider: liboqs` (the same file also calls `oqs.Signature`).
 - **A docstring word made a nested helper's key generation a ban** (row 505, D11 of
   `boot-proba/REZULTAT.md` §8). U-Boot `test/py/tests/test_vboot.py`: `test_vboot_ext_data_bounds`
   ("Test that malformed external-data properties are rejected.") is a rejection test by its
