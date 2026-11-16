@@ -3332,7 +3332,7 @@ def _helpers_in_rejection_tests(lines: list[str], tests: set[int]) -> dict[int, 
     return out
 
 
-# Row 497: the `with` block of a rejection test is one whatever it expects -- MCUboot's
+# Row 497: the `with` block of a rejection test that names a key size is one -- MCUboot's
 # `with self.assertRaises(RSAUsageError):` over `RSA.generate(key_size=1024)` tests that 1024 is
 # refused, and set the headline to RSA-1024 critical. Row 91 caught it only when the line also
 # held a denial word (`match='Unsupported ...'`).

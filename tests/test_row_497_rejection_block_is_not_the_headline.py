@@ -9,7 +9,7 @@ severity `critical`. It came from `scripts/tests/keys/test_rsa.py:39`:
 
 a test that 1024 is refused. A `with pytest.raises(...)` / `self.assertRaises(...)` block was a
 rejection test (row 91) only when its line also held a denial word (`match='Unsupported ...'`);
-without one the call inside was a use. Now the block itself is the rejection test, its calls
+without one the call inside was a use. Now the block is the rejection test when it names a key size, its calls
 included, and it ends where its indentation does.
 
 The other half of D1 -- the comments in Mbed TLS `rsa.h` ("128 Bytes if RSA-1024 is used") --

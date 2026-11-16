@@ -71,7 +71,10 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   finding `ECDSA-256`; caught in review). MCUboot: lines 38-39 `call` -> `ban`, RSA headline
   1024 -> 2048, finding `RSA-2048` severity high; no other row moved. Scan JSON, MCP tools, CBOM.
   **Not claimed:** a block that expects a curve refused (`ec.SECP192R1()`), with no size, is still
-  read as a use.
+  read as a use. The size decides for the whole block, not what it expects: `with
+  pytest.raises(InvalidSignature):` over `rsa.generate_private_key(65537, key_size=2048)...verify(...)`
+  is still a ban (0.46.0: a call, finding `RSA-2048`), and so is an ECDSA line in a block where
+  another line names an RSA size.
   **Not reproduced:** the other half of D1, the comments in Mbed TLS `rsa.h` ("128 Bytes if
   RSA-1024 is used"), were already `comment` rows and never reached the headline size; pinned
   by a test, no code changed for it. Test code stays counted, not excluded: only the block
