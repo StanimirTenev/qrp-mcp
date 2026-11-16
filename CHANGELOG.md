@@ -99,7 +99,11 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   Scan JSON, MCP tools, CBOM. **Not claimed:** `ecc_dsa` does not become an ECDSA row of its own
   -- it now reads as `ec_dsa` always did, one family word the identifier rule does not read
   alone; MCUboot's ECDSA rows come from elsewhere in the same files. Found on MCUboot f30be48
-  and U-Boot 6487c50 with 0.46.0; not re-measured on the corpus.
+  and U-Boot 6487c50 with 0.46.0; not re-measured on the corpus. **Seen in review, not changed:**
+  the join reads every `ECC_DH` that way, and Mbed TLS spells "EC and FFDH" so
+  (`tests/scripts/all.sh`: `"ECC" or "ECC_DH"`, `accel_ecc_ffdh`); in U-Boot's copy 6 such lines
+  lost their EC and DH rows (5 declarations or references, 1 comment), with no row in their
+  place. DH stays found in U-Boot from other lines.
 - **Key material in three formats was not read** (row 507, D13 of `boot-proba/REZULTAT.md` §8).
   MCUboot's `sim/src/*_pub_key-rs.txt` (public keys as a Rust byte array, `&[0x30, 0x59, ...]`)
   and U-Boot's `doc/chromium/files/devkeys/kernel_data_key.vbprivk` and `kernel.keyblock` were
