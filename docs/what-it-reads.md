@@ -417,7 +417,8 @@ step carries `key_location`: `tpm` (tpm2_sign, or `-engine`/`-provider tpm2`), `
 (pkcs11-tool, `-engine`/`-provider pkcs11`, or an RFC 7512 `pkcs11:` key URI), `kms` (cosign's
 `awskms://`, `gcpkms://`, `azurekms://`, `hashivault://`), `file` (a path), or "not determined from
 the line" (a keyring, a keystore, a variable, `k8s://`, `env://`). A key URI is named as written,
-without its query, so a `pin-value` is not copied out. tpm2_sign's `-s/--scheme` and pkcs11-tool's
+without its query and any `pin-value`/`pin-source` attribute, so a PIN is not copied into
+`signing_key`. tpm2_sign's `-s/--scheme` and pkcs11-tool's
 `-m/--mechanism` give `key_algorithm` (`ECDSA, named on the line (ECDSA-SHA256)`). In the CBOM the steps
 are still only counted. Raised by Ken Camp. Whether a trust anchor can be rotated in the field is
 not in any file and is not inferred: that is the platform owner's statement.

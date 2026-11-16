@@ -33,13 +33,16 @@ pkcs11-tool --module /usr/lib/softhsm/libsofthsm2.so --sign --mechanism ECDSA-SH
 openssl dgst -sha256 -sign /etc/keys/release.pem -out payload.ossl.sig payload.bin
 """
 MORE = """#!/bin/sh
-cosign sign --key "pkcs11:token=a;object=b?pin-value=1234" img
+cosign sign --key "pkcs11:token=a;object=b?pin-value=Qx7PinWv" img
 cosign sign --key awskms:///alias/release img
 openssl dgst -sha256 -sign "pkcs11:object=rel;type=private" -engine pkcs11 -keyform engine -out s p
 openssl pkeyutl -sign -provider pkcs11 -inkey "pkcs11:object=rel" -in d -out s
 cosign sign --key k8s://ns/key img
 gpg --detach-sign release.tar
 pkcs11-tool --verify -m ECDSA-SHA256 --id 01 -i p --signature-file x
+openssl dgst -sha256 -sign rel -engine pkcs11 -keyform engine -out s p
+openssl pkeyutl -sign -provider tpm2 -inkey handle:0x81000000 -in d -out s
+cosign sign --key "pkcs11:token=a;object=b;pin-value=Zq9PinXy" img
 """
 
 
@@ -79,6 +82,11 @@ def _check(ci):
     assert s[("more.sh", 7)]["key_location"] == "not determined from the line"
     # A verify is not a signing step.
     assert ("more.sh", 8) not in s
+    # The engine or provider, where the key is not a URI of its own.
+    assert s[("more.sh", 9)]["key_location"] == "pkcs11_token"
+    assert s[("more.sh", 10)]["key_location"] == "tpm"
+    # A PIN in the URI's path is dropped too.
+    assert s[("more.sh", 11)]["signing_key"]["path"] == "pkcs11:token=a;object=b"
 
 
 def test_scan_json(tree, tmp_path):
@@ -88,7 +96,7 @@ def test_scan_json(tree, tmp_path):
     _check(json.loads(text)["evidence"]["ci_pipeline"])
     out2 = tmp_path / "m.json"
     server.scan_to_file([str(tree), "--out", str(out2)])
-    assert "1234" not in out2.read_text()
+    assert "Qx7PinWv" not in out2.read_text() and "Zq9PinXy" not in out2.read_text()
 
 
 def test_mcp_tool(tree):
@@ -97,7 +105,7 @@ def test_mcp_tool(tree):
 
 def test_cbom(tree):
     for doc in (server.export_cbom(str(tree)), cyclonedx.build(scan_directory(tree))):
-        assert "pin-value" not in json.dumps(doc)
+        assert "Qx7PinWv" not in json.dumps(doc) and "Zq9PinXy" not in json.dumps(doc)
         props = {p["name"]: p["value"] for p in doc["properties"]}
         steps = {(c["location"], c["line"]): c
                  for c in json.loads(props["qrp:evidence:signing_commands"])}

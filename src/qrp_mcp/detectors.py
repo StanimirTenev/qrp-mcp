@@ -1936,6 +1936,9 @@ KEY_NOT_READ = "not determined: key not in the files read"
 KEY_LOCATION_UNKNOWN = "not determined from the line"
 _KEY_URI = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]+):")
 _KMS_SCHEMES = {"awskms", "gcpkms", "azurekms", "hashivault"}
+_PIN_ATTRIBUTE = re.compile(r";?pin-(?:value|source)=[^;]*", re.IGNORECASE)
+# libp11's engine and pkcs11-provider are `pkcs11`; tpm2-openssl's provider is `tpm2`
+# (docs/keys.md), tpm2-tss-engine's engine `tpm2tss` (README).
 _KEY_ENGINE = re.compile(r"\s-(?:engine|provider)(?:\s+|=)(pkcs11|tpm2)", re.IGNORECASE)
 # The family the line names: tpm2_sign `-s/--scheme` (tpm2-tools man/common/alg.md) and
 # pkcs11-tool `-m/--mechanism` (a PKCS #11 mechanism name, `ECDSA-SHA256`, `SHA256-RSA-PKCS`).
@@ -4711,7 +4714,7 @@ def _link_signing_keys(ci_findings: list[dict[str, Any]],
         if uri:
             # Row 482: a key URI is named as written, without its query (an RFC 7512
             # `pin-value` stays in the file), and not looked up as a path.
-            written = written.split("?", 1)[0]
+            written = _PIN_ATTRIBUTE.sub("", written.split("?", 1)[0])
             step["signing_key"] = {"path": written, "in_tree": False}
         elif written and ("$" in written or "{" in written or "%" in written):
             # Row 500: a key the script is given (`-k $1`, `${KEY}`, `%KEY%`) is named as
@@ -4754,15 +4757,16 @@ def _key_location(step: dict[str, Any], uri: str) -> str:
         return "tpm"
     if step["command_type"] == "pkcs11_tool_sign":
         return "pkcs11_token"
-    if uri:
-        scheme = uri.split(":", 1)[0].lower()
-        return ("pkcs11_token" if scheme == "pkcs11" else
-                "kms" if scheme in _KMS_SCHEMES else KEY_LOCATION_UNKNOWN)
+    scheme = uri.split(":", 1)[0].lower() if uri else ""
+    if scheme == "pkcs11":
+        return "pkcs11_token"
+    if scheme in _KMS_SCHEMES:
+        return "kms"
     engine = _KEY_ENGINE.search(step.get("excerpt", ""))
     if engine:
         return "pkcs11_token" if engine.group(1).lower() == "pkcs11" else "tpm"
     key = step.get("signing_key") or {}
-    if key.get("path") and not _WHOLE_VARIABLE.match(key["path"]):
+    if key.get("path") and not uri and not _WHOLE_VARIABLE.match(key["path"]):
         return "file"
     return KEY_LOCATION_UNKNOWN
 

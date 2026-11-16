@@ -13,11 +13,13 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   awskms:///alias/x` became `awskms:/alias/x` (a path normalisation). `tpm2_sign`, `pkcs11-tool
   --sign`/`-s` and `openssl pkeyutl -sign` are now signing steps, and every step carries
   `key_location`: `file`, `tpm`, `pkcs11_token`, `kms` or "not determined from the line"; a
-  quoted key value is read whole, a key URI is kept as written without its query (an RFC 7512
-  `pin-value` is not copied into `signing_key`; at `--level full` the excerpt still holds
+  quoted key value is read whole, a key URI is kept as written without its query and without
+  any `pin-value`/`pin-source` attribute (RFC 7512; not copied into `signing_key`; at `--level full` the excerpt still holds
   the line as written); tpm2_sign's `-s` and pkcs11-tool's `-m`
-  give `key_algorithm`. Sources: tpm2-tools man/tpm2_sign.1.md and man/common/alg.md, OpenSC
-  pkcs11-tool(1), cosign doc/cosign_sign.md (at 6181e75). Scan JSON, MCP tools, CBOM
+  give `key_algorithm`; an OpenSSL `-engine`/`-provider` `pkcs11` or `tpm2` (tpm2-openssl
+  docs/keys.md `-provider tpm2`, tpm2-tss-engine README `-engine tpm2tss`) gives the location
+  where the key is not a URI of its own. Sources: tpm2-tools man/tpm2_sign.1.md and
+  man/common/alg.md, OpenSC pkcs11-tool(1), cosign doc/cosign_sign.md (at 6181e75). Scan JSON, MCP tools, CBOM
   (`qrp:evidence:signing_commands`). **Not claimed / not done:** a key in a Kubernetes secret
   (`k8s://`), `env://`, a gpg keyring or a Java keystore is "not determined"; Android StrongBox
   and Apple Secure Enclave keys in code (rows 484, 483) are still not given a location; cosign's
