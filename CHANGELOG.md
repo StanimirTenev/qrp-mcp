@@ -64,9 +64,14 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   sits in `with self.assertRaises(RSAUsageError):` -- a test that 1024 is refused -- and was a
   `call`: `algorithm_key_sizes.RSA` 1024, a finding `RSA-1024`, `weak_key`, severity `critical`.
   A `with pytest.raises(...)` / `self.assertRaises(...)` block was a rejection test (row 91) only
-  when its line also held a denial word; now the block is one whatever it expects, calls
-  included, to the end of its indentation. MCUboot: lines 38-39 `call` -> `ban`, RSA headline
+  when its line also held a denial word; now the block is one when a line in it names a key size
+  (RSA, DSA, DH), calls included, to the end of its indentation. A block without a size is read
+  as before: `with pytest.raises(InvalidSignature):` over an ECDSA `verify` expects a working
+  algorithm to refuse bad data, a use (a first version of this fix made it a ban and lost the
+  finding `ECDSA-256`; caught in review). MCUboot: lines 38-39 `call` -> `ban`, RSA headline
   1024 -> 2048, finding `RSA-2048` severity high; no other row moved. Scan JSON, MCP tools, CBOM.
+  **Not claimed:** a block that expects a curve refused (`ec.SECP192R1()`), with no size, is still
+  read as a use.
   **Not reproduced:** the other half of D1, the comments in Mbed TLS `rsa.h` ("128 Bytes if
   RSA-1024 is used"), were already `comment` rows and never reached the headline size; pinned
   by a test, no code changed for it. Test code stays counted, not excluded: only the block

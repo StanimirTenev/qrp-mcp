@@ -125,3 +125,47 @@ def test_the_gate_and_the_full_read_agree():
         lines = text.split("\n")
         assert (d.scan_source_file(Path(name), name, lines, hot=None)
                 == d.scan_source_file(Path(name), name, lines, hot=d.hot_lines(lines, ".py")))
+
+
+# Review of 2a50e2a: a block that expects a working algorithm to refuse bad data -- a tampered
+# signature -- is a use of that algorithm, not a refusal of it. 0.46.0 read this line as an
+# ECDSA `call` with a finding ECDSA-256; the block rule made it a `ban` and the finding went.
+# The block is a rejection only when it names the key size it expects refused.
+TEST_TAMPERED = """import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature
+
+
+def test_tampered():
+    with pytest.raises(InvalidSignature):
+        ec.generate_private_key(ec.SECP256R1()).public_key().verify(b"x", b"y", ec.ECDSA(h))
+"""
+
+
+def _check_tampered(result):
+    kinds = {e["algorithm"]: e["evidence_kind"] for e in result["evidence"]["source_code"]
+             if e["path"] == "tests/test_tampered.py" and e["line"] == 8}
+    assert kinds.get("ECDSA") == "call", kinds
+    assert any(f["raw_value"] == "ECDSA-256" for f in result["findings"]), result["findings"]
+
+
+def _tampered_tree(root):
+    (root / "tests").mkdir(parents=True)
+    (root / "tests/test_tampered.py").write_text(TEST_TAMPERED)
+    return root
+
+
+def test_a_refused_signature_is_a_use_in_the_scan_json(tmp_path):
+    out = tmp_path / "r.json"
+    assert server.scan_to_file([str(_tampered_tree(tmp_path / "repo")), "--out", str(out)]) == 0
+    _check_tampered(json.loads(out.read_text()))
+
+
+def test_a_refused_signature_is_a_use_in_the_mcp_tool(tmp_path):
+    _check_tampered(server.scan_repo(str(_tampered_tree(tmp_path / "repo"))))
+
+
+def test_a_refused_signature_is_a_use_in_the_cbom(tmp_path):
+    names = {c["name"] for c in server.export_cbom(str(_tampered_tree(tmp_path / "repo")))
+             ["components"]}
+    assert any(n.startswith("ECDSA") for n in names), names

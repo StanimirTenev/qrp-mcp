@@ -3341,8 +3341,21 @@ _REJECTION_WITH = re.compile(
 
 
 def _rejection_blocks(lines: list[str]) -> set[int]:
-    """Indexes of the `with pytest.raises(...):` / `with self.assertRaises(...):` lines."""
-    return {i for i, line in enumerate(lines) if "aises" in line and _REJECTION_WITH.match(line)}
+    """Indexes of the `with pytest.raises(...):` / `with self.assertRaises(...):` lines whose
+    block names a key size. A block without one -- `pytest.raises(InvalidSignature)` over a
+    `verify` -- expects a working algorithm to refuse bad data: a use, as 0.46.0 read it."""
+    out: set[int] = set()
+    for i, line in enumerate(lines):
+        if "aises" not in line or not _REJECTION_WITH.match(line):
+            continue
+        indent = len(line) - len(line.lstrip())
+        for text in lines[i + 1:]:
+            if text.strip() and len(text) - len(text.lstrip()) <= indent:
+                break
+            if any(key_size_on_line(text, f) for f in ("RSA", "DSA", "DH")):
+                out.add(i)
+                break
+    return out
 
 
 # The message a call expects or raises, as a keyword argument's string (`error='... was
