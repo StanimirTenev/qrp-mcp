@@ -1,7 +1,7 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:226faef9-5631-5420-9fd6-1798ff21a2b5",
+  "serialNumber": "urn:uuid:be5ea65b-c21e-5f26-ba97-ae0ada4dcdb8",
   "version": 1,
   "metadata": {
     "timestamp": "2026-06-20T17:26:16+02:00",
@@ -10,11 +10,11 @@
         {
           "type": "application",
           "name": "qrp-mcp",
-          "version": "0.46.0",
+          "version": "0.47.0",
           "properties": [
             {
               "name": "qrp:revision",
-              "value": "89cb4e3ecf1b63720506c7f448644d65fdde4afb (built from)"
+              "value": "612e1502405def929a20650b0681cb059c42e77a (built from)"
             }
           ]
         }
@@ -72,6 +72,10 @@
         {
           "name": "qrp:role",
           "value": "[\"undetermined\", \"undetermined\"]"
+        },
+        {
+          "name": "qrp:operation",
+          "value": "[\"not read\", \"not read\"]"
         }
       ],
       "evidence": {
@@ -144,6 +148,10 @@
         {
           "name": "qrp:role",
           "value": "[\"key_establishment\"]"
+        },
+        {
+          "name": "qrp:operation",
+          "value": "[\"not read\"]"
         }
       ],
       "evidence": {
@@ -709,11 +717,11 @@
     },
     {
       "name": "qrp:coverage:instrument:version",
-      "value": "0.46.0"
+      "value": "0.47.0"
     },
     {
       "name": "qrp:coverage:instrument:revision",
-      "value": "89cb4e3ecf1b63720506c7f448644d65fdde4afb (built from)"
+      "value": "612e1502405def929a20650b0681cb059c42e77a (built from)"
     },
     {
       "name": "qrp:coverage:instrument:source_commit:pinned",
@@ -721,7 +729,7 @@
     },
     {
       "name": "qrp:coverage:instrument:source_commit:commit",
-      "value": "89cb4e3ecf1b63720506c7f448644d65fdde4afb"
+      "value": "612e1502405def929a20650b0681cb059c42e77a"
     },
     {
       "name": "qrp:coverage:instrument:source_commit:dirty",
@@ -737,7 +745,7 @@
     },
     {
       "name": "qrp:coverage:instrument:ruleset:algorithm_patterns",
-      "value": "282"
+      "value": "289"
     },
     {
       "name": "qrp:coverage:instrument:ruleset:iac_algorithm_patterns",
@@ -745,7 +753,7 @@
     },
     {
       "name": "qrp:coverage:instrument:ruleset:signing_command_patterns",
-      "value": "11"
+      "value": "17"
     },
     {
       "name": "qrp:coverage:instrument:ruleset:certificate_oid_names",
@@ -789,7 +797,7 @@
     },
     {
       "name": "qrp:coverage:instrument:claimed_types:source",
-      "value": ".bash,.bat,.c,.cairo,.cc,.cjs,.cmake,.cmd,.cpp,.cs,.cts,.cxx,.fs,.fsx,.go,.groovy,.h,.hh,.hpp,.in,.inc,.java,.js,.jsx,.ksh,.kt,.kts,.mjs,.move,.mts,.php,.pl,.pm,.ps1,.psd1,.psm1,.py,.rb,.rs,.sc,.scala,.sh,.sol,.t,.ts,.tsx,.vb,.zsh"
+      "value": ".bash,.bat,.c,.cairo,.cc,.cjs,.cmake,.cmd,.cpp,.cs,.cts,.cxx,.fs,.fsx,.go,.groovy,.h,.hh,.hpp,.in,.inc,.java,.js,.jsx,.ksh,.kt,.kts,.mjs,.move,.mts,.php,.pl,.pm,.ps1,.psd1,.psm1,.py,.rb,.rs,.sc,.scala,.sh,.sol,.swift,.t,.ts,.tsx,.vb,.zsh"
     },
     {
       "name": "qrp:coverage:instrument:claimed_types:iac",
@@ -797,7 +805,7 @@
     },
     {
       "name": "qrp:coverage:instrument:claimed_types:config",
-      "value": ".cfg,.cnf,.conf,.gotmpl,.hcl,.inf,.ini,.json,.mk,.mqsc,.properties,.props,.reg,.targets,.toml,.tpl,.vcxproj,.wxs,.zone"
+      "value": ".cfg,.cnf,.conf,.dts,.dtsi,.dtso,.gotmpl,.hcl,.inf,.ini,.its,.json,.mk,.mqsc,.properties,.props,.reg,.targets,.toml,.tpl,.vcxproj,.wxs,.zone"
     },
     {
       "name": "qrp:coverage:instrument:claimed_types:config_filenames",
@@ -805,7 +813,7 @@
     },
     {
       "name": "qrp:coverage:instrument:claimed_types:config_filename_pattern",
-      "value": "^(?:Dockerfile|Containerfile|Kconfig)[-.][\\w.-]+$|^[\\w.-]+\\.(?:Dockerfile|Containerfile)$|^sdkconfig(?:\\.[\\w.-]+)?$|^java\\.security\\.[\\w.-]+$|^(?!.*\\.(?i:[0-9]|adoc|bash|bat|bz2|c|cairo|cc|cfg|cjs|cmake|cmd|cnf|conf|cpp|cs|cts|cxx|fs|fsx|go|gotmpl|groovy|gz|h|hcl|hh|hpp|htm|html|in|inc|inf|ini|java|js|json|jsx|ksh|kt|kts|markdown|md|mjs|mk|move|mqsc|mts|pdf|php|pl|pm|pod|properties|props|ps1|psd1|psm1|py|rb|reg|rs|rst|sc|scala|sh|sol|t|targets|toml|tpl|ts|tsx|txt|vb|vcxproj|wxs|xz|zip|zone|zsh)$)(?:sshd|ssh)_config[-_.][\\w.-]+$|^[\\w.-]+\\.(?:sshd|ssh)_config$,^(?:web|app|machine|applicationhost)(?:\\.[\\w-]+)?\\.config$,^dsset-[\\w.-]+$|^db\\.[\\w.-]+$,^K[\\w.-]*\\+\\d{3}\\+\\d{5}\\.(?:key|private)$"
+      "value": "^(?:Dockerfile|Containerfile|Kconfig)[-.][\\w.-]+$|^[\\w.-]+\\.(?:Dockerfile|Containerfile)$|^sdkconfig(?:\\.[\\w.-]+)?$|^[\\w.-]+_defconfig$|^java\\.security\\.[\\w.-]+$|^(?!.*\\.(?i:[0-9]|adoc|bash|bat|bz2|c|cairo|cc|cfg|cjs|cmake|cmd|cnf|conf|cpp|cs|cts|cxx|dts|dtsi|dtso|fs|fsx|go|gotmpl|groovy|gz|h|hcl|hh|hpp|htm|html|in|inc|inf|ini|its|java|js|json|jsx|ksh|kt|kts|markdown|md|mjs|mk|move|mqsc|mts|pdf|php|pl|pm|pod|properties|props|ps1|psd1|psm1|py|rb|reg|rs|rst|sc|scala|sh|sol|swift|t|targets|toml|tpl|ts|tsx|txt|vb|vcxproj|wxs|xz|zip|zone|zsh)$)(?:sshd|ssh)_config[-_.][\\w.-]+$|^[\\w.-]+\\.(?:sshd|ssh)_config$,^(?:web|app|machine|applicationhost)(?:\\.[\\w-]+)?\\.config$,^dsset-[\\w.-]+$|^db\\.[\\w.-]+$,^K[\\w.-]*\\+\\d{3}\\+\\d{5}\\.(?:key|private)$"
     },
     {
       "name": "qrp:coverage:instrument:claimed_types:config_when_a_zone_file",
@@ -825,7 +833,11 @@
     },
     {
       "name": "qrp:coverage:instrument:claimed_types:certificate",
-      "value": ".asc,.cer,.cert,.crt,.csr,.der,.gpg,.jks,.key,.keystore,.p12,.p7b,.p7c,.pem,.pfx,.pgp,.pub,.snk"
+      "value": ".asc,.cer,.cert,.crt,.csr,.der,.gpg,.jks,.key,.keyblock,.keystore,.p12,.p7b,.p7c,.pem,.pfx,.pgp,.pub,.snk,.vbprivk,.vbpubk"
+    },
+    {
+      "name": "qrp:coverage:instrument:claimed_types:key_byte_array_filename_pattern",
+      "value": "^[\\w.-]+-rs\\.txt$"
     },
     {
       "name": "qrp:coverage:instrument:claimed_types:openpgp_key_filenames",
@@ -860,12 +872,60 @@
       "value": "*"
     },
     {
-      "name": "qrp:coverage:instrument:excluded_dirs",
-      "value": ".git,.mypy_cache,.pytest_cache,.ruff_cache,.tox,.venv,__pycache__,build,dist,node_modules,target,vendor,venv"
+      "name": "qrp:coverage:instrument:excluded_dirs:0",
+      "value": ".git"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:1",
+      "value": ".mypy_cache"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:2",
+      "value": ".pytest_cache"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:3",
+      "value": ".ruff_cache"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:4",
+      "value": ".tox"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:5",
+      "value": ".venv"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:6",
+      "value": "__pycache__"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:7",
+      "value": "build"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:8",
+      "value": "dist"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:9",
+      "value": "node_modules"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:10",
+      "value": "target"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:11",
+      "value": "vendor (at the root, or beside a package manifest)"
+    },
+    {
+      "name": "qrp:coverage:instrument:excluded_dirs:12",
+      "value": "venv"
     },
     {
       "name": "qrp:coverage:corpus:target",
-      "value": "/tmp/example/server-configs-nginx"
+      "value": "server-configs-nginx"
     },
     {
       "name": "qrp:coverage:corpus:pinned_at:pinned",
@@ -894,6 +954,10 @@
     {
       "name": "qrp:coverage:corpus:content_digest",
       "value": "sha256:4014cfc06bb12044c9ca3ecce6029316b74e31523a04af0ea57e0cd418ae5084"
+    },
+    {
+      "name": "qrp:coverage:corpus:target_basis",
+      "value": "the scanned folder's own name; its absolute path is not carried in the CBOM (it names the machine and differs between two places that hold one tree); it is in the scan result's coverage.corpus.target"
     },
     {
       "name": "qrp:coverage:window",
@@ -1298,6 +1362,10 @@
     {
       "name": "qrp:chosen_outside_files:places",
       "value": ""
+    },
+    {
+      "name": "qrp:tls_listeners",
+      "value": "[{\"location\": \"conf.d/.default.conf\", \"line\": 12, \"ports\": [\"443\", \"443\"], \"groups\": [], \"groups_set\": \"not in this file: an included file or the TLS library's default applies, not resolved\", \"certificates\": [], \"certificates_set\": []}, {\"location\": \"conf.d/templates/example.com.conf\", \"line\": 12, \"ports\": [\"443\", \"443\"], \"groups\": [], \"groups_set\": \"not in this file: an included file or the TLS library's default applies, not resolved\", \"certificates\": [], \"certificates_set\": []}, {\"location\": \"conf.d/templates/example.com.conf\", \"line\": 26, \"ports\": [\"443\", \"443\"], \"groups\": [], \"groups_set\": \"not in this file: an included file or the TLS library's default applies, not resolved\", \"certificates\": [], \"certificates_set\": []}, {\"location\": \"test/vhosts/default.conf\", \"line\": 11, \"ports\": [\"443\", \"443\"], \"groups\": [], \"groups_set\": \"not in this file: an included file or the TLS library's default applies, not resolved\", \"certificates\": [], \"certificates_set\": []}, {\"location\": \"test/vhosts/secure.server.localhost.conf\", \"line\": 1, \"ports\": [\"443\", \"443\"], \"groups\": [], \"groups_set\": \"not in this file: an included file or the TLS library's default applies, not resolved\", \"certificates\": [], \"certificates_set\": []}, {\"location\": \"test/vhosts/secure.server.localhost.conf\", \"line\": 14, \"ports\": [\"443\", \"443\"], \"groups\": [], \"groups_set\": \"not in this file: an included file or the TLS library's default applies, not resolved\", \"certificates\": [], \"certificates_set\": []}]"
     },
     {
       "name": "qrp:evidence:ci_signing_commands",

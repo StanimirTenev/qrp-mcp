@@ -1,12 +1,12 @@
-# Sample CBOM from qrp-mcp 0.46.0
+# Sample CBOM from qrp-mcp 0.47.0
 
-`h5bp-server-configs-nginx.cbom.json` is a CycloneDX 1.6 CBOM that qrp-mcp 0.46.0 wrote for a small public
+`h5bp-server-configs-nginx.cbom.json` is a CycloneDX 1.6 CBOM that qrp-mcp 0.47.0 wrote for a small public
 repository. It is meant as an import test for a CBOM reader.
 
 - **Repository:** https://github.com/h5bp/server-configs-nginx (H5BP's nginx configuration)
 - **Commit:** `d2f2c3e2fac76f429adb738894499b8fb756d2f3` (20 June 2026)
 - **Licence of the repository:** MIT (`LICENSE.txt`, "Copyright (c) H5BP")
-- **Command** (the built 0.46.0 wheel, installed in a fresh virtual environment):
+- **Command** (qrp-mcp 0.47.0 from PyPI, through `uvx qrp-mcp==0.47.0`):
 
   ```
   qrp-mcp cbom server-configs-nginx --out h5bp-server-configs-nginx.cbom.json
@@ -14,7 +14,7 @@ repository. It is meant as an import test for a CBOM reader.
 
   This uses the default `--level masked`: the quoted lines are starred except for the algorithm
   names. Files and line numbers are kept.
-- **sha256 of the file:** `e8938fef8532a57ee1febd858b374dd948071dce9c7395165c958e9423c65bdc`
+- **sha256 of the file:** `2b252185671d4c0f3c1684cab8b6142db911b344a43b736027c79a5ccc644a28`
 - **Validated** against the CycloneDX 1.6 JSON schema with zero errors. Two copies were used:
   `bom-1.6.schema.json` from the specification's `master` branch (the copy the qrp-mcp tests
   vendor) and the one from the `1.6` branch. Every `bom-ref` that the document points to resolves
@@ -51,13 +51,18 @@ those files is in the `qrp:coverage:*` properties.
 
 ## Rerunning it yourself
 
-Clone the repository at the commit above and run the command. With 0.46.0 your file will differ
-from this one in one field, `qrp:coverage:corpus:target`, which records the absolute path of the
-scanned folder (here `/tmp/example/server-configs-nginx`). Compare
-`qrp:findings_fingerprint:sha256` instead; for this commit and 0.46.0 it is
-`efaeeeec2048349ac52feb9de26d7c2fbf8d5e4b820856d1737a1821a71bf91a`.
+Clone the repository at the commit above and run the command with 0.47.0. Your file should be the
+same bytes as this one (sha256 above): the CBOM records the scanned folder by its own name,
+`server-configs-nginx`, not by its absolute path, and `qrp:coverage:corpus:target_basis` says so.
+This was checked by generating it in two different folders on one machine; both gave the sha256
+above. The findings alone can also be compared through `qrp:findings_fingerprint:sha256`, which is
+`efaeeeec2048349ac52feb9de26d7c2fbf8d5e4b820856d1737a1821a71bf91a` for this commit, the same as
+with 0.46.0.
 
-From 0.47.0 that field is the folder's own name (`server-configs-nginx`), and
-`qrp:coverage:corpus:target_basis` says so; the absolute path stays only in the scan result
-(`scan --out`, `coverage.corpus.target`). A CBOM of one commit made in two places is then the
-same bytes. This sample is still the 0.46.0 file.
+## What changed from the 0.46.0 sample
+
+The same 13 components, with the same `bom-ref`s and the same TLS links. New: `qrp:tls_listeners`
+(each `listen ... ssl` with its port, and where its groups and certificates are set or that they
+are not set in that file), `qrp:operation` on the EC components (here `not read`: the
+repository configures groups, it does not call key-agreement code), and the excluded-directory
+rule as one property per name. `qrp:coverage:corpus:target` is the folder name.
