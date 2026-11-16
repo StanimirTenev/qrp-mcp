@@ -3263,6 +3263,19 @@ def _rejection_tests(lines: list[str]) -> set[int]:
     return out
 
 
+# Row 497: the `with` block of a rejection test is one whatever it expects -- MCUboot's
+# `with self.assertRaises(RSAUsageError):` over `RSA.generate(key_size=1024)` tests that 1024 is
+# refused, and set the headline to RSA-1024 critical. Row 91 caught it only when the line also
+# held a denial word (`match='Unsupported ...'`).
+_REJECTION_WITH = re.compile(
+    r"^\s*(?:async\s+)?with\s.*\b(?:pytest\.raises|assertRaises(?:Regex)?)\s*\(.*:\s*(?:#.*)?$")
+
+
+def _rejection_blocks(lines: list[str]) -> set[int]:
+    """Indexes of the `with pytest.raises(...):` / `with self.assertRaises(...):` lines."""
+    return {i for i, line in enumerate(lines) if "aises" in line and _REJECTION_WITH.match(line)}
+
+
 # The message a call expects or raises, as a keyword argument's string (`error='... was
 # removed'`, pytest.raises(match=...)): text, as a prose string is (rel3-rules).
 _MESSAGE_KEYWORD = re.compile(
@@ -3834,7 +3847,8 @@ def scan_source_file(path: Path, rel_path: str,
     # Release 3b: rows from identifiers alone, kept only if the file turns out to hold crypto.
     by_identifier: list[dict[str, Any]] = []
     standing_alone: list[dict[str, Any]] = []   # release 3e: kept without that (stands_alone)
-    rejection_tests = _rejection_tests(lines) if ext in _DOCSTRING_EXT else set()
+    rejection_tests = ((_rejection_tests(lines) | _rejection_blocks(lines))
+                       if ext in _DOCSTRING_EXT else set())
     defined: list[frozenset[str]] = []  # row 463: the file's defined names, read on first need
     denial_lines: set[int] = set()      # row 473: lines a denial block or rejection test governs
     # The lines visited: with a gate, those it marked and those a comment, docstring or Go

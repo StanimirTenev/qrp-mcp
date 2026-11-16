@@ -6,6 +6,18 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.47.0 (unreleased)
 
+- **A negative test set MCUboot's headline to "RSA-1024 critical"** (row 497, D1 of
+  `boot-proba/REZULTAT.md` §8). `scripts/tests/keys/test_rsa.py:39` `RSA.generate(key_size=1024)`
+  sits in `with self.assertRaises(RSAUsageError):` -- a test that 1024 is refused -- and was a
+  `call`: `algorithm_key_sizes.RSA` 1024, a finding `RSA-1024`, `weak_key`, severity `critical`.
+  A `with pytest.raises(...)` / `self.assertRaises(...)` block was a rejection test (row 91) only
+  when its line also held a denial word; now the block is one whatever it expects, calls
+  included, to the end of its indentation. MCUboot: lines 38-39 `call` -> `ban`, RSA headline
+  1024 -> 2048, finding `RSA-2048` severity high; no other row moved. Scan JSON, MCP tools, CBOM.
+  **Not reproduced:** the other half of D1, the comments in Mbed TLS `rsa.h` ("128 Bytes if
+  RSA-1024 is used"), were already `comment` rows and never reached the headline size; pinned
+  by a test, no code changed for it. Test code stays counted, not excluded: only the block
+  changed.
 - **A CMake variable was read as the environment** (row 505, D10 of `boot-proba/REZULTAT.md`
   §8). MCUboot's `boot/zephyr/CMakeLists.txt:748` `set(key_size "${boot_enc_key_size}")` and
   `:752` `math(EXPR key_size "${key_size} * 2")` -- the byte length of the encrypted-key TLV,
@@ -22,7 +34,8 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
   87). tinycrypt's ECDSA file `ecc_dsa` (`#include <tinycrypt/ecc_dsa.h>`, `ecc_dsa.c` in CMake
   and in MCUboot's `sim/mcuboot-sys/build.rs`) was DSA with severity high -- 5 rows, MCUboot's
   whole DSA finding; ECC + DSA (and tinycrypt's ECC + DH) is now joined as EC + DSA was, and the
-  Rust DSA word skips `ecc_dsa`. `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES` and
+  Rust DSA word skips `ecc_dsa`. The EC identifier rows on the same `ecc_dsa`/`ecc_dh` lines
+  (11 on MCUboot, never counted as uses) go with them. `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES` and
   `MBEDTLS_REMOVE_ARC4_CIPHERSUITES` were a declaration, a use; a `#define` whose name has a
   `REMOVE_` word is now a not-a-use, rule `removal list` (`keys.remove(rsa_key)` is still a use).
   Scan JSON, MCP tools, CBOM. **Not claimed:** `ecc_dsa` does not become an ECDSA row of its own
