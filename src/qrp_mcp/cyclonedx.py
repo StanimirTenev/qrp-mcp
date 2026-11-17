@@ -1402,6 +1402,32 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["scope"] = "excluded"
         components.append(component)
 
+    # Row 522: the same for IKE, a strongSwan proposal that can be negotiated classical.
+    by_ike: dict[str, list[dict[str, Any]]] = {}
+    for item in scan_result["evidence"].get("ike_proposals", []):
+        by_ike.setdefault(_ref("ike-ke", f"{item['group']}-offered-alone"), []).append(item)
+    for ref, group in sorted(by_ike.items()):
+        component = {
+            "type": "cryptographic-asset",
+            "bom-ref": ref,
+            "name": f"{group[0]['group']} (IKE key exchange offered alone)",
+            "cryptoProperties": {"assetType": "algorithm",
+                                 "algorithmProperties": {"primitive": "key-agree"}},
+            "properties": [
+                {"name": f"{NS}basis", "value": "configured_ike"},
+                {"name": f"{NS}offered", "value": "alone"},
+                {"name": f"{NS}family", "value": group[0]["family"]},
+            ],
+            "evidence": {"occurrences": [
+                {"location": g["path"], "line": g["line"],
+                 "additionalContext": _context(g)}
+                for g in group
+            ]},
+        }
+        if all(g.get("in_test_code") for g in group):
+            component["scope"] = "excluded"
+        components.append(component)
+
     # An EC key whose private scalar is small enough to read off the public key
     # (ZA-OPRAVYANE row 32). Related key material, one component per curve and scalar:
     # the same weak key in two files is one key.

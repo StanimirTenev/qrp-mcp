@@ -58,7 +58,7 @@ MANDATES: dict[str, dict[str, Any]] = {
 STALE_AFTER_DAYS = 180
 
 # Evidence categories that are key establishment by what they are.
-_KEY_ESTABLISHMENT = {"tls_groups", "ssh_kex", "static_rsa_kex"}
+_KEY_ESTABLISHMENT = {"tls_groups", "ssh_kex", "static_rsa_kex", "ike_proposals"}
 _NOT_USE = {"comment", "ban", "named_but_not_used", "identifier"}
 _NETWORKING = re.compile(r"ipsec|swanctl|strongswan|libreswan|openswan|racoon|openvpn|"
                          r"wireguard|vpn", re.IGNORECASE)
@@ -397,8 +397,10 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             # Row 479: a public-key encryption command is not a signing step.
             signing = (category == "ci_pipeline"
                        and item.get("operation") != "public_key_encryption")
+            # Row 522: every IKE proposal row is a classical key exchange by construction (ECDH,
+            # DH, X25519, X448), whether or not another row made its family a finding.
             in_vulnerable = family is not None and (
-                family in vulnerable or raw.get(family) in vulnerable
+                family in vulnerable or raw.get(family) in vulnerable or category == "ike_proposals"
                 or any(r.startswith(f"{family}-") and v in vulnerable for r, v in raw.items()))
             if not (in_vulnerable or signing):
                 for name, block in blocks.items():

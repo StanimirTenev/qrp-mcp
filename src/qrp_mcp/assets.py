@@ -1681,6 +1681,73 @@ def scan_ssh_kex(line: str) -> list[dict[str, Any]]:
         })
     return out
 
+# -- A classical IKE key exchange offered on its own ----------------------------------------
+#
+# The same defect again, in strongSwan (ZA-OPRAVYANE row 522, 2026-11-17): `proposals =
+# aes256gcm16-prfsha384-ecp256-ke1_mlkem768, aes256gcm16-prfsha384-ecp256` and the first
+# proposal alone scanned the same. A proposal is the keywords between dashes, proposals are
+# separated by commas (docs.strongswan.org, config/proposals). Its key exchange is classical
+# when it names a classical group and no additional exchange (RFC 9370, `keN_<method>`), or one
+# made optional by `keN_none` ("none" is accepted as an additional key exchange method, so the
+# peer may negotiate without it). The groups are strongSwan's keywords: ecpNNN (IANA 19-21,
+# 26), the brainpool ecpNNNbp, modpNNNN, x25519/curve25519, x448/curve448.
+CLASSICAL_IKE_GROUPS = {
+    **{f"ecp{n}": "ECDH" for n in (192, 224, 256, 384, 521)},
+    **{f"ecp{n}bp": "ECDH" for n in (224, 256, 384, 512)},
+    **{f"modp{n}": "DH" for n in (768, 1024, 1536, 2048, 3072, 4096, 6144, 8192)},
+    "modp1024s160": "DH", "modp2048s224": "DH", "modp2048s256": "DH",
+    "x25519": "X25519", "curve25519": "X25519", "x448": "X448", "curve448": "X448",
+}
+_IKE_PROPOSAL_SETTING = re.compile(r"^\s*((?:esp_|ah_)?proposals|ike|esp|ah)\s*=\s*([^#\n]+)",
+                                   re.IGNORECASE)
+_IKE_ADDITIONAL = re.compile(r"^ke([1-7])_(\w+)$", re.IGNORECASE)
+
+
+def scan_ike_proposals(line: str) -> list[dict[str, Any]]:
+    """Classical key exchanges a strongSwan proposal line can negotiate with no post-quantum
+    one. In a proposal the methods of one kind are alternatives, so `ecp256-mlkem768` can be
+    ecp256 alone, and each additional exchange `keN_` is classical-capable when one of its
+    alternatives is `none` or a classical group."""
+    setting = _IKE_PROPOSAL_SETTING.match(line)
+    if not setting:
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for proposal in setting.group(2).split(","):
+        proposal = proposal.strip().rstrip("!")
+        words = [w.lower() for w in proposal.split("-")]
+        groups = [w for w in words if w in CLASSICAL_IKE_GROUPS]
+        additional: dict[str, list[str]] = {}
+        for m in map(_IKE_ADDITIONAL.match, words):
+            if m:
+                additional.setdefault(m.group(1), []).append(m.group(2).lower())
+        if not groups or not all("none" in methods or any(x in CLASSICAL_IKE_GROUPS
+                                                          for x in methods)
+                                 for methods in additional.values()):
+            continue
+        why = ("it names no additional key exchange" if not additional else
+               "each additional key exchange it names can be none or classical (" + ", ".join(
+                   f"ke{n}_{x}" for n, methods in sorted(additional.items()) for x in methods
+                   if x == "none" or x in CLASSICAL_IKE_GROUPS) + ")")
+        for group in groups:
+            if group in seen:
+                continue
+            seen.add(group)
+            out.append({
+                "group": group,
+                "family": CLASSICAL_IKE_GROUPS[group],
+                "setting": setting.group(1),
+                "proposal": proposal,
+                "offered": "alone",
+                "basis": "configured_ike",
+                "description": (f"{group} is offered here as a key exchange of its own, without "
+                                f"a post-quantum one: the proposal {proposal} can be negotiated "
+                                f"classical, since {why}. Which proposal an SA uses is chosen "
+                                f"with the peer and is not stated by this line."),
+            })
+    return out
+
+
 TLS_TERMINATION = (
     "These files configure TLS. This scan reads files, not connections. The key "
     "exchange a connection negotiates is settled where TLS terminates -- this server, "

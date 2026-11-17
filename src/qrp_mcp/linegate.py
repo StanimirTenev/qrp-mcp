@@ -69,6 +69,9 @@ LITERALS: set[str] = {
     "priority",
     # assets.scan_ssh_kex: _SSH_KEX_SETTING contains `KexAlgorithms`.
     "kexalgorithms",
+    # assets.scan_ike_proposals: nothing without a CLASSICAL_IKE_GROUPS keyword, each of which
+    # holds one of these.
+    "ecp", "modp", "25519", "448",
     # detectors.PPK_CONFIG_ASSIGN.
     "ppk",
     # detectors.scan_hybrid_names: nothing without a name in _HYBRID_NAME, which are given to

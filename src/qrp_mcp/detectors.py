@@ -33,7 +33,8 @@ from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins
                      os_packages,
                      dockerfile_pins, library_support, names_none_of, pinned_versions,
                      scan_encrypted_at_rest, scan_hybrid_groups, scan_manifest, scan_openssl_fips, scan_openssl_cnf_keys,
-                     scan_protocols, scan_ssh_kex, scan_static_rsa_kex, scan_tls_groups,
+                     scan_ike_proposals, scan_protocols, scan_ssh_kex, scan_static_rsa_kex,
+                     scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions, yaml_list_settings)
 from .certificates import (BASE64_PEM_MARK, byte_array_public_keys, vboot_private_key, decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
                            looks_like_key_file, scan_certificate_file, small_scalar_keys,
@@ -5588,7 +5589,7 @@ _READING_LISTS = (
     "hybrid_names", "pinned_images", "ssh_kex_findings", "weak_key_findings", "fips_findings",
     "pins", "property_reads", "skipped_files", "left_out", "files_read", "markers",
     "excluded_by_config", "material_problems", "runtime_choices", "ec_points_checked",
-    "cipher_suite_findings", "oids_not_known", "kms_refs",)
+    "cipher_suite_findings", "oids_not_known", "kms_refs", "ike_proposal_findings",)
 _READING_COUNTS = ("files_scanned", "skipped_kinds", "present_kinds")
 _READING_MAPS = ("key_files", "file_digests", "codeowners", "file_digests_lf")
 _READING_LIST_MAPS = ("property_values",)
@@ -5605,8 +5606,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
      tls_group_findings, static_rsa_findings, hybrid_places, hybrid_names, pinned_images,
      ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads, skipped_files,
      left_out, files_read, markers, excluded_by_config, material_problems, runtime_choices_found,
-     ec_points_checked, cipher_suite_findings, oids_not_known, kms_refs, files_scanned, skipped_kinds,
-     present_kinds,
+     ec_points_checked, cipher_suite_findings, oids_not_known, kms_refs, ike_proposal_findings,
+     files_scanned, skipped_kinds, present_kinds,
      key_files, file_digests, codeowners, file_digests_lf, property_values) = (
         r[name] for name in _READING)
     # A walked file is not a link, so it can only resolve to an excluded path of its own
@@ -5776,6 +5777,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
             kex["line"] = number
             kex["in_test_code"] = in_test_code(rel_path)
             ssh_kex_findings.append(kex)
+        for kex in scan_ike_proposals(text_line):
+            kex.update(path=rel_path, line=number, in_test_code=in_test_code(rel_path))
+            ike_proposal_findings.append(kex)
         for asset in _policy_assets(text_line):
             asset.update(path=rel_path, line=number, excerpt=text_line.strip()[:200])
             protocol_findings.append(asset)
@@ -6469,6 +6473,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     oids_not_known: list[dict[str, Any]] = []
     # Row 489: KMS aliases written and the Terraform KMS aliases and keys (kms_references).
     kms_refs: list[dict[str, Any]] = []
+    # Row 522: classical strongSwan proposals; see assets.scan_ike_proposals.
+    ike_proposal_findings: list[dict[str, Any]] = []
     reading = dict(zip(_READING, (
         source_findings, ci_findings, iac_findings, embedded_key_findings, unreadable, reports,
         declarations, undecoded, content_parts, protocol_findings, dependency_findings,
@@ -6476,7 +6482,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         ssh_kex_findings, weak_key_findings, fips_findings, pins, property_reads,
         skipped_files, left_out, files_read, markers, excluded_by_config, material_problems,
         runtime_choices_found, ec_points_checked, cipher_suite_findings, oids_not_known,
-        kms_refs, files_scanned,
+        kms_refs, ike_proposal_findings, files_scanned,
         skipped_kinds, present_kinds, key_files,
         file_digests, codeowners, file_digests_lf, property_values)))
     reading["files_present"] = files_present
@@ -6542,7 +6548,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         _attach_owners(
             source_findings + ci_findings + iac_findings + embedded_key_findings
             + protocol_findings + dependency_findings + tls_group_findings
-            + static_rsa_findings + ssh_kex_findings + weak_key_findings,
+            + static_rsa_findings + ssh_kex_findings + weak_key_findings
+            + ike_proposal_findings,
             _read_codeowners(owners_file, codeowners[owners_file]))
     # Row 521: certificate, configuration and embedded-key rows had no `in_test_code`, and the
     # count read a missing flag as other code. Every row with a path says it, by the same rule.
@@ -6618,6 +6625,7 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
         "oids_not_known": oids_not_known,
         "library_support_findings": library_support(pinned_images, hybrid_places, files_read),
         "ssh_kex_findings": ssh_kex_findings,
+        "ike_proposal_findings": ike_proposal_findings,
         "weak_key_findings": weak_key_findings,
         # The bound of that check, said where it ran even when it found nothing (row 154).
         "weak_key_check": ({

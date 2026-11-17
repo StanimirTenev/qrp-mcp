@@ -126,7 +126,8 @@ def test_the_gate_finds_what_reading_every_line_finds(core, tmp_path):
 
 
 RULES = [assets.scan_protocols, assets.scan_tls_groups, assets.scan_hybrid_groups,
-         d.scan_hybrid_names, assets.scan_static_rsa_kex, assets.scan_ssh_kex, d._policy_assets,
+         d.scan_hybrid_names, assets.scan_static_rsa_kex, assets.scan_ssh_kex,
+         assets.scan_ike_proposals, d._policy_assets,
          dnssec.unnamed_records, d.scan_openssl3_names, d.scan_cose_algorithms, d.scan_jca_names,
          opcua.scan, aws_tls.scan, ike.fortios_addke, dnssec.scan_records, d.scan_cipher_suites,
          assets.static_rsa_positions, d.PPK_CONFIG_ASSIGN.search, switches.matches]

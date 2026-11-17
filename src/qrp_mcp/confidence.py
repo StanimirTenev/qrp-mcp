@@ -54,7 +54,7 @@ _INFERRED = (
 # A getProperty default, used because no properties file in the tree sets the key.
 _FALLBACK = "named as the default of getProperty"
 _GO_SIGNATURE = re.compile(r"^\s*func\b")
-_SETTINGS = {"tls_groups", "ssh_kex", "static_rsa_kex"}
+_SETTINGS = {"tls_groups", "ssh_kex", "static_rsa_kex", "ike_proposals"}
 
 
 def _down(level: str) -> str:

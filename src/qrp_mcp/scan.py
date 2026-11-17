@@ -348,6 +348,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             # The same for SSH, in a KexAlgorithms list. Apart from tls_groups: an
             # sshd_config is not a TLS configuration.
             "ssh_kex": scan_result.get("ssh_kex_findings", []),
+            # The same for IKE (row 522): a strongSwan proposal that can be negotiated with a
+            # classical key exchange alone.
+            "ike_proposals": scan_result.get("ike_proposal_findings", []),
             # RSA key exchange (static RSA) enabled by a cipher-suite setting: AES256-SHA
             # names no key exchange and is TLS_RSA_WITH_AES_256_CBC_SHA.
             "static_rsa_kex": scan_result.get("static_rsa_kex_findings", []),
@@ -1062,7 +1065,8 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
     # a pure hybrid gets nothing, so the two read apart.
     hybrid_lines = {(h["path"], h["line"]) for h in scan_result.get("hybrid_names") or []}
     for item in ((scan_result.get("tls_group_findings") or [])
-                 + (scan_result.get("ssh_kex_findings") or [])):
+                 + (scan_result.get("ssh_kex_findings") or [])
+                 + (scan_result.get("ike_proposal_findings") or [])):
         if (item["path"], item["line"]) in hybrid_lines:
             family = family_of.get(item["family"], item["family"])
             places = notes.setdefault(family, {}).setdefault("fallback_beside_hybrid", [])
