@@ -1173,9 +1173,15 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
     # not counted as deployed: the CBOM already marked it `scope: excluded` while the
     # summary said hybrid_partial (ZA-OPRAVYANE row 62). Never the other way round: test-only
     # classical still counts as vulnerable.
+    # Row 521: by family, over every name of it. A composite ML-DSA-44-Ed25519 key in a test
+    # fixture is a name of the ML-DSA family; once fixture files carried the flag, it marked the
+    # whole family test-only and set aside ML-DSA used outside tests.
+    by_family: dict[str, list[dict[str, Any]]] = {}
     for name, items in uses.items():
-        family = family_of.get(name)
-        if family and all(i.get("in_test_code") for i in items):
+        if family_of.get(name):
+            by_family.setdefault(family_of[name], []).extend(items)
+    for family, items in by_family.items():
+        if all(i.get("in_test_code") for i in items):
             notes.setdefault(family, {})["in_test_code"] = True
             if family in pqc:
                 set_aside.add(family)

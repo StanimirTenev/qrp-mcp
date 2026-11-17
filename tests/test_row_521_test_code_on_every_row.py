@@ -92,3 +92,27 @@ def test_the_command_line_carries_it(tmp_path):
                     str(root), "--out", str(out), "--level", "full"],
                    check=True, capture_output=True, env=dict(os.environ))
     _check(json.loads(out.read_text()))
+
+
+def _composite_fixture() -> str:
+    import base64
+    import struct
+    blob = b"".join(struct.pack(">I", len(b)) + b for b in (b"ssh-mldsa44-ed25519",
+                                                            bytes(1312 + 32)))
+    return "ssh-mldsa44-ed25519 " + base64.b64encode(blob).decode() + " fixture\n"
+
+
+def test_a_test_only_name_does_not_make_its_family_test_only(tmp_path):
+    """OpenSSH 7fe3b24: once `regress/unittests/sshkey/testdata/*.pub` carried the flag, the
+    composite ML-DSA-44-Ed25519 there marked the whole ML-DSA family test-only, and ML-DSA used
+    outside tests was set aside. A family is test-only when every name of it is."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "app.py").write_text(
+        "from pqcrypto.sign import ml_dsa_65\npk, sk = ml_dsa_65.generate_keypair()\n")
+    (tmp_path / "tests" / "testdata").mkdir(parents=True)
+    (tmp_path / "tests" / "testdata" / "k.pub").write_text(_composite_fixture())
+    result = scan_directory(tmp_path)
+    assert {f["raw_value"]: f.get("in_test_code") for f in result["findings"]} == {
+        "ML-DSA": None, "ML-DSA-44-Ed25519": None}
+    assert result["summary"]["pqc_ready_count"] == 2
+    assert result["summary"]["by_role"]["signature"]["pqc_readiness"] == "pqc_ready"
