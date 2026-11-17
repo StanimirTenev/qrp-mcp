@@ -361,7 +361,9 @@ def _iter_oids(der: bytes) -> set[str]:
 # header is on the first line, and the size cap keeps this from turning into a
 # reason to open every blob in the tree.
 KEY_PEEK_MAX_BYTES = 64 * 1024
-_KEY_HEADER = re.compile(rb"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----", re.M)
+# Row 520: ssh.com's SSH2 private key has four dashes (openssh regress/rsa_ssh2.prv).
+_KEY_HEADER = re.compile(rb"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|"
+                         rb"^---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----", re.M)
 # A header on its own is documentation: OpenSSL's PEM_read.pod prints the markers
 # with the body elided ("MIICdg...."). Key material carries real base64, and the
 # smallest private key there is runs to several hundred characters of it. Summed
@@ -1048,6 +1050,62 @@ def key_in_source(lines: list[str], index: int) -> dict[str, Any]:
         f"-----BEGIN {label}-----\n{body}\n-----END {label}-----\n".encode())
 
 
+# Row 520: ssh.com's SSH2 private key (`---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----`, RFC
+# 4716-style armour with `Header: value` lines, a `\` continuing one). The blob, as OpenSSH's
+# and PuTTY's importers read it: uint32 magic 0x3f6ff9eb, uint32 length, string key type
+# (`if-modn{sign{rsa-pkcs1-sha1},...}` RSA, `dl-modp{...}` DSA), string cipher (`none` or
+# `3des-cbc`), string key data. Unencrypted RSA data: uint32 length, then e, d, n, u, p, q,
+# each a uint32 bit count and its bytes.
+_SSHCOM_BLOCK = re.compile(r"^---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----[ \t\r]*\n(.*?)"
+                           r"^---- END SSH2 ENCRYPTED PRIVATE KEY ----", re.M | re.S)
+_SSHCOM_MAGIC = 0x3F6FF9EB
+_SSHCOM_FAMILIES = {"if-modn": "RSA", "dl-modp": "DSA"}
+
+
+def _sshcom_key_fields(body: str) -> dict[str, Any]:
+    import struct
+
+    lines, continued = [], False
+    for line in body.splitlines():
+        line = line.strip()
+        if continued or ":" in line:
+            continued = line.endswith("\\")
+            continue
+        lines.append(line)
+    try:
+        blob = base64.b64decode("".join(lines), validate=False)
+        if struct.unpack(">I", blob[:4])[0] != _SSHCOM_MAGIC:
+            return {"key_unread": "body_not_a_key"}
+        at = 8
+
+        def string(data: bytes, at: int) -> tuple[bytes, int]:
+            size = struct.unpack(">I", data[at:at + 4])[0]
+            return data[at + 4:at + 4 + size], at + 4 + size
+
+        key_type, at = string(blob, at)
+        cipher, at = string(blob, at)
+        data, at = string(blob, at)
+    except (ValueError, TypeError, struct.error):
+        return {"key_unread": "body_not_a_key"}
+    family = _SSHCOM_FAMILIES.get(key_type.decode("ascii", "replace").split("{", 1)[0])
+    if family is None:
+        return {"key_unread": "family_not_named"}
+    out: dict[str, Any] = {"key_algorithm": family}
+    if cipher != b"none":
+        out["key_unread"] = "password_protected"
+    elif family == "RSA":
+        at = 4
+        try:
+            for _ in range(3):      # e, d, n
+                bits = struct.unpack(">I", data[at:at + 4])[0]
+                at += 4 + (bits + 7) // 8
+            if at <= len(data):
+                out["key_size"] = bits
+        except struct.error:
+            pass
+    return out
+
+
 def scan_certificate_file(path: Path, rel_path: str,
                           raw: bytes | None = None) -> tuple[list[dict[str, Any]],
                                                              list[dict[str, Any]]]:
@@ -1154,6 +1212,20 @@ def scan_certificate_file(path: Path, rel_path: str,
             pkcs1_public.add(len(blobs) - 1)
         if line_no in material["public_keys"]:
             parsed_public_blobs[len(blobs) - 1] = line_no
+
+    for match in _SSHCOM_BLOCK.finditer(text):
+        found_blocks = True
+        line_no = text.count("\n", 0, match.start()) + 1
+        fields = _sshcom_key_fields(match.group(1))
+        keys.append({"path": rel_path, "line": line_no, "type": "SSH2 ENCRYPTED PRIVATE KEY",
+                     "description": "private key material in an ssh.com SSH2 private key block",
+                     **fields})
+        family = fields.get("key_algorithm")
+        if family:
+            record(family, f"{family} key in an ssh.com SSH2 private key block (key type from "
+                           f"its header)", line_no, "---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----")
+            if "key_size" in fields and algorithms and algorithms[-1]["algorithm"] == family:
+                algorithms[-1]["key_size"] = fields["key_size"]
 
     # A .der or .p12 is the same content without the armour -- unless it was parsed.
     if not blobs and not found_blocks and not material["certificates"] \
