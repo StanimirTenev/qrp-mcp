@@ -128,7 +128,8 @@ see its tests fail.
     such a call is a place in `chosen_outside_files`, `kind: remote_signing`, with `key_location`
     (`kms`, `vault`, `ssh_agent`): boto3 KMS `sign(KeyId=...)` with no algorithm on the line,
     Google Cloud KMS `asymmetric_sign`, Vault `transit/sign/` by an HTTP or client write and hvac
-    `transit.sign_data`, paramiko ssh-agent `sign_ssh_data`. No family is claimed.
+    `transit.sign_data`, paramiko ssh-agent `sign_ssh_data`. No family is claimed. A boto3 call wrapped
+    over lines is read with the four lines after it, so an algorithm written there is a row.
   - AWS KMS `RSASSA_PSS_SHA_*` and `RSASSA_PKCS1_V1_5_SHA_*` gave no row (#9): RSA now, with
     `key_location: kms` in a boto3 KMS file.
   - `ECC_SECG_P256K1` was reported as P-256 (#10): it is secp256k1.
@@ -137,8 +138,9 @@ see its tests fail.
     `kSecAttrKeySizeInBits: 1024` is the size.
   - An environment read was a place only by the variable on the left, and Go's `os.Getenv` never
     (#6): the environment variable's own name now decides too (`ALG2 = os.environ["JWT_ALG"]`,
-    `curve := os.Getenv("TLS_CURVES")`); a secret or a location (`*_KEY`, `*_FILE`, `*_URL`) is not
-    a place.
+    `curve := os.Getenv("TLS_CURVES")`); a secret or a location (`*_KEY`, `*_FILE`, `*_URL`), a
+    debugging switch, or a value written into the environment (`process.env.X = '...'`, found on
+    the corpus) is not a place.
   - A JOSE default beside an environment read (`os.environ.get('JWT_ALG', 'ES256')`,
     `process.env.JWT_ALG || 'RS256'`) was not a place (#7, row 511): it is, with `default` and
     `overridable: true`, as docs/what-it-reads.md already promised.
