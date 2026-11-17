@@ -432,6 +432,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     _library_default_key_exchange(result)
     _authentication_not_read(result, repo_path)
     result["tls_listeners"] = _tls_listeners(result, repo_path)
+    result["trust_stores"] = _trust_stores(result, repo_path)
     _readiness_by_role(result)
     _unowned(result)
     result["layer_disagreements"] = _layer_disagreements(result)
@@ -787,6 +788,73 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
     if not places:
         return None
     return {"meaning": LISTENERS_MEANING, "count": len(places), "places": places}
+
+
+# Row 517 (Georgi Ivanov, 17.11.2026): the roots were read and nothing said who trusts them. A
+# place that loads a trust store, in three forms: Python's `load_verify_locations` or
+# `create_default_context` with `cafile`/`capath`, Go's `AppendCertsFromPEM` with the path of an
+# `os.ReadFile` in the ten lines above it, nginx's `ssl_client_certificate` /
+# `ssl_trusted_certificate`. The path is linked to a file read as tls_listeners links one.
+_TRUST_PYTHON = re.compile(
+    r"\b(load_verify_locations|create_default_context)\s*\([^)]*?\b(?:cafile|capath)\s*=\s*"
+    r"[\"']([^\"']+)[\"']|\b(load_verify_locations)\s*\(\s*[\"']([^\"']+)[\"']")
+_TRUST_GO = re.compile(r"\b(AppendCertsFromPEM)\s*\(")
+_GO_READ_FILE = re.compile(r"\b(?:os|ioutil)\.ReadFile\(\s*\"([^\"]+)\"")
+_TRUST_NGINX = re.compile(
+    r"^\s*(ssl_client_certificate|ssl_trusted_certificate)\s+[\"']?([^\s;\"']+)")
+TRUST_STORES_MEANING = (
+    "places that load a trust store -- the certificates this code or server accepts as roots: "
+    "the path each names, the files read that it is, and the anchors in them. Read in three "
+    "forms (Python load_verify_locations/create_default_context cafile or capath, Go "
+    "AppendCertsFromPEM after os.ReadFile, nginx ssl_client_certificate/ssl_trusted_certificate); "
+    "a path outside the tree is said, not read; a system store used by default is not listed")
+
+
+def _trust_stores(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
+    read = set(result.get("files_read") or [])
+    anchors: dict[str, list[dict[str, Any]]] = {}
+    for r in result["evidence"].get("source_code", []):
+        if r.get("certificate") and r.get("certificate_role") == "subject_public_key":
+            anchors.setdefault(r["path"], []).append(r)
+    places = []
+    for rel in result.get("files_read") or []:
+        suffix = rel.rsplit(".", 1)[-1].lower() if "." in rel else ""
+        if suffix not in ("py", "go") and not confidence._is_config(rel):
+            continue
+        try:
+            lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for n, line in enumerate(lines, 1):
+            setting = named = None
+            m = _TRUST_PYTHON.search(line) if suffix == "py" else None
+            if m:
+                setting, named = m.group(1) or m.group(3), m.group(2) or m.group(4)
+            m = _TRUST_GO.search(line) if suffix == "go" else None
+            if m:
+                setting = m.group(1)
+                found = [f.group(1) for f in map(_GO_READ_FILE.search, lines[max(0, n - 11):n])
+                         if f]
+                named = found[-1] if found else None
+            m = _TRUST_NGINX.match(line.split("#", 1)[0]) if suffix not in ("py", "go") else None
+            if m:
+                setting, named = m.group(1), m.group(2)
+            if not setting:
+                continue
+            linked = sorted({c for c in (named, str(Path(rel).parent / named))
+                             if named and not named.startswith("/") and c in read}) \
+                if named else []
+            places.append({
+                "path": rel, "line": n, "setting": setting, "file": named,
+                "file_read": linked, "outside_the_tree": bool(named and named.startswith("/")),
+                "anchors": [{"path": a["path"], "line": a["line"], "family": a["algorithm"],
+                             **{k: a[k] for k in ("key_size", "curve") if k in a},
+                             "subject": a["certificate"].get("subject"),
+                             "self_signed": a["certificate"].get("self_signed")}
+                            for f in linked for a in anchors.get(f, [])]})
+    if not places:
+        return None
+    return {"meaning": TRUST_STORES_MEANING, "count": len(places), "places": places}
 
 
 def _readiness_by_role(result: dict[str, Any]) -> None:

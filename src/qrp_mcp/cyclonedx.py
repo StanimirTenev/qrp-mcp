@@ -1719,6 +1719,15 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                   "certificates_set": sorted({c["set"] for c in x["certificates"]})}
                  for x in scan_result["tls_listeners"]["places"]], ensure_ascii=False)}]
             if scan_result.get("tls_listeners") else []) + (
+            # Row 517: each place that loads a trust store, with the anchors read in it.
+            [{"name": f"{NS}trust_stores", "value": json.dumps(
+                [{"location": x["path"], "line": x["line"], "setting": x["setting"],
+                  "file": x["file"], "file_read": x["file_read"],
+                  "outside_the_tree": x["outside_the_tree"],
+                  "anchors": [f"{a['family']}" + (f"-{a['key_size']}" if a.get("key_size")
+                                                  else "") for a in x["anchors"]]}
+                 for x in scan_result["trust_stores"]["places"]], ensure_ascii=False)}]
+            if scan_result.get("trust_stores") else []) + (
             # Row 473: the lines closed as not a use, with the rule that closed each.
             [{"name": f"{NS}named_but_not_used:lines", "value": json.dumps(
                 [{"family": r["family"], "location": r["path"], "line": r["line"],
