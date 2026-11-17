@@ -156,6 +156,44 @@ front. The scanner cannot see a connection; the field says that, not what the co
 Raised in public on 1 October 2026, where a measurement at the front door met the same gap
 from the other side.
 
+### A classical IKE key exchange offered on its own (from 0.49.0)
+
+The same defect in strongSwan (row 522): `proposals = aes256gcm16-prfsha384-ecp256-ke1_mlkem768,
+aes256gcm16-prfsha384-ecp256` and the first proposal alone gave the same `findings_fingerprint`
+and `key_establishment: pqc_ready`. A strongSwan proposal (swanctl.conf `proposals`,
+`esp_proposals`, `ah_proposals`; ipsec.conf `ike`, `esp`, `ah`) is the keywords between dashes,
+and the methods of one kind in it are alternatives. When it names a classical group (`ecpNNN`,
+`ecpNNNbp`, `modpNNNN`, `x25519`/`curve25519`, `x448`/`curve448`) and every additional exchange
+it names (`keN_`, RFC 9370) can be `none` or classical, it can be negotiated with no
+post-quantum exchange: the group is a finding of its own under `evidence.ike_proposals`, with
+`offered: "alone"`, `basis: "configured_ike"` and the `proposal`. So the two configurations above
+differ, `closure` closes `ecp256 offered alone` when the classical proposal goes, the summary
+lists it in `fallback_beside_hybrid` when the line also names a hybrid (and the key-establishment
+part, `pqc_ready` with the hybrid alone, reads `hybrid_partial`), a `--mandate` dates it as
+key establishment, and the CBOM has a component, `ecp256 (IKE key exchange offered alone)`.
+
+⚠️ What is not claimed: which proposal an SA uses (the peers choose). Libreswan's `ike=` syntax
+(`aes256-sha2;dh20`, `addke`) and FortiOS, Cisco and Junos proposals are not read for this.
+
+### Trust stores (from 0.49.0)
+
+`trust_stores` (row 517) lists each place that loads a trust store -- the certificates a client or
+server accepts as roots: Python `load_verify_locations` or `create_default_context` with a
+`cafile`/`capath`, Go `AppendCertsFromPEM` with the path of an `os.ReadFile` in the ten lines
+above it, nginx `ssl_client_certificate` and `ssl_trusted_certificate`. Each place gives the path
+it names (`file`), the files read that path is (`file_read`, linked as `tls_listeners` links a
+certificate: relative to the root or to the file's directory), the anchors in them with their
+families, sizes and `self_signed`, and `outside_the_tree` for an absolute path, which is said and
+not read (below `--level full` such a path is masked, as a line is). `null` when there is none. The CBOM carries it as `qrp:trust_stores`.
+
+⚠️ What is not claimed: Java `TrustManagerFactory` and keystores, a system store used by default,
+or what a peer presents. A path outside the tree is not put in `chosen_outside_files`, which is
+for values read at run time.
+
+From 0.49.0 a certificate's `index` is its place in the file (1, 2, ... across PEM blocks). Until
+0.48.0 every certificate of a PEM bundle was 1, and in a `fullchain.pem` the root's key entered
+the listener's certificate as a second signature.
+
 ### Two layers that disagree (from 0.46.0)
 
 Where one repository configures TLS key exchange in two layers that disagree -- a terminator's

@@ -298,6 +298,12 @@ From 0.32.0 an EC key's **curve is named** from its named-curve identifier — P
 secp256k1 (`1.3.132.0.10`) from SEC 2 v2.0 — as `curve` and `key_size` on the EC finding. Before,
 the curve identifier was swallowed by `id-ecPublicKey`, and a P-384 key read as "EC".
 
+From 0.49.0 an **ssh.com SSH2 private key** (`---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----`, four
+dashes; OpenSSH keeps one as `regress/rsa_ssh2.prv`) is read: the family from the blob's key type
+(`if-modn{...}` RSA, `dl-modp{...}` DSA) and, for an unencrypted RSA key, the size of its
+modulus; an encrypted one says `key_unread: password_protected`. Until 0.48.0 the file was
+`type_not_claimed`.
+
 From 0.45.0 an **OpenSSH private key** (`-----BEGIN OPENSSH PRIVATE KEY-----`) names its
 family: the openssh-key-v1 format (OpenSSH `PROTOCOL.key`) keeps the public key in the clear
 ahead of the encrypted part, so the key type (`ssh-ed25519`, `ecdsa-sha2-nistp384`, `ssh-rsa`
@@ -416,7 +422,12 @@ the families it found in it. A path written with a variable is left alone. From 
 step carries `key_location`: `tpm` (tpm2_sign, or `-engine`/`-provider tpm2`), `pkcs11_token`
 (pkcs11-tool, `-engine`/`-provider pkcs11`, or an RFC 7512 `pkcs11:` key URI), `kms` (cosign's
 `awskms://`, `gcpkms://`, `azurekms://`, `hashivault://`), `file` (a path), or "not determined from
-the line" (a keyring, a keystore, a variable, `k8s://`, `env://`). A key URI is named as written,
+the line" (a keyring, a keystore, a variable, `k8s://`, `env://`). From 0.49.0 (row 519) a
+source row on a KMS SDK call carries `key_location: kms` too: boto3's KMS parameters
+(`SigningAlgorithm=`, `EncryptionAlgorithm=`, `KeyAgreementAlgorithm=`, `KeySpec=`) in a file that
+makes a boto3 `kms` client, or an Azure Key Vault algorithm enum in a file that imports its
+cryptography client; the CBOM tags the occurrence `[key: kms]`. azure-keyvault-keys' lower-case
+members (`SignatureAlgorithm.rs256`, `.ps256`, `.es256`, `.es256_k`) are read as RSA and ECDSA. A key URI is named as written,
 without its query and any `pin-value`/`pin-source` attribute, so a PIN is not copied into
 `signing_key`. tpm2_sign's `-s/--scheme` and pkcs11-tool's
 `-m/--mechanism` give `key_algorithm` (`ECDSA, named on the line (ECDSA-SHA256)`). In the CBOM the steps

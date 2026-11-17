@@ -149,6 +149,22 @@ the clause and not counted by the gate. Every mandate block says how old its rea
 document is, and past 180 days (`stale`) the command line says so
 ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
 
+From 0.49.0 `--mandate` also takes four financial regulators whose duty dates no line of code --
+Bank of Israel (`il-boi`), FINMA (`ch-finma`), HKMA (`hk-hkma`) and MAS (`sg-mas`, a
+consultation): the sector and the duty, quoted, with no clause on any occurrence and a gate that
+never counts them. A mandate block also carries the sha256 of each document as it was read, and
+`qrp-mcp mandate-check NAME --document FILE` says whether a copy you downloaded is still the same
+document (the tool itself still fetches nothing)
+([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
+
+From 0.49.0 `trust_stores` lists each place that loads a trust store (Python `cafile`, Go
+`AppendCertsFromPEM`, nginx `ssl_client_certificate`), the anchors read in it, and whether its
+path is outside the tree; a strongSwan proposal that can be negotiated with a classical key
+exchange alone is a row of its own (`evidence.ike_proposals`), so removing the fallback is
+closed; a KMS SDK call (boto3 KMS, Azure Key Vault) says `key_location: kms`; and every evidence
+row with a path says `in_test_code`
+([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/tls.md)).
+
 From 0.47.0 `--mandate nist-ir-8547` also gives each clause `federal_high_value_assets`: the date
 by role that NIST IR 8547 (section 4) restates from EO 14412 and OMB M-26-15 -- post-quantum key
 establishment by 2030-12-31, signatures by 2031-12-31 -- for federal high value assets and high

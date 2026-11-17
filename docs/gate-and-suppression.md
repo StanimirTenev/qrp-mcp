@@ -40,6 +40,23 @@ one place. The CHANGELOG entry named beside each item is the full text.
   `stale_because` with the document's URL, and the command line says it on stderr. It does not
   change the gate or the exit code. It is counted to `--as-of`, not to the clock, so a run with the
   same `--as-of` gives the same bytes.
+- From 0.49.0 (row 523) `--mandate il-boi | ch-finma | hk-hkma | sg-mas` names a sector's duty with
+  no date for code: Bank of Israel letter 202501 (an initial plan within a year of the letter),
+  FINMA Guidance 05/2026 (a PQC roadmap by mid-2027), HKMA circular B1/15C (full sectoral
+  readiness by 2030) and MAS consultation paper P019-2026 (proposed migration dates; a
+  consultation, `in_force: false`). The block has `kind: "sector_duty"`, the `sector`, each duty
+  quoted (`duties[].quote`), `read_on` and `stale` like every mandate, `in_scope: 0` and `gate:
+  "not_applicable"`: no occurrence gets a clause and the gate never counts it. A span the document
+  gives ("within a year", "mid-2027") is said as written, not turned into a day. HKMA's `url` is
+  null: the circular's own address was not recorded when it was read.
+- From 0.49.0 (row 524) a mandate whose document address and hash were both recorded when it was
+  read carries `documents` (url, sha256 as downloaded, read_on): eu-pqc-roadmap, ca-cccs, nl-rqs,
+  se-ncsc, jp-gov, in-dst, de-bsi, il-boi, sg-mas. A scan says `document_changed: "not_fetched"`;
+  it makes no network call. `qrp-mcp mandate-check NAME --document FILE ...` compares copies you
+  downloaded (without `--document` it lists the documents with a `curl` for each) and says
+  `document_changed` true, false or not_fetched; exit 1 when one changed. A changed hash says the
+  bytes changed, not that a deadline moved. Only PDFs are recorded: an HTML page changes its
+  bytes without a change to its text.
 - `--mandate nist-ir-8547` follows the final NIST IR 8547; the gate counts the deprecation date
   (2030), named in `gate_counts` and `next_gate_deadline` beside `next_deadline` (0.38.0, 0.41.0).
 - `--mandate nist-ir-8547` also says, in `federal_high_value_assets` on each clause and on the

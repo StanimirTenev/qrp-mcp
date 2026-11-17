@@ -4,6 +4,103 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.49.0 (2026-11-17)
+
+Eight rows of the fix list, from five probes of LinkedIn rooms and one thread (17.11). Each was
+reproduced on 0.48.0 (dab656c) with its probe before the fix, pinned by a test that fails on
+0.48.0, and each fix was reverted once to see its tests fail.
+
+- **A chain's root read as its leaf** (row 517, Georgi Ivanov). In a PEM bundle every
+  certificate was `index: 1` (counted inside its block, which holds one), and `tls_listeners`
+  takes index 1 as the leaf: in a `fullchain.pem` the root's RSA-2048 entered the listener's
+  certificate as a second "signature on the certificate". The index is now the certificate's
+  place in the file. Not in `findings_fingerprint`, which does not hold the index.
+- **Who trusts the roots was not said** (row 517). The roots were read and `self_signed`, and
+  `load_verify_locations(cafile=...)`, Go's `AppendCertsFromPEM` of a file read from /etc and
+  nginx's `ssl_client_certificate` gave no output. `trust_stores` lists each such place: the
+  path it names, the files read that it is, their anchors with families, whether the path is
+  outside the tree, and `in_test_code`; scan JSON, MCP tools and CBOM (`qrp:trust_stores`). A
+  path that is not a file read is source text and is masked below `--level full`.
+  Bounded to those three forms (and `ssl_trusted_certificate`, `create_default_context(cafile=)`,
+  `capath`); not Java trust managers or a system store used by default. On Vault 41e571b: 31
+  places, all Go `AppendCertsFromPEM`, most of a PEM held in memory (`file: null`).
+- **An algorithm chosen in the environment through a JCA factory was invisible** (row 518).
+  `Signature.getInstance(System.getenv("SIG_ALG"))` beside a PKCS#11 KeyStore gave no row and
+  `chosen_outside_files` 0. A `getInstance` of Signature, KeyPairGenerator, KeyAgreement or
+  KeyGenerator whose argument is read from the environment is now a place there, with no family
+  claimed (`Cipher.getInstance(...)` already was). python-pkcs11's
+  `generate_keypair(KeyType.RSA, 3072)` now gives `key_size: 3072`. Left as they are: the
+  identifier rows for function names such as `new_rsa_key`, which are notes by design.
+- **Azure Key Vault's algorithm names, and where a KMS key lives** (row 519, Iakovos Ellinas).
+  `client.sign(SignatureAlgorithm.rs256, digest)` gave no row: the Python SDK's members are
+  lower-case (`rs256`, `ps256`, `es256`, `es256_k`), and are now read by the enum's name, never as
+  a bare word. A row on a boto3 KMS call (`SigningAlgorithm=`, `EncryptionAlgorithm=`,
+  `KeyAgreementAlgorithm=`, `KeySpec=` in a file with a boto3 `kms` client) or on an Azure Key
+  Vault algorithm enum (in a file importing its cryptography client) carries `key_location:
+  "kms"`, as a signing step has since 0.47.0; the CBOM tags the occurrence `[key: kms]`. It is not
+  identity for baselines or `closure`. Not read for this: Google Cloud KMS, HashiCorp Vault.
+- **ssh.com's SSH2 private key was not opened** (row 520, Bryant Nielson). OpenSSH's
+  `regress/rsa_ssh2.prv` (`---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----`, four dashes) was
+  `type_not_claimed`; the peek for key material knew the five-dash PEM header only. It is read:
+  the family from the key type (`if-modn` RSA, `dl-modp` DSA), and an unencrypted RSA key's size.
+  On OpenSSH 7fe3b24: 741 -> 742 of 873 files read (84.88% -> 84.99%), the key RSA-1024, and one
+  more `private_key` finding; nothing else moved.
+- **Certificate, configuration and key rows did not say they were test code** (row 521, Abid
+  Hussain Mohammed). `in_test_code` was set on rows found in source text only, and
+  `test_code.findings_in_other_code` counted a missing flag as other code. Every evidence row with
+  a path now carries it, by the same rule. On certbot 56ee049: 252 in test code / 365 other ->
+  340 / 277 (the 88 rows under tests/testdata the row named); the CBOM marks 29 more components
+  `scope: excluded`. Findings and `findings_fingerprint` are unchanged. Whether a family is
+  test-only is now decided over all its names: with the flag on fixture files, OpenSSH's
+  composite ML-DSA-44-Ed25519 test keys would otherwise have marked the whole ML-DSA family
+  test-only and set aside the ML-DSA outside tests (caught on the positive control before
+  release).
+- **The classical fallback in an IKE proposal was invisible** (row 522, Gowthami Pagilla).
+  strongSwan `proposals = ...-ecp256-ke1_mlkem768, ...-ecp256` and the hybrid proposal alone
+  gave the same `findings_fingerprint` and `key_establishment: pqc_ready`. A proposal that can be
+  negotiated with a classical key exchange alone (no `keN_`, or every `keN_` with `none` or a
+  classical alternative) is a row in `evidence.ike_proposals` (`offered: alone`), as `tls_groups`
+  (0.28.0) and `ssh_kex` are: the fingerprint moves, `closure` closes `ecp256 offered alone`, the
+  summary lists it in `fallback_beside_hybrid` and its key-establishment part reads
+  `hybrid_partial` instead of `pqc_ready` (with `because`), `--mandate` dates it as key
+  establishment, and the CBOM has a component. Without the fallback the part is `pqc_ready`, as
+  before. Not read for this: Libreswan's `ike=` syntax, FortiOS, Cisco, Junos.
+- **A sector's duty with no date for code** (row 523, Meir Goldman). `--mandate il-boi |
+  ch-finma | hk-hkma | sg-mas`: Bank of Israel letter 202501, FINMA Guidance 05/2026, HKMA circular
+  B1/15C, MAS consultation paper P019-2026, each quoted as the register of 17.11 quotes it, with
+  `read_on`. A new kind, `sector_duty`: the sector and the duty, `in_scope: 0`, `gate:
+  "not_applicable"`; no occurrence gets a clause and the exit code never moves. MAS is
+  `in_force: false` (a consultation). A span ("within a year", "mid-2027") is said as written;
+  no day is inferred. HKMA's `url` is null: the circular's address was not recorded.
+- **`stale` measured our reading, not the document** (row 524). A mandate now keeps the sha256 of
+  each document as downloaded when read (`documents`), where the address and the hash were both
+  recorded: nine of the sixteen. A scan says `document_changed: "not_fetched"`. `qrp-mcp
+  mandate-check NAME --document FILE ...` compares copies you downloaded, matched by hash in any
+  order (without `--document`, a `curl` for each): `document_changed` true, false or not_fetched,
+  exit 1 when one changed.
+  **Limit:** qrp-mcp still makes no network call, so the fetch is yours; a changed hash says the
+  bytes changed, not that a deadline moved; only PDFs are recorded, since an HTML page changes its
+  bytes with no change to its text; uk-ncsc, au-ism, sg-csa-cii, cnsa-2.0, nist-ir-8547, ch-finma
+  and hk-hkma have no recorded hash and stay not_fetched.
+
+**What changes for an existing user.** A strongSwan configuration with a proposal that can be
+negotiated classical now has `ike_proposals` rows -- beside a hybrid or not -- so its
+`findings_fingerprint` moves; a baseline written by 0.48.0 does not hold them (they read as new),
+and under `--mandate` they are dated key-establishment rows that can fail a gate that passed on
+0.48.0. An IKE hybrid with such a fallback reads `hybrid_partial` in its key-establishment part.
+Rows on boto3 KMS and Azure Key Vault calls gain `key_location`, which is not identity, and the
+CBOM's `additionalContext` of their occurrences gains `[key: kms]`; certificate, key and
+configuration rows gain `in_test_code`, and the CBOM marks the test-only ones `scope: excluded`.
+`trust_stores` and the sector duties never move a gate.
+
+Positive controls against 0.48.0 (OpenSSH 7fe3b24, certbot 56ee049, Vault 41e571b): files read
+742 (+1), 850, 5,434; findings 71 (+1, the SSH2 key), 40, 74; the same detected families and
+`chosen_outside_files` counts. certbot's and Vault's `findings_fingerprint` are the same; OpenSSH's
+moves by the SSH2 key. The corpus regression against 0.48.0 (185 pinned public repositories, one
+labeller's labels) is unchanged in both splits: disagreement with the model, A' 395 and 71, B'
+262 and 42 -- disagreement with a model, not recall or precision. Not claimed: any change to how
+much of a tree's own cryptography is found beyond the rows above.
+
 ## 0.48.0 (2026-11-17)
 
 - **`--mandate` knew only the United States** (17.11, after a public deadline tracker: a list
