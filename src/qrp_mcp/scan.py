@@ -1032,6 +1032,9 @@ def _withhold_reassurance(summary: Any, block: dict[str, Any], scan_result: dict
     # A key whose algorithm no line of the same place names: what it is was not determined.
     named_at = {(i["path"], i["line"]) for items in _in_use(scan_result).values()
                 for i in items}
+    # Row 526: a PPK's secret is a shared secret of a known kind, not a key of unknown family.
+    named_at |= {(k["path"], k["line"]) for k in scan_result.get("embedded_key_findings") or []
+                 if k.get("key_material") == "shared secret"}
     for f in findings:
         if f.algorithm_family == "private_key" and f.classification == "unknown":
             path, _, line = f.location.rpartition(":")
@@ -1240,6 +1243,18 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
         mechanism = family_of.get("PPK")
         if mechanism:
             notes.setdefault(mechanism, {})["protects"] = sorted(protected)
+            # Row 526: where the PPK's secret comes from, as far as the files read say.
+            inline = [f"{k['path']}:{k['line']}"
+                      for k in scan_result.get("embedded_key_findings") or []
+                      if k.get("type") == "strongSwan PPK secret"]
+            notes[mechanism]["ppk_source"] = (
+                f"in the files read: {', '.join(inline)} (a swanctl secrets ppk section holds "
+                f"the secret itself -- committed key material, see evidence.embedded_keys)"
+                if inline else
+                "not in the files read: the secret is configured elsewhere (a secrets file "
+                "outside the tree, an include, a plugin) or fetched at run time, for instance "
+                "from a QKD key management entity; where it comes from, and how it is "
+                "distributed, is not read (a QKD client is out of scope)")
             if not protected and all(ppk_files.values()):
                 set_aside.add(mechanism)
                 notes[mechanism]["reason"] = (

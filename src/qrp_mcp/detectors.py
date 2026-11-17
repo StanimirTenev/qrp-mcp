@@ -6020,6 +6020,8 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         wg_rows, wg_keys = wireguard.scan(lines)
         ike_rows += wg_rows
         embedded_key_findings.extend({**k, "path": rel_path} for k in wg_keys)
+        # Row 526: a PPK whose secret is written in a swanctl.conf `secrets` block.
+        embedded_key_findings.extend({**k, "path": rel_path} for k in ike.ppk_secrets(lines))
         for item in src:
             if item["algorithm"] == "RSA" and item.get("key_size") in (None, "undetermined"):
                 bits = dnssec.rsa_dnskey_bits(lines[item["line"] - 1])

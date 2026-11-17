@@ -1087,8 +1087,12 @@ def extract_findings(request: FingerprintRequest) -> list[Finding]:
                     quantum_vulnerable=False,
                     weak_key=True,
                     severity="critical",
-                    reason="Embedded private key material committed to the repository; rotate "
-                    "the key and remove it from version control history.",
+                    reason=("Postquantum preshared key (RFC 8784) committed to the repository: "
+                            "whoever has the tree has the secret the PPK adds to the key "
+                            "derivation; rotate it and remove it from version control history."
+                            if item.get("key_material") == "shared secret" else
+                            "Embedded private key material committed to the repository; rotate "
+                            "the key and remove it from version control history."),
                 )
             )
 

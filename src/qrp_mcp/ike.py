@@ -283,3 +283,50 @@ def scan_auth(lines: list[str]) -> list[dict[str, Any]]:
             item["key_size"], item["curve"] = int(size), f"P-{size}"
         out.append(item)
     return out
+
+
+# Row 526: an RFC 8784 PPK whose secret is written in swanctl.conf. swanctl.conf(5): "secrets.
+# ppk<suffix>.secret: Value of the PPK. It may either be an ASCII string, a hex encoded string
+# if it has a 0x prefix or a Base64 encoded string if it has a 0s prefix." The secret is
+# committed key material, a shared secret, and its bytes are never quoted (no excerpt).
+_SWANCTL_TOKEN = re.compile(r"([\w.-]+)\s*\{|\}|(?<![\w.-])secret\s*=\s*(\"[^\"]*\"|[^\s}]+)")
+
+
+def _secret_bits(value: str) -> int | None:
+    import base64
+    import binascii
+    if value[:2].lower() == "0x":
+        digits = value[2:]
+        return len(digits) * 4 if re.fullmatch(r"[0-9A-Fa-f]+", digits) else None
+    if value[:2].lower() == "0s":
+        try:
+            return len(base64.b64decode(value[2:], validate=True)) * 8
+        except (binascii.Error, ValueError):
+            return None
+    return None
+
+
+def ppk_secrets(lines: list[str]) -> list[dict[str, Any]]:
+    """The PPK secrets a swanctl.conf `secrets` block holds, as embedded key rows."""
+    stack: list[str] = []
+    out: list[dict[str, Any]] = []
+    for number, line in enumerate(lines, 1):
+        if line.lstrip().startswith("#"):
+            continue
+        for m in _SWANCTL_TOKEN.finditer(line):
+            if m.group(1):
+                stack.append(m.group(1))
+            elif m.group(0) == "}":
+                if stack:
+                    stack.pop()
+            elif len(stack) == 2 and stack[0] == "secrets" and stack[1].startswith("ppk"):
+                row = {"line": number, "type": "strongSwan PPK secret",
+                       "key_material": "shared secret",
+                       "description": (f"secret key material: an RFC 8784 postquantum preshared "
+                                       f"key written in the file (swanctl secrets, section "
+                                       f"{stack[1]}); its value is not quoted")}
+                bits = _secret_bits(m.group(2).strip('"'))
+                if bits:
+                    row["key_size"] = bits
+                out.append(row)
+    return out

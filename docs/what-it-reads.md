@@ -408,6 +408,13 @@ would report a protected deployment as `classical_only`. PPK is matched by the d
 switch it on and classified as `quantum_resistant_mechanism` — deliberately not `pqc_ready`,
 because a preshared key is not ML-KEM. Whether it holds depends on the entropy of the key and
 on out-of-band distribution, neither of which is visible in a file, and the finding says so.
+From 0.49.0 (row 526) a PPK whose secret is written in a swanctl.conf `secrets` block
+(`ppk<suffix> { secret = 0x... }`, hex, `0s` base64 or a string) is committed key material in
+`evidence.embedded_keys` (`type: strongSwan PPK secret`, `key_material: shared secret`, its size
+where the value is hex or base64); its value is never quoted, at any `--level`. The CBOM names it
+a `secret-key`. The PPK finding says `ppk_source`: the place in the files read, or "not in the
+files read". Where the secret comes from otherwise -- a secrets file outside the tree, a plugin,
+a QKD key management entity (an ETSI GS QKD 014 client) -- is not read.
 
 **CI/CD pipelines** — signing commands such as `gpg --sign`, `cosign sign`, `signtool`,
 `jarsigner`, `codesign`. From 0.32.0 also Secure Boot, kernel-module and IMA/EVM signing, each

@@ -111,6 +111,14 @@ see its tests fail.
   scope. README now says so, with symmetric ciphers, hashes, MACs and KDFs, and the output carries
   it in `coverage.claims.out_of_scope_by_design` -- scan JSON, the MCP tools and the CBOM's coverage
   properties. Nothing is detected that was not before.
+- **A PPK written in swanctl.conf was not committed key material** (row 526, Daniel Grazioli).
+  `secrets { ppk-qkd { secret = 0x...(256 bits) } }` gave `embedded_keys: []`, and the PPK finding
+  did not say where its secret came from. The secret is now a row in `evidence.embedded_keys`
+  (`strongSwan PPK secret`, `key_material: shared secret`, `key_size`), a `private_key` finding
+  with its own reason (rotate it), and a CycloneDX `secret-key`; its value is never quoted. A
+  classical IKE PSK (`ike<suffix>`) is not read for this. The PPK finding gains `ppk_source`: the
+  place, or "not in the files read". Out of scope, and said in README: a client of a QKD key
+  management entity, and where a PPK comes from beyond the files read.
 
 **What changes for an existing user.** A strongSwan configuration with a proposal that can be
 negotiated classical now has `ike_proposals` rows -- beside a hybrid or not -- so its

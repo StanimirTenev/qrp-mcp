@@ -923,7 +923,9 @@ def _key_components(scan_result: dict[str, Any], components: list[dict[str, Any]
             continue
         for o in (c.get("evidence") or {}).get("occurrences", []):
             at.setdefault((o["location"], o.get("line")), []).append(c["bom-ref"])
-    keys = [("private-key", k) for k in scan_result["evidence"]["embedded_keys"]] + [
+    # Row 526: a PPK's secret is a secret key, not a private key.
+    keys = [("secret-key" if k.get("key_material") == "shared secret" else "private-key", k)
+            for k in scan_result["evidence"]["embedded_keys"]] + [
         ("public-key", k) for k in scan_result["evidence"].get("source_code", [])
         if k.get("key_material") == "public key"]
     out: list[dict[str, Any]] = []
@@ -939,7 +941,9 @@ def _key_components(scan_result: dict[str, Any], components: list[dict[str, Any]
                 rcm["algorithmRef"] = refs[0]
         if isinstance(size, int) and not isinstance(size, bool):
             rcm["size"] = size
-        if family:
+        if kind == "secret-key":
+            name = "PPK (RFC 8784) secret key" + (f", {size} bits" if isinstance(size, int) else "")
+        elif family:
             name = (f"{family}-{size}" if isinstance(size, int) else family) + (
                 " private key" if kind == "private-key" else " public key")
         else:
