@@ -82,6 +82,9 @@ def test_the_secret_is_never_quoted(tmp_path, level):
         main(["cbom", str(tree), "--no-config", "--level", level, "--out", str(bom)])
     for written in (out, bom):
         assert SECRET[8:40] not in written.read_text()
+        if level != "full":
+            # The section's name is the user's text: not quoted below full.
+            assert "ppk-qkd" not in written.read_text()
 
 
 def test_the_cbom_holds_a_secret_key_not_a_private_key(tmp_path):

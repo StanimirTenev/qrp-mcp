@@ -366,12 +366,12 @@ SYMMETRIC: dict[str, dict[str, Any]] = {
     "cnsa-2.0": {
         "dates": "AES-128 and AES-192, SHA-256: not compliant now (unchanged from CNSA 1.0)",
         "document_says": [
-            {"quote": "Advanced Encryption Standard (AES) ... Use 256-bit keys for all "
-                      "classification levels",
-             "source": "NSA CSA PP-22-1338, Symmetric-key algorithms, Table II"},
-            {"quote": "Secure Hash Algorithm (SHA) ... Use SHA-384 or SHA-512 for all "
-                      "classification levels",
-             "source": "NSA CSA PP-22-1338, Symmetric-key algorithms, Table II"}]},
+            {"quote": "Use 256-bit keys for all classification levels.",
+             "source": "NSA CSA PP-22-1338, Table II, Advanced Encryption Standard (AES), "
+                       "Parameters"},
+            {"quote": "Use SHA-384 or SHA-512 for all classification levels.",
+             "source": "NSA CSA PP-22-1338, Table II, Secure Hash Algorithm (SHA), "
+                       "Parameters"}]},
     "au-ism": {
         "dates": "AES-128, AES-192, SHA-224, SHA-256 and HMAC-SHA256 (IPsec): not approved "
                  "beyond 2030, for reasons the document gives as not quantum",
@@ -384,7 +384,8 @@ SYMMETRIC: dict[str, dict[str, Any]] = {
              "source": "Guidelines for cryptography, Using Secure Hashing Algorithms"},
             {"quote": "For interoperability and maintainability reasons, HMAC-SHA256 will not "
                       "be approved beyond 2030.",
-             "source": "Guidelines for cryptography, Using Internet Protocol Security"}]},
+             "source": "Guidelines for cryptography, Using cryptographic protocols, Internet "
+                       "Protocol Security (Pseudorandom function; Integrity algorithms)"}]},
     "ca-cccs": {
         "dates": "SHA-224 and SHA3-224, and HMAC keys under 128 bits, by the end of 2030; AES-128 "
                  "and SHA-256 stay recommended",

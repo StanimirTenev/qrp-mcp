@@ -5131,6 +5131,10 @@ _NOT_A_CHOICE = re.compile(r"(?:^|_)(?:KEY|SECRET|PASS(?:WORD)?|TOKEN|SALT|IV|PA
 def _runtime_env_name(text: str) -> re.Match | None:
     for m in _RUNTIME_ENV_NAME.finditer(text):
         name = next(g for g in m.groups() if g)
+        # A value written into the environment (`process.env.GRPC_SSL_CIPHER_SUITES = '...'`,
+        # found on the corpus) is in the file, not chosen outside it.
+        if re.match(r"\s*\]?\s*=(?!=)", text[m.end():]):
+            continue
         if _RUNTIME_SETTING.search(name) and not _NOT_A_CHOICE.search(name):
             return m
     return None
@@ -5249,8 +5253,12 @@ def remote_signing(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         stripped = line.strip()
         if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
             continue
+        # A call wrapped over lines (`kms.sign(KeyId=k,` / `SigningAlgorithm='...')`) is read
+        # with the four lines after it; the match must open on this line.
+        window = " ".join(lines[number - 1:number + 4])
         for pattern, where, location, needs in _REMOTE_SIGNING:
-            if pattern.search(line) and (needs is None or needs.search(text)):
+            hit = pattern.search(window)
+            if hit and hit.start() < len(line) and (needs is None or needs.search(text)):
                 out.append({"path": rel_path, "line": number, "setting": "signing algorithm",
                             "read_from": where, "kind": "remote_signing",
                             "key_location": location, "excerpt": stripped[:200],

@@ -322,9 +322,10 @@ def ppk_secrets(lines: list[str]) -> list[dict[str, Any]]:
             elif len(stack) == 2 and stack[0] == "secrets" and stack[1].startswith("ppk"):
                 row = {"line": number, "type": "strongSwan PPK secret",
                        "key_material": "shared secret",
-                       "description": (f"secret key material: an RFC 8784 postquantum preshared "
-                                       f"key written in the file (swanctl secrets, section "
-                                       f"{stack[1]}); its value is not quoted")}
+                       # The section's name is the user's text, so it is not repeated.
+                       "description": ("secret key material: an RFC 8784 postquantum preshared "
+                                       "key written in the file (a swanctl secrets ppk section); "
+                                       "its value is not quoted")}
                 bits = _secret_bits(m.group(2).strip('"'))
                 if bits:
                     row["key_size"] = bits

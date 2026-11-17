@@ -98,6 +98,23 @@ def test_17_remote_signing_is_a_place(tmp_path):
     assert any(r["algorithm"] == "ECDSA" for r in _at(result, "sign.py", 10))
 
 
+def test_17_a_call_wrapped_over_lines_that_names_the_algorithm_is_not_a_place(tmp_path):
+    result = _scan(tmp_path, {"w.py": "import boto3\nkms = boto3.client('kms')\n"
+                                      "s = kms.sign(KeyId=k, Message=m,\n"
+                                      "             SigningAlgorithm='ECDSA_SHA_256')\n"
+                                      "t = kms.sign(KeyId=k, Message=m,\n"
+                                      "             SigningAlgorithm=ALG)\n"})
+    places = _places(result)
+    assert ("w.py", 3) not in places and ("w.py", 5) in places
+
+
+def test_6_a_value_written_into_the_environment_is_not_a_place(tmp_path):
+    result = _scan(tmp_path, {"h.js": "process.env.GRPC_SSL_CIPHER_SUITES = 'ECDHE-RSA-AES128-GCM-"
+                                      "SHA256';\nconst c = process.env.GRPC_SSL_CIPHER_SUITES;\n"})
+    places = _places(result)
+    assert ("h.js", 1) not in places and ("h.js", 2) in places
+
+
 def test_17_a_vault_path_in_prose_is_not_a_place(tmp_path):
     result = _scan(tmp_path, {"notes.py": "# see transit/sign/ in the docs\n"
                                           "PATH = 'transit/sign/'\n"})
