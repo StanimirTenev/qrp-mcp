@@ -181,7 +181,15 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     fallbacks = {family: note["fallback_beside_hybrid"] for family, note in sorted(notes.items())
                  if note.get("fallback_beside_hybrid")}
     if fallbacks:
-        summary.by_role["key_establishment"]["fallback_beside_hybrid"] = fallbacks
+        part = summary.by_role["key_establishment"]
+        part["fallback_beside_hybrid"] = fallbacks
+        # Row 522: an IKE hybrid's classical half is not a key-establishment family here, so a
+        # classical proposal beside it left the part `pqc_ready`. A fallback offered alone is
+        # not ready: the part says the hybrid is partial, as a TLS fallback's does.
+        if part["pqc_readiness"] == "pqc_ready":
+            part["pqc_readiness"] = "hybrid_partial"
+            part["because"] = ["a classical key exchange is offered alone beside the hybrid: "
+                               + ", ".join(p for places in fallbacks.values() for p in places)]
 
     coverage_block = coverage.build(
         repo_path=repo_path,

@@ -61,6 +61,9 @@ def test_a_classical_proposal_beside_a_hybrid_is_a_row(tmp_path):
     b = scan_directory(_tree(tmp_path / "b", WITHOUT))
     assert b["evidence"]["ike_proposals"] == []
     assert result["findings_fingerprint"]["sha256"] != b["findings_fingerprint"]["sha256"]
+    # The part was pqc_ready in both; with the fallback it is not.
+    assert result["summary"]["by_role"]["key_establishment"]["pqc_readiness"] == "hybrid_partial"
+    assert b["summary"]["by_role"]["key_establishment"]["pqc_readiness"] == "pqc_ready"
 
 
 def test_an_optional_additional_exchange_is_a_classical_fallback(tmp_path):
