@@ -167,13 +167,26 @@ configuration rows gain `in_test_code`, and the CBOM marks the test-only ones `s
 `trust_stores` and the sector duties never move a gate. Under `--mandate cnsa-2.0`, `au-ism`,
 `ca-cccs` or `nist-ir-8547` a gate that passed on 0.48.0 now reads `not_established` (row 527),
 with the same exit code 0; a check on the word `pass` needs to read `not_established` too.
+From the second batch (row 528) a tree with `gpg --detach-sign`/`-b`/`--clearsign`, AWS KMS
+`RSASSA_*` names, a C-array private key, a `.env` file or an RSA size now read on one line gets
+rows it did not have, so its `findings_fingerprint` moves and a 0.48.0 baseline reads them as new;
+`chosen_outside_files` gains places (environment reads by the variable's name, Go `os.Getenv`,
+JOSE defaults, `remote_signing`), which are not identity; a `.env` file counts as read, not as
+`type_not_claimed`.
 
 Positive controls against 0.48.0 (OpenSSH 7fe3b24, certbot 56ee049, Vault 41e571b): files read
 742 (+1), 850, 5,434; findings 71 (+1, the SSH2 key), 40, 74; the same detected families and
 `chosen_outside_files` counts. certbot's and Vault's `findings_fingerprint` are the same; OpenSSH's
-moves by the SSH2 key. The corpus regression against 0.48.0 (185 pinned public repositories, one
+moves by the SSH2 key. After the second batch, on the installed wheel: OpenSSH 742 of 873, 71
+findings, the same fingerprint and 17 `chosen_outside_files` places (the environment-name rule
+first added OpenSSH's fuzz-harness `getenv("KEX_FUZZ_DEBUG")`; a debugging switch is now not a
+place); certbot 850, 41 findings (+1: `tools/_release.sh:169` signs with `gpg -u ... --detach-sign`,
+which was silent), so its fingerprint moves; Vault 5,435 (+1: `ui/.env`, now a read file type), 74
+findings, the same fingerprint. `--mandate` does not move `findings_fingerprint` (certbot with six
+mandates, checked). The corpus regression against 0.48.0 (185 pinned public repositories, one
 labeller's labels) is unchanged in both splits: disagreement with the model, A' 395 and 71, B'
-262 and 42 -- disagreement with a model, not recall or precision. Not claimed: any change to how
+262 and 42 -- disagreement with a model, not recall or precision; after the second batch
+(143fb0c -> 69727a9) the same: A' 395 and 71, B' 262 and 42. Not claimed: any change to how
 much of a tree's own cryptography is found beyond the rows above.
 
 ## 0.48.0 (2026-11-17)
