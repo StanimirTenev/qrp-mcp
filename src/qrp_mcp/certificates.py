@@ -882,11 +882,15 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
     public_keys: dict[int, dict[str, Any]] = {}
     problems: list[dict[str, Any]] = []
     parsed_blocks: set[int] = set()
+    # Row 517: a certificate's index is its place in the file, not in its block -- a PEM block
+    # holds one, so every certificate of a bundle was 1 and a chain's root read as its leaf.
+    placed = [0]
 
     def add(line: int, excerpt: str, fmt: str, found: list[Any]) -> None:
-        for index, cert in enumerate(found, start=1):
+        for cert in found:
+            placed[0] += 1
             try:
-                described, families = describe_certificate(cert, fmt, index)
+                described, families = describe_certificate(cert, fmt, placed[0])
             except Exception:  # noqa: BLE001 -- parsed lazily; a field may still fail
                 continue
             certs.append((line, excerpt, described, families))
