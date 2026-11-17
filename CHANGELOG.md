@@ -119,6 +119,42 @@ see its tests fail.
   classical IKE PSK (`ike<suffix>`) is not read for this. The PPK finding gains `ppk_source`: the
   place, or "not in the files read". Out of scope, and said in README: a client of a QKD key
   management entity, and where a PPK comes from beyond the files read.
+- **The defects of the blind-spot audit of 0.48.0** (row 528; 50 probes, read-only, 17.11). Each
+  is the audit's probe line, now a test:
+  - `gpg --batch --detach-sign`, `gpg -b`, `gpg --clearsign` gave no signing step, while README
+    names `gpg --sign` (#18). The gpg rule now reads `-s`/`--sign`, `-b`/`--detach-sign`,
+    `--clearsign` after other options and in a short-option cluster; not `--verify` or `-c`.
+  - Signing through a KMS, Vault or an agent left the file "read" with nothing said (#17). Decided:
+    such a call is a place in `chosen_outside_files`, `kind: remote_signing`, with `key_location`
+    (`kms`, `vault`, `ssh_agent`): boto3 KMS `sign(KeyId=...)` with no algorithm on the line,
+    Google Cloud KMS `asymmetric_sign`, Vault `transit/sign/` by an HTTP or client write and hvac
+    `transit.sign_data`, paramiko ssh-agent `sign_ssh_data`. No family is claimed.
+  - AWS KMS `RSASSA_PSS_SHA_*` and `RSASSA_PKCS1_V1_5_SHA_*` gave no row (#9): RSA now, with
+    `key_location: kms` in a boto3 KMS file.
+  - `ECC_SECG_P256K1` was reported as P-256 (#10): it is secp256k1.
+  - Google Cloud KMS's `CryptoKeyVersionAlgorithm.EC_SIGN_P256_SHA256` (#11) and Swift's
+    `kSecAttrKeyTypeRSA` (#39) read as "named but not used": now uses; the Swift line's
+    `kSecAttrKeySizeInBits: 1024` is the size.
+  - An environment read was a place only by the variable on the left, and Go's `os.Getenv` never
+    (#6): the environment variable's own name now decides too (`ALG2 = os.environ["JWT_ALG"]`,
+    `curve := os.Getenv("TLS_CURVES")`); a secret or a location (`*_KEY`, `*_FILE`, `*_URL`) is not
+    a place.
+  - A JOSE default beside an environment read (`os.environ.get('JWT_ALG', 'ES256')`,
+    `process.env.JWT_ALG || 'RS256'`) was not a place (#7, row 511): it is, with `default` and
+    `overridable: true`, as docs/what-it-reads.md already promised.
+  - RSA-1024 made on one line by `RSA_generate_key(1024, ...)`, paramiko `RSAKey.generate(1024)` or
+    cfssl's one-line `{"algo": "rsa", "size": 1024}` had `key_size: undetermined`, so it never
+    reached `weak_count` or `algorithm_key_sizes` (#38). The size is read.
+  - A private key written as a C byte array in a `.h` gave nothing, not even
+    `claimed_but_not_decoded` (#31, row 459): one whose DER parses is in `embedded_keys`, its bytes
+    not quoted.
+  - The one new file type (decided): `.env`, `.env.production` and the like, read as
+    configuration for the private key they can hold.
+  - The OpenSSL a base image carries (`FROM alpine:3.12`) is not read, and README now says so in
+    "What it is not" (decided: a limit, no code).
+  Not done from the audit, and not in this row: HD wallets (BIP32/BIP39), Azure `RSA-HSM`,
+  minisign/signify/`ssh-keygen -Y sign`/`git tag -s`, libsodium `crypto_sign_keypair` alone,
+  smallstep, a key as a hex string, `SHA1PRNG`, and the other file types it listed.
 
 **What changes for an existing user.** A strongSwan configuration with a proposal that can be
 negotiated classical now has `ike_proposals` rows -- beside a hybrid or not -- so its

@@ -36,7 +36,7 @@ from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins
                      scan_ike_proposals, scan_protocols, scan_ssh_kex, scan_static_rsa_kex,
                      scan_tls_groups,
                      scan_tls_listeners, static_rsa_positions, yaml_list_settings)
-from .certificates import (BASE64_PEM_MARK, byte_array_public_keys, vboot_private_key, decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
+from .certificates import (BASE64_PEM_MARK, byte_array_public_keys, c_array_private_keys, vboot_private_key, decode_text, embedded_material, is_certificate_file, is_undecoded, key_in_source,
                            looks_like_key_file, scan_certificate_file, small_scalar_keys,
                            unparsed_material, SMALL_SCALAR_BOUND)
 
@@ -610,6 +610,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("Ed25519", "Ed25519 named by Apple CryptoKit", re.compile(r"\bCurve25519\.Signing\b")),
     ("EC", "EC named by the Apple Security framework", re.compile(
         r"\bkSecAttrKeyType(?:ECSECPrimeRandom|EC)\b")),
+    # Row 528 (audit #39): its RSA key type, which read as an identifier, "named but not used".
+    ("RSA", "RSA named by the Apple Security framework", re.compile(r"\bkSecAttrKeyTypeRSA\b")),
     # wolfCrypt, wolfSSL's crypto library: its classical API names the family only inside
     # a wc_ identifier, and a whole wolfSSL program scanned as empty (ZA-OPRAVYANE row 72).
     # Every prefix checked against wolfssl/wolfcrypt/{rsa,ecc,dh,md5,sha,hash,des3,falcon}.h
@@ -1527,6 +1529,12 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"[\"']RSA_(?:SIGN_(?:PSS|PKCS1|RAW_PKCS1)|DECRYPT_OAEP)_(?:2048|3072|4096)\w*[\"']|"
         # AWS KMS EncryptionAlgorithmSpec, RSA key transport (ZA-OPRAVYANE row 208).
         r"\bEncryptionAlgorithmSpec\.RSAES_OAEP_SHA_(?:1|256)\b|[\"']RSAES_OAEP_SHA_(?:1|256)[\"']|"
+        # Row 528 (audit #9): AWS KMS SigningAlgorithmSpec, the RSA signing names of every boto3
+        # example. (#11): Google Cloud KMS's enum by its member, unquoted, as the client writes it.
+        r"\bSigningAlgorithmSpec\.RSASSA_(?:PSS|PKCS1_V1_5)_SHA_(?:256|384|512)\b|"
+        r"[\"']RSASSA_(?:PSS|PKCS1_V1_5)_SHA_(?:256|384|512)[\"']|"
+        r"\bCryptoKeyVersionAlgorithm\.RSA_(?:SIGN_(?:PSS|PKCS1|RAW_PKCS1)|DECRYPT_OAEP)_"
+        r"(?:2048|3072|4096)\w*|"
         r"(?i:\b(?:key_?algo|algo)[\"']?\s*[:=]\s*[\"']rsa[\"'])|\bAlg(?:RS|PS)(?:1|256|384|512)\b|"
         # Fabric CA's YAML `keyrequest: algo: rsa`, unquoted (fix list, 04.11.2026).
         r"(?i:^\s*algo\s*:\s*rsa\s*(?:#.*)?$)")),
@@ -1537,6 +1545,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
      re.compile(
         r"(?i:xmldsig(?:11|-more)?#ecdsa-)|\bSIG_ECDSA_\w+|\bSignatureMethod\.ECDSA_\w+|"
         r"\bTransformEcdsa\w*|[\"']EC_SIGN_(?:P256|P384|SECP256K1)_SHA\d+[\"']|\bECC_SECG_P256K1\b|"
+        r"\bCryptoKeyVersionAlgorithm\.EC_SIGN_(?:P256|P384|SECP256K1)_SHA\d+\b|"
         r"(?i:\b(?:key_?algo|algo)[\"']?\s*[:=]\s*[\"']ecdsa[\"'])|\bAlgES(?:256K?|384|512)\b")),
     ("EC", "EC named by a key spec or a library constant (release 3e)", re.compile(
         r"\bECC_NIST_P(?:256|384|521)\b|\bEC_(?:prime256v1|secp384r1|secp521r1)\b|"
@@ -1854,7 +1863,12 @@ def _only_names_defined_here(line: str, matches: list[re.Match], code: str,
 
 # (command_type, compiled regex) for signing commands found in CI/build configs.
 SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("gpg_sign", re.compile(r"\bgpg\s+(--detach-sign|--sign|-s)\b")),
+    # Row 528 (audit #18): gpg(1) `-s`/`--sign`, `-b`/`--detach-sign`, `--clearsign`/
+    # `--clear-sign`, after other options (`gpg --batch --yes --detach-sign`) and in a cluster of
+    # short options (`-ab`, `-sa`). Not `--verify`, nor `-c` (a passphrase).
+    ("gpg_sign", re.compile(
+        r"\bgpg2?\b[^|;&\n]*?\s(?:--detach-sign|--sign|--clear-?sign|-[aequvz]*[sb][aequvzsb]*)"
+        r"(?=\s|$)")),
     ("openssl_sign", re.compile(r"\bopenssl\s+(dgst|smime|cms)\b.*-sign\b")),
     ("cosign_sign", re.compile(r"\bcosign\s+sign\b")),
     ("signtool_sign", re.compile(r"\bsigntool\s+sign\b", re.IGNORECASE)),
@@ -2317,7 +2331,16 @@ _KEY_SIZE = re.compile(
     r"GenerateKey\([^)]*?(\d{3,5})\s*\)|"
     # phpseclib 3: `RSA::createKey(4096)` (row 303).
     r"(?<![\w\\])RSA::createKey\(\s*(\d{3,5})\s*\)|"
+    # Row 528 (audit #38): the old `RSA_generate_key(bits, e, cb, arg)` has the size first;
+    # ahead of the `_ex(rsa, bits, ...)` form, which would read the exponent 65537 as the size.
+    r"\bRSA_generate_key\(\s*(\d{3,5})\s*,|"
     r"\bRSA_generate_key(?:_ex)?\(\s*[^,]*,\s*(\d{3,5})|"
+    # paramiko `RSAKey.generate(1024)` / `(bits=1024)`; cfssl's key request on one line,
+    # `{"algo": "rsa", "size": 1024}` in either order; Swift's kSecAttrKeySizeInBits.
+    r"\bRSAKey\.generate\(\s*(?:bits\s*=\s*)?(\d{3,5})\b|"
+    r"[\"']algo[\"']\s*:\s*[\"']rsa[\"']\s*,\s*[\"']size[\"']\s*:\s*(\d{3,5})\b|"
+    r"[\"']size[\"']\s*:\s*(\d{3,5})\s*,\s*[\"']algo[\"']\s*:\s*[\"']rsa[\"']|"
+    r"\bkSecAttrKeySizeInBits(?:\s+as\s+String)?\s*:\s*(\d{3,5})\b|"
     r"\bgenrsa\b[^\n]*?(\d{3,5})|"
     r"EVP_PKEY_Q_keygen\((?:[^)]|\(size_t\))*?(\d{3,5})\s*\)|"
     # DNSSEC: BIND's `algorithm rsasha256 2048` and `dnssec-keygen -a RSASHA256 -b 2048`.
@@ -2660,9 +2683,16 @@ def is_ci_config_file(path: Path, repo_path: Path) -> bool:
     return path.name in CI_CONFIG_FILENAMES
 
 
+# Row 528, decided 17.11: the one new file type of the blind-spot audit is a dotenv file
+# (`.env`, `.env.production`, `.env.local`), for the private key it can hold; read as
+# configuration, so its `KEY=VALUE` lines are read by the same rules as a .properties line.
+DOTENV_NAME = re.compile(r"^\.env(?:\.[\w.-]+)?$")
+
+
 def is_config_file(path: Path) -> bool:
     """A configuration file, by extension or by one of the extensionless names."""
     return (path.suffix.lower() in CONFIG_EXTENSIONS or path.name in CONFIG_FILENAMES
+            or bool(DOTENV_NAME.match(path.name))
             or bool(CONFIG_FILENAME_PATTERN.match(path.name))
             or (not path.suffix and path.parent.name in CONFIG_DIRECTORIES)
             or bool(DOTNET_CONFIG_NAME.match(path.name)))
@@ -4035,6 +4065,7 @@ def scan_source_file(path: Path, rel_path: str,
         # inflates the headline number by however many ways the line could be
         # spotted, which is not a property of the code being scanned.
         seen_on_line: set[str] = set()
+        ec_rule_spans: list[tuple[int, int]] = []
         first_on_line = len(findings)
         prose = ((_prose_spans(code) + (_message_spans(code) if ext in _DOCSTRING_EXT else [])
                   + _logged_spans(code))
@@ -4073,6 +4104,8 @@ def scan_source_file(path: Path, rel_path: str,
             if cipher_exclusions and all(_is_excluded(line, m.start()) for m in matches):
                 continue
             seen_on_line.add(algorithm)
+            if algorithm in ("ECDSA", "ECDH"):
+                ec_rule_spans.extend((m.start(), m.end()) for m in matches)
             # Per match, not per line: a hardened configuration bans one algorithm
             # and enables another on the same line, and reading the whole line as a
             # ban would hide the live one.
@@ -4384,6 +4417,10 @@ def scan_source_file(path: Path, rel_path: str,
             carried = [hit for hit in carried if hit[0] != "DH" or "DH" not in components.components(
                 registry._MEMBER.match(bare, hit[1]).group(0))]
         for family, pos, said in carried:
+            # Row 528 (audit #11): EC carried by a name an ECDSA or ECDH rule read on this line
+            # (Google Cloud KMS's `...Algorithm.EC_SIGN_P256_SHA256`) is that row, not a note.
+            if family == "EC" and any(s <= pos < e for s, e in ec_rule_spans):
+                continue
             alone = registry.stands_alone(registry._MEMBER.match(bare, pos).group(0))
             if family in seen_on_line:
                 # The line's row for the family stands alone if any identifier for it does.
@@ -4660,6 +4697,7 @@ def _split_call_names(path: Path, rel_path: str, lines: list[str],
 
 
 _NOT_A_SETTING = ("#", ";", "//", "--", "/*", "*", "<!--")
+_C_FAMILY = {".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".hxx", ".inc", ".ino"}
 
 
 def _policy_assets(line: str) -> list[dict[str, Any]]:
@@ -5051,12 +5089,13 @@ def scan_iac_file(path: Path, rel_path: str,
 # environment: `set_ciphers(os.environ[...])`, `JWT_ALGORITHM: ${{ vars.X }}`, `ENV
 # TLS_CIPHERS=$CIPHERS`, `process.env.KEX`.
 _RUNTIME_REFERENCE = re.compile(
-    r"os\.environ|os\.getenv|\bgetenv\s*\(|process\.env\b|System\.getenv|"
+    # Row 528 (audit #6): Go's os.Getenv / os.LookupEnv too.
+    r"os\.environ|os\.getenv|\bgetenv\s*\(|os\.(?:Getenv|LookupEnv)\s*\(|process\.env\b|System\.getenv|"
     r"Environment\.GetEnvironmentVariable|\$\{\{\s*(?:secrets|vars|env|inputs)\.|"
     r"\$\{[A-Za-z_][A-Za-z0-9_]*(?::-[^}]*)?\}|\$[A-Z][A-Z0-9_]{2,}\b")
 _RUNTIME_SETTING = re.compile(
     r"cipher|curve|ecdh|\bkex|key_?exchange|kexalgorithms|tls_?groups?|ssl_?groups?|"
-    r"(?:sig(?:ning|nature)?|jwt|jws|hash|key|token)_?alg(?:orithm)?s?\b|\balgorithms?\b|"
+    r"(?:sig(?:n|ning|nature)?|jwt|jws|hash|key|token)_?alg(?:orithm)?s?\b|\balgorithms?\b|"
     r"key_?size|key_?length|rsa_?bits|tls_?(?:min|max)_?version|ssl_?protocols",
     re.IGNORECASE)
 _RUNTIME_ASSIGNMENT = re.compile(
@@ -5075,7 +5114,29 @@ _RUNTIME_CRYPTO_CALL = re.compile(
 _RUNTIME_JCA = re.compile(
     r"\b((?:Signature|Cipher|KeyPairGenerator|KeyAgreement|KeyGenerator)\.getInstance)\s*\(\s*("
     + _RUNTIME_REFERENCE.pattern + r")")
-_RUNTIME_BYTES = (b"environ", b"getenv", b"process.env", b"System.getenv",
+# Row 528 (audit #6): `ALG2 = os.environ["JWT_ALG"]` and Go's `curve := os.Getenv("TLS_CURVES")`
+# were silent, because the setting's name had to be the variable on the left. The name of the
+# environment variable read says it as well. Not a secret or a location held in such a variable
+# (`CIPHER_KEY`, `CURVE_FILE`), nor a switch for debugging (OpenSSH's fuzz harness reads
+# `getenv("KEX_FUZZ_DEBUG")`; caught on the positive control).
+_RUNTIME_ENV_NAME = re.compile(
+    r"(?:os\.environ(?:\.get)?\s*[\[(]|os\.getenv\s*\(|\bgetenv\s*\(|os\.(?:Getenv|LookupEnv)\s*\(|"
+    r"System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\()\s*[\"']([A-Za-z_][\w.-]*)[\"']|"
+    r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])")
+_NOT_A_CHOICE = re.compile(r"(?:^|_)(?:KEY|SECRET|PASS(?:WORD)?|TOKEN|SALT|IV|PATH|FILE|DIR|URL|"
+                           r"DEBUG|TRACE|LOG|VERBOSE)$",
+                           re.IGNORECASE)
+
+
+def _runtime_env_name(text: str) -> re.Match | None:
+    for m in _RUNTIME_ENV_NAME.finditer(text):
+        name = next(g for g in m.groups() if g)
+        if _RUNTIME_SETTING.search(name) and not _NOT_A_CHOICE.search(name):
+            return m
+    return None
+
+
+_RUNTIME_BYTES = (b"environ", b"getenv", b"Getenv", b"LookupEnv", b"process.env", b"System.getenv",
                   b"GetEnvironmentVariable", b"${", b"$")
 
 
@@ -5094,6 +5155,9 @@ _RUNTIME_DEFAULT = re.compile(
 
 
 _DEFAULT_SHAPE = re.compile(r"^[A-Za-z][A-Za-z0-9_.+-]{1,40}$")
+# Row 528 (audit #7, row 511): a JOSE name (RFC 7518 section 3.1, RFC 8037) does not spell its
+# family: `os.environ.get('JWT_ALG', 'ES256')` was a finding and no place.
+_JOSE_DEFAULT = re.compile(r"^(?:(RS|PS)(256|384|512)|(ES)(256K?|384|512)|(EdDSA))$")
 
 
 def _runtime_default(text: str) -> dict[str, Any] | None:
@@ -5105,6 +5169,11 @@ def _runtime_default(text: str) -> dict[str, Any] | None:
         # family as a word: the classifier alone reads `echo` as EC and `desktop` as DES.
         if not _DEFAULT_SHAPE.match(default):
             continue
+        jose = _JOSE_DEFAULT.match(default)
+        if jose:
+            family = "RSA" if jose.group(1) else "ECDSA" if jose.group(3) else "EdDSA"
+            return {"setting": name, "read_from": m.group(0).strip(), "default": default,
+                    "default_family": family, "overridable": True}
         family = classify_algorithm(default, "explicit", source="", location="").algorithm_family
         if family and family != "unknown" and re.search(
                 r"(?<![A-Za-z0-9])" + re.escape(family).replace(r"\-", "[-_]?") + r"(?![a-z])",
@@ -5136,15 +5205,57 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         found = (_RUNTIME_ASSIGNMENT.search(text) or _RUNTIME_CRYPTO_CALL.search(text)
                  or _RUNTIME_JCA.search(text))
         default = _runtime_default(text)
-        if not found and not default:
+        by_name = None if found or default else _runtime_env_name(text)
+        if not found and not default and not by_name:
             continue
         place = {"path": rel_path, "line": number,
-                 "setting": found.group(1) if found else default["setting"],
-                 "read_from": found.group(2).strip() if found else default["read_from"],
+                 "setting": (found.group(1) if found else default["setting"] if default
+                             else next(g for g in by_name.groups() if g)),
+                 "read_from": (found.group(2).strip() if found else default["read_from"]
+                               if default else by_name.group(0).strip()),
                  "excerpt": stripped[:200], "in_test_code": in_test_code(rel_path)}
         if default:
             place.update({k: default[k] for k in ("default", "default_family", "overridable")})
         out.append(place)
+    return out
+
+
+# Row 528 (audit #17), decided 17.11: a signature made by a remote service or an agent, whose key
+# and algorithm are not in the files, is a place in chosen_outside_files, as an environment read
+# is. boto3 KMS `sign(...)` with no algorithm written on the line (AWS KMS API Sign:
+# SigningAlgorithm is required, so a name there is a value read elsewhere); Google Cloud KMS
+# `asymmetric_sign` (the algorithm is the key version's); HashiCorp Vault transit `transit/sign/`
+# by an HTTP or client write, and hvac's `transit.sign_data` (the transit key's type); paramiko
+# ssh-agent keys' `sign_ssh_data`. Lines only, never a comment; no family is claimed.
+_REMOTE_SIGN_BYTES = (b"kms", b"asymmetric", b"Asymmetric", b"transit", b"sign_ssh_data")
+_REMOTE_SIGNING = (
+    (re.compile(r"\.sign\s*\((?=[^)]*\bKeyId\s*=)(?![^)]*\bSigningAlgorithm\s*=\s*[\"'])"),
+     "AWS KMS (boto3 kms.sign)", "kms", re.compile(r"\bclient\(\s*[\"']kms[\"']")),
+    (re.compile(r"\basymmetric_?sign\s*\(", re.IGNORECASE),
+     "Google Cloud KMS (asymmetric_sign)", "kms", re.compile(r"kms", re.IGNORECASE)),
+    (re.compile(r"(?:\b(?:requests|httpx|session|client)\.(?:post|put)\s*\(|\bfetch\s*\(|\bcurl\b|"
+                r"\.Logical\(\)\.Write\w*\s*\(|\bvault\s+write\b)[^\n]*transit/sign/"
+                r"|\.transit\.sign_data\s*\("),
+     "HashiCorp Vault transit (transit/sign)", "vault", None),
+    (re.compile(r"\.sign_ssh_data\s*\("), "ssh-agent (paramiko Agent)", "ssh_agent",
+     re.compile(r"\bAgent\s*\(")),
+)
+
+
+def remote_signing(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    text = "\n".join(lines)
+    out: list[dict[str, Any]] = []
+    for number, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
+            continue
+        for pattern, where, location, needs in _REMOTE_SIGNING:
+            if pattern.search(line) and (needs is None or needs.search(text)):
+                out.append({"path": rel_path, "line": number, "setting": "signing algorithm",
+                            "read_from": where, "kind": "remote_signing",
+                            "key_location": location, "excerpt": stripped[:200],
+                            "in_test_code": in_test_code(rel_path)})
+                break
     return out
 
 
@@ -5447,7 +5558,9 @@ def _tag_parameter_sets(items: list[dict[str, Any]]) -> None:
 # Rows 310, 345: IKE's `ecp256`/`ecp384`/`ecp521` are the same curves, groups 19-21 (RFC 5903,
 # https://www.rfc-editor.org/rfc/rfc5903#section-3).
 _NIST_CURVE = re.compile(
-    r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))(?![0-9])|"
+    # Not `P256K1`: AWS KMS's ECC_SECG_P256K1 is secp256k1 (row 528, audit #10).
+    r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))"
+    r"(?![0-9]|[Kk]1)|"
     r"(?<![A-Za-z])ecp(256|384|521)(?![0-9])",
     re.IGNORECASE)
 
@@ -5455,7 +5568,7 @@ _NIST_CURVE = re.compile(
 # Row 458: pyca's `ec.SECP256K1()` gave an EC row with no curve and no size, while python-ecdsa's
 # `curve=SECP256k1` (a registry name, read as its own token) gave secp256k1. SEC 2 v2.0 section
 # 2.4.1: secp256k1, a Koblitz curve over a 256-bit prime field.
-_SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])", re.IGNORECASE)
+_SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])|\bECC_SECG_P256K1\b", re.IGNORECASE)
 _CURVE_SIZE = {"P-256": 256, "P-384": 384, "P-521": 521, "secp256k1": 256}
 _ECDSA_SIZE_NAME = re.compile(r"(?<![A-Za-z0-9])ecdsa(256|384|521)(?![0-9])", re.IGNORECASE)
 # Row 460: what the secp256k1 rule matched by a library that has no other curve -- ethers'
@@ -5739,6 +5852,10 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         kms_refs.extend(kms_references(rel_path, lines, terraform))
     if any(b in raw for b in _RUNTIME_BYTES):
         runtime_choices_found.extend(runtime_choices(rel_path, lines))
+    if any(b in raw for b in _REMOTE_SIGN_BYTES):
+        taken = {(p["path"], p["line"]) for p in runtime_choices_found}
+        runtime_choices_found.extend(p for p in remote_signing(rel_path, lines)
+                                     if (p["path"], p["line"]) not in taken)
     if b"qrp:ignore" in raw:
         found, lines = suppression.read_markers(rel_path, lines)
         markers.extend(found)
@@ -5969,6 +6086,12 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         source_keys = scan_embedded_keys(rel_path, lines)
         _embedded_pem(path, rel_path, raw, source_findings, source_keys, material_problems)
         embedded_key_findings.extend(source_keys)
+        if b"0x30" in raw and path.suffix.lower() in _C_FAMILY:
+            embedded_key_findings.extend(
+                {"path": rel_path, "line": line_no, "type": "private key as a C byte array",
+                 "description": "private key material written as a C byte array, its DER "
+                                "parsed as a key", **fields}
+                for fields, line_no in c_array_private_keys(raw))
         # A release script signs the same way a pipeline does, and the pipeline
         # often only calls it (ZA-OPRAVYANE row 34).
         # Row 383: a PowerShell script too.

@@ -791,6 +791,30 @@ def byte_array_public_keys(raw: bytes) -> list[tuple[dict[str, Any], int]]:
     return out
 
 
+# Row 528 (audit #31, row 459): a private key written as a C byte array in a header (`static
+# const unsigned char k[] = {0x30,0x77,...};`), as firmware keeps one. Each `{...}` of hex bytes
+# that starts a DER SEQUENCE and parses whole as a private key; its bytes are not quoted.
+_C_ARRAY = re.compile(rb"\{\s*0x30\s*,((?:\s*0x[0-9a-fA-F]{2}\s*,){30,}\s*0x[0-9a-fA-F]{2})\s*,?\s*\}")
+
+
+def c_array_private_keys(raw: bytes) -> list[tuple[dict[str, Any], int]]:
+    """(fields, line) of each private key a C source or header holds as a byte array."""
+    out: list[tuple[dict[str, Any], int]] = []
+    for m in _C_ARRAY.finditer(raw):
+        der = b"\x30" + bytes(int(h.group(1), 16) for h in _HEX_BYTE.finditer(m.group(1)))
+        head = _der_header(der, 0, 0x30)
+        if head is None or head[1] + head[0] != len(der):
+            continue
+        try:
+            from cryptography.hazmat.primitives import serialization
+            fields = _key_fields(_key_info(serialization.load_der_private_key(der, None)))
+        except Exception:  # noqa: BLE001 -- never raises: a table of bytes is not a key
+            continue
+        if "key_algorithm" in fields:
+            out.append((fields, raw.count(b"\n", 0, m.start()) + 1))
+    return out
+
+
 def vboot_private_key(raw: bytes) -> dict[str, Any] | None:
     """The fields of a Chromium vboot private key (.vbprivk); None where it does not parse."""
     try:

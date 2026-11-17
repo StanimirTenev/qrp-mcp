@@ -486,6 +486,15 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   `type_not_claimed`.
 - **MD5 quoted alone** (row 466): `digest("MD5", data)`, `AUDIT_DIGEST = "md5"` — as SHA-1
   quoted alone already was. A longer string (`"md5sum"`, a message) is not.
+- **The blind-spot audit of 0.48.0** (row 528): AWS KMS `RSASSA_PSS_SHA_*` and
+  `RSASSA_PKCS1_V1_5_SHA_*` are RSA; `ECC_SECG_P256K1` is secp256k1, no longer P-256; Google Cloud
+  KMS's `CryptoKeyVersionAlgorithm.EC_SIGN_P256_SHA256` (and its RSA members) and Swift's
+  `kSecAttrKeyTypeRSA` are uses, not "named but not used"; an RSA size is read from
+  `RSA_generate_key(1024, ...)`, paramiko `RSAKey.generate(1024)`, cfssl's one-line
+  `{"algo": "rsa", "size": 1024}` and Swift's `kSecAttrKeySizeInBits: 1024`, so a 1024-bit key
+  reaches `weak_count`; a private key written as a C byte array (`{0x30,0x77,...}` in a `.h` or
+  `.c`) whose DER parses is in `embedded_keys`; gpg signs with `-b`/`--detach-sign`,
+  `--clearsign` and a short-option cluster, after other options.
 - **secp256k1** (rows 458, 460, 461): pyca's `ec.SECP256K1()` now carries the curve and 256 bits
   (python-ecdsa's `SECP256k1` already did); a line naming two curves names none. ethers,
   btcec, bitcoinjs-lib, ECPair, ecrecover and the JSON-RPC signing calls carry secp256k1 too;
@@ -499,6 +508,23 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   algorithm (`us-east-1`) is not a place.
   From 0.47.0, in a `CMakeLists.txt` or `*.cmake` file `${name}` is a CMake variable, set in the
   build, and is not a place; `$ENV{name}` is (row 505).
+  From 0.49.0 (row 528, audit #7) a JOSE name as the default (`os.environ.get('JWT_ALG',
+  'ES256')`, `process.env.JWT_ALG || 'RS256'`) is a place too: RS/PS = RSA, ES = ECDSA, EdDSA.
+- **Which environment reads are places** (row 528, audit #6). Until 0.49.0 only the variable on
+  the left decided: `JWT_ALG = os.getenv("JWT_ALG")` was a place and `ALG2 = os.environ["JWT_ALG"]`
+  was not, and Go's `os.Getenv` never was. From 0.49.0 the name of the environment variable read
+  decides as well (`os.environ[...]`, `os.getenv`, `getenv`, Go `os.Getenv`/`os.LookupEnv`,
+  `System.getenv`, `Environment.GetEnvironmentVariable`, `process.env.X`), by the same setting
+  words (cipher, curve, kex, groups, a `*_ALG`/`*_ALGORITHM`, key size, TLS version); a variable
+  that holds a secret or a location (`*_KEY`, `*_SECRET`, `*_FILE`, `*_PATH`, `*_URL`) is not one.
+- **Signing done elsewhere** (row 528, audit #17, decided 17.11): a signature made by a remote
+  service or an agent is a place in `chosen_outside_files` with `kind: remote_signing` and
+  `key_location` (`kms`, `vault`, `ssh_agent`): boto3 KMS `sign(KeyId=...)` without an algorithm
+  written on the line, Google Cloud KMS `asymmetric_sign`, HashiCorp Vault `transit/sign/` by an
+  HTTP or client write and hvac `transit.sign_data`, paramiko ssh-agent `sign_ssh_data`. No family
+  is claimed. A KMS call that writes the algorithm (`SigningAlgorithm='ECDSA_SHA_256'`) is a row,
+  as before. Not read for this: other SDKs, Azure Key Vault without an algorithm, a signing
+  service behind a URL of its own.
 
 ### Very long lines
 
