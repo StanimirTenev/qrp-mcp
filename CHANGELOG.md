@@ -6,8 +6,8 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.48.0 (2026-11-17)
 
-- **`--mandate` knew only the United States** (stenli, 17.11, after the deadline tracker shown by
-  Quantanaut: a list of dates, with no link to the code they catch). `cnsa-2.0` and
+- **`--mandate` knew only the United States** (17.11, after a public deadline tracker: a list
+  of dates, with no link to the code they catch). `cnsa-2.0` and
   `nist-ir-8547` were the only names. Ten more, each read from the authority's own document
   (on 2026-11-17; the ISM's sentences from the September 2026 PDF fetched on 2026-09-27, the
   `read_on` its block carries) and quoted in `profiles.DATED_MANDATES`: `eu-pqc-roadmap` (NIS Cooperation Group
