@@ -50,6 +50,7 @@ MANDATES: dict[str, dict[str, Any]] = {
     "cnsa-2.0": profiles.PROFILES["us-cnsa2"]["mandate"],
     "nist-ir-8547": profiles.NIST_IR_8547,
     **profiles.DATED_MANDATES,
+    **profiles.SECTOR_DUTIES,
 }
 
 # The table of deadlines is a reading of documents that change. A block whose `read_on` is
@@ -337,8 +338,61 @@ def _stale(m: dict[str, Any], day: date) -> dict[str, Any]:
         out["stale_because"] = (
             f"the deadlines were read from the document on {m['read_on']}, {age} days before "
             f"{day.isoformat()} (more than {STALE_AFTER_DAYS}): a newer version may have moved "
-            f"them; check {m['url']}")
+            f"them; check {m['url'] or m['document']}")
     return out
+
+
+# Row 524: whether the document itself changed since it was read, which `stale` cannot say. A
+# scan makes no network call, so it says not_fetched; `qrp-mcp mandate-check` compares copies the
+# user downloaded.
+DOCUMENT_LIMITS = (
+    "qrp-mcp makes no network call: the documents are downloaded by you (`how`) and compared "
+    "here by sha256 with the copy read on `read_on`. A changed hash says the bytes changed, not "
+    "that a deadline moved: re-read the document. Only PDFs are recorded (an HTML page changes "
+    "its bytes without a change to its text); a site that blocks scripts can serve an error "
+    "page, which reads as changed.")
+
+
+def _documents(name: str, m: dict[str, Any]) -> dict[str, Any]:
+    return {"documents": m.get("documents") or [], "document_changed": "not_fetched",
+            "document_check": f"not fetched by a scan; compare a fresh download with "
+                              f"`qrp-mcp mandate-check {name} --document FILE`"}
+
+
+def check_documents(name: str, files: list[str]) -> dict[str, Any]:
+    """Compare downloaded copies, in the order of the mandate's `documents`, with their hashes
+    at read time: `document_changed` true, false or not_fetched for each and for the whole."""
+    import hashlib
+    from pathlib import Path
+
+    m = MANDATES[name]
+    docs = m.get("documents") or []
+    out: list[dict[str, Any]] = []
+    for n, doc in enumerate(docs):
+        row = {**doc, "sha256_at_read": doc["sha256"],
+               "how": f"curl -sSL -o doc{n + 1}.pdf '{doc['url']}'"}
+        del row["sha256"]
+        if n < len(files):
+            data = Path(files[n]).expanduser().read_bytes()
+            row["file"] = files[n]
+            row["sha256_now"] = hashlib.sha256(data).hexdigest()
+            row["document_changed"] = row["sha256_now"] != doc["sha256"]
+        else:
+            row["document_changed"] = "not_fetched"
+        out.append(row)
+    said = [r["document_changed"] for r in out]
+    result: dict[str, Any] = {
+        "mandate": name, "document": m["document"], "read_on": m["read_on"], "documents": out,
+        "document_changed": (True if True in said else
+                             False if said and all(v is False for v in said) else "not_fetched"),
+        "limits": DOCUMENT_LIMITS}
+    if not docs:
+        result["why_not_fetched"] = ("a document address with its hash was not recorded when "
+                                     "this mandate was read; `url` is where to look")
+        result["url"] = m["url"]
+    elif len(files) > len(docs):
+        result["files_not_compared"] = files[len(docs):]
+    return result
 
 
 def stale(result: dict[str, Any]) -> list[str]:
@@ -355,6 +409,8 @@ def apply(result: dict[str, Any], names: list[str], day: date,
     horizon = _add_months(day, lead_months or 0)
     failed = False
     blocks: dict[str, dict[str, Any]] = {}
+    sectors = {n: _sector_block(MANDATES[n], day) for n in names if n in profiles.SECTOR_DUTIES}
+    names = [n for n in names if n not in sectors]
     for name in names:
         m = MANDATES[name]
         blocks[name] = {
@@ -366,6 +422,7 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             "gate_counts": "deprecated_after" if name == "nist-ir-8547" else "deadline",
             "next_gate_deadline": None,
             **_stale(m, day),
+            **_documents(name, m),
         }
         if name in profiles.DATED_MANDATES:
             if m.get("sources"):
@@ -485,8 +542,24 @@ def apply(result: dict[str, Any], names: list[str], day: date,
         elif unread and block["gate"] == "pass":
             block["gate"] = "not_established"
             block["gate_not_established_because"] = unread
-    result["mandates"] = blocks
+    result["mandates"] = {**blocks, **sectors}
     return failed
+
+
+def _sector_block(m: dict[str, Any], day: date) -> dict[str, Any]:
+    """Row 523: a sector's duty with no date for code. Said, never counted."""
+    return {
+        "kind": "sector_duty", "document": m["document"], "url": m["url"],
+        "read_on": m["read_on"], "as_of": day.isoformat(), "sector": m["sector"],
+        "in_force": m["in_force"], "nature": m["nature"], "duties": m["duties"],
+        "dates_no_occurrence": True, "in_scope": 0, "gate": "not_applicable",
+        **_documents(m["name"], m),
+        "gate_not_applicable_because": (
+            "the document requires a plan, a roadmap or readiness of the sector by a date and "
+            "dates no algorithm, so no occurrence carries its date; whether this repository's "
+            "owner is in the sector is not known to the scan"),
+        **_stale(m, day),
+    }
 
 
 def _count_date(block: dict[str, Any], clause: dict[str, Any], item: dict[str, Any], day: date,

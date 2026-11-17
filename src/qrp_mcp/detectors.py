@@ -4801,7 +4801,8 @@ _BOTO3_KMS_ARG = re.compile(
 _AZURE_KEYVAULT_CRYPTO = re.compile(
     r"azure\.keyvault\.keys\.crypto|com\.azure\.security\.keyvault\.keys\.cryptography|"
     r"Azure\.Security\.KeyVault\.Keys\.Cryptography")
-_AZURE_KEYVAULT_ENUM = re.compile(r"\b(?:SignatureAlgorithm|EncryptionAlgorithm|KeyWrapAlgorithm)\.\w")
+_AZURE_KEYVAULT_ENUM = re.compile(
+    r"\b(?:SignatureAlgorithm|EncryptionAlgorithm|KeyWrapAlgorithm)\.\w")
 
 
 def _kms_key_location(lines: list[str], rows: list[dict[str, Any]]) -> None:

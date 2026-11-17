@@ -661,6 +661,35 @@ def closure_to_file(argv: list[str]) -> int:
     return _write(result, out_path, "closure")
 
 
+def mandate_check_to_file(argv: list[str]) -> int:
+    """`qrp-mcp mandate-check NAME --document FILE ...` (row 524): whether a mandate's documents
+    changed since they were read, by sha256 of copies the user downloaded. No network call."""
+    p = argparse.ArgumentParser(
+        prog="qrp-mcp mandate-check",
+        description="Compare downloaded copies of a --mandate's documents with the sha256 each "
+                    "had when it was read: document_changed true, false or not_fetched. Run "
+                    "without --document to see the documents and a curl command for each. "
+                    "Nothing is fetched by this tool. Exit 1 when a document changed.")
+    p.add_argument("name", choices=sorted(mandates.MANDATES), metavar="NAME",
+                   help="a --mandate name")
+    p.add_argument("--document", action="append", default=[], metavar="FILE",
+                   help="a downloaded copy, in the order of the mandate's documents "
+                        "(repeatable)")
+    p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
+    a = p.parse_args(argv)
+    for name in a.document:
+        if not Path(name).expanduser().is_file():
+            p.error(f"no file at {name}")
+    out_path = Path(a.out).expanduser() if a.out else None
+    if out_path is not None and not out_path.resolve().parent.is_dir():
+        p.error(f"the folder for --out does not exist: {out_path.parent}")
+    result = mandates.check_documents(a.name, a.document)
+    written = _write(result, out_path, "mandate-check")
+    if written:
+        return written
+    return 1 if result["document_changed"] is True else 0
+
+
 def build_gap_to_file(argv: list[str]) -> int:
     """`qrp-mcp build-gap SCAN.json BUILD_DIR --out FILE`: a source scan set beside the tables
     a build's toolchain wrote (buildgap.py says which, and what is never read)."""
@@ -712,7 +741,9 @@ USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MC
                                ca-cccs, au-ism, nl-rqs, se-ncsc, jp-gov, sg-csa-cii,
                                in-dst, de-bsi (repeatable); a mandate read from
                                its document more than 180 days before --as-of is said
-                               on stderr and in mandates.NAME.stale
+                               on stderr and in mandates.NAME.stale; il-boi, ch-finma,
+                               hk-hkma, sg-mas are a sector's duty with no date for
+                               code: said in the block, never counted by the gate
        qrp-mcp cbom PATH [--out FILE] [--level full|masked|trimmed]
                     [--config FILE | --no-config] [--baseline FILE] [--write-baseline FILE]
                                scan a directory and write a CycloneDX 1.6 CBOM
@@ -731,6 +762,11 @@ USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MC
                                bearing packages/modules in the build, the scan named J;
                                reads only deps.json, .NET metadata names, `go version -m`
                                and `go tool nm` (robustness on known patterns)
+       qrp-mcp mandate-check NAME [--document FILE ...] [--out FILE]
+                               whether a --mandate's documents changed since they were
+                               read: sha256 of copies you downloaded against the hash at
+                               read time; without --document, the documents and a curl
+                               for each (this tool fetches nothing); exit 1 if changed
        qrp-mcp --version
 """
 
@@ -750,6 +786,8 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(control_to_file(argv[1:]))
     if argv[0] == "build-gap":
         raise SystemExit(build_gap_to_file(argv[1:]))
+    if argv[0] == "mandate-check":
+        raise SystemExit(mandate_check_to_file(argv[1:]))
     if argv[0] in ("-h", "--help", "help"):
         print(USAGE, end="")
         raise SystemExit(0)

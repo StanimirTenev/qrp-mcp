@@ -757,7 +757,8 @@ DATED_MANDATES: dict[str, dict[str, Any]] = {
     # quantum-safe ready. By 31 Dec 2031: Completion of quantum-safe migration across CII
     # computer and computer systems, i.e. vulnerable cryptography should no longer be used."
     # MAS Consultation Paper P019-2026 (6 Nov 2026) proposes other dates for financial
-    # institutions; a consultation, not in force, so not here.
+    # institutions; a consultation, not in force, so not dated here: it is the sector duty
+    # `sg-mas` below (row 523).
     "sg-csa-cii": {
         "name": "sg-csa-cii",
         "document": "Cyber Security Agency of Singapore, Quantum-Safe Handbook V1 (16 Jul "
@@ -901,6 +902,143 @@ DATED_MANDATES: dict[str, dict[str, Any]] = {
                      "recommended in combination with a quantum-safe KEM method'",
     },
 }
+
+
+# `--mandate il-boi|ch-finma|hk-hkma|sg-mas` (row 523, Meir Goldman, 17.11.2026): a sector's
+# regulator requires a plan, a roadmap or readiness by a date and dates no algorithm, so no line
+# of code carries the date. A block of its own kind (`sector_duty`): the sector, each duty quoted
+# as srokove-v-skenera/REGISTAR.md section 2 quotes it (read 17.11.2026 11:15, status П), and no
+# clause on any occurrence; the gate never counts it. A date the document gives only as a span
+# ("within a year", "mid-2027") is said as written, never turned into a day.
+SECTOR_DUTIES: dict[str, dict[str, Any]] = {
+    # Bank of Israel, Banking Supervision, letter of 7 January 2025 (202501), to the banking
+    # corporations: the initial preparation plan goes to the supervision "within a year of the
+    # date of this letter" (lines 125-126 of the text extracted from the PDF).
+    "il-boi": {
+        "name": "il-boi",
+        "document": "Bank of Israel, Banking Supervision, letter 202501 (7 January 2025): "
+                    "preparing the banking system for cyber risks of quantum computing",
+        "url": "https://www.boi.org.il/media/sfbbtjvt/202501.pdf",
+        "read_on": "2026-11-17",
+        "sector": "banking corporations supervised by the Bank of Israel (the letter's "
+                  "addressees)",
+        "in_force": True,
+        "nature": "a supervisory letter: a plan required, no algorithm dated",
+        "duties": [
+            {"quote": "…תכנית היערכות זו תועבר … בתוך שנה מיום מכתבי זה",
+             "what": "an initial preparation plan, sent to the Banking Supervision",
+             "by": "within one year of the letter (as written; not resolved to a day)"},
+        ],
+    },
+    # FINMA Guidance 05/2026, Quantum computing, 9 July 2026, section 3.1 "Strategy and roadmap".
+    "ch-finma": {
+        "name": "ch-finma",
+        "document": "FINMA Guidance 05/2026, Quantum computing (Aufsichtsmitteilung, 9 July 2026)",
+        "url": "https://www.finma.ch/en/news/2026/07/20260709-mm-am-05-26/",
+        "read_on": "2026-11-17",
+        "sector": "institutions supervised by FINMA",
+        "in_force": True,
+        "nature": "supervisory guidance: a recommendation, no algorithm dated",
+        "duties": [
+            {"quote": "FINMA recommends that a PQC roadmap be drawn up by mid-2027 at the latest.",
+             "what": "a PQC roadmap", "by": "mid-2027 at the latest (as written)"},
+        ],
+    },
+    # HKMA circular B1/15C, 27 July 2026, to all Authorized Institutions, with the Quantum
+    # Preparedness Index (QPI) whitepaper. The circular's own address was not recorded when the
+    # copy was saved, so `url` is null rather than a guess.
+    "hk-hkma": {
+        "name": "hk-hkma",
+        "document": "HKMA circular B1/15C, Results of Quantum Preparedness Index Survey "
+                    "(27 July 2026)",
+        "url": None,
+        "read_on": "2026-11-17",
+        "sector": "Authorized Institutions in Hong Kong (the circular's addressees)",
+        "in_force": True,
+        "nature": "readiness of the sector measured by an index, not a migration deadline",
+        "duties": [
+            {"quote": "with the expectation that full sectoral readiness will be achieved by "
+                      "2030",
+             "what": "full sectoral readiness, by the QPI", "by": "2030 (as written)"},
+        ],
+    },
+    # MAS Consultation Paper P019-2026, 6 November 2026, paragraph 2: proposed dates. Comments
+    # close 23 November 2026; "not intended to impose legally binding obligations".
+    "sg-mas": {
+        "name": "sg-mas",
+        "document": "MAS Consultation Paper P019-2026, Quantum-Safe Migration Guidance and "
+                    "Timelines for the Financial Sector (6 November 2026)",
+        "url": "https://www.mas.gov.sg/publications/consultations/2026/consultation-paper-on-"
+               "quantum-safe-migration-guidance-and-timelines-for-the-financial-sector",
+        "read_on": "2026-11-17",
+        "sector": "financial institutions in Singapore",
+        "in_force": False,
+        "nature": "a consultation, not in force (comments until 23 November 2026); the proposed "
+                  "Circular is not intended to impose legally binding obligations",
+        "duties": [
+            {"quote": "b) By 31 December 2030 – Complete the migration of critical systems …",
+             "what": "proposed: migration of critical systems", "by": "31 December 2030"},
+            {"quote": "c) By 31 December 2034 – … all remaining systems",
+             "what": "proposed: migration of all remaining systems", "by": "31 December 2034"},
+        ],
+    },
+}
+
+
+# Row 524: `stale` measured the age of our reading, not the document. The sha256 of each document
+# as downloaded when read, with the address it was downloaded from -- only where both were
+# recorded (srokove-v-skenera/REGISTAR.md and the SHA256SUMS files beside the saved copies,
+# recomputed with sha256sum on the copies on 17.11.2026 and equal to the register's prefixes).
+# PDFs only: an HTML page changes its bytes with no change to its text. Not recorded, so not
+# here: uk-ncsc (a page), au-ism (the copy of 27.09, its address not recorded), sg-csa-cii (a
+# page), cnsa-2.0 and nist-ir-8547 (not re-read), ch-finma (the guidance PDF's address was not
+# recorded), hk-hkma (the circular's address was not recorded).
+_READ = "2026-11-17"
+DOCUMENT_HASHES: dict[str, list[dict[str, str]]] = {
+    "eu-pqc-roadmap": [
+        {"url": "https://ec.europa.eu/newsroom/dae/redirection/document/117507",
+         "sha256": "e76b0ea3abe5606e71d49c154a2fe1422413b5c31d0cc8dbf87a74263ead00ea"}],
+    "ca-cccs": [
+        {"url": "https://www.cyber.gc.ca/sites/default/files/itsp40111-cryptographic-"
+                "algorithms-e.pdf",
+         "sha256": "7486938ad0ff87fef3731576fc9816973562614e0098c5ada6aabae71d551f80"},
+        {"url": "https://www.cyber.gc.ca/sites/default/files/itsm.40.001-migration-post-"
+                "quantum-cryptography-government-canada-e.pdf",
+         "sha256": "79cb1a08a7f75533e81ffbd614d62543d87e3f7434e66f0ae59ec7ffdbdae7ca"}],
+    "nl-rqs": [
+        {"url": "https://zoek.officielebekendmakingen.nl/blg-1279064.pdf",
+         "sha256": "f1d481d3000685ab1993baf8e5fcaccf533b3257425e3776374d7f6f807812eb"}],
+    "se-ncsc": [
+        {"url": "https://www.ncsc.se/siteassets/publikationer/nationella-rekommendationer-for-"
+                "overgangen-till-kvantsaker-kryptografi-2026_tga.pdf",
+         "sha256": "ac5c299f4726eb63303c8d3840ceaa4e8bc88121c14d6944acba2da8006b5325"}],
+    "jp-gov": [
+        {"url": "https://www.cas.go.jp/jp/seisaku/pqc/pdf/report_202511.pdf",
+         "sha256": "6c550bacbb715a71880e926e36b7bc5d67d7a3c00f6f2b6f836d54feb483c611"}],
+    "in-dst": [
+        {"url": "https://www.dst.gov.in/static/uploads/2026/07/"
+                "dba5f97fa8f4c8db5ef668306548a470.pdf",
+         "sha256": "b9d2d53b2c03cfc47f9f4ce5ae0ceaebe1f46f50fccca8fc1cdbc70defd4d9ff"}],
+    "de-bsi": [
+        {"url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/"
+                "TG02102/BSI-TR-02102-1.pdf?__blob=publicationFile",
+         "sha256": "f601cdf25c000b431573a307a3c125f3c51d301897089e7e63dde0449367a62a"},
+        {"url": "https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Krypto/"
+                "Leitlinie-Umstellung-PQC.pdf?__blob=publicationFile&v=3",
+         "sha256": "ad714afe5fc46d1b488a022b232c0c9c1e2f93cd3dcd70c268c89e0287ce19dc"}],
+    "il-boi": [
+        {"url": "https://www.boi.org.il/media/sfbbtjvt/202501.pdf",
+         "sha256": "0f11f4dc83cf343c139a1e2572fca8c4ddfa83f2cc1db35fc4dff591aa77a671"}],
+    # The link to the paper on the consultation page as saved on 17.11.2026.
+    "sg-mas": [
+        {"url": "https://www.mas.gov.sg/-/media/mas-media-library/publications/consultations/trpd/"
+                "2026/p019-2026-november-2026-consultation-paper-on-quantumsafe-migration-"
+                "guidance-and-timelines-for-the-f.pdf",
+         "sha256": "7f4eec59c2d97a76ab6871d2f5844ef9e06ed1408f6709f3906938c1fa202fb7"}],
+}
+for _name, _docs in DOCUMENT_HASHES.items():
+    (DATED_MANDATES.get(_name) or SECTOR_DUTIES[_name])["documents"] = [
+        {**d, "read_on": _READ} for d in _docs]
 
 
 def names() -> list[str]:
