@@ -174,7 +174,7 @@ def test_the_mandate_dates_a_composite_s_classical_half_as_a_composite(tmp_path)
           "--out", str(out)])
     result = json.loads(out.read_text())
     block = result["mandates"]["nist-ir-8547"]
-    assert block["composite"] == 3 and block["gate"] == "pass"
+    assert block["composite"] == 3 and block["gate"] == "not_established"  # row 527
     for item in result["evidence"]["source_code"]:
         if item["algorithm"] in ("ECDSA", "RSA"):
             assert item["mandates"]["nist-ir-8547"]["status"] == "composite_allowed"

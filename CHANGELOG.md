@@ -94,6 +94,17 @@ see its tests fail.
   four-digit year (`0001-01-01T00:00:00Z`), which `--as-of` and the CBOM's `notValidAfter` read;
   `expired` is true, as it was without `--as-of`. The date is the certificate's own, so it is kept,
   not set aside as unread. `findings_fingerprint` does not hold dates and is unchanged.
+- **`--mandate cnsa-2.0` passed AES-128 and SHA-256 code in silence** (row 527). CNSA 2.0 requires
+  AES-256 and SHA-384/512 (already under CNSA 1.0), and the gate counted only the public-key
+  occurrences: `in_scope: 0`, `pass`. The scan does not read symmetric ciphers or hashes, so it
+  cannot count their sizes; four documents date them, and their blocks now carry `symmetric`
+  (`status: not_established`, what the document dates, its words with the section): `cnsa-2.0`,
+  `au-ism` (AES-128/192, SHA-224/256 and HMAC-SHA256 not approved beyond 2030 -- "for
+  interoperability and maintainability reasons", not quantum), `ca-cccs` (SHA-224, SHA3-224, HMAC
+  keys under 128 bits by the end of 2030) and `nist-ir-8547` (the 112-bit standards in 2030). A
+  gate that would pass reads `not_established` with the reason, as for unread files (row 204); a
+  fail stays a fail; the exit code does not change. The ten other documents date public-key
+  cryptography only and still pass. Not done: reading AES key sizes or hash output sizes.
 
 **What changes for an existing user.** A strongSwan configuration with a proposal that can be
 negotiated classical now has `ike_proposals` rows -- beside a hybrid or not -- so its
@@ -103,7 +114,9 @@ and under `--mandate` they are dated key-establishment rows that can fail a gate
 Rows on boto3 KMS and Azure Key Vault calls gain `key_location`, which is not identity, and the
 CBOM's `additionalContext` of their occurrences gains `[key: kms]`; certificate, key and
 configuration rows gain `in_test_code`, and the CBOM marks the test-only ones `scope: excluded`.
-`trust_stores` and the sector duties never move a gate.
+`trust_stores` and the sector duties never move a gate. Under `--mandate cnsa-2.0`, `au-ism`,
+`ca-cccs` or `nist-ir-8547` a gate that passed on 0.48.0 now reads `not_established` (row 527),
+with the same exit code 0; a check on the word `pass` needs to read `not_established` too.
 
 Positive controls against 0.48.0 (OpenSSH 7fe3b24, certbot 56ee049, Vault 41e571b): files read
 742 (+1), 850, 5,434; findings 71 (+1, the SSH2 key), 40, 74; the same detected families and

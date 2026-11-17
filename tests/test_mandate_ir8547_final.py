@@ -103,7 +103,8 @@ def test_block_names_the_date_the_gate_counts(tmp_path):
     assert block["gate"] == "fail" and failed
 
 
-@pytest.mark.parametrize("lead, gate", [(50, "pass"), (51, "fail")])
+# Row 527: below the lead the gate reads not_established (symmetric clauses not read).
+@pytest.mark.parametrize("lead, gate", [(50, "not_established"), (51, "fail")])
 def test_gate_counts_the_deprecation(tmp_path, lead, gate):
     # 2026-10-30 + 50 months = 2030-12-30 (before 2030-12-31); + 51 months passes it.
     r, failed = _scan(tmp_path, {"keys.py": KEYS}, lead=lead)

@@ -157,6 +157,14 @@ never counts them. A mandate block also carries the sha256 of each document as i
 document (the tool itself still fetches nothing)
 ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
 
+Four of the mandates also date symmetric or hash algorithms, which the scan does not read:
+`cnsa-2.0` (AES-256 and SHA-384/512, already required), `au-ism` (AES-128/192, SHA-224/256 and
+HMAC-SHA256 "will not be approved beyond 2030", for interoperability and maintainability reasons),
+`ca-cccs` and `nist-ir-8547` (the 112-bit tail by 2030). From 0.49.0 their blocks say
+`symmetric: not_established`, quoting the document, and a gate that would pass reads
+`not_established` instead -- the exit code stays that of a pass. Before, AES-128 and SHA-256 code
+passed `--mandate cnsa-2.0` in silence.
+
 From 0.49.0 `trust_stores` lists each place that loads a trust store (Python `cafile`, Go
 `AppendCertsFromPEM`, nginx `ssl_client_certificate`), the anchors read in it, and whether its
 path is outside the tree; a strongSwan proposal that can be negotiated with a classical key

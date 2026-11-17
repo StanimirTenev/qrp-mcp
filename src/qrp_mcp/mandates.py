@@ -353,6 +353,62 @@ DOCUMENT_LIMITS = (
     "page, which reads as changed.")
 
 
+# Row 527: four of the documents date symmetric or hash algorithms, which a scan does not read
+# (out of scope by design, row 525), so it cannot count AES or SHA sizes against them. Their words,
+# as the copies read for qrp-kachestvo/obhvat-razuznavane/01-grover-simetrichno.md give them
+# (checked again on 17.11.2026 against srokove-v-skenera/raw/src and razuznavane/profili/src).
+# The other documents date public-key cryptography only.
+SYMMETRIC_NOT_READ = (
+    "this document also dates symmetric or hash algorithms (document_says), and the scan does "
+    "not read symmetric ciphers, hashes, MACs or their sizes: whether the code meets those "
+    "clauses is not established, whatever the gate says of the public-key occurrences")
+SYMMETRIC: dict[str, dict[str, Any]] = {
+    "cnsa-2.0": {
+        "dates": "AES-128 and AES-192, SHA-256: not compliant now (unchanged from CNSA 1.0)",
+        "document_says": [
+            {"quote": "Advanced Encryption Standard (AES) ... Use 256-bit keys for all "
+                      "classification levels",
+             "source": "NSA CSA PP-22-1338, Symmetric-key algorithms, Table II"},
+            {"quote": "Secure Hash Algorithm (SHA) ... Use SHA-384 or SHA-512 for all "
+                      "classification levels",
+             "source": "NSA CSA PP-22-1338, Symmetric-key algorithms, Table II"}]},
+    "au-ism": {
+        "dates": "AES-128, AES-192, SHA-224, SHA-256 and HMAC-SHA256 (IPsec): not approved "
+                 "beyond 2030, for reasons the document gives as not quantum",
+        "document_says": [
+            {"quote": "For interoperability and maintainability reasons, AES-128 and AES-192 "
+                      "will not be approved beyond 2030.",
+             "source": "Guidelines for cryptography, Using symmetric cryptographic algorithms"},
+            {"quote": "For interoperability and maintainability reasons, SHA-224 and SHA-256 "
+                      "will not be approved beyond 2030.",
+             "source": "Guidelines for cryptography, Using Secure Hashing Algorithms"},
+            {"quote": "For interoperability and maintainability reasons, HMAC-SHA256 will not "
+                      "be approved beyond 2030.",
+             "source": "Guidelines for cryptography, Using Internet Protocol Security"}]},
+    "ca-cccs": {
+        "dates": "SHA-224 and SHA3-224, and HMAC keys under 128 bits, by the end of 2030; AES-128 "
+                 "and SHA-256 stay recommended",
+        "document_says": [
+            {"quote": "SHA-224 should be phased out by the end of 2030.",
+             "source": "ITSP.40.111 v5, section 7.2"},
+            {"quote": "SHA3-224 should be phased out by the end of 2030.",
+             "source": "ITSP.40.111 v5, section 7.3"},
+            {"quote": "The key length should be increased to at least 128 bits by the end of "
+                      "2030.",
+             "source": "ITSP.40.111 v5, section 9.1 (HMAC)"}]},
+    "nist-ir-8547": {
+        "dates": "the symmetric standards at the 112-bit security level, in 2030; AES-128 and "
+                 "SHA-256 are not dated",
+        "document_says": [
+            {"quote": "NIST has a few symmetric cryptography standards at the 112-bit security "
+                      "level, which will be disallowed in 2030.",
+             "source": "NIST IR 8547, section 4.1.3"},
+            {"quote": "NIST does not expect to need to transition away from these standards as "
+                      "part of the PQC migration.",
+             "source": "NIST IR 8547, section 2.1.3"}]},
+}
+
+
 def _documents(name: str, m: dict[str, Any]) -> dict[str, Any]:
     return {"documents": m.get("documents") or [], "document_changed": "not_fetched",
             "document_check": f"not fetched by a scan; compare a fresh download with "
@@ -548,6 +604,18 @@ def apply(result: dict[str, Any], names: list[str], day: date,
         elif unread and block["gate"] == "pass":
             block["gate"] = "not_established"
             block["gate_not_established_because"] = unread
+    # Row 527: a pass that cannot see the symmetric clauses of its own document is not a pass;
+    # a fail stays a fail, and the exit code of a pass does not change.
+    for name, block in blocks.items():
+        if name not in SYMMETRIC:
+            continue
+        block["symmetric"] = {"status": "not_established", "evaluated": False,
+                              "because": SYMMETRIC_NOT_READ, **SYMMETRIC[name]}
+        if block["gate"] == "pass":
+            block["gate"] = "not_established"
+            block["gate_not_established_because"] = SYMMETRIC_NOT_READ
+        elif block["gate"] == "not_established":
+            block["gate_not_established_because"] += "; and " + SYMMETRIC_NOT_READ
     result["mandates"] = {**blocks, **sectors}
     return failed
 

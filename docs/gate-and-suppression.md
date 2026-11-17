@@ -72,6 +72,14 @@ one place. The CHANGELOG entry named beside each item is the full text.
   no legacy-use status, so the dates stand and the line trips the gate like any other (0.47.0).
 - A gate over files that were not read is not a pass: `gate` reads `not_established` and
   `gate_not_established_because` gives the count; the exit code of that case stays 0 (0.41.0).
+- Nor is a gate whose document dates symmetric or hash algorithms, which a scan does not read
+  (0.49.0, row 527): `cnsa-2.0` (AES-256, SHA-384/512, already required), `au-ism` (AES-128/192,
+  SHA-224/256, HMAC-SHA256 not approved beyond 2030), `ca-cccs` (SHA-224, SHA3-224 and HMAC keys
+  under 128 bits by the end of 2030) and `nist-ir-8547` (the 112-bit standards, 2030). Their block
+  carries `symmetric` -- `status: not_established`, `evaluated: false`, what the document dates
+  and its words (`document_says`) -- and a gate that would pass reads `not_established` with that
+  reason; a fail stays a fail and the exit code is unchanged. The other documents date public-key
+  cryptography only and pass as before.
 - `--min-coverage PERCENT` (with `--mandate`) makes it a failure: when fewer than PERCENT of the
   files present were read (`coverage.scope.coverage_pct`), the gate is `fail`, exit 1, and
   `gate_failed_because` says how many files were not read. It measures files opened; a file read

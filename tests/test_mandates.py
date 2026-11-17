@@ -143,7 +143,8 @@ def test_deadline_gate_exit_code(tree, tmp_path, args, code):
             "--out", str(out)]
     assert server.scan_to_file(argv) == code
     r = json.loads(out.read_text())
-    assert r["mandates"]["nist-ir-8547"]["gate"] == ("fail" if code else "pass")
+    # Row 527: not a pass while the symmetric clauses of IR 8547 are not read; exit 0 still.
+    assert r["mandates"]["nist-ir-8547"]["gate"] == ("fail" if code else "not_established")
 
 
 def test_suppressed_rows_do_not_trip_the_gate(tmp_path):

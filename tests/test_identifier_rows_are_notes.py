@@ -69,7 +69,8 @@ def test_identifier_rows_get_no_mandate_clause_and_trip_no_gate(tmp_path):
     assert all("mandates" not in e and "hndl_exposed" not in e for e in rows)
     block = result["mandates"]["nist-ir-8547"]
     assert block["in_scope"] == 0 and block["hndl_exposed"] == 0
-    assert block["gate"] == "pass" and code == 0
+    # Row 527: IR 8547 dates 112-bit symmetric standards the scan does not read.
+    assert block["gate"] == "not_established" and code == 0
 
 
 def test_a_real_use_beside_them_still_gets_its_clause(tmp_path):

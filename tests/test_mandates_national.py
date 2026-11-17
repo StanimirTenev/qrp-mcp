@@ -270,7 +270,9 @@ def test_cli_gate_by_mandate(tree, tmp_path, name, lead, code):
                   "--lead-months", str(lead))
     assert p.returncode == code, p.stderr
     r = json.loads(out.read_text())
-    assert r["mandates"][name]["gate"] == ("fail" if code else "pass")
+    # Row 527: the ISM dates AES-128 and SHA-256, which the scan does not read.
+    assert r["mandates"][name]["gate"] == (
+        "fail" if code else "not_established" if name == "au-ism" else "pass")
 
 
 def test_sarif_carries_the_new_clause_and_the_staleness(tree, tmp_path):

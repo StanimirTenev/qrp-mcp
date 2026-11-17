@@ -57,8 +57,9 @@ def test_files_not_read_make_a_pass_not_established(tmp_path):
 
 def test_every_file_read_still_passes(tmp_path):
     code, block = _run(tmp_path, _tree(tmp_path, binaries=False), "--lead-months", "12")
-    assert block["gate"] == "pass" and code == 0
-    assert "gate_not_established_because" not in block
+    # Row 527: every file read, and still not a pass -- for the symmetric clauses only.
+    assert block["gate"] == "not_established" and code == 0
+    assert block["gate_not_established_because"] == block["symmetric"]["because"]
 
 
 def test_a_failing_gate_stays_failed_with_files_not_read(tmp_path):
@@ -85,7 +86,7 @@ def test_min_coverage_met_leaves_the_gate_as_it_was(tmp_path):
     other = tmp_path / "all-read"
     code, block = _run(other, _tree(other, binaries=False), "--lead-months", "12",
                        "--min-coverage", "100")
-    assert block["gate"] == "pass" and code == 0
+    assert block["gate"] == "not_established" and code == 0  # row 527
 
 
 def test_min_coverage_needs_a_mandate(tmp_path):
