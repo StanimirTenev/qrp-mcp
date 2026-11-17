@@ -360,23 +360,29 @@ def _documents(name: str, m: dict[str, Any]) -> dict[str, Any]:
 
 
 def check_documents(name: str, files: list[str]) -> dict[str, Any]:
-    """Compare downloaded copies, in the order of the mandate's `documents`, with their hashes
-    at read time: `document_changed` true, false or not_fetched for each and for the whole."""
+    """Compare downloaded copies with the mandate's `documents` hashes at read time, matched by
+    hash: `document_changed` true, false or not_fetched for each and for the whole."""
     import hashlib
     from pathlib import Path
 
     m = MANDATES[name]
     docs = m.get("documents") or []
+    hashed = [(f, hashlib.sha256(Path(f).expanduser().read_bytes()).hexdigest()) for f in files]
+    # A copy is matched to the document whose hash it has, whatever the order; the copies left
+    # are paired with the documents left, in order -- those are the changed ones.
+    matched = {d["sha256"]: f for f, h in hashed for d in docs if h == d["sha256"]}
+    left = [(f, h) for f, h in hashed if f not in matched.values()]
     out: list[dict[str, Any]] = []
     for n, doc in enumerate(docs):
         row = {**doc, "sha256_at_read": doc["sha256"],
                "how": f"curl -sSL -o doc{n + 1}.pdf '{doc['url']}'"}
         del row["sha256"]
-        if n < len(files):
-            data = Path(files[n]).expanduser().read_bytes()
-            row["file"] = files[n]
-            row["sha256_now"] = hashlib.sha256(data).hexdigest()
-            row["document_changed"] = row["sha256_now"] != doc["sha256"]
+        if doc["sha256"] in matched:
+            row.update(file=matched[doc["sha256"]], sha256_now=doc["sha256"],
+                       document_changed=False)
+        elif left:
+            f, h = left.pop(0)
+            row.update(file=f, sha256_now=h, document_changed=True)
         else:
             row["document_changed"] = "not_fetched"
         out.append(row)
@@ -390,8 +396,8 @@ def check_documents(name: str, files: list[str]) -> dict[str, Any]:
         result["why_not_fetched"] = ("a document address with its hash was not recorded when "
                                      "this mandate was read; `url` is where to look")
         result["url"] = m["url"]
-    elif len(files) > len(docs):
-        result["files_not_compared"] = files[len(docs):]
+    elif left:
+        result["files_not_compared"] = [f for f, _ in left]
     return result
 
 

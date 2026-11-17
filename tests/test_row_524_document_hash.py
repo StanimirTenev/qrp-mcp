@@ -111,3 +111,18 @@ def test_a_mandate_with_nothing_recorded_says_so():
     out = json.loads(r.stdout)
     assert out["documents"] == [] and out["document_changed"] == "not_fetched"
     assert "not recorded" in out["why_not_fetched"]
+
+
+def test_copies_are_matched_by_hash_not_by_order(monkeypatch, tmp_path, capsys):
+    one, two = tmp_path / "one.pdf", tmp_path / "two.pdf"
+    one.write_bytes(b"%PDF first\n")
+    two.write_bytes(b"%PDF second\n")
+    docs = [{"url": f"https://example.test/{p.name}", "read_on": "2026-11-17",
+             "sha256": hashlib.sha256(p.read_bytes()).hexdigest()} for p in (one, two)]
+    monkeypatch.setitem(mandates.MANDATES, "xx-two", {
+        "name": "xx-two", "document": "two documents", "url": "https://example.test/",
+        "read_on": "2026-11-17", "documents": docs})
+    code, out = _check(["mandate-check", "xx-two", "--document", str(two), "--document",
+                        str(one)], capsys)
+    assert code == 0 and out["document_changed"] is False
+    assert [d["file"] for d in out["documents"]] == [str(one), str(two)]

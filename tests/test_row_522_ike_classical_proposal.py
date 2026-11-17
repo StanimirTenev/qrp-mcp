@@ -138,3 +138,17 @@ def test_a_mandate_dates_the_fallback_as_key_establishment(tmp_path):
     [row] = json.loads(out.read_text())["evidence"]["ike_proposals"]
     assert row["mandates"]["eu-pqc-roadmap"]["deadline"] == "2035-12-31"
     assert row["hndl_exposed"] is True
+
+
+def test_sarif_carries_the_fallback(tmp_path):
+    rules = []
+    for name, proposals in (("a", WITH), ("b", WITHOUT)):
+        root = _tree(tmp_path / name, proposals)
+        out = tmp_path / f"{name}.sarif"
+        subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "scan",
+                        str(root), "--format", "sarif", "--out", str(out)],
+                       check=True, capture_output=True, env=dict(os.environ))
+        rules.append([(x["ruleId"], x["properties"]["evidence"])
+                      for x in json.loads(out.read_text())["runs"][0]["results"]])
+    assert ("qrp/ECDH", "ike_proposals") in rules[0]
+    assert not [r for r in rules[1] if r[1] == "ike_proposals"]

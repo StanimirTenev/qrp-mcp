@@ -911,22 +911,20 @@ DATED_MANDATES: dict[str, dict[str, Any]] = {
 # clause on any occurrence; the gate never counts it. A date the document gives only as a span
 # ("within a year", "mid-2027") is said as written, never turned into a day.
 SECTOR_DUTIES: dict[str, dict[str, Any]] = {
-    # Bank of Israel, Banking Supervision, letter of 7 January 2025 (202501), to the banking
-    # corporations: the initial preparation plan goes to the supervision "within a year of the
-    # date of this letter" (lines 125-126 of the text extracted from the PDF).
+    # Bank of Israel, Banking Supervision, letter of 7 January 2025 (202501). The register's quote
+    # is from lines 125-126 of the text extracted from the PDF; the addressees, line 7.
     "il-boi": {
         "name": "il-boi",
-        "document": "Bank of Israel, Banking Supervision, letter 202501 (7 January 2025): "
-                    "preparing the banking system for cyber risks of quantum computing",
+        "document": "Bank of Israel, Banking Supervision, letter 202501 (7 January 2025)",
         "url": "https://www.boi.org.il/media/sfbbtjvt/202501.pdf",
         "read_on": "2026-11-17",
-        "sector": "banking corporations supervised by the Bank of Israel (the letter's "
-                  "addressees)",
+        "sector": "the letter's addressees, in its words: "
+                  "התאגידים הבנקאיים ובעלי רישיון נותן שירותי תשלום יציבותי",
         "in_force": True,
         "nature": "a supervisory letter: a plan required, no algorithm dated",
         "duties": [
             {"quote": "…תכנית היערכות זו תועבר … בתוך שנה מיום מכתבי זה",
-             "what": "an initial preparation plan, sent to the Banking Supervision",
+             "what": "a preparation plan",
              "by": "within one year of the letter (as written; not resolved to a day)"},
         ],
     },
@@ -936,7 +934,8 @@ SECTOR_DUTIES: dict[str, dict[str, Any]] = {
         "document": "FINMA Guidance 05/2026, Quantum computing (Aufsichtsmitteilung, 9 July 2026)",
         "url": "https://www.finma.ch/en/news/2026/07/20260709-mm-am-05-26/",
         "read_on": "2026-11-17",
-        "sector": "institutions supervised by FINMA",
+        "sector": "institutions supervised by FINMA (the guidance's scope was not read line by "
+                  "line)",
         "in_force": True,
         "nature": "supervisory guidance: a recommendation, no algorithm dated",
         "duties": [
@@ -959,7 +958,7 @@ SECTOR_DUTIES: dict[str, dict[str, Any]] = {
         "duties": [
             {"quote": "with the expectation that full sectoral readiness will be achieved by "
                       "2030",
-             "what": "full sectoral readiness, by the QPI", "by": "2030 (as written)"},
+             "what": "full sectoral readiness", "by": "2030 (as written)"},
         ],
     },
     # MAS Consultation Paper P019-2026, 6 November 2026, paragraph 2: proposed dates. Comments

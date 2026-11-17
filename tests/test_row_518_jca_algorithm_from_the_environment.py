@@ -1,4 +1,4 @@
-"""Row 518 (17.11.2026, Davide Rossi; probe `linkedin-postove/2026-11-17/stai-qrp/proba-rossi/`).
+"""Row 518 (17.11.2026; a probe of a LinkedIn room on HSM signing, `linkedin-postove/2026-11-17/`).
 
 `Signature.getInstance(System.getenv("SIG_ALG"))` beside a PKCS#11 KeyStore gave nothing at all:
 no row, and `chosen_outside_files` 0, so the file read as if it had no cryptography. The

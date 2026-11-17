@@ -412,6 +412,11 @@ def _mask_owners(result: dict[str, Any]) -> None:
     # Row 490: a listener's server names are host names, masked as owners are.
     for place in (result.get("tls_listeners") or {}).get("places") or []:
         place["server_name"] = [_mask_excerpt(str(n), "") for n in place["server_name"]]
+    # Row 517: the path a trust store is loaded from is source text (a path under /etc that is
+    # not in the tree), masked as a line is; a file read keeps its path, as every row does.
+    for place in (result.get("trust_stores") or {}).get("places") or []:
+        if place.get("file") and not place.get("file_read"):
+            place["file"] = _mask_excerpt(str(place["file"]), "")
 
 
 def _at_level(result: dict[str, Any], level: str) -> dict[str, Any]:
@@ -673,8 +678,8 @@ def mandate_check_to_file(argv: list[str]) -> int:
     p.add_argument("name", choices=sorted(mandates.MANDATES), metavar="NAME",
                    help="a --mandate name")
     p.add_argument("--document", action="append", default=[], metavar="FILE",
-                   help="a downloaded copy, in the order of the mandate's documents "
-                        "(repeatable)")
+                   help="a downloaded copy of one of the mandate's documents, matched to it "
+                        "by hash in any order (repeatable)")
     p.add_argument("--out", metavar="FILE", help="write here instead of standard output")
     a = p.parse_args(argv)
     for name in a.document:

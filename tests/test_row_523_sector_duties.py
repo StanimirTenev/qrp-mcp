@@ -91,3 +91,26 @@ def test_the_command_line_takes_it_and_exits_0(tmp_path):
                        capture_output=True, text=True, env=dict(os.environ))
     assert r.returncode == 0, r.stderr
     assert json.loads(out.read_text())["mandates"]["ch-finma"]["gate"] == "not_applicable"
+
+
+def test_sarif_and_the_config_file_take_it(tmp_path):
+    root = tmp_path / "t"
+    root.mkdir()
+    (root / "app.py").write_text(RSA)
+    sarif = tmp_path / "s.sarif"
+    r = subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "scan",
+                        str(root), "--format", "sarif", "--out", str(sarif), "--as-of",
+                        "2026-11-17", "--mandate", "il-boi", "--mandate", "hk-hkma",
+                        "--mandate", "eu-pqc-roadmap"],
+                       capture_output=True, text=True, env=dict(os.environ))
+    assert r.returncode == 0, r.stderr
+    said = json.loads(sarif.read_text())["runs"][0]["properties"]["mandates"]
+    assert said["hk-hkma"]["kind"] == "sector_duty" and said["hk-hkma"]["url"] is None
+    assert said["eu-pqc-roadmap"]["in_scope"] >= 1
+    (root / ".qrp.toml").write_text('mandate = ["ch-finma"]\n')
+    out = tmp_path / "c.json"
+    r = subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "scan",
+                        str(root), "--out", str(out), "--as-of", "2026-11-17"],
+                       capture_output=True, text=True, env=dict(os.environ))
+    assert r.returncode == 0, r.stderr
+    assert list(json.loads(out.read_text())["mandates"]) == ["ch-finma"]

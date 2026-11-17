@@ -111,8 +111,8 @@ def test_it_reaches_the_tools_the_command_line_and_the_cbom(tmp_path):
     assert _short(scan_repo(str(root), level="full")) == EXPECTED
     out = tmp_path / "s.json"
     subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "scan",
-                    str(root), "--out", str(out)], check=True, capture_output=True,
-                   env=dict(os.environ))
+                    str(root), "--out", str(out), "--level", "full"], check=True,
+                   capture_output=True, env=dict(os.environ))
     assert _short(json.loads(out.read_text())) == EXPECTED
     props = {p["name"]: p["value"] for p in build(scan_directory(root))["properties"]}
     said = json.loads(props["qrp:trust_stores"])
@@ -123,3 +123,24 @@ def test_it_reaches_the_tools_the_command_line_and_the_cbom(tmp_path):
 def test_nothing_without_a_trust_store(tmp_path):
     (tmp_path / "a.py").write_text("import ssl\nctx = ssl.create_default_context()\n")
     assert scan_directory(tmp_path)["trust_stores"] is None
+
+
+def test_a_path_outside_the_tree_is_masked_below_full(tmp_path):
+    """The written path is source text: below `--level full` it is masked as a line is, in the
+    scan, the tools and the CBOM. A path that is a file read stays, as every row's path does."""
+    root = _tree(tmp_path / "t")
+    out = tmp_path / "s.json"
+    subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "scan",
+                    str(root), "--out", str(out)], check=True, capture_output=True,
+                   env=dict(os.environ))
+    cbom = tmp_path / "c.json"
+    subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "cbom",
+                    str(root), "--out", str(cbom)], check=True, capture_output=True,
+                   env=dict(os.environ))
+    props = {p["name"]: p["value"] for p in json.loads(cbom.read_text())["properties"]}
+    for files in ([p["file"] for p in json.loads(out.read_text())["trust_stores"]["places"]],
+                  [p["file"] for p in scan_repo(str(root))["trust_stores"]["places"]],
+                  [p["file"] for p in json.loads(props["qrp:trust_stores"])]):
+        assert files[0] == "trust/ca-bundle.pem"
+        assert "etc" not in files[1] and "factory" not in files[1] and files[1].startswith("/")
+        assert "nginx" not in files[2]
