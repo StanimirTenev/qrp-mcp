@@ -2325,6 +2325,8 @@ _KEY_SIZE = re.compile(
     r"\bRsaPrivateKey::new\([^,]*,\s*(\d{3,5})\b|\bwc_MakeRsaKey\([^,]*,\s*(\d{3,5})\b|"
     r"\bEVP_RSA_gen\(\s*(\d{3,5})\b|set_rsa_keygen_bits\([^,]*,\s*(\d{3,5})\b|"
     r"RSAKeyGenParameterSpec\(\s*(\d{3,5})\b|"
+    # Row 518: python-pkcs11, `session.generate_keypair(KeyType.RSA, 3072)`.
+    r"\bgenerate_keypair\(\s*KeyType\.RSA\s*,\s*(\d{3,5})\b|"
     # Rows 369, 370, 374 (W1): .NET `RSA.Create(1024)`, `new RSACryptoServiceProvider(512)`,
     # `new RSACng(3072)`; PowerShell `New-SelfSignedCertificate ... -KeyLength 1024`.
     r"\bRSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:RSACryptoServiceProvider|RSACng)\(\s*(\d{3,5})\s*\)|"
@@ -5037,6 +5039,11 @@ _RUNTIME_CRYPTO_CALL = re.compile(
     r"\.(?:sign|verify|encrypt|decrypt|derive|wrap|unwrap|wrap_?key|unwrap_?key|"
     r"derive_?key|generate_?key(?:_?pair)?)\w*\s*\([^)]*?\b(mech(?:anism)?|alg(?:orithm)?|cipher)"
     r"\s*=\s*(?:get\(\s*)?[\"']?((?-i:" + _RUNTIME_REFERENCE.pattern + r"))", re.IGNORECASE)
+# Row 518: `Signature.getInstance(System.getenv("SIG_ALG"))` -- a JCA factory whose algorithm
+# is read at run time. The setting is the factory's own name; no family is claimed.
+_RUNTIME_JCA = re.compile(
+    r"\b((?:Signature|Cipher|KeyPairGenerator|KeyAgreement|KeyGenerator)\.getInstance)\s*\(\s*("
+    + _RUNTIME_REFERENCE.pattern + r")")
 _RUNTIME_BYTES = (b"environ", b"getenv", b"process.env", b"System.getenv",
                   b"GetEnvironmentVariable", b"${", b"$")
 
@@ -5095,7 +5102,8 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
             continue
         # The reference must be the setting's value: right after it, past `=`, `:`, `(`, a
         # comma or a space and an optional quote -- not merely on the same line.
-        found = _RUNTIME_ASSIGNMENT.search(text) or _RUNTIME_CRYPTO_CALL.search(text)
+        found = (_RUNTIME_ASSIGNMENT.search(text) or _RUNTIME_CRYPTO_CALL.search(text)
+                 or _RUNTIME_JCA.search(text))
         default = _runtime_default(text)
         if not found and not default:
             continue
