@@ -101,7 +101,9 @@ EXPECTED = [
 
 
 def test_each_place_that_loads_a_trust_store_is_named(tmp_path):
-    assert _short(scan_directory(_tree(tmp_path))) == EXPECTED
+    result = scan_directory(_tree(tmp_path))
+    assert _short(result) == EXPECTED
+    assert [p["in_test_code"] for p in result["trust_stores"]["places"]] == [False] * 3
 
 
 def test_it_reaches_the_tools_the_command_line_and_the_cbom(tmp_path):

@@ -845,7 +845,8 @@ def _trust_stores(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                              if named and not named.startswith("/") and c in read}) \
                 if named else []
             places.append({
-                "path": rel, "line": n, "setting": setting, "file": named,
+                "path": rel, "line": n, "in_test_code": detectors.in_test_code(rel),
+                "setting": setting, "file": named,
                 "file_read": linked, "outside_the_tree": bool(named and named.startswith("/")),
                 "anchors": [{"path": a["path"], "line": a["line"], "family": a["algorithm"],
                              **{k: a[k] for k in ("key_size", "curve") if k in a},
