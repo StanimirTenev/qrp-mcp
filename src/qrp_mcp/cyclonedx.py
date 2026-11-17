@@ -668,6 +668,9 @@ def _context(item: dict[str, Any]) -> str:
     # the inventory, and said where the occurrence is, as the scan result says it.
     if item.get("role") == "non_security_use":
         tags.append("[non_security_use]")
+    # Row 519: a KMS SDK call's key is in the KMS (`key_location`).
+    if item.get("key_location") and "command_type" not in item:
+        tags.append(f"[key: {item['key_location']}]")
     # The owner of this place, by CODEOWNERS (ZA-OPRAVYANE row 94). Per occurrence, because
     # a component is an algorithm and one algorithm sits in many teams' code; with the line
     # that said it, because it is the file's assumption and not a fact.

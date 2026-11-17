@@ -54,7 +54,9 @@ _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signi
                    # Rows 494, 484: read from another line of the file.
                    "family_named_at", "curve_basis",
                    # Row 500: read from whether the signing key is a file of the tree.
-                   "key_algorithm")
+                   "key_algorithm",
+                   # Row 519: read from another line of the file (the KMS client, the import).
+                   "key_location")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

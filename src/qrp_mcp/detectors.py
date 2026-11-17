@@ -700,7 +700,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # counts it -- and `RS256` is not an English word, which is why a bare token is
         # safe here and a bare `RSA` is not.
         r"(?<![A-Za-z0-9_])(?:RS|PS)(?:256|384|512)(?![0-9A-Za-z_])|"
-        r"[\"']?RSA-OAEP(?:-(?:256|384|512))?[\"']?|[\"']RSA1_5[\"']",
+        r"[\"']?RSA-OAEP(?:-(?:256|384|512))?[\"']?|[\"']RSA1_5[\"']|"
+        # Row 519: azure-keyvault-keys' Python members are lower-case (`SignatureAlgorithm.rs256`).
+        r"\bSignatureAlgorithm\.(?:rs|ps)(?:256|384|512)\b",
     )),
     # A configuration value that names the algorithm is an occurrence: qscan's recall
     # corpus has a whole `config` difficulty class for exactly this
@@ -716,7 +718,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"[\"']ES(?:256|384|512)K?[\"']|"
         r"\bSigningMethodES(?:256|384|512)\b|\bAlgorithm::ES(?:256|384|512)\b|"
         # Same shape, same reason: `jose.ES384` is how certbot's own tests reach it.
-        r"(?<![A-Za-z0-9_])ES(?:256|384|512)K?(?![0-9A-Za-z_])",
+        r"(?<![A-Za-z0-9_])ES(?:256|384|512)K?(?![0-9A-Za-z_])|"
+        # Row 519: azure-keyvault-keys, `SignatureAlgorithm.es256` / `.es256_k`.
+        r"\bSignatureAlgorithm\.es(?:256|384|512)(?:_k)?\b",
     )),
     ("3DES", "3DES (triple DES) usage", re.compile(
         # No word boundaries: the real spellings are glued into identifiers
@@ -4786,6 +4790,31 @@ def _key_location(step: dict[str, Any], uri: str) -> str:
     return KEY_LOCATION_UNKNOWN
 
 
+# Row 519: a row on a KMS SDK call says the key is in the KMS, as a signing step does (row 482).
+# boto3: the KMS API's own parameter names, in a file that makes a `kms` client. Azure Key Vault:
+# its algorithm enums, in a file that imports its cryptography client (jjwt also has a
+# `SignatureAlgorithm`, and signs locally).
+_BOTO3_KMS_CLIENT = re.compile(r"\bclient\(\s*[\"']kms[\"']")
+_BOTO3_KMS_ARG = re.compile(
+    r"\b(?:SigningAlgorithm|EncryptionAlgorithm|KeyAgreementAlgorithm|KeySpec)\s*=\s*[\"']")
+_AZURE_KEYVAULT_CRYPTO = re.compile(
+    r"azure\.keyvault\.keys\.crypto|com\.azure\.security\.keyvault\.keys\.cryptography|"
+    r"Azure\.Security\.KeyVault\.Keys\.Cryptography")
+_AZURE_KEYVAULT_ENUM = re.compile(r"\b(?:SignatureAlgorithm|EncryptionAlgorithm|KeyWrapAlgorithm)\.\w")
+
+
+def _kms_key_location(lines: list[str], rows: list[dict[str, Any]]) -> None:
+    text = "\n".join(lines)
+    boto3 = "boto" in text and _BOTO3_KMS_CLIENT.search(text)
+    azure = _AZURE_KEYVAULT_CRYPTO.search(text)
+    if not (boto3 or azure):
+        return
+    for row in rows:
+        line = lines[row["line"] - 1] if 0 < row.get("line", 0) <= len(lines) else ""
+        if (boto3 and _BOTO3_KMS_ARG.search(line)) or (azure and _AZURE_KEYVAULT_ENUM.search(line)):
+            row["key_location"] = "kms"
+
+
 def _link_recipient_key(step: dict[str, Any], key_files: dict[str, list[str]]) -> None:
     """Row 479: the recipient key's families, only where it is a file the scan read."""
     written = step.pop("_recipient", None)
@@ -5927,6 +5956,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     elif path.suffix.lower() in SOURCE_EXTENSIONS:
         files_scanned["source"] += 1
         found = scan_source_file(path, rel_path, lines, hot=hot)
+        _kms_key_location(lines, found)
         source_findings.extend(found)
         # Uses reached through an alias, folded literals or another file's constant.
         source_findings.extend(indirection.resolve(path, rel_path, lines, found,
