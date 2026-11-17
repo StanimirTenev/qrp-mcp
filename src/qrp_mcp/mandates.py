@@ -1,4 +1,12 @@
-"""`--mandate cnsa-2.0|nist-ir-8547`: the dated clause that applies to each occurrence.
+"""`--mandate NAME`: the dated clause that applies to each occurrence.
+
+NAME is cnsa-2.0 or nist-ir-8547 (United States), or one of `profiles.DATED_MANDATES` (0.48.0):
+eu-pqc-roadmap, uk-ncsc, ca-cccs, au-ism, nl-rqs, se-ncsc, jp-gov, sg-csa-cii, in-dst, de-bsi. A
+dated mandate's clause is every rule of its document that names the occurrence's family and role,
+the earliest date as `deadline`, and the dates for a class of system the scan cannot see
+(high-risk, highest priority) as `earlier_if`, never counted by the gate. Every block says how old
+its reading of the document is on `as_of` (`read_on_age_days`) and `stale` past
+STALE_AFTER_DAYS; it does not move the gate.
 
 Built on the profiles: CNSA 2.0 is the `us-cnsa2` profile's document set, and its dated
 clauses live beside its replacements in `profiles.PROFILES["us-cnsa2"]["mandate"]`; NIST IR
@@ -41,7 +49,13 @@ from .classifier import known_algorithms
 MANDATES: dict[str, dict[str, Any]] = {
     "cnsa-2.0": profiles.PROFILES["us-cnsa2"]["mandate"],
     "nist-ir-8547": profiles.NIST_IR_8547,
+    **profiles.DATED_MANDATES,
 }
+
+# The table of deadlines is a reading of documents that change. A block whose `read_on` is
+# more than this many days before the date the deadlines are counted from (`as_of`) says so.
+# 180 days: two editions of the ISM a year, a TR-02102-1 every January.
+STALE_AFTER_DAYS = 180
 
 # Evidence categories that are key establishment by what they are.
 _KEY_ESTABLISHMENT = {"tls_groups", "ssh_kex", "static_rsa_kex"}
@@ -224,6 +238,114 @@ def _parameter_set(name: str, item: dict[str, Any]) -> dict[str, Any] | None:
             "status": "parameter_set_not_in_mandate"}
 
 
+def _canonical(family: str, role: str) -> list[str]:
+    """The family a dated document names: X25519 is ECDH (a curve of SP 800-186), Ed25519 is
+    EdDSA, EC is ECDSA or ECDH by its role, and both where the line shows none."""
+    if family in _EDDSA:
+        return ["EdDSA"]
+    if family in _EC_AGREEMENT:
+        return ["ECDH"]
+    if family == "EC":
+        return {"signature": ["ECDSA"], "key_establishment": ["ECDH"]}.get(
+            role, ["ECDSA", "ECDH"])
+    return [family]
+
+
+def _date_status(day: date, deadline: str) -> dict[str, Any]:
+    return {"status": "passed" if day > date.fromisoformat(deadline) else "due",
+            "months_until": _months_until(day, date.fromisoformat(deadline))}
+
+
+def _dated(name: str, item: dict[str, Any], family: str, role: str,
+           day: date) -> dict[str, Any] | None:
+    """The clause of a DATED_MANDATES entry: every rule that names this family and role (both
+    roles where the line shows none), the earliest of their dates as `deadline`, and the
+    conditional dates earlier than it as `earlier_if`."""
+    m = MANDATES[name]
+    canon = _canonical(family, role)
+    size = item.get("key_size")
+    curve = _CURVE.search(f"{item.get('curve') or ''} {item.get('excerpt') or ''}")
+    hits = []
+    for rule in m["rules"]:
+        if rule["families"] != "*" and not set(canon) & set(rule["families"]):
+            continue
+        if rule.get("role") and role != "undetermined" and rule["role"] != role:
+            continue
+        if family in rule.get("except", ()):
+            continue
+        if "key_size_below" in rule and not (isinstance(size, int)
+                                             and size < rule["key_size_below"]):
+            continue
+        if "curve" in rule and not (curve and curve.group(1) == rule["curve"]):
+            continue
+        hits.append(rule)
+    if not hits:
+        if not m.get("unlisted"):
+            return None
+        return {"clause": m["unlisted"], "source": m["document"], "status": "not_in_document"}
+    deadline = min(r["deadline"] for r in hits)
+    first = [r for r in hits if r["deadline"] == deadline]
+    out: dict[str, Any] = {"clause": "; ".join(dict.fromkeys(r["clause"] for r in first)),
+                           "source": f"{m['document']}, "
+                                     + "; ".join(dict.fromkeys(r["source"] for r in first)),
+                           "deadline": deadline, **_date_status(day, deadline)}
+    if len(hits) > len(first):
+        out["also"] = [{"clause": r["clause"], "deadline": r["deadline"], "source": r["source"]}
+                       for r in hits if r not in first]
+    if role == "undetermined" and len({r.get("role") for r in hits}) > 1:
+        out["note"] = ("the line shows no role: the dates for key establishment and for "
+                       "signatures both apply, and the earlier is the deadline")
+    earlier = [{"date": c["date"], "clause": c["clause"], "if": c["applies"]}
+               for c in m.get("conditional") or []
+               if c["date"] < deadline and role in c.get("roles", [role])]
+    if earlier:
+        out["earlier_if"] = earlier
+    return out
+
+
+def _dated_parameter_set(name: str, item: dict[str, Any], day: date) -> dict[str, Any] | None:
+    """A post-quantum parameter set the document dates (ML-KEM-768 under the ISM)."""
+    m = MANDATES[name]
+    rule = (m.get("parameter_sets") or {}).get(profiles.parameter_set_name(item))
+    if rule is None:
+        return None
+    return {"clause": rule["clause"], "source": f"{m['document']}, {rule['source']}",
+            "deadline": rule["deadline"], **_date_status(day, rule["deadline"])}
+
+
+def _composite_dated(name: str, halves: set[str]) -> dict[str, Any]:
+    m = MANDATES[name]
+    with_ = ", ".join(sorted(halves))
+    if m.get("composite"):
+        return {"clause": f"classical half of a composite (hybrid) key establishment with "
+                          f"{with_} on this line", "source": f"{m['document']}, "
+                                                             f"{m['composite']}",
+                "status": "composite_allowed"}
+    return {"clause": f"classical half of a composite (hybrid) key establishment with {with_} "
+                      f"on this line: the document gives no date for the classical half of a "
+                      f"hybrid, and none is applied", "source": m["document"],
+            "status": "composite_not_addressed"}
+
+
+def _stale(m: dict[str, Any], day: date) -> dict[str, Any]:
+    """How old the reading of the document is on the day the deadlines are counted from."""
+    read = date.fromisoformat(m["read_on"])
+    age = (day - read).days
+    out: dict[str, Any] = {"read_on_age_days": age, "stale_after_days": STALE_AFTER_DAYS,
+                           "stale": age > STALE_AFTER_DAYS}
+    if out["stale"]:
+        out["stale_because"] = (
+            f"the deadlines were read from the document on {m['read_on']}, {age} days before "
+            f"{day.isoformat()} (more than {STALE_AFTER_DAYS}): a newer version may have moved "
+            f"them; check {m['url']}")
+    return out
+
+
+def stale(result: dict[str, Any]) -> list[str]:
+    """The names of the mandates whose reading is stale, for the command line's warning."""
+    return [n for n, b in (result.get("mandates") or {}).items() if b.get("stale")]
+
+
 def apply(result: dict[str, Any], names: list[str], day: date,
           lead_months: int | None = None, min_coverage: float | None = None) -> bool:
     """Annotate `result` in place; return True when the gate fails."""
@@ -241,10 +363,20 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             "in_scope": 0, "not_in_scope": 0, "hndl_exposed": 0, "hndl_not_determined": 0,
             "within_lead": 0,
             "by_status": {}, "next_deadline": None, "gate": "pass",
-            "gate_counts": "deadline" if name == "cnsa-2.0" else "deprecated_after",
+            "gate_counts": "deprecated_after" if name == "nist-ir-8547" else "deadline",
             "next_gate_deadline": None,
+            **_stale(m, day),
         }
-        if name == "cnsa-2.0":
+        if name in profiles.DATED_MANDATES:
+            if m.get("sources"):
+                blocks[name]["sources"] = m["sources"]
+            blocks[name]["addresses"] = m["addresses"]
+            blocks[name]["composite"] = 0
+            blocks[name]["conditional"] = [{**c, "counted_by_gate": False}
+                                           for c in m.get("conditional") or []]
+            if m.get("milestones"):
+                blocks[name]["milestones"] = m["milestones"]
+        elif name == "cnsa-2.0":
             blocks[name]["new_products"] = m["new_products"]
             blocks[name]["complete_by"] = {"date": m["complete_by"][0],
                                            "clause": m["complete_by"][1]}
@@ -270,7 +402,9 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                 or any(r.startswith(f"{family}-") and v in vulnerable for r, v in raw.items()))
             if not (in_vulnerable or signing):
                 for name, block in blocks.items():
-                    clause = _parameter_set(name, item)
+                    clause = (_dated_parameter_set(name, item, day)
+                              if name in profiles.DATED_MANDATES and item.get("parameter_set")
+                              else _parameter_set(name, item))
                     if clause is None:
                         block["not_in_scope"] += 1
                         continue
@@ -278,6 +412,9 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                     block["in_scope"] += 1
                     block["by_status"][clause["status"]] = block["by_status"].get(
                         clause["status"], 0) + 1
+                    # A dated parameter set (ML-KEM-768 under the ISM) is a deadline.
+                    if "deadline" in clause and _count_date(block, clause, item, day, horizon):
+                        failed = True
                 continue
             role = "signature" if signing else _role(category, item, family or "", kinds)
             # The classical half of a hybrid named on this very line (source rows only: a
@@ -286,15 +423,21 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             composite = category == "source_code" and family in halves
             said: dict[str, Any] = {}
             for name in names:
-                if composite and name == "nist-ir-8547":
-                    clause = _composite(halves - {family, "ECDH"} or halves)
+                dated = name in profiles.DATED_MANDATES
+                if composite and (name == "nist-ir-8547" or dated):
+                    others = halves - {family, "ECDH"} or halves
+                    clause = _composite_dated(name, others) if dated else _composite(others)
                     said[name] = clause
                     blocks[name]["in_scope"] += 1
                     blocks[name]["composite"] += 1
-                    blocks[name]["by_status"]["composite_allowed"] = blocks[name][
-                        "by_status"].get("composite_allowed", 0) + 1
+                    blocks[name]["by_status"][clause["status"]] = blocks[name][
+                        "by_status"].get(clause["status"], 0) + 1
                     continue
                 clause = (_cnsa(category, item, day) if name == "cnsa-2.0"
+                          # A signing step whose key is not a quantum-vulnerable family (an
+                          # ML-DSA key, or one not read) is not dated by these documents.
+                          else (_dated(name, item, family or "", role, day) if in_vulnerable
+                                else None) if dated
                           else None if signing else _nist(item, family or "", role, day))
                 if clause is None:
                     blocks[name]["not_in_scope"] += 1
@@ -306,26 +449,13 @@ def apply(result: dict[str, Any], names: list[str], day: date,
                     clause["status"], 0) + 1
                 if "legacy_use" in clause:
                     block["verify_or_decrypt_only"] += 1
-                # Row 160: the gate counts the date the headline gives, the deprecation for
-                # NIST IR 8547 (2030), not the disallowance five years later.
-                gate_date = clause.get("deprecated_after") or clause["deadline"]
-                if block["next_gate_deadline"] is None or gate_date < block[
-                        "next_gate_deadline"]:
-                    block["next_gate_deadline"] = gate_date
-                upcoming = [d for d in (clause.get("deprecated_after"), clause["deadline"])
-                            if d and date.fromisoformat(d) >= day]
-                if upcoming and (block["next_deadline"] is None
-                                 or min(upcoming) < block["next_deadline"]):
-                    block["next_deadline"] = min(upcoming)
                 if role == "key_establishment":
                     block["hndl_exposed"] += 1
                 elif role == "undetermined":
                     block["hndl_not_determined"] += 1
-                if date.fromisoformat(gate_date) <= horizon:
-                    block["within_lead"] += 1
-                    if item.get("baseline_state") != "baselined":
-                        block["gate"] = "fail"
-                        failed = True
+                # A family the document does not name has no date (`not_in_document`).
+                if "deadline" in clause and _count_date(block, clause, item, day, horizon):
+                    failed = True
             if said:
                 item["mandates"] = said
                 # RSA and EC whose line shows no role may be either: said, not guessed.
@@ -355,6 +485,26 @@ def apply(result: dict[str, Any], names: list[str], day: date,
             block["gate_not_established_because"] = unread
     result["mandates"] = blocks
     return failed
+
+
+def _count_date(block: dict[str, Any], clause: dict[str, Any], item: dict[str, Any], day: date,
+                horizon: date) -> bool:
+    """Count a clause's date on its block; True when it trips the gate."""
+    # Row 160: the gate counts the date the headline gives, the deprecation for
+    # NIST IR 8547 (2030), not the disallowance five years later.
+    gate_date = clause.get("deprecated_after") or clause["deadline"]
+    if block["next_gate_deadline"] is None or gate_date < block["next_gate_deadline"]:
+        block["next_gate_deadline"] = gate_date
+    upcoming = [d for d in (clause.get("deprecated_after"), clause["deadline"])
+                if d and date.fromisoformat(d) >= day]
+    if upcoming and (block["next_deadline"] is None or min(upcoming) < block["next_deadline"]):
+        block["next_deadline"] = min(upcoming)
+    if date.fromisoformat(gate_date) <= horizon:
+        block["within_lead"] += 1
+        if item.get("baseline_state") != "baselined":
+            block["gate"] = "fail"
+            return True
+    return False
 
 
 def _unread(result: dict[str, Any]) -> str | None:

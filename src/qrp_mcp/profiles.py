@@ -353,6 +353,556 @@ NIST_IR_8547: dict[str, Any] = {
 }
 
 
+# `--mandate eu-pqc-roadmap|uk-ncsc|ca-cccs|au-ism|nl-rqs|se-ncsc|jp-gov|sg-csa-cii|in-dst|
+# de-bsi` (mandates.py, 0.48.0): the dated clauses of other jurisdictions, each quoted from its
+# own document, quoted below. Only dates checked against the primary text are here; documents
+# whose dates no line of code carries (a plan, a class of information) are not.
+#
+# Each entry: `rules` are the dates an occurrence carries by itself -- by family (RSA, DH, ECDH,
+# ECDSA, EdDSA, DSA; "*" is any quantum-vulnerable family) and by role, where the document
+# separates them. `conditional` are dates that apply only to a class of system the scan cannot
+# see (high-risk, highest priority): said beside the clause as `earlier_if` and on the block,
+# never counted by the gate (the precedent of row 493). `milestones` are organisational dates
+# (a plan, an inventory) that no line of code carries; on the block only. `composite` is the
+# document's text that leaves the classical half of a hybrid out of the date. A rule's `except`
+# names families the document's own list leaves out of it. `unlisted` is
+# what is said of a quantum-vulnerable family the document does not name. "By 2030" is read as
+# the end of 2030, as for cnsa-2.0: the documents give years.
+DATED_MANDATES: dict[str, dict[str, Any]] = {
+    # NIS Cooperation Group, "A Coordinated Implementation Roadmap for the Transition to
+    # Post-Quantum Cryptography", Part 1, Version 1.1, 11.06.2025. Section 4.1: "For high-risk
+    # use cases, quantum-vulnerable public-key mechanisms shall not be used stand-alone after
+    # the end of 2030, analogously after the end of 2035 for medium-risk use cases." The box
+    # "Timeline for the transition to PQC": "3. By 31.12.2035: The PQC transition for
+    # medium-risk use cases has been completed. The PQC transition for low-risk use cases has
+    # been completed as much as feasible." "2. By 31.12.2030: ... The PQC transition for
+    # high-risk use cases has been completed. ... Quantum-safe software and firmware upgrades
+    # are enabled by default." "1. By 31.12.2026: ... Initial national PQC transition roadmaps
+    # have been established by all Member States." High-risk (section 4.2 item 2): "if
+    # compromising confidentiality after 10 years or more would still cause significant
+    # damage"; section 5 adds high transition effort with high impact, "for example for
+    # securing software updates". The scan sees neither, so 2035 -- the date for every use case
+    # that is not low-risk, and the end of the roadmap for those that are -- is the one counted.
+    "eu-pqc-roadmap": {
+        "name": "eu-pqc-roadmap",
+        "document": "NIS Cooperation Group, A Coordinated Implementation Roadmap for the "
+                    "Transition to Post-Quantum Cryptography (Part 1, Version 1.1, 11.06.2025)",
+        "url": "https://digital-strategy.ec.europa.eu/en/library/coordinated-implementation-"
+               "roadmap-transition-post-quantum-cryptography",
+        "read_on": "2026-11-17",
+        "addresses": "EU Member States, recommended (not law); NIS2 entities through their "
+                     "national plans",
+        "rules": [
+            {"families": "*", "deadline": "2035-12-31",
+             "clause": "quantum-vulnerable public-key mechanisms shall not be used stand-alone "
+                       "after the end of 2035 for medium-risk use cases; the transition for "
+                       "low-risk use cases completed as much as feasible by 31.12.2035",
+             "source": "section 4.1 and the box 'Timeline for the transition to PQC', item 3"},
+        ],
+        "conditional": [
+            {"date": "2030-12-31",
+             "clause": "for high-risk use cases, quantum-vulnerable public-key mechanisms shall "
+                       "not be used stand-alone after the end of 2030",
+             "applies": "only if the use case is high-risk: confidentiality that would still "
+                        "matter after 10 years or more, or a high transition effort with a "
+                        "high impact such as securing software updates (sections 4.2, 5); the "
+                        "scan cannot tell which use cases are",
+             "source": "section 4.1; the box 'Timeline for the transition to PQC', item 2"},
+            {"date": "2030-12-31",
+             "clause": "quantum-safe software and firmware upgrades are enabled by default",
+             "applies": "only if this signs software or firmware upgrades; the scan cannot "
+                        "tell what a key signs",
+             "roles": ["signature", "undetermined"],
+             "source": "the box 'Timeline for the transition to PQC', item 2"},
+        ],
+        "milestones": [
+            {"date": "2026-12-31",
+             "clause": "at least the First Steps implemented and initial national PQC "
+                       "transition roadmaps established by all Member States",
+             "source": "the box 'Timeline for the transition to PQC', item 1"},
+        ],
+        "composite": "section 4.1: the dates are for quantum-vulnerable mechanisms used "
+                     "'stand-alone'; the roadmap recommends 'standardised and tested hybrid "
+                     "solutions'",
+    },
+    # NCSC, "Timelines for migration to post-quantum cryptography", Version 1.0, published and
+    # reviewed 20 March 2025: "By 2028 ... Carry out a full discovery exercise ... Build an
+    # initial plan for migration"; "By 2031 Carry out your early, highest-priority PQC
+    # migration activities"; "By 2035 Complete migration to PQC of all your systems, services
+    # and products". "This leads to a target date of 2035 for completing migration to
+    # post-quantum cryptography." Guidance, not law: "indicative timelines that UK industry,
+    # government and regulators can follow".
+    "uk-ncsc": {
+        "name": "uk-ncsc",
+        "document": "NCSC, Timelines for migration to post-quantum cryptography (Version 1.0, "
+                    "20 March 2025)",
+        "url": "https://www.ncsc.gov.uk/guidance/pqc-migration-timelines",
+        "read_on": "2026-11-17",
+        "addresses": "UK organisations; 'indicative timelines that UK industry, government and "
+                     "regulators can follow' (guidance, not law)",
+        "rules": [
+            {"families": "*", "deadline": "2035-12-31",
+             "clause": "By 2035: Complete migration to PQC of all your systems, services and "
+                       "products",
+             "source": "Executive summary, key milestones"},
+        ],
+        "conditional": [
+            {"date": "2031-12-31",
+             "clause": "By 2031: Carry out your early, highest-priority PQC migration "
+                       "activities",
+             "applies": "only if this system is among the owner's highest-priority "
+                        "migrations; the scan cannot tell",
+             "source": "Executive summary, key milestones"},
+        ],
+        "milestones": [
+            {"date": "2028-12-31",
+             "clause": "By 2028: Define your migration goals; carry out a full discovery "
+                       "exercise; build an initial plan for migration",
+             "source": "Executive summary, key milestones"},
+        ],
+    },
+    # Canadian Centre for Cyber Security. ITSP.40.111, "Cryptographic algorithms for
+    # UNCLASSIFIED, PROTECTED A, and PROTECTED B information", Version 5, in effect May 29,
+    # 2026. Section 5.1: "The RSA modulus length should be increased to at least 3072 bits by
+    # the end of 2030. The use of RSA without a post-quantum key establishment scheme should be
+    # phased out by the end of 2035." 5.2: "The FFC field size should be increased to at least
+    # 3072 bits by the end of 2030. The use of FFC DH and FFC MQV without a post-quantum key
+    # establishment scheme should be phased out by the end of 2035." 5.3: "Curve P-224 should be
+    # phased out by the end of 2030." "The use of ECC CDH and ECC MQV without a post-quantum key
+    # establishment scheme should be phased out by the end of 2035." 6.1: "The RSA modulus
+    # length should be increased to at least 3072 bits by the end of 2030. The use of RSA
+    # without a post-quantum digital signature scheme should be phased out by the end of
+    # 2035." 6.2: "The use of Digital Signature Algorithm (DSA) should be phased out by the end
+    # of 2030." 6.3: "Curve P-224 should be phased out by the end of 2030." "The use of ECDSA
+    # without a post-quantum digital signature scheme should be phased out by the end of 2035."
+    # 6.4: "The use of EdDSA without a post-quantum digital signature scheme should be phased
+    # out by the end of 2035." ITSM.40.001, "Roadmap for the migration to post-quantum
+    # cryptography for the Government of Canada", in effect June 23, 2025, section 4: "April
+    # 2026: Develop an initial departmental PQC migration plan"; "End of 2031: Completion of
+    # PQC migration of high priority systems"; "End of 2035: Completion of PQC migration of
+    # remaining systems" -- for "non-classified IT systems" of federal departments.
+    "ca-cccs": {
+        "name": "ca-cccs",
+        "document": "Canadian Centre for Cyber Security, ITSP.40.111 Cryptographic algorithms "
+                    "for UNCLASSIFIED, PROTECTED A, and PROTECTED B information (Version 5, "
+                    "in effect May 29, 2026); ITSM.40.001 Roadmap for the migration to "
+                    "post-quantum cryptography for the Government of Canada (June 23, 2025)",
+        "url": "https://www.cyber.gc.ca/sites/default/files/itsp40111-cryptographic-"
+               "algorithms-e.pdf",
+        "read_on": "2026-11-17",
+        "sources": [
+            {"document": "ITSP.40.111, Version 5", "read_on": "2026-11-17",
+             "url": "https://www.cyber.gc.ca/sites/default/files/itsp40111-cryptographic-"
+                    "algorithms-e.pdf"},
+            {"document": "ITSM.40.001", "read_on": "2026-11-17",
+             "url": "https://www.cyber.gc.ca/sites/default/files/itsm.40.001-migration-post-"
+                    "quantum-cryptography-government-canada-e.pdf"},
+        ],
+        "addresses": "UNCLASSIFIED, PROTECTED A and PROTECTED B information (ITSP.40.111); "
+                     "non-classified IT systems of Government of Canada departments "
+                     "(ITSM.40.001)",
+        "rules": [
+            {"families": ["RSA"], "role": "key_establishment", "deadline": "2035-12-31",
+             "clause": "The use of RSA without a post-quantum key establishment scheme should "
+                       "be phased out by the end of 2035",
+             "source": "ITSP.40.111 section 5.1"},
+            {"families": ["RSA"], "role": "key_establishment", "deadline": "2030-12-31",
+             "key_size_below": 3072,
+             "clause": "The RSA modulus length should be increased to at least 3072 bits by "
+                       "the end of 2030",
+             "source": "ITSP.40.111 section 5.1"},
+            {"families": ["DH"], "deadline": "2035-12-31",
+             "clause": "The use of FFC DH and FFC MQV without a post-quantum key establishment "
+                       "scheme should be phased out by the end of 2035",
+             "source": "ITSP.40.111 section 5.2"},
+            {"families": ["DH"], "deadline": "2030-12-31", "key_size_below": 3072,
+             "clause": "The FFC field size should be increased to at least 3072 bits by the "
+                       "end of 2030",
+             "source": "ITSP.40.111 section 5.2"},
+            # Section 5.3 recommends ECC CDH on P-224, P-256, P-384 and P-521 only: X25519 and
+            # X448 are not among its curves, so they are `unlisted`, not dated.
+            {"families": ["ECDH"], "deadline": "2035-12-31", "except": ["X25519", "X448"],
+             "clause": "The use of ECC CDH and ECC MQV without a post-quantum key establishment "
+                       "scheme should be phased out by the end of 2035",
+             "source": "ITSP.40.111 section 5.3"},
+            {"families": ["ECDH", "ECDSA"], "deadline": "2030-12-31", "curve": "224",
+             "clause": "Curve P-224 should be phased out by the end of 2030",
+             "source": "ITSP.40.111 sections 5.3 and 6.3"},
+            {"families": ["RSA"], "role": "signature", "deadline": "2035-12-31",
+             "clause": "The use of RSA without a post-quantum digital signature scheme should "
+                       "be phased out by the end of 2035",
+             "source": "ITSP.40.111 section 6.1"},
+            {"families": ["RSA"], "role": "signature", "deadline": "2030-12-31",
+             "key_size_below": 3072,
+             "clause": "The RSA modulus length should be increased to at least 3072 bits by "
+                       "the end of 2030",
+             "source": "ITSP.40.111 section 6.1"},
+            {"families": ["DSA"], "deadline": "2030-12-31",
+             "clause": "The use of Digital Signature Algorithm (DSA) should be phased out by "
+                       "the end of 2030",
+             "source": "ITSP.40.111 section 6.2"},
+            {"families": ["ECDSA"], "deadline": "2035-12-31",
+             "clause": "The use of ECDSA without a post-quantum digital signature scheme should "
+                       "be phased out by the end of 2035",
+             "source": "ITSP.40.111 section 6.3"},
+            {"families": ["EdDSA"], "deadline": "2035-12-31",
+             "clause": "The use of EdDSA without a post-quantum digital signature scheme should "
+                       "be phased out by the end of 2035",
+             "source": "ITSP.40.111 section 6.4"},
+        ],
+        "conditional": [
+            {"date": "2031-12-31",
+             "clause": "End of 2031: Completion of PQC migration of high priority systems",
+             "applies": "only for a high priority non-classified IT system of a Government of "
+                        "Canada department; the scan cannot tell",
+             "source": "ITSM.40.001 section 4"},
+        ],
+        "milestones": [
+            {"date": "2026-04",
+             "clause": "April 2026: Develop an initial departmental PQC migration plan; "
+                       "beginning April 2026 and annually after: report on PQC migration "
+                       "progress",
+             "source": "ITSM.40.001 section 4"},
+            {"date": "2035-12-31",
+             "clause": "End of 2035: Completion of PQC migration of remaining systems",
+             "source": "ITSM.40.001 section 4"},
+        ],
+        "composite": "ITSP.40.111 sections 5 and 6: each phase-out is of the classical scheme "
+                     "used 'without a post-quantum' key establishment or signature scheme",
+        "unlisted": "not among the schemes ITSP.40.111 recommends; it gives no date for it",
+    },
+    # ASD, Information security manual, September 2026, Guidelines for cryptography. "Taking
+    # into account projected technological advances in quantum computing, DH will not be
+    # approved beyond 2030." -- and the same sentence for ECDH, ECDSA and RSA. "For
+    # interoperability and maintainability reasons, ML-DSA-65 will not be approved beyond
+    # 2030." "... ML-KEM-768 will not be approved beyond 2030." The approved asymmetric
+    # algorithms are DH, ECDH, ECDSA, ML-DSA, ML-KEM and RSA; "Only AACAs or high assurance
+    # cryptographic algorithms are used by cryptographic equipment, applications and
+    # libraries" (ISM-0471) -- EdDSA and DSA are not among them. ECDH is on "a suitable curve
+    # from NIST SP 800-186", which specifies Curve25519 and Curve448 (section 3.2.2; read
+    # 17.11.2026), so X25519 and X448 are ECDH here. ISM-1996: "When a
+    # post-quantum traditional hybrid scheme is used, either the post-quantum cryptographic
+    # algorithm, the traditional cryptographic algorithm or both are AACAs." ISM-1917: "The
+    # development and procurement of new cryptographic equipment, applications and libraries
+    # ensures support for the use of ML-DSA-87, ML-KEM-1024, SHA-384, SHA-512 and AES-256 by no
+    # later than 2030."
+    "au-ism": {
+        "name": "au-ism",
+        "document": "ASD, Information security manual (September 2026), Guidelines for "
+                    "cryptography",
+        "url": "https://www.cyber.gov.au/sites/default/files/2026-08/Information%20security%20"
+               "manual%20%28September%202026%29.pdf",
+        # The sentences were read from the PDF fetched on 27.09.2026. On 17.11.2026 the ISM's
+        # "latest" page still gave the September 2026 edition (read in a browser; the site
+        # refuses scripted fetches), so the reading is dated by the copy.
+        "read_on": "2026-09-27",
+        "addresses": "organisations applying the ISM (Australian government entities, and "
+                     "others by choice)",
+        "rules": [
+            {"families": ["DH"], "deadline": "2030-12-31",
+             "clause": "DH will not be approved beyond 2030",
+             "source": "Guidelines for cryptography, Using Diffie-Hellman"},
+            {"families": ["ECDH"], "deadline": "2030-12-31",
+             "clause": "ECDH will not be approved beyond 2030",
+             "source": "Guidelines for cryptography, Using Elliptic Curve Diffie-Hellman"},
+            {"families": ["ECDSA"], "deadline": "2030-12-31",
+             "clause": "ECDSA will not be approved beyond 2030",
+             "source": "Guidelines for cryptography, Using the Elliptic Curve Digital "
+                       "Signature Algorithm"},
+            {"families": ["RSA"], "deadline": "2030-12-31",
+             "clause": "RSA will not be approved beyond 2030",
+             "source": "Guidelines for cryptography, Using Rivest-Shamir-Adleman"},
+        ],
+        "parameter_sets": {
+            "ML-KEM-768": {"deadline": "2030-12-31",
+                           "clause": "ML-KEM-768 will not be approved beyond 2030",
+                           "source": "Guidelines for cryptography, Using the Module-Lattice-"
+                                     "Based Key Encapsulation Mechanism"},
+            "ML-DSA-65": {"deadline": "2030-12-31",
+                          "clause": "ML-DSA-65 will not be approved beyond 2030",
+                          "source": "Guidelines for cryptography, Using the Module-Lattice-"
+                                    "Based Digital Signature Algorithm"},
+        },
+        "milestones": [
+            {"date": "2030-12-31",
+             "clause": "The development and procurement of new cryptographic equipment, "
+                       "applications and libraries ensures support for the use of ML-DSA-87, "
+                       "ML-KEM-1024, SHA-384, SHA-512 and AES-256 by no later than 2030",
+             "source": "ISM-1917"},
+        ],
+        "composite": "ISM-1996: in a post-quantum traditional hybrid scheme 'either the "
+                     "post-quantum cryptographic algorithm, the traditional cryptographic "
+                     "algorithm or both are AACAs'",
+        "unlisted": "not an ASD-approved asymmetric cryptographic algorithm (ISM-0471: only "
+                    "AACAs or high assurance algorithms are used); the ISM gives it no date",
+    },
+    # Rijksoverheid, "Rijksbrede Quantumstrategie", sent to parliament on 5 oktober 2026, the box
+    # "PQC-migratie tijdpad voor de Nederlandse Rijksoverheid": "Uiterlijk eind 2030: ...
+    # Rijksoverheidsorganisaties hebben de PQC-migratie voor gebruiksscenario's met een hoog
+    # risico voltooid. Software en firmware maken standaard gebruik van quantumveilige
+    # cryptografie." "Uiterlijk eind 2035: De Rijksoverheid heeft de PQC-migratie voor
+    # gebruiksscenario's met een gemiddeld risico voltooid. De Rijksoverheid heeft PQC-migratie
+    # voor gebruiksscenario's met een laag risico voor zover mogelijk voltooid." "Uiterlijk eind
+    # 2027: Rijksoverheidsorganisaties hebben een (concept) PQC-migratieplanning opgesteld". Its
+    # nature: "De Nederlandse Rijksoverheid streeft ernaar om dit tijdpad aan te houden." For
+    # central government organisations only; the EU roadmap's shape, so the same reading.
+    "nl-rqs": {
+        "name": "nl-rqs",
+        "document": "Rijksoverheid, Rijksbrede Quantumstrategie (5 oktober 2026), PQC-migratie "
+                    "tijdpad voor de Nederlandse Rijksoverheid",
+        "url": "https://zoek.officielebekendmakingen.nl/blg-1279064.pdf",
+        "read_on": "2026-11-17",
+        "addresses": "Dutch central government organisations (Rijksoverheidsorganisaties); the "
+                     "government 'streeft ernaar' (aims) to keep to it",
+        "rules": [
+            {"families": "*", "deadline": "2035-12-31",
+             "clause": "Uiterlijk eind 2035: De Rijksoverheid heeft de PQC-migratie voor "
+                       "gebruiksscenario's met een gemiddeld risico voltooid [en] voor "
+                       "gebruiksscenario's met een laag risico voor zover mogelijk voltooid",
+             "source": "PQC-migratie tijdpad, 'Uiterlijk eind 2035'"},
+        ],
+        "conditional": [
+            {"date": "2030-12-31",
+             "clause": "Uiterlijk eind 2030: Rijksoverheidsorganisaties hebben de PQC-migratie "
+                       "voor gebruiksscenario's met een hoog risico voltooid",
+             "applies": "only for a high-risk use case; the scan cannot tell",
+             "source": "PQC-migratie tijdpad, 'Uiterlijk eind 2030'"},
+            {"date": "2030-12-31",
+             "clause": "Uiterlijk eind 2030: Software en firmware maken standaard gebruik van "
+                       "quantumveilige cryptografie",
+             "applies": "only if this is the cryptography of software or firmware by default "
+                        "(its updates, its signing); the scan cannot tell what a key protects",
+             "roles": ["signature", "undetermined"],
+             "source": "PQC-migratie tijdpad, 'Uiterlijk eind 2030'"},
+        ],
+        "milestones": [
+            {"date": "2026-12-31",
+             "clause": "Uiterlijk eind 2026: het risico van quantumcomputingtechnologie "
+                       "meegenomen in het risicomanagementproces; een eigen cryptografiebeleid",
+             "source": "PQC-migratie tijdpad, 'Uiterlijk eind 2026'"},
+            {"date": "2027-12-31",
+             "clause": "Uiterlijk eind 2027: een (concept) PQC-migratieplanning opgesteld",
+             "source": "PQC-migratie tijdpad, 'Uiterlijk eind 2027'"},
+            {"date": "2028-12-31",
+             "clause": "Uiterlijk eind 2028: bij inkoop en aanbestedingen eisen en wensen stellen "
+                       "over het gebruik van quantumveilige cryptografie",
+             "source": "PQC-migratie tijdpad, 'Uiterlijk eind 2028'"},
+        ],
+    },
+    # NCSC (Sweden), "Nationella rekommendationer för övergången till kvantsäker kryptografi
+    # 2026", published 27 maj 2026: "Färdigt 2035: Hela övergången till kvantsäker kryptografi
+    # ska vara klar till slutet av år 2035." "Färdigt 2030: För viss information är det dock
+    # bråttom och övergången ska vara klar till slutet av 2030. Det gäller information som är
+    # känslig mer än tio år framåt i tiden, exempelvis sådan som rör individers hälsodata."
+    "se-ncsc": {
+        "name": "se-ncsc",
+        "document": "NCSC (Sweden), Nationella rekommendationer för övergången till kvantsäker "
+                    "kryptografi 2026 (27 maj 2026)",
+        "url": "https://www.ncsc.se/siteassets/publikationer/nationella-rekommendationer-for-"
+               "overgangen-till-kvantsaker-kryptografi-2026_tga.pdf",
+        "read_on": "2026-11-17",
+        "addresses": "Swedish organisations, national recommendations (focus on NIS2 and "
+                     "Cybersäkerhetslagen entities)",
+        "rules": [
+            {"families": "*", "deadline": "2035-12-31",
+             "clause": "Hela övergången till kvantsäker kryptografi ska vara klar till slutet "
+                       "av år 2035",
+             "source": "section 'Färdigt 2035'"},
+        ],
+        "conditional": [
+            {"date": "2030-12-31",
+             "clause": "övergången ska vara klar till slutet av 2030 [för] information som är "
+                       "känslig mer än tio år framåt i tiden",
+             "applies": "only if the information is sensitive more than ten years ahead (e.g. "
+                        "health data); the scan cannot tell",
+             "source": "section 'Färdigt 2030'"},
+        ],
+    },
+    # Cabinet Secretariat (National Cybersecurity Office) and the inter-ministerial PQC
+    # liaison council, 「政府機関等における耐量子計算機暗号（PQC）への移行について（中間とりまとめ）」,
+    # 令和7年11月 (November 2025), section 4 (1): "原則として、2035 年を目処に、耐量子計算機暗号
+    # （PQC）へ移行を行うこととする。" ("In principle, migrate to PQC by around 2035.") It continues:
+    # "特に機微な情報や保護期間が非常に長期となることが想定されている情報等を扱う場合等においては、
+    # より早期に移行を行うことも含め、情報システムごとに適切に検討を行うこととする。" -- earlier
+    # migration for very sensitive or long-protected information, decided per system, with no
+    # date. A roadmap (工程表) is to be drawn up in FY2026. For government bodies under the
+    # Unified Standards. "2035 年を目処に" is read as the end of 2035.
+    "jp-gov": {
+        "name": "jp-gov",
+        "document": "Cabinet Secretariat (Japan), 政府機関等における耐量子計算機暗号（PQC）への"
+                    "移行について（中間とりまとめ） (November 2025)",
+        "url": "https://www.cas.go.jp/jp/seisaku/pqc/pdf/report_202511.pdf",
+        "read_on": "2026-11-17",
+        "addresses": "Japanese government bodies (政府機関等) under the government's Unified "
+                     "Standards; a target 'in principle' (原則として)",
+        "rules": [
+            {"families": "*", "deadline": "2035-12-31",
+             "clause": "原則として、2035 年を目処に、耐量子計算機暗号（PQC）へ移行を行うこととする "
+                       "(in principle, migrate to PQC by around 2035)",
+             "source": "section 4 (1), 耐量子計算機暗号（PQC）への移行期限"},
+        ],
+        "milestones": [
+            {"date": "2027-03-31",
+             "clause": "2026 年度に工程表（ロードマップ）を策定 (a roadmap drawn up in FY2026, "
+                       "which ends 31 March 2027)",
+             "source": "section 1"},
+        ],
+    },
+    # Cyber Security Agency of Singapore, Quantum-Safe Handbook V1 (16 Jul 2026): "Singapore is
+    # aligning with this momentum with requirements for Critical Information Infrastructure
+    # (CII) owners as part of their quantum-safe migration planning: By 31 Mar 2027: Submission
+    # of CII owner's quantum-safe migration plan to CSA. From 1 Jan 2028: Procurement and
+    # implementation of new CII computer and computer systems that have a digital component
+    # should either (a) support quantum-safe algorithms/ technologies; and/or (b) be
+    # quantum-safe ready. By 31 Dec 2031: Completion of quantum-safe migration across CII
+    # computer and computer systems, i.e. vulnerable cryptography should no longer be used."
+    # MAS Consultation Paper P019-2026 (6 Nov 2026) proposes other dates for financial
+    # institutions; a consultation, not in force, so not here.
+    "sg-csa-cii": {
+        "name": "sg-csa-cii",
+        "document": "Cyber Security Agency of Singapore, Quantum-Safe Handbook V1 (16 Jul "
+                    "2026), requirements for CII owners",
+        "url": "https://www.csa.gov.sg/resources/publications/quantum-safe-handbook-and-"
+               "quantum-readiness-index",
+        "read_on": "2026-11-17",
+        "addresses": "owners of Critical Information Infrastructure (CII) in Singapore only",
+        "rules": [
+            {"families": "*", "deadline": "2031-12-31",
+             "clause": "By 31 Dec 2031: Completion of quantum-safe migration across CII computer "
+                       "and computer systems, i.e. vulnerable cryptography should no longer be "
+                       "used",
+             "source": "requirements for CII owners, third item"},
+        ],
+        "milestones": [
+            {"date": "2027-03-31",
+             "clause": "By 31 Mar 2027: Submission of CII owner's quantum-safe migration plan to "
+                       "CSA",
+             "source": "requirements for CII owners, first item"},
+            {"date": "2028-01-01",
+             "clause": "From 1 Jan 2028: new CII computer and computer systems that have a "
+                       "digital component should support quantum-safe algorithms or be "
+                       "quantum-safe ready",
+             "source": "requirements for CII owners, second item"},
+        ],
+    },
+    # Department of Science and Technology, National Quantum Mission, Task Force report "Report
+    # on Quantum-Safe Ecosystem in India -- Roadmap to Quantum Resiliency" (May 2026): "CII
+    # sectors -- government, strategic, defence, power, telecom, transport, and Banking,
+    # Financial Services and Insurance (BFSI) -- will follow accelerated timelines: Foundations
+    # by 2027, High-Priority Migration by 2028, and Full PQC Adoption by 2029. Other
+    # enterprises will follow the baseline timelines of 2028, 2030, and 2033 respectively."
+    # "Milestone 3 -- Full PQC Adoption (CII: by 2029 | Enterprises: by 2033): Complete
+    # enterprise-wide PQC/hybrid (classical + PQC) adoption." Nature: "It does not constitute a
+    # legal or regulatory mandate. Adoption, timelines, and enforcement may be determined by
+    # the respective sectoral regulators" (said of the framework in that section).
+    "in-dst": {
+        "name": "in-dst",
+        "document": "DST, National Quantum Mission, Report on Quantum-Safe Ecosystem in India -- "
+                    "Roadmap to Quantum Resiliency (May 2026)",
+        "url": "https://www.dst.gov.in/static/uploads/2026/07/dba5f97fa8f4c8db5ef668306548a470"
+               ".pdf",
+        "read_on": "2026-11-17",
+        "addresses": "Indian organisations; a Task Force recommendation, not a regulation "
+                     "(sectoral regulators may set their own)",
+        "rules": [
+            {"families": "*", "deadline": "2033-12-31",
+             "clause": "Milestone 3 -- Full PQC Adoption (Enterprises: by 2033): Complete "
+                       "enterprise-wide PQC/hybrid (classical + PQC) adoption",
+             "source": "Milestone 3"},
+        ],
+        "conditional": [
+            {"date": "2029-12-31",
+             "clause": "CII sectors ... will follow accelerated timelines: ... Full PQC Adoption "
+                       "by 2029",
+             "applies": "only for Critical Information Infrastructure (government, strategic, "
+                        "defence, power, telecom, transport, BFSI); the scan cannot tell",
+             "source": "Milestone 3; the accelerated timelines for CII"},
+            {"date": "2030-12-31",
+             "clause": "Milestone 2 -- Migrate High-Priority Systems (Enterprises: by 2030)",
+             "applies": "only for a high-priority system; the scan cannot tell",
+             "source": "Milestone 2"},
+        ],
+        "milestones": [
+            {"date": "2028-12-31",
+             "clause": "Milestone 1 -- Build Foundations (CII: by 2027 | Enterprises: by "
+                       "2028): inventory cryptographic assets and assess quantum risk",
+             "source": "Milestone 1"},
+        ],
+        "composite": "Milestone 3: 'Complete enterprise-wide PQC/hybrid (classical + PQC) "
+                     "adoption'",
+    },
+    # BSI, Technical Guideline TR-02102-1, "Cryptographic Mechanisms: Recommendations and Key
+    # Lengths", Version 2026-01. Section 2.1: "The sole use of classic key agreement mechanisms
+    # is only recommended until the end of 2031, see also Section 2.3. For applications with
+    # very high protection requirements, the transition to quantum-safe mechanisms should
+    # already take place by the end of 2030." "Based on current knowledge, the use of classic
+    # signature mechanisms is therefore only recommended until the end of 2035." Section 2.3:
+    # "The use of the methods in this chapter beyond 2031 is only recommended in combination
+    # with a quantum-safe KEM method from Chapter 2.4 and a key derivation from Chapter 2.2."
+    # Section 5.3.1: "The restriction of the recommendation for RSA until 2031 in Table 2.2 only
+    # applies to key exchange. Signatures with RSA are expected to be recommended until 2035".
+    # BMDS, BMI and BSI, "Leitlinie zur Umstellung auf PQC", 11. September 2026, section 3:
+    # "Anwendungsfälle mit hohem Risiko sollten bis Ende 2030 quantensicher sein. Analog sollte
+    # dies für Anwendungsfälle mit mittlerem Risiko bis Ende 2035 umgesetzt sein." Section 4.3:
+    # "Das kryptografische Inventar sollte regelmäßig auf Aktualität geprüft werden; die
+    # initiale Erstellung sollte bis Ende 2026 abgeschlossen sein." Section 4.1: "Die in dieser
+    # Roadmap enthaltenen Fristen sind dringende Empfehlungen".
+    "de-bsi": {
+        "name": "de-bsi",
+        "document": "BSI, Technical Guideline TR-02102-1, Cryptographic Mechanisms: "
+                    "Recommendations and Key Lengths (Version 2026-01)",
+        "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/TechGuidelines/"
+               "TG02102/BSI-TR-02102-1.pdf?__blob=publicationFile",
+        "read_on": "2026-11-17",
+        "sources": [
+            {"document": "TR-02102-1, Version 2026-01", "read_on": "2026-11-17",
+             "url": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/"
+                    "TechGuidelines/TG02102/BSI-TR-02102-1.pdf?__blob=publicationFile"},
+            {"document": "BMDS, BMI and BSI, Leitlinie zur Umstellung auf PQC (11. September "
+                         "2026)", "read_on": "2026-11-17",
+             "url": "https://www.bsi.bund.de/SharedDocs/Downloads/DE/BSI/Krypto/"
+                    "Leitlinie-Umstellung-PQC.pdf?__blob=publicationFile"},
+        ],
+        "addresses": "recommendations of a BSI Technical Guideline; the Leitlinie's dates are "
+                     "'dringende Empfehlungen' (urgent recommendations) for Germany",
+        "rules": [
+            {"families": "*", "role": "key_establishment", "deadline": "2031-12-31",
+             "clause": "The sole use of classic key agreement mechanisms is only recommended "
+                       "until the end of 2031",
+             "source": "TR-02102-1 section 2.1; Table 2.2 'Recommended until 2031'"},
+            {"families": "*", "role": "signature", "deadline": "2035-12-31",
+             "clause": "the use of classic signature mechanisms is therefore only recommended "
+                       "until the end of 2035",
+             "source": "TR-02102-1 section 2.1; section 5.3"},
+        ],
+        "conditional": [
+            {"date": "2030-12-31",
+             "clause": "For applications with very high protection requirements, the "
+                       "transition to quantum-safe mechanisms should already take place by the "
+                       "end of 2030",
+             "applies": "only for applications with very high protection requirements; the "
+                        "scan cannot tell",
+             "roles": ["key_establishment", "undetermined"],
+             "source": "TR-02102-1 section 2.1"},
+            {"date": "2030-12-31",
+             "clause": "Anwendungsfälle mit hohem Risiko sollten bis Ende 2030 quantensicher "
+                       "sein",
+             "applies": "only for a high-risk use case (Leitlinie section 4.5, following the EU "
+                        "roadmap); the scan cannot tell",
+             "source": "Leitlinie zur Umstellung auf PQC, section 3"},
+        ],
+        "milestones": [
+            {"date": "2026-12-31",
+             "clause": "die initiale Erstellung [des kryptografischen Inventars] sollte bis "
+                       "Ende 2026 abgeschlossen sein",
+             "source": "Leitlinie zur Umstellung auf PQC, section 4.3"},
+        ],
+        "composite": "TR-02102-1 section 2.3: beyond 2031 the classical methods are 'only "
+                     "recommended in combination with a quantum-safe KEM method'",
+    },
+}
+
+
 def names() -> list[str]:
     return ["nist", *PROFILES]
 

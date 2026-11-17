@@ -4,6 +4,47 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.48.0 (2026-11-17)
+
+- **`--mandate` knew only the United States** (stenli, 17.11, after the deadline tracker shown by
+  Quantanaut: a list of dates, with no link to the code they catch). `cnsa-2.0` and
+  `nist-ir-8547` were the only names. Ten more, each read from the authority's own document
+  (on 2026-11-17; the ISM's sentences from the September 2026 PDF fetched on 2026-09-27, the
+  `read_on` its block carries) and quoted in `profiles.DATED_MANDATES`: `eu-pqc-roadmap` (NIS Cooperation Group
+  roadmap v1.1), `uk-ncsc` (NCSC timelines v1.0), `ca-cccs` (ITSP.40.111 v5 and ITSM.40.001),
+  `au-ism` (ISM September 2026), `nl-rqs` (Rijksbrede Quantumstrategie, 5 oktober 2026),
+  `se-ncsc` (NCSC Sweden, 27 maj 2026), `jp-gov` (Cabinet Secretariat interim report, November
+  2025), `sg-csa-cii` (CSA Quantum-Safe Handbook V1, CII owners), `in-dst` (DST / National
+  Quantum Mission Task Force report, May 2026) and `de-bsi` (BSI TR-02102-1 2026-01 and the
+  Leitlinie zur Umstellung auf PQC, 11 September 2026). Each clause gives the rules that name the
+  occurrence's family and role and the earliest of their dates as `deadline`, which the gate
+  counts; where a document dates algorithms (Canada, Australia, Germany), the date is the
+  algorithm's -- DSA, P-224 and RSA below 3072 bits by the end of 2030 in Canada, ML-KEM-768 and
+  ML-DSA-65 not approved beyond 2030 in Australia. A family a document does not list (EdDSA and
+  DSA in the ISM, X25519 in ITSP.40.111, whose curves are P-224 to P-521) is `not_in_document`,
+  with no date. A signing step whose key's family is not read gets no clause from these
+  documents (CNSA 2.0 still dates signing as a class). Scan JSON and SARIF, and `.qrp.toml`.
+  **Not claimed / not done:** a date for a class of system the scan cannot see (EU and German
+  high-risk use cases by 2030, UK highest-priority migrations by 2031, India's CII by 2029) is
+  said in `earlier_if` and `conditional` and never counted (`counted_by_gate: false`): the gate
+  counts only a date that applies to the occurrence by itself; nothing here is a legal finding, and several are recommendations (`addresses`
+  says whose and what kind). Left out: South Korea (the 2031
+  date for important national systems is in a press release; the per-algorithm table is in
+  drafts that were not downloaded), France (the State's roadmap dates systems handling
+  Diffusion Restreinte information and products bought from 2030 -- nothing a line of code
+  carries), Singapore's MAS (a consultation, not in force), Hong Kong (sector readiness by 2030,
+  not migration), Israel's Bank of Israel letter (a plan within a year), Switzerland's FINMA (a
+  roadmap by mid-2027), the Czech NÚKIB estimate and the G7 Cyber Expert Group statement
+  ("non-authoritative"). No detection changed: without `--mandate` a scan of OpenSSH and certbot
+  gives the same evidence, findings and summary as 0.47.0.
+- **The table of deadlines could go stale without a word.** A mandate is a reading of a document
+  on a date; a newer edition moves the dates and nothing said so. Every mandate block now has
+  `read_on_age_days` (to `as_of`), `stale_after_days` (180) and `stale`; past 180 days,
+  `stale_because` with the document's URL, and a line on stderr. It does not change the gate or
+  the exit code, and it is counted to `--as-of`, not the clock, so a rerun with the same `--as-of`
+  is the same bytes. **Not claimed:** that a reading younger than 180 days is current: a document
+  can change the day after it was read.
+
 ## 0.47.0 (2026-11-16)
 
 - **Where the signing key lives was not said** (row 482, Richard Blech; probe `hw-sign-proba`,

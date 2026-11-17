@@ -140,6 +140,15 @@ ports, server names (masked below `--level full`), the groups and the certificat
 each one's family, so two servers in one file no longer read as one inventory. The CBOM carries it
 as `qrp:tls_listeners` ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/tls.md)).
 
+From 0.48.0 `--mandate` also takes the deadlines of the EU (`eu-pqc-roadmap`), the UK (`uk-ncsc`),
+Canada (`ca-cccs`), Australia (`au-ism`), the Netherlands (`nl-rqs`), Sweden (`se-ncsc`), Japan
+(`jp-gov`), Singapore's CII owners (`sg-csa-cii`), India (`in-dst`) and Germany (`de-bsi`), each
+quoted from the authority's own document, so a finding says which deadline catches it in each.
+A date for a class of system the scan cannot see -- high-risk, highest priority -- is said beside
+the clause and not counted by the gate. Every mandate block says how old its reading of the
+document is, and past 180 days (`stale`) the command line says so
+([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
+
 From 0.47.0 `--mandate nist-ir-8547` also gives each clause `federal_high_value_assets`: the date
 by role that NIST IR 8547 (section 4) restates from EO 14412 and OMB M-26-15 -- post-quantum key
 establishment by 2030-12-31, signatures by 2031-12-31 -- for federal high value assets and high

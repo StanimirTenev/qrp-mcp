@@ -7,9 +7,39 @@ one place. The CHANGELOG entry named beside each item is the full text.
 
 ## Mandates and the gate
 
-- `--mandate cnsa-2.0|nist-ir-8547` gives each quantum-vulnerable occurrence its dated clause and
+- `--mandate NAME` gives each quantum-vulnerable occurrence its dated clause and
   `hndl_exposed`. With `--lead-months N` the run exits 1 when a deadline falls inside the lead
   time (0.37.0).
+- From 0.48.0 NAME is also one of ten other documents, each read from the authority's own text;
+  the sentences each date comes from are quoted in the comments of `profiles.DATED_MANDATES`:
+
+  | NAME | document | the date the gate counts | said, not counted |
+  |---|---|---|---|
+  | `eu-pqc-roadmap` | NIS Cooperation Group roadmap v1.1 (11.06.2025) | 2035-12-31, not stand-alone (medium risk) | 2030 for high-risk use cases; software and firmware upgrades quantum-safe by default |
+  | `uk-ncsc` | NCSC timelines v1.0 (20 March 2025) | 2035-12-31, all systems | 2031 highest-priority migrations; 2028 discovery and plan (milestone) |
+  | `ca-cccs` | ITSP.40.111 v5 (29 May 2026); ITSM.40.001 (23 June 2025) | by algorithm: 2035-12-31 without a post-quantum scheme; 2030-12-31 for DSA, P-224 and RSA/FFC below 3072 bits | 2031 high priority systems of GC departments; X25519 and X448 are not among its curves (`not_in_document`, no date) |
+  | `au-ism` | ASD ISM, September 2026 | 2030-12-31 for DH, ECDH, ECDSA, RSA, and for ML-KEM-768 and ML-DSA-65 | EdDSA and DSA are not approved at all (`not_in_document`, no date) |
+  | `nl-rqs` | Rijksbrede Quantumstrategie (5 oktober 2026), central government | 2035-12-31 | 2030 high risk; 2030 software and firmware quantum-safe by default |
+  | `se-ncsc` | NCSC Sweden national recommendations (27 maj 2026) | 2035-12-31 | 2030 for information sensitive more than ten years ahead |
+  | `jp-gov` | Cabinet Secretariat interim report (November 2025), government bodies | 2035-12-31 ("in principle") | roadmap in FY2026 (milestone) |
+  | `sg-csa-cii` | CSA Quantum-Safe Handbook V1 (16 Jul 2026), CII owners only | 2031-12-31 | plan by 31 Mar 2027; new CII systems quantum-safe ready from 1 Jan 2028 (milestones) |
+  | `in-dst` | DST / National Quantum Mission Task Force report (May 2026), a recommendation | 2033-12-31 (enterprises) | 2029 for CII; 2030 high-priority systems |
+  | `de-bsi` | BSI TR-02102-1 2026-01; Leitlinie zur Umstellung auf PQC (11 September 2026) | by role: 2031-12-31 key agreement alone, 2035-12-31 classical signatures | 2030 very high protection (key agreement) and high-risk use cases; inventory by end of 2026 (milestone) |
+
+  A date for a class of system the scan cannot see (high-risk, highest priority, CII) is in the
+  clause's `earlier_if` and the block's `conditional`, with `counted_by_gate: false`, as the
+  federal dates of `nist-ir-8547` are. Organisational dates (a plan, an inventory) are in the
+  block's `milestones`. Where the document's date is for the classical scheme used alone, the
+  classical half of a hybrid on the same line is `composite_allowed` with no date; where the
+  document does not say, `composite_not_addressed`, with no date either. Where a line shows no
+  role and the document dates the roles differently (`de-bsi`), both dates are given and the
+  earlier is the deadline, with a `note`. "By 2030" is read as the end of 2030. None of these is
+  law for everyone who picks it: each block says whom the document addresses (`addresses`).
+- From 0.48.0 every mandate block says how old its reading of the document is: `read_on_age_days`
+  counted to `as_of`, `stale_after_days` (180) and `stale`. Past 180 days the block carries
+  `stale_because` with the document's URL, and the command line says it on stderr. It does not
+  change the gate or the exit code. It is counted to `--as-of`, not to the clock, so a run with the
+  same `--as-of` gives the same bytes.
 - `--mandate nist-ir-8547` follows the final NIST IR 8547; the gate counts the deprecation date
   (2030), named in `gate_counts` and `next_gate_deadline` beside `next_deadline` (0.38.0, 0.41.0).
 - `--mandate nist-ir-8547` also says, in `federal_high_value_assets` on each clause and on the

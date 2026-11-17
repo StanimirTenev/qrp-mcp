@@ -562,6 +562,11 @@ def scan_to_file(argv: list[str], cbom: bool = False) -> int:
     failed = False
     if wanted:
         failed = mandates.apply(result, wanted, a.as_of or date.today(), lead, min_coverage)
+        # The table of deadlines is a reading of documents that change; an old reading is said.
+        # It does not move the gate or the exit code.
+        for name in mandates.stale(result):
+            print(f"qrp-mcp: --mandate {name}: {result['mandates'][name]['stale_because']}",
+                  file=sys.stderr)
     result = _at_level(result, level)
     fingerprint = (result.get("findings_fingerprint") or {}).get("sha256")
     if cbom:
@@ -696,13 +701,18 @@ def build_gap_to_file(argv: list[str]) -> int:
 
 USAGE = """usage: qrp-mcp                 start the MCP server on stdio (what MCP clients run)
        qrp-mcp scan PATH [--out FILE] [--level full|masked|trimmed] [--profile NAME]
-                    [--format json|sarif] [--mandate cnsa-2.0|nist-ir-8547]
+                    [--format json|sarif] [--mandate NAME]
                     [--lead-months N] [--min-coverage PERCENT] [--as-of YYYY-MM-DD]
                     [--config FILE | --no-config] [--baseline FILE] [--write-baseline FILE]
                     [--control-seed N]
                                scan a directory and write the result as JSON or SARIF;
                                exit 1 when a --mandate deadline has passed or falls
-                               within --lead-months, or coverage is below --min-coverage
+                               within --lead-months, or coverage is below --min-coverage;
+                               NAME: cnsa-2.0, nist-ir-8547, eu-pqc-roadmap, uk-ncsc,
+                               ca-cccs, au-ism, nl-rqs, se-ncsc, jp-gov, sg-csa-cii,
+                               in-dst, de-bsi (repeatable); a mandate read from
+                               its document more than 180 days before --as-of is said
+                               on stderr and in mandates.NAME.stale
        qrp-mcp cbom PATH [--out FILE] [--level full|masked|trimmed]
                     [--config FILE | --no-config] [--baseline FILE] [--write-baseline FILE]
                                scan a directory and write a CycloneDX 1.6 CBOM
