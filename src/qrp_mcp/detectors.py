@@ -6506,6 +6506,13 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
             + protocol_findings + dependency_findings + tls_group_findings
             + static_rsa_findings + ssh_kex_findings + weak_key_findings,
             _read_codeowners(owners_file, codeowners[owners_file]))
+    # Row 521: certificate, configuration and embedded-key rows had no `in_test_code`, and the
+    # count read a missing flag as other code. Every row with a path says it, by the same rule.
+    for row in (source_findings + ci_findings + iac_findings + embedded_key_findings
+                + protocol_findings + dependency_findings + tls_group_findings
+                + static_rsa_findings + ssh_kex_findings + weak_key_findings):
+        if isinstance(row.get("path"), str) and "in_test_code" not in row:
+            row["in_test_code"] = in_test_code(row["path"])
     _join_pins(source_findings + iac_findings, pins)
     _tag_parameter_sets(source_findings + iac_findings)
     _tag_curves(source_findings + iac_findings)
