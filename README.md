@@ -346,7 +346,16 @@ A **free inventory tool**, not a readiness assessment. It deliberately does not 
 - risk scoring or prioritisation,
 - migration planning — a `replacement` names what a finding becomes, not when or in what order,
 - network or host scanning, or reading a system certificate store,
-- tracking change over time — `prove_closure` compares two scans you give it; nothing keeps a history.
+- tracking change over time — `prove_closure` compares two scans you give it; nothing keeps a history,
+- symmetric cryptography, hashes and MACs, key derivation (PBKDF2, scrypt, Argon2, HKDF) or
+  random number generation (SecureRandom, DRBG, `os.urandom`, `secrets`, a remote entropy service) —
+  out of scope by design: it reports the public-key cryptography a quantum computer would break. A file
+  holding only these is read and gives no row; the output says so in
+  `coverage.claims.out_of_scope_by_design`. MD5, SHA-1, DES, 3DES and RC4 are still named where
+  found. Four `--mandate` documents date AES or SHA sizes (`cnsa-2.0`, `au-ism`, `ca-cccs`,
+  `nist-ir-8547`); under them the gate says `not_established` for symmetric rather than pass,
+- fetching keys from a QKD key management entity (an ETSI GS QKD 014 client) or judging where a
+  postquantum preshared key comes from beyond the files read.
 
 Those live in the [Quantum Readiness Platform](https://quantumreadiness.eu), the product this
 tool is extracted from. Nothing here is crippled to push you there — what it does, it does

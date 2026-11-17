@@ -105,6 +105,12 @@ see its tests fail.
   gate that would pass reads `not_established` with the reason, as for unread files (row 204); a
   fail stays a fail; the exit code does not change. The ten other documents date public-key
   cryptography only and still pass. Not done: reading AES key sizes or hash output sizes.
+- **Randomness and key derivation were out of scope only in docs/measurement.md** (row 525, Tooba
+  Qasim). SecureRandom, DRBG, `os.urandom`, `secrets`, `random` for a token and a remote entropy
+  service gave no output, and README's "What it is not" did not say why. Decided: they stay out of
+  scope. README now says so, with symmetric ciphers, hashes, MACs and KDFs, and the output carries
+  it in `coverage.claims.out_of_scope_by_design` -- scan JSON, the MCP tools and the CBOM's coverage
+  properties. Nothing is detected that was not before.
 
 **What changes for an existing user.** A strongSwan configuration with a proposal that can be
 negotiated classical now has `ike_proposals` rows -- beside a hybrid or not -- so its

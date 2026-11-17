@@ -215,6 +215,23 @@ def _concentration(composition: dict[str, int], present: int, partition: str,
     }
 
 
+# Row 525: what the instrument does not read by design, said in the output and not only in
+# docs/measurement.md. A file holding only these reads as read with nothing found.
+OUT_OF_SCOPE_BY_DESIGN = {
+    "what": ["symmetric ciphers (AES, ChaCha20) and their key sizes",
+             "hashes and MACs for integrity (SHA-2, SHA-3, HMAC); MD5, SHA-1, DES, 3DES and RC4 "
+             "are named where found, as broken or deprecated",
+             "key derivation (PBKDF2, scrypt, Argon2, HKDF) and where a key was derived from",
+             "random number generation (SecureRandom, DRBG, os.urandom, secrets, math/rand, a "
+             "remote entropy service) and the quality of a seed"],
+    "meaning": "not read: this instrument reports the public-key cryptography a "
+               "cryptographically relevant quantum computer would break. A file that holds only "
+               "these is read and gives no row; that is the scope, not a finding of absence",
+    "mandates": "four --mandate documents date symmetric or hash algorithms (cnsa-2.0, au-ism, "
+                "ca-cccs, nist-ir-8547); their block says symmetric: not_established",
+}
+
+
 def _claims(control: dict[str, Any] | None) -> dict[str, Any]:
     """What kind of claim every figure in this block is, stated rather than implied.
 
@@ -231,6 +248,7 @@ def _claims(control: dict[str, Any] | None) -> dict[str, Any]:
         "axis": "reached",
         "meaning": AXES["reached"],
         "second_axis_not_claimed": AXES["answered"],
+        "out_of_scope_by_design": OUT_OF_SCOPE_BY_DESIGN,
         "control": control,
         # A different kind of claim under its own key (row 433): robustness on known
         # patterns, from lines the instrument's own harness planted. Not independent, so
