@@ -83,6 +83,18 @@ reproduced on 0.48.0 (dab656c) with its probe before the fix, pinned by a test t
   bytes with no change to its text; uk-ncsc, au-ism, sg-csa-cii, cnsa-2.0, nist-ir-8547, ch-finma
   and hk-hkma have no recorded hash and stay not_fetched.
 
+Second batch, the same day, before release: rows 516 and 525–528. Each was reproduced on the
+first batch's tree (e897092) and pinned by a test that fails there; each fix was reverted once to
+see its tests fail.
+
+- **`--as-of` stopped the scan on certbot** (row 516). certbot's acme tests hold the ARI draft's
+  example certificate, valid from and to the year 1 (GeneralizedTime `00010101000000Z`). The
+  certificate rows wrote the year as `%Y` does on glibc, unpadded (`1-01-01T00:00:00Z`), and
+  `--as-of` could not parse it back: a ValueError, with no output. Dates are now written with a
+  four-digit year (`0001-01-01T00:00:00Z`), which `--as-of` and the CBOM's `notValidAfter` read;
+  `expired` is true, as it was without `--as-of`. The date is the certificate's own, so it is kept,
+  not set aside as unread. `findings_fingerprint` does not hold dates and is unchanged.
+
 **What changes for an existing user.** A strongSwan configuration with a proposal that can be
 negotiated classical now has `ike_proposals` rows -- beside a hybrid or not -- so its
 `findings_fingerprint` moves; a baseline written by 0.48.0 does not hold them (they read as new),

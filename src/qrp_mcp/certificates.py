@@ -492,7 +492,10 @@ UNPARSED_REASONS = {
 
 
 def _iso(moment: Any) -> str:
-    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Row 516: the year with four digits. glibc's %Y does not pad, so the ARI draft's example
+    # certificate (valid from and to the year 1) read `1-01-01`, which `--as-of` could not parse.
+    utc = moment.astimezone(timezone.utc)
+    return f"{utc.year:04d}-" + utc.strftime("%m-%dT%H:%M:%SZ")
 
 
 def _as_of() -> tuple[Any, str]:
