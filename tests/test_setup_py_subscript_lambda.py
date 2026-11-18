@@ -39,6 +39,17 @@ def test_the_review_reproduction_through_the_scan(tmp_path):
     ('setup(install_requires=["a"] + ["paramiko"])', ["a", "paramiko"]),
     ('setup(install_requires=["ecdsa" if X else "paramiko"])', ["ecdsa", "paramiko"]),
     ('setup(extras_require={"a": ["ecdsa"], "b": ["paramiko"]})', ["ecdsa", "paramiko"]),
+    # A call beside a literal drops only the call (fifth review: 720f5c4 dropped these too).
+    ('setup(install_requires=["cryptography>=41", "paramiko"] + read_requirements("x.txt"))',
+     ["cryptography", "paramiko"]),
+    ('setup(install_requires=["cryptography"] + get_reqs())', ["cryptography"]),
+    ('setup(install_requires=get_reqs() + ["cryptography"])', ["cryptography"]),
+    ('setup(install_requires=get_reqs()[0] + ["cryptography"])', ["cryptography"]),
+    ('setup(install_requires=["cryptography>=" + str(v), "paramiko"])', ["cryptography", "paramiko"]),
+    ('setup(extras_require={"a": ["pyopenssl"] + extra("a"), "b": ["paramiko"]})',
+     ["pyopenssl", "paramiko"]),
+    ('setup(install_requires=["cryptography"] if x else get())', ["cryptography"]),
+    ('setup(install_requires=["a"] + ["paramiko"][:1] + ["ecdsa"])', ["a", "ecdsa"]),
 ])
 def test_literal_values_are_still_read(text, expected):
     assert _names(text) == expected

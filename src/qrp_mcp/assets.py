@@ -596,6 +596,7 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
     value: list[dict[str, Any]] | None = None
     run: list[tuple[str, str, int]] = []  # adjacent string literals: (prefix, token, line)
     line, depth, excess, previous, before = 1, 0, 0, "", ""
+    tail = 0  # strings the operand just ended put into the element
 
     def new_frame(opener: str, call: bool) -> dict[str, Any]:
         return {"opener": opener, "kept": [], "element": [], "spoilt": False, "keyed": False,
@@ -633,6 +634,7 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
             value = None
         if kind == "l":
             previous = before = ""
+            tail = 0
             continue
         if value is None:
             if kind == "o" and word in "([{":
@@ -641,9 +643,11 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
                 depth = max(depth - 1, 0)
             elif kind == "o" and word == "=" and previous in _SETUP_NAMES and before != ".":
                 value = [new_frame("=", False)]
+                tail = 0
             previous, before = (word if kind != "s" else "'"), previous
             continue
         frame = value[-1]
+        next_tail = 0
         if kind == "s":
             if not frame["cond"]:
                 run.append((match.group("p") or "", word[len(match.group("p") or ""):], at))
@@ -652,12 +656,14 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
         if run:
             frame["element"].append(list(run))
             run.clear()
+            tail = 1
         if kind == "o" and word in "([{":
             depth += 1
-            if operand_ended() and not frame["cond"]:
-                # A call or a subscript computes the element (fourth review of 0.50.0, 18.11:
+            if tail and previous in {")", "]", "}", "'"}:
+                # A subscript of a literal computes it: its strings are dropped, the `+`
+                # operands beside it stay (fourth review of 0.50.0, 18.11:
                 # `["requests", "paramiko"][:1]` gave paramiko).
-                frame["spoilt"] = True
+                del frame["element"][-tail:]
             if len(value) < 200:
                 value.append(new_frame(word, operand_ended() or frame["cond"]))
             else:
@@ -676,6 +682,7 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
                 value.pop()
                 if not frame["call"] and not frame["tuple"]:
                     value[-1]["element"].extend(frame["kept"])
+                    next_tail = len(frame["kept"])
         elif kind == "o" and word == ",":
             end_element(frame)
             frame["tuple"] = frame["opener"] == "("
@@ -692,7 +699,7 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
             pass
         elif kind == "n" and word in _PY_KEYWORDS or kind == "o" and word not in _SETUP_KEEPS:
             frame["spoilt"] = True
-        previous, before = word, previous
+        previous, before, tail = word, previous, next_tail
     if value is not None:
         end_element(value[0])
         found += _setup_rows(value[0]["kept"])
