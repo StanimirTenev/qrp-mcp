@@ -295,8 +295,8 @@ def test_an_environment_name_must_say_key_or_certificate_as_a_word(tmp_path):
 def test_a_command_before_a_key_path_is_not_a_setting(tmp_path):
     result = scan_directory(_write(tmp_path, {
         ".github/workflows/ci.yml": "steps:\n  - run: |\n      sha256sum ./support/private_key.pem\n",
-        "vpn/client.ovpn": "client\nca ca.crt\n"}))
-    assert [(l["path"], l["setting"]) for l in _leads(result)] == [("vpn/client.ovpn", "ca")]
+        "vpn/client.conf": "client\nca ca.crt\n"}))
+    assert [(l["path"], l["setting"]) for l in _leads(result)] == [("vpn/client.conf", "ca")]
 
 
 def test_a_relative_path_is_followed_from_the_nearest_parent_that_has_it(tmp_path):

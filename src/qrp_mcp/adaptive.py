@@ -362,9 +362,15 @@ _NOT_INCLUDING = {"Makefile", "GNUmakefile", "makefile", "Kconfig", "Dockerfile"
 _KEY_SUFFIX = r"(?:" + "|".join(re.escape(s) for s in KEY_SUFFIXES) + r")"
 # A setting whose value is a key or certificate file: `smtpd_tls_cert_file = /x.pem`,
 # `cert: tls/server.crt`, OpenVPN `ca ca.crt`, OpenSSH `HostKey` (whose files have no suffix).
+# Separated by a space only for the settings named here (OpenVPN, nginx, Apache): any word
+# before a path is a command as often (`sha256sum ./key.pem` in a workflow, Vault 18.11).
+_SPACE_KEY_SETTINGS = (r"ca|cert|key|dh|pkcs12|tls-auth|tls-crypt|tls-crypt-v2|crl-verify|"
+                       r"ssl_dhparam|ssl_password_file|ssl_stapling_file|ssl_crl|"
+                       r"SSL(?:CACertificate|CertificateChain|CARevocation|ProxyMachineCertificate"
+                       r"|ProxyCACertificate|OpenSSLConfCmd)File")
 _CONFIG_KEY_SETTING = re.compile(
-    r"^\s*(?:-\s+)?([A-Za-z_][\w.-]*)[\"']?\s*(?:[=:]\s*|\s+)[\"']?([^\s\"';,]+" + _KEY_SUFFIX
-    + r")[\"']?\s*[;,]?\s*(?:#.*)?$", re.IGNORECASE)
+    r"^\s*(?:-\s+)?(?:([A-Za-z_][\w.-]*)[\"']?\s*[=:]\s*|(" + _SPACE_KEY_SETTINGS + r")\s+)"
+    r"[\"']?([^\s\"';,]+" + _KEY_SUFFIX + r")[\"']?\s*[;,]?\s*(?:#.*)?$", re.IGNORECASE)
 _SSH_KEY_SETTING = re.compile(r"^\s*(HostKey|HostCertificate|TrustedUserCAKeys|IdentityFile|"
                               r"CertificateFile|RevokedKeys)\s+[\"']?([^\s\"']+)")
 # A call that opens or loads a file, with a literal key or certificate path among its first
@@ -500,10 +506,14 @@ def _leads(result: dict[str, Any], root: Path) -> dict[str, Any]:
             if config:
                 if detectors.CERTIFICATE_FILE_SETTING.match(raw):
                     continue
-                m = _SSH_KEY_SETTING.match(raw) or _CONFIG_KEY_SETTING.match(raw)
+                m = _SSH_KEY_SETTING.match(raw)
+                setting, target = (m.group(1), m.group(2)) if m else (None, None)
+                m = None if m else _CONFIG_KEY_SETTING.match(raw)
                 if m:
-                    add("key_file_path", rel, n, m.group(1), m.group(2),
-                        _resolve(m.group(2), rel, read, root))
+                    setting, target = m.group(1) or m.group(2), m.group(3)
+                if target:
+                    add("key_file_path", rel, n, setting, target,
+                        _resolve(target, rel, read, root))
             if code and _CODE_LOAD.search(raw):
                 for lit in _LITERAL_KEY_PATH.finditer(raw):
                     add("key_file_path", rel, n, _CODE_LOAD.search(raw).group(1), lit.group(1),
