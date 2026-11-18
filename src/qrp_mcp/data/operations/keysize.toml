@@ -654,6 +654,34 @@ Windows Registry Editor Version 5.00
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "schannel.reg", algorithm = "DH", key_size = 2048, line = 4}}]}
 
+[[ecosystems.refresh]]
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+pattern = '\b((?:brainpool|nist)P\d{3}[rt]?1?)\b'
+file = "Keys.cs"
+snippet = "using System.Security.Cryptography;\nvar key = ECDsa.Create(ECCurve.NamedCurves.{candidate});\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgeneratekeypair"
+pattern = '\b(BCRYPT_\w+_ALGORITHM)\b'
+file = "keys.c"
+snippet = "#include <bcrypt.h>\nBCryptOpenAlgorithmProvider(&hAlg, {candidate}, NULL, 0);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey"
+pattern = '\b(CALG_\w+|RSA\d+BIT_KEY)\b'
+file = "keys.c"
+snippet = "#include <wincrypt.h>\nCryptGenKey(hProv, {candidate}, 0, &hKey);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate"
+pattern = 'KeyAlgorithm\s*=?\s*\x27?([A-Za-z0-9_]+)\x27?'
+file = "cert.ps1"
+snippet = "New-SelfSignedCertificate -DnsName www.example.com -KeyAlgorithm {candidate}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", line = 1}}]}
+
 [[ecosystems]]
 ecosystem = "PKI"
 scope = "Certificates, SPKI and PKCS#8 keys and CSRs in PEM and DER for RSA, DSA and NIST EC; OpenSSH ssh-rsa and ecdsa-sha2 public keys; JWK RSA n, EC crv, OKP crv; cfssl key and Fabric CA csr.keyrequest. Not covered: encrypted keys and PKCS#12 (the size is behind a password), XML RSAKeyValue, the small-private-scalar check of rows 32/51/154/155 (a property of the key, not a spelling), JWK x5c chains."
@@ -960,3 +988,24 @@ csr:
     size: 384
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "fabric-ca-server-config.yaml", algorithm = "ECDSA", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+pattern = '-----BEGIN ([A-Z0-9 ]+)-----'
+file = "candidate.pem"
+snippet = "-----BEGIN {candidate}-----\nMIIBAA==\n-----END {candidate}-----\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.pem", line = 1}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+pattern = '"crv":\s*"([A-Za-z0-9-]+)"'
+file = "jwks.json"
+snippet = "{\n  \"keys\": [\n    {\"kty\": \"EC\", \"crv\": \"{candidate}\", \"x\": \"AA\", \"y\": \"AA\"}\n  ]\n}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", line = 3}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.rfc-editor.org/rfc/rfc8037.txt"
+pattern = '"crv":\s*"([A-Za-z0-9-]+)"'
+file = "jwks.json"
+snippet = "{\n  \"keys\": [\n    {\"kty\": \"OKP\", \"crv\": \"{candidate}\", \"x\": \"AA\"}\n  ]\n}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", line = 3}}]}

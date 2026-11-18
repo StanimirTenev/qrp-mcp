@@ -8905,3 +8905,46 @@ snippet = '''
 ok = hss_init_extra_info(a, b, c);
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "pq.c", line = 2, algorithm = "HSS/LMS"}}]}
+
+[[ecosystems.refresh]]
+source = "https://openquantumsafe.org/liboqs/api/doxygen/kem_8h.html"
+pattern = '\b(OQS_KEM_alg_\w+)\b'
+file = "candidate.c"
+snippet = "#include <oqs/oqs.h>\nv = {candidate};\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://openquantumsafe.org/liboqs/api/doxygen/sig_8h.html"
+pattern = '\b(OQS_SIG_alg_\w+)\b'
+file = "candidate.c"
+snippet = "#include <oqs/oqs.h>\nv = {candidate};\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://openquantumsafe.org/liboqs/api/doxygen/sig__stfl_8h.html"
+pattern = '\b(OQS_SIG_STFL_alg_\w+)\b'
+file = "candidate.c"
+snippet = "#include <oqs/oqs.h>\nv = {candidate};\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__LMS.html"
+pattern = '\b(wc_LmsKey_\w+|WC_LMS_PARM_\w+)\b'
+file = "candidate.c"
+snippet = "#include <wolfssl/wolfcrypt/wc_lms.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__XMSS.html"
+pattern = '\b(wc_XmssKey_\w+)\b'
+file = "candidate.c"
+snippet = "#include <wolfssl/wolfcrypt/wc_xmss.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/cisco/hash-sigs/master/read.me"
+pattern = '\b(hss_[a-z_]+)\b'
+ignore = ["hss_error_none", "hss_extra_info", "hss_working_key", "hss_lib", "hss_lib_thread", "hss_lib_threaded"]
+file = "candidate.c"
+snippet = "#include <hss.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}

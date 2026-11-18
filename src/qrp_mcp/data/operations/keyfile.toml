@@ -206,3 +206,10 @@ stringData:
   ca.crt: |
 {{CERT_RSA2048_PEM|4}}'''
 expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+pattern = '-----BEGIN ([A-Z0-9 ]+)-----'
+file = "candidate.pem"
+snippet = "-----BEGIN {candidate}-----\nMIIBAA==\n-----END {candidate}-----\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.pem", line = 1}}]}

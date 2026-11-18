@@ -238,3 +238,10 @@ setup(
 )
 '''
 expect = {rows = [{at = "evidence.dependencies", match = {path = "setup.py", line = 4, package = "paramiko", version = "3.4.0"}}]}
+
+[[ecosystems.refresh]]
+source = "https://docs.python.org/3/library/os.html"
+pattern = '\b(os\.(?:environb?|getenvb?|putenv|unsetenv)\b)'
+file = "settings.py"
+snippet = "import os\nkey = {candidate}('TLS_KEY')\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "settings.py", line = 2}}]}

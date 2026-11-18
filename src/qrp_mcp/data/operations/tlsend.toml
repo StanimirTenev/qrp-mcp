@@ -303,3 +303,31 @@ backend b
   server s1 10.0.0.1:443 ssl verify required ca-file /etc/ssl/up-ca.pem
 '''
 expect = {rows = [{at = "trust_stores.places", match = {path = "haproxy.cfg", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://nginx.org/en/docs/http/ngx_http_proxy_module.html"
+pattern = '\b(proxy_ssl_\w+)\b'
+file = "nginx.conf"
+snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} on;\n  }\n}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+
+[[ecosystems.refresh]]
+source = "https://nginx.org/en/docs/http/ngx_http_grpc_module.html"
+pattern = '\b(grpc_ssl_\w+)\b'
+file = "nginx.conf"
+snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} on;\n  }\n}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+
+[[ecosystems.refresh]]
+source = "https://nginx.org/en/docs/http/ngx_http_uwsgi_module.html"
+pattern = '\b(uwsgi_ssl_\w+)\b'
+file = "nginx.conf"
+snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} on;\n  }\n}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+
+[[ecosystems.refresh]]
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+pattern = '\b(ssl_(?:verify|trusted|client)\w*)\b'
+file = "nginx.conf"
+snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} on;\n  }\n}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}

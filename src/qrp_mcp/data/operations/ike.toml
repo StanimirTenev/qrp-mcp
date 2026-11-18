@@ -881,3 +881,17 @@ PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
 Endpoint = 192.95.5.67:1234
 '''
 expect = {rows = [{at = "evidence.source_code", match = {algorithm = "X25519"}}]}
+
+[[ecosystems.refresh]]
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+pattern = '\b((?:modp|ecp)\d{3,4}(?:s\d{3}|bp)?|curve(?:25519|448)|x(?:25519|448)|mlkem\d{3,4}|kyber\d|frodo\w*|hqc\d|bike\d|sntrup\d+|ke\d_\w+)\b'
+file = "swanctl.conf"
+snippet = "connections {\n  c {\n    proposals = aes256-sha256-{candidate}\n  }\n}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "swanctl.conf", line = 3}}]}
+
+[[ecosystems.refresh]]
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+pattern = '\b(dh\d{1,2}|modp\d{3,4}|ecp_?\d{3}|curve25519|mlkem_?\d{3,4})\b'
+file = "ipsec.conf"
+snippet = "conn c\n  ike=aes256-sha2;{candidate}\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "ipsec.conf", line = 2}}]}

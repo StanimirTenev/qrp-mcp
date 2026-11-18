@@ -1939,3 +1939,179 @@ snippet = '''
 rc = gcry_sexp_build(&key, NULL, "(private-key (ecc (curve \"NIST P-256\")(q %m)(d %m)))", q, d);
 '''
 expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.refresh]]
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+pattern = '\b(CK[KM]_(?:RSA|DSA|DH|X9_42_DH|EC|ECDSA|ECDH|EC_EDWARDS|EC_MONTGOMERY|EDDSA|XEDDSA|X3DH|KEA|GOSTR3410)\w*)\b'
+file = "candidate.c"
+snippet = "#include <pkcs11.h>\nv = {candidate};\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+pattern = '\b(EVP_PKEY_(?:get[01]|set1|assign)_\w+)\b'
+file = "candidate.c"
+snippet = "#include <openssl/evp.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+pattern = '\b(EVP_PKEY_CTX_new\w*)\b'
+file = "candidate.c"
+snippet = "#include <openssl/evp.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/ECDSA_sign.pod"
+pattern = '\b(ECDSA_\w+)\b'
+file = "candidate.c"
+snippet = "#include <openssl/ecdsa.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EC_KEY_new.pod"
+pattern = '\b(EC_KEY_\w+)\b'
+file = "candidate.c"
+snippet = "#include <openssl/ec.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/DH_generate_key.pod"
+pattern = '\b(DH_\w+)\b'
+file = "candidate.c"
+snippet = "#include <openssl/dh.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/RSA_generate_key.pod"
+pattern = '\b(RSA_\w+)\b'
+file = "candidate.c"
+snippet = "#include <openssl/rsa.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/DSA_generate_key.pod"
+pattern = '\b(DSA_\w+)\b'
+file = "candidate.c"
+snippet = "#include <openssl/dsa.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+pattern = '\b(GNUTLS_PK_\w+|GNUTLS_SIGN_(?:RSA|DSA|ECDSA|EDDSA|GOST)\w*)\b'
+file = "candidate.c"
+snippet = "#include <gnutls/gnutls.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+pattern = '\b(PSA_(?:KEY_TYPE|ALG|ECC_FAMILY|DH_FAMILY)_(?:RSA|DSA|ECC|ECDSA|ECDH|DH|FFDH|ED|PURE_EDDSA|DETERMINISTIC_ECDSA|SECP|SECT|BRAINPOOL|MONTGOMERY|TWISTED_EDWARDS|RFC7919)\w*)\b'
+file = "candidate.c"
+snippet = "#include <psa/crypto.h>\nv = {candidate};\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/rsa.h"
+pattern = '\b(mbedtls_rsa_\w+)\b'
+file = "candidate.c"
+snippet = "#include <mbedtls/rsa.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdsa.h"
+pattern = '\b(mbedtls_ecdsa_\w+)\b'
+file = "candidate.c"
+snippet = "#include <mbedtls/ecdsa.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdh.h"
+pattern = '\b(mbedtls_ecdh_\w+)\b'
+file = "candidate.c"
+snippet = "#include <mbedtls/ecdh.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/dhm.h"
+pattern = '\b(mbedtls_dhm_\w+)\b'
+file = "candidate.c"
+snippet = "#include <mbedtls/dhm.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+pattern = '\b(wc_\w*Rsa\w*)\b'
+file = "candidate.c"
+snippet = "#include <wolfssl/wolfcrypt/rsa.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ECC.html"
+pattern = '\b(wc_ecc_\w+)\b'
+file = "candidate.c"
+snippet = "#include <wolfssl/wolfcrypt/ecc.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Diffie-Hellman.html"
+pattern = '\b(wc_\w*Dh\w*)\b'
+file = "candidate.c"
+snippet = "#include <wolfssl/wolfcrypt/dh.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__DSA.html"
+pattern = '\b(wc_\w*Dsa\w*)\b'
+file = "candidate.c"
+snippet = "#include <wolfssl/wolfcrypt/dsa.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ED25519.html"
+pattern = '\b(wc_ed25519_\w+)\b'
+file = "candidate.c"
+snippet = "#include <wolfssl/wolfcrypt/ed25519.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Curve25519.html"
+pattern = '\b(wc_curve25519_\w+)\b'
+file = "candidate.c"
+snippet = "#include <wolfssl/wolfcrypt/curve25519.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+pattern = '\b(crypto_sign\w*)\b'
+ignore = ["crypto_sign_BYTES", "crypto_sign_PUBLICKEYBYTES", "crypto_sign_SECRETKEYBYTES", "crypto_sign_SEEDBYTES"]
+file = "candidate.c"
+snippet = "#include <sodium.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+pattern = '\b(crypto_box\w*)\b'
+file = "candidate.c"
+snippet = "#include <sodium.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://doc.libsodium.org/key_exchange"
+pattern = '\b(crypto_kx\w*)\b'
+file = "candidate.c"
+snippet = "#include <sodium.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://doc.libsodium.org/advanced/scalar_multiplication"
+pattern = '\b(crypto_scalarmult\w*)\b'
+file = "candidate.c"
+snippet = "#include <sodium.h>\nr = {candidate}(a, b);\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+[[ecosystems.refresh]]
+source = "https://www.gnupg.org/documentation/manuals/gcrypt/General-public_002dkey-related-Functions.html"
+pattern = '\(\s*((?:genkey|public-key|private-key|sig-val|enc-val|data|rsa|dsa|ecc|ecdsa|elg|eddsa|ecdh)\b)'
+file = "candidate.c"
+snippet = "#include <gcrypt.h>\nrc = gcry_sexp_build(&parms, NULL, \"(genkey ({candidate} (nbits 4:2048)))\");\n"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
