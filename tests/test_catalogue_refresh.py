@@ -268,3 +268,18 @@ def test_a_tightened_pattern_drops_the_noise_and_keeps_the_names(operation, ecos
     admitted = _admitted(operation, ecosystem, page, text)
     assert not admitted & dropped, sorted(admitted & dropped)
     assert kept <= admitted, sorted(kept - admitted)
+
+
+def test_a_pem_label_of_one_word_is_known_when_a_spelling_holds_it():
+    """Stage 3b: `-----BEGIN PKCS7-----` was the word `pkcs7-----`, so PKCS7 and CMS, which
+    keyfile.toml holds, came back as candidates (KANDIDATI-119 §4, tool defect 1)."""
+    from qrp_mcp import operations
+    (eco,) = [e for d in operations.catalogue() if d["operation"] == "keyfile" for e in d["ecosystems"]
+              if e["ecosystem"] == "PKI"]
+    known = _tool().Known(eco)
+    assert "pkcs7" in known and "cms" in known
+    # and the dashes are cut only at the ends: a name inside a longer one is still not known
+    other = _tool().Known({"spellings": [{"spelling": "KexAlgorithms curve25519-sha256@libssh.org",
+                                          "snippet": "-----BEGIN PKCS7-----"}]})
+    assert "curve25519-sha256" not in other and "curve25519-sha256@libssh.org" in other
+    assert "begin" in other and "pkcs7-----" in other
