@@ -1,0 +1,305 @@
+# Operation `tlsend`, ecosystem nginx (nginx and nginx-like servers: nginx, HAProxy, Caddy): where TLS
+# terminates, whether the peer's certificate is verified, and which trust anchor verifies it. Pages
+# fetched 18.11.2026. `expect` follows the page: a `*_ssl_verify` directive that is off -- or absent,
+# where the page gives off as the default -- is a TLS hop that is not authenticated; a
+# `*_trusted_certificate` or `ca-file` is a trust store.
+
+operation = "tlsend"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "nginx"
+scope = "nginx http/stream listen ssl, proxy/grpc/uwsgi ssl_verify and *_ssl_trusted_certificate, ssl_client_certificate, ssl_trusted_certificate; HAProxy bind ssl, verify none (server, default-server, ssl-server-verify), server ca-file; Caddy reverse_proxy tls_insecure_skip_verify. Not covered: ssl_verify_client optional_no_ca, the upstream direction of *_ssl_protocols (row 193), Envoy, Traefik, listen quic, grpc/uwsgi verification by default."
+
+[[ecosystems.spellings]]
+id = "nginx-http-listen-ssl"
+spelling = "listen 443 ssl"
+source = "https://nginx.org/en/docs/http/ngx_http_core_module.html"
+quote = "The ssl parameter (0.7.14) allows specifying that all connections accepted on this port should work in SSL mode."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+  }
+}
+'''
+expect = {rows = [{at = "tls_listeners.places", match = {path = "nginx.conf", line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-stream-listen-ssl"
+spelling = "stream listen 12345 ssl"
+source = "https://nginx.org/en/docs/stream/ngx_stream_ssl_module.html"
+quote = "listen 12345 ssl;"
+file = "nginx.conf"
+snippet = '''
+stream {
+  server {
+    listen 12345 ssl;
+  }
+}
+'''
+expect = {rows = [{at = "tls_listeners.places", match = {path = "nginx.conf", line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-bind-ssl-crt"
+spelling = "bind :443 ssl crt"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "ssl This setting is only available when support for OpenSSL was built in. It enables SSL deciphering on connections instantiated from this listener."
+file = "haproxy.cfg"
+snippet = '''
+frontend f
+  bind :443 ssl crt /etc/haproxy/site.pem
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 2, basis = "configured_listener"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-proxy-ssl-verify-off"
+spelling = "proxy_ssl_verify off"
+source = "https://nginx.org/en/docs/http/ngx_http_proxy_module.html"
+quote = "Enables or disables verification of the proxied HTTPS server certificate."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    location / {
+      proxy_pass https://up;
+      proxy_ssl_verify off;
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 6, basis = "configured_verification", peer_verification = "off", verification_setting = "proxy_ssl_verify off"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-proxy-ssl-verify-default"
+spelling = "proxy_pass https:// with no proxy_ssl_verify (default off)"
+source = "https://nginx.org/en/docs/http/ngx_http_proxy_module.html"
+quote = "Syntax: proxy_ssl_verify on | off ; Default: proxy_ssl_verify off;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    location / {
+      proxy_pass https://up;
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 5, basis = "configured_verification", peer_verification = "off"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-stream-proxy-ssl-verify-off"
+spelling = "stream proxy_ssl_verify off"
+source = "https://nginx.org/en/docs/stream/ngx_stream_proxy_module.html"
+quote = "Enables or disables verification of the proxied server certificate."
+file = "nginx.conf"
+snippet = '''
+stream {
+  server {
+    listen 12345;
+    proxy_pass up:443;
+    proxy_ssl on;
+    proxy_ssl_verify off;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 6, basis = "configured_verification", peer_verification = "off", verification_setting = "proxy_ssl_verify off"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-grpc-ssl-verify-off"
+spelling = "grpc_ssl_verify off"
+source = "https://nginx.org/en/docs/http/ngx_http_grpc_module.html"
+quote = "Syntax: grpc_ssl_verify on | off ; Default: grpc_ssl_verify off;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    location / {
+      grpc_pass grpcs://up;
+      grpc_ssl_verify off;
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 6, basis = "configured_verification", peer_verification = "off", verification_setting = "grpc_ssl_verify off"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-uwsgi-ssl-verify-off"
+spelling = "uwsgi_ssl_verify off"
+source = "https://nginx.org/en/docs/http/ngx_http_uwsgi_module.html"
+quote = "Syntax: uwsgi_ssl_verify on | off ; Default: uwsgi_ssl_verify off;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    location / {
+      uwsgi_pass suwsgi://up;
+      uwsgi_ssl_verify off;
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 6, basis = "configured_verification", peer_verification = "off", verification_setting = "uwsgi_ssl_verify off"}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-server-verify-none"
+spelling = "server ... ssl verify none"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "If specified to 'none', servers certificates are not verified."
+file = "haproxy.cfg"
+snippet = '''
+backend b
+  server s1 10.0.0.1:443 ssl verify none
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 2, basis = "configured_verification", peer_verification = "off", verification_setting = "verify none"}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-default-server-verify-none"
+spelling = "default-server ssl verify none"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "If specified to 'none', servers certificates are not verified."
+file = "haproxy.cfg"
+snippet = '''
+backend b
+  default-server ssl verify none
+  server s1 10.0.0.1:443
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 2, basis = "configured_verification", peer_verification = "off", verification_setting = "verify none"}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-ssl-server-verify-none"
+spelling = "global ssl-server-verify none"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "verify [none|required] The default behavior for SSL verify on servers side."
+file = "haproxy.cfg"
+snippet = '''
+global
+  ssl-server-verify none
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 2, basis = "configured_verification", peer_verification = "off", verification_setting = "ssl-server-verify none"}}]}
+
+[[ecosystems.spellings]]
+id = "caddy-tls-insecure-skip-verify"
+spelling = "transport http { tls_insecure_skip_verify }"
+source = "https://caddyserver.com/docs/caddyfile/directives/reverse_proxy"
+quote = "tls_insecure_skip_verify turns off TLS handshake verification, making the connection insecure"
+file = "Caddyfile"
+snippet = '''
+example.com {
+  reverse_proxy https://up {
+    transport http {
+      tls_insecure_skip_verify
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 4, basis = "configured_verification", peer_verification = "off"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-client-certificate"
+spelling = "ssl_client_certificate"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "Syntax: ssl_client_certificate file ;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_client_certificate /etc/ssl/clients-ca.pem;
+  }
+}
+'''
+expect = {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 4}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-trusted-certificate"
+spelling = "ssl_trusted_certificate"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "Syntax: ssl_trusted_certificate file ;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_trusted_certificate /etc/ssl/chain-ca.pem;
+  }
+}
+'''
+expect = {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 4}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-proxy-ssl-trusted-certificate"
+spelling = "proxy_ssl_trusted_certificate"
+source = "https://nginx.org/en/docs/http/ngx_http_proxy_module.html"
+quote = "Syntax: proxy_ssl_trusted_certificate file ;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    proxy_ssl_trusted_certificate /etc/ssl/up-ca.pem;
+  }
+}
+'''
+expect = {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-grpc-ssl-trusted-certificate"
+spelling = "grpc_ssl_trusted_certificate"
+source = "https://nginx.org/en/docs/http/ngx_http_grpc_module.html"
+quote = "Syntax: grpc_ssl_trusted_certificate file ;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    grpc_ssl_trusted_certificate /etc/ssl/up-ca.pem;
+  }
+}
+'''
+expect = {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-uwsgi-ssl-trusted-certificate"
+spelling = "uwsgi_ssl_trusted_certificate"
+source = "https://nginx.org/en/docs/http/ngx_http_uwsgi_module.html"
+quote = "Syntax: uwsgi_ssl_trusted_certificate file ;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    uwsgi_ssl_trusted_certificate /etc/ssl/up-ca.pem;
+  }
+}
+'''
+expect = {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-stream-proxy-ssl-trusted-certificate"
+spelling = "proxy_ssl_trusted_certificate"
+source = "https://nginx.org/en/docs/stream/ngx_stream_proxy_module.html"
+quote = "Syntax: proxy_ssl_trusted_certificate file ; Default: — Context: stream , server"
+file = "nginx.conf"
+snippet = '''
+stream {
+  server {
+    proxy_ssl_trusted_certificate /etc/ssl/up-ca.pem;
+  }
+}
+'''
+expect = {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-server-ca-file"
+spelling = "server ... ssl verify required ca-file"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "It designates a PEM file from which to load CA certificates used to verify server's certificate."
+file = "haproxy.cfg"
+snippet = '''
+backend b
+  server s1 10.0.0.1:443 ssl verify required ca-file /etc/ssl/up-ca.pem
+'''
+expect = {rows = [{at = "trust_stores.places", match = {path = "haproxy.cfg", line = 2}}]}

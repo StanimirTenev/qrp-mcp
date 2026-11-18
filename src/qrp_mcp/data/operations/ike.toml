@@ -1,0 +1,875 @@
+# Operation `ike`: an IKE / IPsec / VPN proposal (definition in qrp-kachestvo/obratna-proba/operacii/definicii.md).
+# Every spelling below is taken from the page in its `source`, fetched on 18.11.2026; `quote` is the
+# text on that page that names it. `expect` is what the spelling means by that page, not what the
+# scanner printed. tests/test_operation_closure.py writes each `snippet` to `file`, scans it, and
+# checks `expect`.
+
+operation = "ike"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "IPsec"
+scope = "strongSwan swanctl.conf proposals (every key exchange keyword of the proposals page), authentication constraints and PPK; Libreswan ipsec.conf ike=/esp= groups, authby= and ppk=; WireGuard keys. Not covered: strongSwan ipsec.conf (legacy), vendor CLIs (FortiOS, Cisco, Junos: netdev), IKE fragmentation (no algorithm)."
+
+[[ecosystems.spellings]]
+id = "strongswan-modp768"
+spelling = "modp768"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp768 768 bits 1"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp768
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 768}}, {at = "evidence.ike_proposals", match = {group = "modp768", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp1024"
+spelling = "modp1024"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp1024 1024 bits 2"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp1024
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 1024}}, {at = "evidence.ike_proposals", match = {group = "modp1024", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp1536"
+spelling = "modp1536"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp1536 1536 bits 5"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp1536
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 1536}}, {at = "evidence.ike_proposals", match = {group = "modp1536", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp2048"
+spelling = "modp2048"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp2048 2048 bits 14"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp2048
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 2048}}, {at = "evidence.ike_proposals", match = {group = "modp2048", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp3072"
+spelling = "modp3072"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp3072 3072 bits 15"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp3072
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 3072}}, {at = "evidence.ike_proposals", match = {group = "modp3072", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp4096"
+spelling = "modp4096"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp4096 4096 bits 16"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp4096
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 4096}}, {at = "evidence.ike_proposals", match = {group = "modp4096", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp6144"
+spelling = "modp6144"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp6144 6144 bits 17"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp6144
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 6144}}, {at = "evidence.ike_proposals", match = {group = "modp6144", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp8192"
+spelling = "modp8192"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp8192 8192 bits 18"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp8192
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 8192}}, {at = "evidence.ike_proposals", match = {group = "modp8192", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp1024s160"
+spelling = "modp1024s160"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp1024s160 1024 bits 160 bits 22"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp1024s160
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 1024}}, {at = "evidence.ike_proposals", match = {group = "modp1024s160", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp2048s224"
+spelling = "modp2048s224"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp2048s224 2048 bits 224 bits 23"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp2048s224
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 2048}}, {at = "evidence.ike_proposals", match = {group = "modp2048s224", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-modp2048s256"
+spelling = "modp2048s256"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "modp2048s256 2048 bits 256 bits 24"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-modp2048s256
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "DH", key_size = 2048}}, {at = "evidence.ike_proposals", match = {group = "modp2048s256", family = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp192"
+spelling = "ecp192"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp192 192 bits 25"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp192
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 192}}, {at = "evidence.ike_proposals", match = {group = "ecp192", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp224"
+spelling = "ecp224"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp224 224 bits 26"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp224
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 224}}, {at = "evidence.ike_proposals", match = {group = "ecp224", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp256"
+spelling = "ecp256"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp256 256 bits 19"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp256
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 256}}, {at = "evidence.ike_proposals", match = {group = "ecp256", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp384"
+spelling = "ecp384"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp384 384 bits 20"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp384
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 384}}, {at = "evidence.ike_proposals", match = {group = "ecp384", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp521"
+spelling = "ecp521"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp521 521 bits 21"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp521
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 521}}, {at = "evidence.ike_proposals", match = {group = "ecp521", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp224bp"
+spelling = "ecp224bp"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp224bp 224 bits 27"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp224bp
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 224}}, {at = "evidence.ike_proposals", match = {group = "ecp224bp", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp256bp"
+spelling = "ecp256bp"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp256bp 256 bits 28"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp256bp
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 256}}, {at = "evidence.ike_proposals", match = {group = "ecp256bp", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp384bp"
+spelling = "ecp384bp"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp384bp 384 bits 29"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp384bp
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 384}}, {at = "evidence.ike_proposals", match = {group = "ecp384bp", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ecp512bp"
+spelling = "ecp512bp"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ecp512bp 512 bits 30"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp512bp
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 512}}, {at = "evidence.ike_proposals", match = {group = "ecp512bp", family = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-curve25519"
+spelling = "curve25519"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "curve25519 or x25519 256 bits 31"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-curve25519
+  }
+}
+'''
+expect = {rows = [{at = "evidence.ike_proposals", match = {group = "curve25519", family = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-x25519"
+spelling = "x25519"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "curve25519 or x25519 256 bits 31"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-x25519
+  }
+}
+'''
+expect = {rows = [{at = "evidence.ike_proposals", match = {group = "x25519", family = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-curve448"
+spelling = "curve448"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "curve448 or x448 448 bits 32"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-curve448
+  }
+}
+'''
+expect = {rows = [{at = "evidence.ike_proposals", match = {group = "curve448", family = "X448"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-x448"
+spelling = "x448"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "curve448 or x448 448 bits 32"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-x448
+  }
+}
+'''
+expect = {rows = [{at = "evidence.ike_proposals", match = {group = "x448", family = "X448"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-mlkem512"
+spelling = "mlkem512"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "mlkem512 1 (128 bits) 35"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-mlkem512
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ML-KEM", parameter_set = "512"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-mlkem768"
+spelling = "mlkem768"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "mlkem768 3 (192 bits) 36"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-mlkem768
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-mlkem1024"
+spelling = "mlkem1024"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "mlkem1024 5 (256 bits) 37"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-mlkem1024
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ML-KEM", parameter_set = "1024"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ke1-additional"
+spelling = "x25519-ke1_mlkem768"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "For example, x25519-ke1_mlkem768 adds ML-KEM-768 as additional key exchange method after the initial key exchange with X25519"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-x25519-ke1_mlkem768
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.source_code", match = {line = 4, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-esp-proposals"
+spelling = "esp_proposals = aes128gcm16-ecp256"
+source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
+quote = "ESP: aes128gcm16-ecp256"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    children {
+      net {
+        esp_proposals = aes128gcm16-ecp256
+      }
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 5, algorithm = "EC", key_size = 256}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-auth-rsa-size"
+spelling = "auth = rsa-2048"
+source = "https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html"
+quote = "specify the key type followed by the minimum strength in bits (e.g. ecdsa-384 or rsa-2048-ecdsa-256 )"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    remote {
+      auth = rsa-2048
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-auth-ecdsa-size"
+spelling = "auth = ecdsa-384"
+source = "https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html"
+quote = "specify the key type followed by the minimum strength in bits (e.g. ecdsa-384 or rsa-2048-ecdsa-256 )"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    remote {
+      auth = ecdsa-384
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-auth-rsa-pss"
+spelling = "auth = rsa/pss-sha256"
+source = "https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html"
+quote = "To require RSASSA-PSS signatures use rsa/pss instead of pubkey or rsa as e.g. in rsa/pss-sha256"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    remote {
+      auth = rsa/pss-sha256
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-auth-eap-tls"
+spelling = "auth = eap-tls:ecdsa-384-sha384"
+source = "https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html"
+quote = "eap-tls:ecdsa-384-sha384"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    remote {
+      auth = eap-tls:ecdsa-384-sha384
+    }
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ppk-required"
+spelling = "ppk_id + ppk_required = yes"
+source = "https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html"
+quote = "Whether a Postquantum Preshared Key (PPK, RFC 8784 ) is required for this connection"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp384
+    ppk_id = qkd-1
+    ppk_required = yes
+  }
+}
+'''
+expect = {detected = ["PPK"], value = [{at = "summary.pqc_readiness", is = "mechanism_protected"}]}
+
+[[ecosystems.spellings]]
+id = "strongswan-ppk-not-required"
+spelling = "ppk_id + ppk_required = no"
+source = "https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html"
+quote = "<conn>.ppk_required no Since version 5.7.0"
+file = "swanctl.conf"
+snippet = '''
+connections {
+  gw {
+    version = 2
+    proposals = aes256-sha256-ecp384
+    ppk_id = qkd-1
+    ppk_required = no
+  }
+}
+'''
+expect = {value = [{at = "summary.pqc_readiness", is_not = "mechanism_protected"}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-modp2048"
+spelling = "ike=aes128-sha1;modp2048"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "ike=aes128-sha1;modp2048"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes128-sha1;modp2048
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-modp1024-1536"
+spelling = "ike=3des-md5;modp1024,aes-sha1;modp1536"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "ike=3des-md5;modp1024,aes-sha1;modp1536"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=3des-md5;modp1024,aes-sha1;modp1536
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 1024}}, {at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 1536}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-dh19"
+spelling = "ike=aes256-sha2;dh19"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "ike=aes256-sha2;dh19"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "256-bit random ECP group"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh19
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 256}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-dh20"
+spelling = "ike=aes256-sha2;dh20"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "Diffie-Hellman groups 19,20 and 21 from RFC-5903 are supported"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "384-bit random ECP group"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh20
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 384}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-dh21"
+spelling = "ike=aes256-sha2;dh21"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "Diffie-Hellman groups 19,20 and 21 from RFC-5903 are supported"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "521-bit random ECP group"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh21
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 521}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-dh31"
+spelling = "ike=aes256-sha2;dh31"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "Curve25519 from RFC-8031 is supported as \"dh31\""
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "Curve25519"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh31
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-dh22"
+spelling = "ike=aes128-sha1;dh22"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "ike=aes128-sha1;dh22"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "1024-bit MODP Group with 160-bit Prime Order Subgroup"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes128-sha1;dh22
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-dh14-plus-dh19"
+spelling = "ike=aes_gcm+chacha20_poly1305;dh14+dh19"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "ike=aes_gcm+chacha20_poly1305;dh14+dh19"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "2048-bit MODP Group"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes_gcm+chacha20_poly1305;dh14+dh19
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 2048}}, {at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 256}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-esp-dh19"
+spelling = "esp=aes128-sha2_512;dh19"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "esp=aes128-sha2_512;dh19"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "256-bit random ECP group"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    esp=aes128-sha2_512;dh19
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 256}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-authby-rsasig"
+spelling = "authby=rsasig"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "Using authby=rsasig means using rsa-sha2_512"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    authby=rsasig
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-authby-rsa-sha2"
+spelling = "authby=rsa-sha2"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "rsa-sha2 RSASSA-PSS digital signature based authentication"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    authby=rsa-sha2
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-authby-rsa-sha1"
+spelling = "authby=rsa-sha1"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "rsa-sha1 RSA-PKCSv1.5 digital signature based authentication with SHA1"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    authby=rsa-sha1
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-authby-ecdsa"
+spelling = "authby=ecdsa"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "ECDSA digital signature based authentication with any of the hash algorithms"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    authby=ecdsa
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-authby-ecdsa-sha2_384"
+spelling = "authby=ecdsa-sha2_384"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "ecdsa-sha2_384"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    authby=ecdsa-sha2_384
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-ppk-insist"
+spelling = "ppk=insist"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "insist , signifying we allow communication only if PPK is used for key derivation"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh20
+    ppk=insist
+'''
+expect = {detected = ["PPK"], value = [{at = "summary.pqc_readiness", is = "mechanism_protected"}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-ppk-propose"
+spelling = "ppk=propose"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "propose or yes (the default), signifying we propose to use PPK for this connection"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh20
+    ppk=propose
+'''
+expect = {value = [{at = "summary.pqc_readiness", is_not = "mechanism_protected"}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-ppk-yes"
+spelling = "ppk=yes"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "propose or yes (the default), signifying we propose to use PPK for this connection"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh20
+    ppk=yes
+'''
+expect = {value = [{at = "summary.pqc_readiness", is_not = "mechanism_protected"}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-ppk-never"
+spelling = "ppk=never"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "never or no , signifying that PPK should not be used for key derivation"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh20
+    ppk=never
+'''
+expect = {value = [{at = "summary.pqc_readiness", is_not = "mechanism_protected"}]}
+
+[[ecosystems.spellings]]
+id = "libreswan-ppk-no"
+spelling = "ppk=no"
+source = "https://libreswan.org/man/ipsec.conf.5.html"
+quote = "never or no , signifying that PPK should not be used for key derivation"
+file = "ipsec.conf"
+snippet = '''
+conn gw
+    ikev2=insist
+    ike=aes256-sha2;dh20
+    ppk=no
+'''
+expect = {value = [{at = "summary.pqc_readiness", is_not = "mechanism_protected"}]}
+
+[[ecosystems.spellings]]
+id = "wireguard-privatekey"
+spelling = "[Interface] PrivateKey ="
+source = "https://git.zx2c4.com/wireguard-tools/plain/src/man/wg.8"
+quote = "PrivateKey \\(em a base64 private key generated by \\fIwg genkey\\fP. Required."
+file = "wg0.conf"
+snippet = '''
+[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+ListenPort = 51820
+'''
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "wireguard-publickey"
+spelling = "[Peer] PublicKey ="
+source = "https://www.wireguard.com/protocol/"
+quote = "Curve25519 for ECDH"
+file = "wg0.conf"
+snippet = '''
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+Endpoint = 192.95.5.67:1234
+'''
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "X25519"}}]}

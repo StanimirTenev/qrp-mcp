@@ -1,0 +1,208 @@
+# Operation `keyfile`, ecosystem PKI files: a key or certificate file loaded or parsed -- PEM labels
+# (RFC 7468, OpenSSL's traditional labels, RFC 5915, OpenSSH, RFC 4716, OpenPGP armor), the same
+# structures in DER and PKCS#12, and PEM carried inside JSON and YAML. `material` names key material the
+# test makes when it runs (tests/test_operation_closure.py, _make_material); no key is committed. The
+# material is a 2048-bit RSA key and certificate, a P-256 key and request, an Ed25519 key; `expect` is
+# what that material is. Pages fetched 18.11.2026.
+
+operation = "keyfile"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "PKI"
+scope = "PEM labels CERTIFICATE, X509 CRL, CERTIFICATE REQUEST, NEW CERTIFICATE REQUEST, PKCS7, CMS, PRIVATE KEY, ENCRYPTED PRIVATE KEY, PUBLIC KEY, RSA PRIVATE KEY, RSA PUBLIC KEY, EC PRIVATE KEY, OPENSSH PRIVATE KEY; SSH2 PUBLIC KEY; PGP PUBLIC KEY BLOCK; DER certificate, PKCS#8 key and PKCS#7; PKCS#12; PEM in JSON and YAML. Not covered: JKS/JCEKS (Java), .ovpn inline blocks (IPsec), ATTRIBUTE CERTIFICATE, PGP private keys."
+
+[[ecosystems.spellings]]
+id = "pem-certificate"
+spelling = "-----BEGIN CERTIFICATE-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "Public-key certificates are encoded using the \"CERTIFICATE\" label."
+file = "cert.pem"
+material = "CERT_RSA2048_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048, line = 1}}]}
+
+[[ecosystems.spellings]]
+id = "pem-x509-crl"
+spelling = "-----BEGIN X509 CRL-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "Certificate Revocation Lists (CRLs) are encoded using the \"X509 CRL\" label."
+file = "ca.crl"
+material = "CRL_RSA_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pem-certificate-request"
+spelling = "-----BEGIN CERTIFICATE REQUEST-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN CERTIFICATE REQUEST-----"
+file = "req.csr"
+material = "CSR_EC256_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "EC", key_size = 256, curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "pem-new-certificate-request"
+spelling = "-----BEGIN NEW CERTIFICATE REQUEST-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "The label \"NEW CERTIFICATE REQUEST\" is also in wide use."
+file = "req.csr"
+material = "CSR_EC256_NEW_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "EC", key_size = 256, curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "pem-pkcs7"
+spelling = "-----BEGIN PKCS7-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN PKCS7-----"
+file = "chain.p7b"
+material = "CERT_RSA2048_PKCS7_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "pem-cms"
+spelling = "-----BEGIN CMS-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN CMS-----"
+file = "chain.pem"
+material = "CERT_RSA2048_CMS_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "pem-private-key"
+spelling = "-----BEGIN PRIVATE KEY-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN PRIVATE KEY-----"
+file = "key.pem"
+material = "RSA2048_PKCS8_PEM"
+expect = {rows = [{at = "evidence.embedded_keys", match = {key_algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "pem-encrypted-private-key"
+spelling = "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN ENCRYPTED PRIVATE KEY-----"
+file = "key.pem"
+material = "RSA2048_PKCS8_ENCRYPTED_PEM"
+expect = {rows = [{at = "evidence.embedded_keys", match = {line = 1, type = "ENCRYPTED PRIVATE KEY"}}]}
+
+[[ecosystems.spellings]]
+id = "pem-public-key"
+spelling = "-----BEGIN PUBLIC KEY-----"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN PUBLIC KEY-----"
+file = "pub.pem"
+material = "RSA2048_SPKI_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048, key_material = "public key"}}]}
+
+[[ecosystems.spellings]]
+id = "pem-rsa-private-key"
+spelling = "-----BEGIN RSA PRIVATE KEY-----"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/PEM_read_bio_PrivateKey.pod"
+quote = "-----BEGIN RSA PRIVATE KEY-----"
+file = "key.pem"
+material = "RSA2048_PKCS1_PEM"
+expect = {rows = [{at = "evidence.embedded_keys", match = {key_algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "pem-rsa-public-key"
+spelling = "-----BEGIN RSA PUBLIC KEY-----"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/PEM_read_bio_PrivateKey.pod"
+quote = "The public key is encoded using a PKCS#1 RSAPublicKey"
+file = "pub.pem"
+material = "RSA2048_PKCS1_PUBLIC_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048, key_material = "public key"}}]}
+
+[[ecosystems.spellings]]
+id = "pem-ec-private-key"
+spelling = "-----BEGIN EC PRIVATE KEY-----"
+source = "https://www.rfc-editor.org/rfc/rfc5915.txt"
+quote = "-----BEGIN EC PRIVATE KEY-----"
+file = "key.pem"
+material = "EC256_SEC1_PEM"
+expect = {rows = [{at = "evidence.embedded_keys", match = {key_algorithm = "EC", key_size = 256, curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "openssh-private-key"
+spelling = "-----BEGIN OPENSSH PRIVATE KEY-----"
+source = "none"
+file = "id_ed25519"
+material = "ED25519_OPENSSH_PRIVATE"
+expect = {rows = [{at = "evidence.embedded_keys", match = {key_algorithm = "Ed25519", key_size = 256}}]}
+
+[[ecosystems.spellings]]
+id = "ssh2-public-key"
+spelling = "---- BEGIN SSH2 PUBLIC KEY ----"
+source = "https://www.rfc-editor.org/rfc/rfc4716.txt"
+quote = "---- BEGIN SSH2 PUBLIC KEY ----"
+file = "key.pub"
+material = "ED25519_SSH2_PUBLIC"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "openpgp-public-key-block"
+spelling = "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+source = "https://www.rfc-editor.org/rfc/rfc9580.txt"
+quote = "Used for armoring public keys."
+file = "keys.asc"
+material = "fixture:openpgp/release-keys.asc"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "der-certificate"
+spelling = "certificate, DER"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man1/openssl-x509.pod.in"
+quote = "[B<-inform> B<DER>|B<PEM>]"
+file = "cert.der"
+material = "CERT_RSA2048_DER"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048, line = 1}}]}
+
+[[ecosystems.spellings]]
+id = "der-private-key"
+spelling = "private key, PKCS#8 DER"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man1/openssl-pkey.pod.in"
+quote = "=item B<-inform> B<DER>|B<PEM>|B<P12>|B<ENGINE>"
+file = "key.der"
+material = "RSA2048_PKCS8_DER"
+expect = {rows = [{at = "evidence.embedded_keys", match = {key_algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "der-pkcs7"
+spelling = "PKCS#7, DER"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "The encoded data MUST be a BER-encoded ASN.1 ContentInfo"
+file = "chain.p7b"
+material = "CERT_RSA2048_PKCS7_DER"
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs12"
+spelling = "PKCS#12 (.p12)"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man1/openssl-pkcs12.pod.in"
+quote = "openssl pkcs12 -in file.p12 -out file.pem"
+file = "file.p12"
+material = "RSA2048_PKCS12"
+expect = {rows = [{at = "evidence.embedded_keys", match = {line = 1}}]}
+
+[[ecosystems.spellings]]
+id = "pem-in-json-string"
+spelling = "PEM inside a JSON string (\\n escapes)"
+source = "https://www.rfc-editor.org/rfc/rfc8259.txt"
+quote = "%x6E / ; n line feed U+000A"
+file = "profile.json"
+snippet = '''
+{"tls": {"ca": "{{CERT_RSA2048_PEM|json}}"}}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "pem-in-yaml-literal-block"
+spelling = "PEM inside a YAML literal block scalar (key: |)"
+source = "https://yaml.org/spec/1.2.2/"
+quote = "8.1.2. Literal Style"
+file = "secret.yaml"
+snippet = '''
+apiVersion: v1
+kind: Secret
+stringData:
+  ca.crt: |
+{{CERT_RSA2048_PEM|4}}'''
+expect = {rows = [{at = "evidence.source_code", match = {algorithm = "RSA", key_size = 2048}}]}

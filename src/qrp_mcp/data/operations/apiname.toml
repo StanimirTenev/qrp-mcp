@@ -1,0 +1,1939 @@
+# Operation `apiname`, ecosystem C: a primitive named through a C library's API, constant or header
+# (definicii.md, rule B3). Bounded: only the libraries the family's rows name (ZA-OPRAVYANE rows 65,
+# 67, 72, 73, 120, 122, 123, 133, 135), and in each only the public-key names on the reference pages
+# in `source`, fetched 18.11.2026. The rest of each API (hashes, ciphers, the many helpers) is not
+# in this catalogue. `expect`: the family the page gives the name, on the line it is written.
+
+operation = "apiname"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "C"
+scope = "OpenSSL 3.0 EVP key types and legacy RSA/DSA/DH/EC_KEY/ECDSA calls; wolfCrypt RSA/ECC/DH/DSA/Ed25519/Curve25519; libsodium crypto_sign/box/kx/scalarmult; Mbed TLS 3.6 rsa/ecdsa/ecdh/dhm and PSA key types and algorithms; PKCS#11 3.1 CKK_/CKM_ public-key names; GnuTLS GNUTLS_PK_/GNUTLS_SIGN_; Libgcrypt GCRY_PK_. Not covered: strongSwan's source API, X.509 text names in C, the rest of each library's API."
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-rsa"
+spelling = "EVP_PKEY_RSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "EVP_PKEY_RSA"
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-rsa-pss"
+spelling = "EVP_PKEY_RSA_PSS"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "EVP_PKEY_RSA_PSS"
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA_PSS, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-dsa"
+spelling = "EVP_PKEY_DSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "EVP_PKEY_DSA"
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DSA, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-dh"
+spelling = "EVP_PKEY_DH"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "EVP_PKEY_DH"
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DH, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-ec"
+spelling = "EVP_PKEY_EC"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "EVP_PKEY_EC"
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-sm2"
+spelling = "EVP_PKEY_SM2"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "EVP_PKEY_SM2"
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_SM2, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "SM2"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-x25519"
+spelling = "EVP_PKEY_X25519"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "EVP_PKEY_X25519"
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-x448"
+spelling = "EVP_PKEY_X448"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "EVP_PKEY_X448"
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_X448, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X448"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-rsa"
+spelling = "\"RSA\""
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "These are names like \"RSA\", \"DSA\""
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-dsa"
+spelling = "\"DSA\""
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
+quote = "These are names like \"RSA\", \"DSA\""
+file = "a.c"
+snippet = '''
+EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-set1-rsa"
+spelling = "EVP_PKEY_set1_RSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_set1_RSA"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_set1_RSA(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-set1-dsa"
+spelling = "EVP_PKEY_set1_DSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_set1_DSA"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_set1_DSA(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-set1-dh"
+spelling = "EVP_PKEY_set1_DH"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_set1_DH"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_set1_DH(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-set1-ec-key"
+spelling = "EVP_PKEY_set1_EC_KEY"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_set1_EC_KEY"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_set1_EC_KEY(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-get0-rsa"
+spelling = "EVP_PKEY_get0_RSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_get0_RSA"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_get0_RSA(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-get0-dsa"
+spelling = "EVP_PKEY_get0_DSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_get0_DSA"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_get0_DSA(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-get0-dh"
+spelling = "EVP_PKEY_get0_DH"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_get0_DH"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_get0_DH(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-get0-ec-key"
+spelling = "EVP_PKEY_get0_EC_KEY"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_get0_EC_KEY"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_get0_EC_KEY(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-get1-rsa"
+spelling = "EVP_PKEY_get1_RSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_get1_RSA"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_get1_RSA(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-get1-dsa"
+spelling = "EVP_PKEY_get1_DSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_get1_DSA"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_get1_DSA(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-get1-dh"
+spelling = "EVP_PKEY_get1_DH"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_get1_DH"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_get1_DH(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-get1-ec-key"
+spelling = "EVP_PKEY_get1_EC_KEY"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_get1_EC_KEY"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_get1_EC_KEY(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-assign-rsa"
+spelling = "EVP_PKEY_assign_RSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_assign_RSA"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_assign_RSA(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-assign-dsa"
+spelling = "EVP_PKEY_assign_DSA"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_assign_DSA"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_assign_DSA(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-assign-dh"
+spelling = "EVP_PKEY_assign_DH"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_assign_DH"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_assign_DH(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-pkey-assign-ec-key"
+spelling = "EVP_PKEY_assign_EC_KEY"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
+quote = "EVP_PKEY_assign_EC_KEY"
+file = "a.c"
+snippet = '''
+r = EVP_PKEY_assign_EC_KEY(pkey, key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-rsa-generate-key-ex"
+spelling = "RSA_generate_key_ex"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/RSA_generate_key.pod"
+quote = "RSA_generate_key_ex"
+file = "a.c"
+snippet = '''
+RSA_generate_key_ex(rsa, 2048, e, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-rsa-generate-multi-prime-key"
+spelling = "RSA_generate_multi_prime_key"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/RSA_generate_key.pod"
+quote = "RSA_generate_multi_prime_key"
+file = "a.c"
+snippet = '''
+RSA_generate_multi_prime_key(rsa, 4096, 3, e, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-dsa-generate-key"
+spelling = "DSA_generate_key"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/DSA_generate_key.pod"
+quote = "DSA_generate_key"
+file = "a.c"
+snippet = '''
+DSA_generate_key(dsa);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-dh-generate-key"
+spelling = "DH_generate_key"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/DH_generate_key.pod"
+quote = "DH_generate_key"
+file = "a.c"
+snippet = '''
+DH_generate_key(dh);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-dh-compute-key"
+spelling = "DH_compute_key"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/DH_generate_key.pod"
+quote = "DH_compute_key"
+file = "a.c"
+snippet = '''
+n = DH_compute_key(key, pub, dh);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-dh-compute-key-padded"
+spelling = "DH_compute_key_padded"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/DH_generate_key.pod"
+quote = "DH_compute_key_padded"
+file = "a.c"
+snippet = '''
+n = DH_compute_key_padded(key, pub, dh);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-ec-key-new-by-curve-name"
+spelling = "EC_KEY_new_by_curve_name"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EC_KEY_new.pod"
+quote = "EC_KEY_new_by_curve_name"
+file = "a.c"
+snippet = '''
+EC_KEY *k = EC_KEY_new_by_curve_name(nid);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-ec-key-generate-key"
+spelling = "EC_KEY_generate_key"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EC_KEY_new.pod"
+quote = "EC_KEY_generate_key"
+file = "a.c"
+snippet = '''
+EC_KEY_generate_key(k);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-ec-key-set-private-key"
+spelling = "EC_KEY_set_private_key"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EC_KEY_new.pod"
+quote = "EC_KEY_set_private_key"
+file = "a.c"
+snippet = '''
+EC_KEY_set_private_key(k, priv);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-ecdsa-sign"
+spelling = "ECDSA_sign"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/ECDSA_sign.pod"
+quote = "ECDSA_sign"
+file = "a.c"
+snippet = '''
+r = ECDSA_sign(0, dgst, dlen, sig, &siglen, eckey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-ecdsa-verify"
+spelling = "ECDSA_verify"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/ECDSA_sign.pod"
+quote = "ECDSA_verify"
+file = "a.c"
+snippet = '''
+r = ECDSA_verify(0, dgst, dlen, sig, &siglen, eckey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-ecdsa-do-sign"
+spelling = "ECDSA_do_sign"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/ECDSA_sign.pod"
+quote = "ECDSA_do_sign"
+file = "a.c"
+snippet = '''
+ECDSA_SIG *s = ECDSA_do_sign(dgst, dlen, eckey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-ecdsa-do-verify"
+spelling = "ECDSA_do_verify"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/ECDSA_sign.pod"
+quote = "ECDSA_do_verify"
+file = "a.c"
+snippet = '''
+r = ECDSA_do_verify(dgst, dlen, s, eckey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-ecdsa-size"
+spelling = "ECDSA_size"
+source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/ECDSA_sign.pod"
+quote = "ECDSA_size"
+file = "a.c"
+snippet = '''
+int n = ECDSA_size(eckey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-initrsakey"
+spelling = "wc_InitRsaKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_InitRsaKey"
+file = "a.c"
+snippet = '''
+ret = wc_InitRsaKey(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-makersakey"
+spelling = "wc_MakeRsaKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_MakeRsaKey"
+file = "a.c"
+snippet = '''
+ret = wc_MakeRsaKey(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-rsapublicencrypt"
+spelling = "wc_RsaPublicEncrypt"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_RsaPublicEncrypt"
+file = "a.c"
+snippet = '''
+ret = wc_RsaPublicEncrypt(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-rsaprivatedecrypt"
+spelling = "wc_RsaPrivateDecrypt"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_RsaPrivateDecrypt"
+file = "a.c"
+snippet = '''
+ret = wc_RsaPrivateDecrypt(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-rsassl-sign"
+spelling = "wc_RsaSSL_Sign"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_RsaSSL_Sign"
+file = "a.c"
+snippet = '''
+ret = wc_RsaSSL_Sign(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-rsassl-verify"
+spelling = "wc_RsaSSL_Verify"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_RsaSSL_Verify"
+file = "a.c"
+snippet = '''
+ret = wc_RsaSSL_Verify(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-rsapss-sign"
+spelling = "wc_RsaPSS_Sign"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_RsaPSS_Sign"
+file = "a.c"
+snippet = '''
+ret = wc_RsaPSS_Sign(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-rsapublickeydecode"
+spelling = "wc_RsaPublicKeyDecode"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_RsaPublicKeyDecode"
+file = "a.c"
+snippet = '''
+ret = wc_RsaPublicKeyDecode(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-rsaprivatekeydecode"
+spelling = "wc_RsaPrivateKeyDecode"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_RsaPrivateKeyDecode"
+file = "a.c"
+snippet = '''
+ret = wc_RsaPrivateKeyDecode(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-freersakey"
+spelling = "wc_FreeRsaKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__RSA.html"
+quote = "wc_FreeRsaKey"
+file = "a.c"
+snippet = '''
+ret = wc_FreeRsaKey(&key, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ecc-make-key"
+spelling = "wc_ecc_make_key"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ECC.html"
+quote = "wc_ecc_make_key"
+file = "a.c"
+snippet = '''
+ret = wc_ecc_make_key(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ecc-init"
+spelling = "wc_ecc_init"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ECC.html"
+quote = "wc_ecc_init"
+file = "a.c"
+snippet = '''
+ret = wc_ecc_init(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ecc-import-x963"
+spelling = "wc_ecc_import_x963"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ECC.html"
+quote = "wc_ecc_import_x963"
+file = "a.c"
+snippet = '''
+ret = wc_ecc_import_x963(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ecc-sign-hash"
+spelling = "wc_ecc_sign_hash"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ECC.html"
+quote = "wc_ecc_sign_hash"
+file = "a.c"
+snippet = '''
+ret = wc_ecc_sign_hash(hash, hlen, sig, &slen, &rng, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ecc-verify-hash"
+spelling = "wc_ecc_verify_hash"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ECC.html"
+quote = "wc_ecc_verify_hash"
+file = "a.c"
+snippet = '''
+ret = wc_ecc_verify_hash(hash, hlen, sig, &slen, &rng, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ecc-shared-secret"
+spelling = "wc_ecc_shared_secret"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ECC.html"
+quote = "wc_ecc_shared_secret"
+file = "a.c"
+snippet = '''
+ret = wc_ecc_shared_secret(&priv, &pub, out, &outlen);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-initdhkey"
+spelling = "wc_InitDhKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Diffie-Hellman.html"
+quote = "wc_InitDhKey"
+file = "a.c"
+snippet = '''
+ret = wc_InitDhKey(&key, &rng, priv, &plen, pub, &publen);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-dhgeneratekeypair"
+spelling = "wc_DhGenerateKeyPair"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Diffie-Hellman.html"
+quote = "wc_DhGenerateKeyPair"
+file = "a.c"
+snippet = '''
+ret = wc_DhGenerateKeyPair(&key, &rng, priv, &plen, pub, &publen);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-dhagree"
+spelling = "wc_DhAgree"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Diffie-Hellman.html"
+quote = "wc_DhAgree"
+file = "a.c"
+snippet = '''
+ret = wc_DhAgree(&key, &rng, priv, &plen, pub, &publen);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-dhsetkey"
+spelling = "wc_DhSetKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Diffie-Hellman.html"
+quote = "wc_DhSetKey"
+file = "a.c"
+snippet = '''
+ret = wc_DhSetKey(&key, &rng, priv, &plen, pub, &publen);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-freedhkey"
+spelling = "wc_FreeDhKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Diffie-Hellman.html"
+quote = "wc_FreeDhKey"
+file = "a.c"
+snippet = '''
+ret = wc_FreeDhKey(&key, &rng, priv, &plen, pub, &publen);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-initdsakey"
+spelling = "wc_InitDsaKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__DSA.html"
+quote = "wc_InitDsaKey"
+file = "a.c"
+snippet = '''
+ret = wc_InitDsaKey(digest, sig, &key, &rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-dsasign"
+spelling = "wc_DsaSign"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__DSA.html"
+quote = "wc_DsaSign"
+file = "a.c"
+snippet = '''
+ret = wc_DsaSign(digest, sig, &key, &rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-dsaverify"
+spelling = "wc_DsaVerify"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__DSA.html"
+quote = "wc_DsaVerify"
+file = "a.c"
+snippet = '''
+ret = wc_DsaVerify(digest, sig, &key, &rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-makedsakey"
+spelling = "wc_MakeDsaKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__DSA.html"
+quote = "wc_MakeDsaKey"
+file = "a.c"
+snippet = '''
+ret = wc_MakeDsaKey(digest, sig, &key, &rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-freedsakey"
+spelling = "wc_FreeDsaKey"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__DSA.html"
+quote = "wc_FreeDsaKey"
+file = "a.c"
+snippet = '''
+ret = wc_FreeDsaKey(digest, sig, &key, &rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ed25519-init"
+spelling = "wc_ed25519_init"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ED25519.html"
+quote = "wc_ed25519_init"
+file = "a.c"
+snippet = '''
+ret = wc_ed25519_init(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ed25519-make-key"
+spelling = "wc_ed25519_make_key"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ED25519.html"
+quote = "wc_ed25519_make_key"
+file = "a.c"
+snippet = '''
+ret = wc_ed25519_make_key(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ed25519-sign-msg"
+spelling = "wc_ed25519_sign_msg"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ED25519.html"
+quote = "wc_ed25519_sign_msg"
+file = "a.c"
+snippet = '''
+ret = wc_ed25519_sign_msg(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-ed25519-verify-msg"
+spelling = "wc_ed25519_verify_msg"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__ED25519.html"
+quote = "wc_ed25519_verify_msg"
+file = "a.c"
+snippet = '''
+ret = wc_ed25519_verify_msg(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-curve25519-init"
+spelling = "wc_curve25519_init"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Curve25519.html"
+quote = "wc_curve25519_init"
+file = "a.c"
+snippet = '''
+ret = wc_curve25519_init(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-curve25519-make-key"
+spelling = "wc_curve25519_make_key"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Curve25519.html"
+quote = "wc_curve25519_make_key"
+file = "a.c"
+snippet = '''
+ret = wc_curve25519_make_key(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "wolfcrypt-wc-curve25519-shared-secret"
+spelling = "wc_curve25519_shared_secret"
+source = "https://www.wolfssl.com/documentation/manuals/wolfssl/group__Curve25519.html"
+quote = "wc_curve25519_shared_secret"
+file = "a.c"
+snippet = '''
+ret = wc_curve25519_shared_secret(&rng, 32, &key);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-sign-keypair"
+spelling = "crypto_sign_keypair"
+source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+quote = "crypto_sign_keypair"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+meaning_quote = "Single-part signature: Ed25519"
+file = "a.c"
+snippet = '''
+crypto_sign_keypair(sig, NULL, msg, len, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-sign-detached"
+spelling = "crypto_sign_detached"
+source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+quote = "crypto_sign_detached"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+meaning_quote = "Single-part signature: Ed25519"
+file = "a.c"
+snippet = '''
+crypto_sign_detached(sig, NULL, msg, len, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-sign-verify-detached"
+spelling = "crypto_sign_verify_detached"
+source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+quote = "crypto_sign_verify_detached"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+meaning_quote = "Single-part signature: Ed25519"
+file = "a.c"
+snippet = '''
+crypto_sign_verify_detached(sig, NULL, msg, len, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-sign-seed-keypair"
+spelling = "crypto_sign_seed_keypair"
+source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+quote = "crypto_sign_seed_keypair"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+meaning_quote = "Single-part signature: Ed25519"
+file = "a.c"
+snippet = '''
+crypto_sign_seed_keypair(sig, NULL, msg, len, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-sign-open"
+spelling = "crypto_sign_open"
+source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+quote = "crypto_sign_open"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
+meaning_quote = "Single-part signature: Ed25519"
+file = "a.c"
+snippet = '''
+crypto_sign_open(sig, NULL, msg, len, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-box-keypair"
+spelling = "crypto_box_keypair"
+source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+quote = "crypto_box_keypair"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+meaning_quote = "Key exchange: X25519"
+file = "a.c"
+snippet = '''
+crypto_box_keypair(c, m, mlen, n, pk, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-box-easy"
+spelling = "crypto_box_easy"
+source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+quote = "crypto_box_easy"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+meaning_quote = "Key exchange: X25519"
+file = "a.c"
+snippet = '''
+crypto_box_easy(c, m, mlen, n, pk, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-box-open-easy"
+spelling = "crypto_box_open_easy"
+source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+quote = "crypto_box_open_easy"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+meaning_quote = "Key exchange: X25519"
+file = "a.c"
+snippet = '''
+crypto_box_open_easy(c, m, mlen, n, pk, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-box-detached"
+spelling = "crypto_box_detached"
+source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+quote = "crypto_box_detached"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+meaning_quote = "Key exchange: X25519"
+file = "a.c"
+snippet = '''
+crypto_box_detached(c, m, mlen, n, pk, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-box-beforenm"
+spelling = "crypto_box_beforenm"
+source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+quote = "crypto_box_beforenm"
+meaning_source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
+meaning_quote = "Key exchange: X25519"
+file = "a.c"
+snippet = '''
+crypto_box_beforenm(c, m, mlen, n, pk, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-kx-keypair"
+spelling = "crypto_kx_keypair"
+source = "https://doc.libsodium.org/key_exchange"
+quote = "crypto_kx_keypair"
+meaning_source = "https://doc.libsodium.org/key_exchange"
+meaning_quote = "byte output of the X25519 key exchange operation"
+file = "a.c"
+snippet = '''
+crypto_kx_keypair(rx, tx, pk, sk, peer);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-kx-client-session-keys"
+spelling = "crypto_kx_client_session_keys"
+source = "https://doc.libsodium.org/key_exchange"
+quote = "crypto_kx_client_session_keys"
+meaning_source = "https://doc.libsodium.org/key_exchange"
+meaning_quote = "byte output of the X25519 key exchange operation"
+file = "a.c"
+snippet = '''
+crypto_kx_client_session_keys(rx, tx, pk, sk, peer);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-kx-server-session-keys"
+spelling = "crypto_kx_server_session_keys"
+source = "https://doc.libsodium.org/key_exchange"
+quote = "crypto_kx_server_session_keys"
+meaning_source = "https://doc.libsodium.org/key_exchange"
+meaning_quote = "byte output of the X25519 key exchange operation"
+file = "a.c"
+snippet = '''
+crypto_kx_server_session_keys(rx, tx, pk, sk, peer);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-scalarmult-base"
+spelling = "crypto_scalarmult_base"
+source = "https://doc.libsodium.org/advanced/scalar_multiplication"
+quote = "crypto_scalarmult_base"
+meaning_source = "https://doc.libsodium.org/advanced/scalar_multiplication"
+meaning_quote = "X25519"
+file = "a.c"
+snippet = '''
+crypto_scalarmult_base(pk, sk);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libsodium-crypto-scalarmult"
+spelling = "crypto_scalarmult"
+source = "https://doc.libsodium.org/advanced/scalar_multiplication"
+quote = "crypto_scalarmult"
+meaning_source = "https://doc.libsodium.org/advanced/scalar_multiplication"
+meaning_quote = "X25519"
+file = "a.c"
+snippet = '''
+crypto_scalarmult(q, n, p);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-rsa-init"
+spelling = "mbedtls_rsa_init"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/rsa.h"
+quote = "mbedtls_rsa_init"
+file = "a.c"
+snippet = '''
+ret = mbedtls_rsa_init(&ctx, f_rng, p_rng, 2048, 65537);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-rsa-gen-key"
+spelling = "mbedtls_rsa_gen_key"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/rsa.h"
+quote = "mbedtls_rsa_gen_key"
+file = "a.c"
+snippet = '''
+ret = mbedtls_rsa_gen_key(&ctx, f_rng, p_rng, 2048, 65537);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-rsa-pkcs1-sign"
+spelling = "mbedtls_rsa_pkcs1_sign"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/rsa.h"
+quote = "mbedtls_rsa_pkcs1_sign"
+file = "a.c"
+snippet = '''
+ret = mbedtls_rsa_pkcs1_sign(&ctx, f_rng, p_rng, 2048, 65537);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-rsa-pkcs1-verify"
+spelling = "mbedtls_rsa_pkcs1_verify"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/rsa.h"
+quote = "mbedtls_rsa_pkcs1_verify"
+file = "a.c"
+snippet = '''
+ret = mbedtls_rsa_pkcs1_verify(&ctx, f_rng, p_rng, 2048, 65537);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-rsa-pkcs1-encrypt"
+spelling = "mbedtls_rsa_pkcs1_encrypt"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/rsa.h"
+quote = "mbedtls_rsa_pkcs1_encrypt"
+file = "a.c"
+snippet = '''
+ret = mbedtls_rsa_pkcs1_encrypt(&ctx, f_rng, p_rng, 2048, 65537);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-rsa-pkcs1-decrypt"
+spelling = "mbedtls_rsa_pkcs1_decrypt"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/rsa.h"
+quote = "mbedtls_rsa_pkcs1_decrypt"
+file = "a.c"
+snippet = '''
+ret = mbedtls_rsa_pkcs1_decrypt(&ctx, f_rng, p_rng, 2048, 65537);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-rsa-rsassa-pss-sign"
+spelling = "mbedtls_rsa_rsassa_pss_sign"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/rsa.h"
+quote = "mbedtls_rsa_rsassa_pss_sign"
+file = "a.c"
+snippet = '''
+ret = mbedtls_rsa_rsassa_pss_sign(&ctx, f_rng, p_rng, 2048, 65537);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdsa-sign"
+spelling = "mbedtls_ecdsa_sign"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdsa.h"
+quote = "mbedtls_ecdsa_sign"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdsa_sign(&grp, &r, &s, &d, buf, blen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdsa-verify"
+spelling = "mbedtls_ecdsa_verify"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdsa.h"
+quote = "mbedtls_ecdsa_verify"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdsa_verify(&grp, &r, &s, &d, buf, blen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdsa-genkey"
+spelling = "mbedtls_ecdsa_genkey"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdsa.h"
+quote = "mbedtls_ecdsa_genkey"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdsa_genkey(&grp, &r, &s, &d, buf, blen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdsa-write-signature"
+spelling = "mbedtls_ecdsa_write_signature"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdsa.h"
+quote = "mbedtls_ecdsa_write_signature"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdsa_write_signature(&grp, &r, &s, &d, buf, blen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdsa-read-signature"
+spelling = "mbedtls_ecdsa_read_signature"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdsa.h"
+quote = "mbedtls_ecdsa_read_signature"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdsa_read_signature(&grp, &r, &s, &d, buf, blen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdh-gen-public"
+spelling = "mbedtls_ecdh_gen_public"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdh.h"
+quote = "mbedtls_ecdh_gen_public"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdh_gen_public(&grp, &z, &Qp, &d, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdh-compute-shared"
+spelling = "mbedtls_ecdh_compute_shared"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdh.h"
+quote = "mbedtls_ecdh_compute_shared"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdh_compute_shared(&grp, &z, &Qp, &d, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdh-setup"
+spelling = "mbedtls_ecdh_setup"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdh.h"
+quote = "mbedtls_ecdh_setup"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdh_setup(&grp, &z, &Qp, &d, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-ecdh-calc-secret"
+spelling = "mbedtls_ecdh_calc_secret"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/ecdh.h"
+quote = "mbedtls_ecdh_calc_secret"
+file = "a.c"
+snippet = '''
+ret = mbedtls_ecdh_calc_secret(&grp, &z, &Qp, &d, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-dhm-make-public"
+spelling = "mbedtls_dhm_make_public"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/dhm.h"
+quote = "mbedtls_dhm_make_public"
+file = "a.c"
+snippet = '''
+ret = mbedtls_dhm_make_public(&ctx, x_size, output, olen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-dhm-calc-secret"
+spelling = "mbedtls_dhm_calc_secret"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/dhm.h"
+quote = "mbedtls_dhm_calc_secret"
+file = "a.c"
+snippet = '''
+ret = mbedtls_dhm_calc_secret(&ctx, x_size, output, olen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-dhm-make-params"
+spelling = "mbedtls_dhm_make_params"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/dhm.h"
+quote = "mbedtls_dhm_make_params"
+file = "a.c"
+snippet = '''
+ret = mbedtls_dhm_make_params(&ctx, x_size, output, olen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-mbedtls-dhm-read-public"
+spelling = "mbedtls_dhm_read_public"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/mbedtls/dhm.h"
+quote = "mbedtls_dhm_read_public"
+file = "a.c"
+snippet = '''
+ret = mbedtls_dhm_read_public(&ctx, x_size, output, olen, f_rng, p_rng);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-key-type-rsa-key-pair"
+spelling = "PSA_KEY_TYPE_RSA_KEY_PAIR"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_KEY_TYPE_RSA_KEY_PAIR"
+file = "a.c"
+snippet = '''
+psa_set_key_type(&attr, PSA_KEY_TYPE_RSA_KEY_PAIR);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-key-type-rsa-public-key"
+spelling = "PSA_KEY_TYPE_RSA_PUBLIC_KEY"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_KEY_TYPE_RSA_PUBLIC_KEY"
+file = "a.c"
+snippet = '''
+psa_set_key_type(&attr, PSA_KEY_TYPE_RSA_PUBLIC_KEY);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-key-type-dh-key-pair"
+spelling = "PSA_KEY_TYPE_DH_KEY_PAIR"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_KEY_TYPE_DH_KEY_PAIR"
+file = "a.c"
+snippet = '''
+psa_set_key_type(&attr, PSA_KEY_TYPE_DH_KEY_PAIR);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-rsa-pkcs1v15-sign"
+spelling = "PSA_ALG_RSA_PKCS1V15_SIGN"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_RSA_PKCS1V15_SIGN"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_RSA_PKCS1V15_SIGN);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-rsa-pss"
+spelling = "PSA_ALG_RSA_PSS"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_RSA_PSS"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_RSA_PSS);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-rsa-oaep"
+spelling = "PSA_ALG_RSA_OAEP"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_RSA_OAEP"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_RSA_OAEP);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-rsa-pkcs1v15-crypt"
+spelling = "PSA_ALG_RSA_PKCS1V15_CRYPT"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_RSA_PKCS1V15_CRYPT"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_RSA_PKCS1V15_CRYPT);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-ecdsa"
+spelling = "PSA_ALG_ECDSA"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_ECDSA"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_ECDSA);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-deterministic-ecdsa"
+spelling = "PSA_ALG_DETERMINISTIC_ECDSA"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_DETERMINISTIC_ECDSA"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_DETERMINISTIC_ECDSA);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-ecdh"
+spelling = "PSA_ALG_ECDH"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_ECDH"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_ECDH);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-ffdh"
+spelling = "PSA_ALG_FFDH"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_FFDH"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_FFDH);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-alg-pure-eddsa"
+spelling = "PSA_ALG_PURE_EDDSA"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_ALG_PURE_EDDSA"
+file = "a.c"
+snippet = '''
+psa_set_key_algorithm(&attr, PSA_ALG_PURE_EDDSA);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EdDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "mbed-psa-key-type-ecc-key-pair"
+spelling = "PSA_KEY_TYPE_ECC_KEY_PAIR"
+source = "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/v3.6.2/include/psa/crypto_values.h"
+quote = "PSA_KEY_TYPE_ECC_KEY_PAIR"
+file = "a.c"
+snippet = '''
+psa_set_key_type(&attr, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckk-rsa"
+spelling = "CKK_RSA"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKK_RSA"
+file = "a.c"
+snippet = '''
+CK_KEY_TYPE kt = CKK_RSA;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckk-dsa"
+spelling = "CKK_DSA"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKK_DSA"
+file = "a.c"
+snippet = '''
+CK_KEY_TYPE kt = CKK_DSA;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckk-dh"
+spelling = "CKK_DH"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKK_DH"
+file = "a.c"
+snippet = '''
+CK_KEY_TYPE kt = CKK_DH;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckk-ec"
+spelling = "CKK_EC"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKK_EC"
+file = "a.c"
+snippet = '''
+CK_KEY_TYPE kt = CKK_EC;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckk-ecdsa"
+spelling = "CKK_ECDSA"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKK_ECDSA"
+file = "a.c"
+snippet = '''
+CK_KEY_TYPE kt = CKK_ECDSA;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckk-ec-edwards"
+spelling = "CKK_EC_EDWARDS"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKK_EC_EDWARDS"
+file = "a.c"
+snippet = '''
+CK_KEY_TYPE kt = CKK_EC_EDWARDS;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EdDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckk-ec-montgomery"
+spelling = "CKK_EC_MONTGOMERY"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKK_EC_MONTGOMERY"
+file = "a.c"
+snippet = '''
+CK_KEY_TYPE kt = CKK_EC_MONTGOMERY;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-rsa-pkcs-key-pair-gen"
+spelling = "CKM_RSA_PKCS_KEY_PAIR_GEN"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_RSA_PKCS_KEY_PAIR_GEN"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_RSA_PKCS_KEY_PAIR_GEN, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-rsa-pkcs"
+spelling = "CKM_RSA_PKCS"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_RSA_PKCS"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_RSA_PKCS, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-rsa-pkcs-oaep"
+spelling = "CKM_RSA_PKCS_OAEP"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_RSA_PKCS_OAEP"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_RSA_PKCS_OAEP, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-rsa-pkcs-pss"
+spelling = "CKM_RSA_PKCS_PSS"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_RSA_PKCS_PSS"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_RSA_PKCS_PSS, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-sha256-rsa-pkcs"
+spelling = "CKM_SHA256_RSA_PKCS"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_SHA256_RSA_PKCS"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_SHA256_RSA_PKCS, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-rsa-x-509"
+spelling = "CKM_RSA_X_509"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_RSA_X_509"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_RSA_X_509, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-dsa-key-pair-gen"
+spelling = "CKM_DSA_KEY_PAIR_GEN"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_DSA_KEY_PAIR_GEN"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_DSA_KEY_PAIR_GEN, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-dsa"
+spelling = "CKM_DSA"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_DSA"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_DSA, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-dsa-sha256"
+spelling = "CKM_DSA_SHA256"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_DSA_SHA256"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_DSA_SHA256, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-dh-pkcs-key-pair-gen"
+spelling = "CKM_DH_PKCS_KEY_PAIR_GEN"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_DH_PKCS_KEY_PAIR_GEN"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_DH_PKCS_KEY_PAIR_GEN, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-dh-pkcs-derive"
+spelling = "CKM_DH_PKCS_DERIVE"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_DH_PKCS_DERIVE"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_DH_PKCS_DERIVE, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-ec-key-pair-gen"
+spelling = "CKM_EC_KEY_PAIR_GEN"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_EC_KEY_PAIR_GEN"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_EC_KEY_PAIR_GEN, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-ecdsa"
+spelling = "CKM_ECDSA"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_ECDSA"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_ECDSA, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-ecdsa-sha256"
+spelling = "CKM_ECDSA_SHA256"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_ECDSA_SHA256"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_ECDSA_SHA256, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-ecdh1-derive"
+spelling = "CKM_ECDH1_DERIVE"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_ECDH1_DERIVE"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_ECDH1_DERIVE, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-ecdh1-cofactor-derive"
+spelling = "CKM_ECDH1_COFACTOR_DERIVE"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_ECDH1_COFACTOR_DERIVE"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_ECDH1_COFACTOR_DERIVE, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-ec-edwards-key-pair-gen"
+spelling = "CKM_EC_EDWARDS_KEY_PAIR_GEN"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_EC_EDWARDS_KEY_PAIR_GEN"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_EC_EDWARDS_KEY_PAIR_GEN, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EdDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-eddsa"
+spelling = "CKM_EDDSA"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_EDDSA"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_EDDSA, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EdDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-ec-montgomery-key-pair-gen"
+spelling = "CKM_EC_MONTGOMERY_KEY_PAIR_GEN"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_EC_MONTGOMERY_KEY_PAIR_GEN"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_EC_MONTGOMERY_KEY_PAIR_GEN, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-rsa"
+spelling = "GNUTLS_PK_RSA"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_RSA"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_RSA;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-rsa-pss"
+spelling = "GNUTLS_PK_RSA_PSS"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_RSA_PSS"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_RSA_PSS;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-dsa"
+spelling = "GNUTLS_PK_DSA"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_DSA"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_DSA;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-dh"
+spelling = "GNUTLS_PK_DH"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_DH"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_DH;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DH"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-ecdsa"
+spelling = "GNUTLS_PK_ECDSA"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_ECDSA"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_ECDSA;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-ecdh-x25519"
+spelling = "GNUTLS_PK_ECDH_X25519"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_ECDH_X25519"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_ECDH_X25519;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-eddsa-ed25519"
+spelling = "GNUTLS_PK_EDDSA_ED25519"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_EDDSA_ED25519"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_EDDSA_ED25519;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-ecdh-x448"
+spelling = "GNUTLS_PK_ECDH_X448"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_ECDH_X448"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_ECDH_X448;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X448"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-eddsa-ed448"
+spelling = "GNUTLS_PK_EDDSA_ED448"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_EDDSA_ED448"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_EDDSA_ED448;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed448"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-sign-rsa-sha256"
+spelling = "GNUTLS_SIGN_RSA_SHA256"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_SIGN_RSA_SHA256"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_SIGN_RSA_SHA256;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-sign-ecdsa-sha256"
+spelling = "GNUTLS_SIGN_ECDSA_SHA256"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_SIGN_ECDSA_SHA256"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_SIGN_ECDSA_SHA256;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-sign-dsa-sha256"
+spelling = "GNUTLS_SIGN_DSA_SHA256"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_SIGN_DSA_SHA256"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_SIGN_DSA_SHA256;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-sign-rsa-pss-sha256"
+spelling = "GNUTLS_SIGN_RSA_PSS_SHA256"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_SIGN_RSA_PSS_SHA256"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_SIGN_RSA_PSS_SHA256;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-sign-eddsa-ed25519"
+spelling = "GNUTLS_SIGN_EDDSA_ED25519"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_SIGN_EDDSA_ED25519"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_SIGN_EDDSA_ED25519;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-gcry-pk-rsa"
+spelling = "GCRY_PK_RSA"
+source = "none"
+file = "a.c"
+snippet = '''
+err = gcry_pk_algo_info(GCRY_PK_RSA, GCRYCTL_TEST_ALGO, NULL, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-gcry-pk-dsa"
+spelling = "GCRY_PK_DSA"
+source = "none"
+file = "a.c"
+snippet = '''
+err = gcry_pk_algo_info(GCRY_PK_DSA, GCRYCTL_TEST_ALGO, NULL, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-gcry-pk-elg"
+spelling = "GCRY_PK_ELG"
+source = "none"
+file = "a.c"
+snippet = '''
+err = gcry_pk_algo_info(GCRY_PK_ELG, GCRYCTL_TEST_ALGO, NULL, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ElGamal"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-gcry-pk-ecdsa"
+spelling = "GCRY_PK_ECDSA"
+source = "none"
+file = "a.c"
+snippet = '''
+err = gcry_pk_algo_info(GCRY_PK_ECDSA, GCRYCTL_TEST_ALGO, NULL, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-gcry-pk-ecdh"
+spelling = "GCRY_PK_ECDH"
+source = "none"
+file = "a.c"
+snippet = '''
+err = gcry_pk_algo_info(GCRY_PK_ECDH, GCRYCTL_TEST_ALGO, NULL, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-gcry-pk-ecc"
+spelling = "GCRY_PK_ECC"
+source = "none"
+file = "a.c"
+snippet = '''
+err = gcry_pk_algo_info(GCRY_PK_ECC, GCRYCTL_TEST_ALGO, NULL, NULL);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-genkey-rsa-nbits-4-2048"
+spelling = "(genkey (rsa (nbits 4:2048)))"
+source = "https://www.gnupg.org/documentation/manuals/gcrypt/General-public_002dkey-related-Functions.html"
+quote = "(genkey (rsa (nbits 4:2048)))"
+file = "a.c"
+snippet = '''
+rc = gcry_sexp_build(&parms, NULL, "(genkey (rsa (nbits 4:2048)))");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-substitute-elg-for-rsa"
+spelling = "substitute \"elg\" for \"rsa\""
+source = "https://www.gnupg.org/documentation/manuals/gcrypt/General-public_002dkey-related-Functions.html"
+quote = "substitute \"elg\" for \"rsa\""
+file = "a.c"
+snippet = '''
+rc = gcry_sexp_build(&parms, NULL, "(genkey (elg (nbits 4:2048)))");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "ElGamal"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-to-create-a-dsa-key-use-dsa"
+spelling = "to create a DSA key use \"dsa\""
+source = "https://www.gnupg.org/documentation/manuals/gcrypt/General-public_002dkey-related-Functions.html"
+quote = "to create a DSA key use \"dsa\""
+file = "a.c"
+snippet = '''
+rc = gcry_sexp_build(&parms, NULL, "(genkey (dsa (nbits 4:2048)))");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-public-key-rsa-n-n-mpi-e-e-mpi"
+spelling = "(public-key (rsa (n n-mpi ) (e e-mpi )))"
+source = "https://www.gnupg.org/documentation/manuals/gcrypt/RSA-key-parameters.html"
+quote = "(public-key (rsa (n n-mpi ) (e e-mpi )))"
+file = "a.c"
+snippet = '''
+rc = gcry_sexp_build(&key, NULL, "(public-key (rsa (n %m)(e %m)))", n, e);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-private-key-dsa-p-p-mpi"
+spelling = "(private-key (dsa (p p-mpi )"
+source = "https://www.gnupg.org/documentation/manuals/gcrypt/DSA-key-parameters.html"
+quote = "(private-key (dsa (p p-mpi )"
+file = "a.c"
+snippet = '''
+rc = gcry_sexp_build(&key, NULL, "(private-key (dsa (p %m)(q %m)(g %m)(y %m)(x %m)))", p, q, g, y, x);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "libgcrypt-private-key-ecc-curve-nist-p-192"
+spelling = "(private-key (ecc (curve \"NIST P-192\")"
+source = "https://www.gnupg.org/documentation/manuals/gcrypt/ECC-key-parameters.html"
+quote = "(private-key (ecc (curve \"NIST P-192\")"
+file = "a.c"
+snippet = '''
+rc = gcry_sexp_build(&key, NULL, "(private-key (ecc (curve \"NIST P-256\")(q %m)(d %m)))", q, d);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}

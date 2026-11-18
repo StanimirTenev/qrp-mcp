@@ -1,0 +1,240 @@
+# Operation `external`, ecosystem Python: the algorithm or implementation chosen outside the line -- read
+# from the environment at run time (the os module), or brought in by a declared dependency (pyproject.toml,
+# dependency groups, requirements files, setuptools). Pages fetched 18.11.2026. `expect`: an environment read
+# is a place in chosen_outside_files (with its default where one is written); a declared package is a
+# dependency row carrying what the manifest asks for, and the version where it pins one (==).
+
+operation = "external"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Py"
+scope = "os.environ[...] / .get, os.getenv, os.getenvb, os.environb; pyproject [project] dependencies and optional-dependencies, [dependency-groups]; requirements files (pins, ranges, markers, --hash); setup.cfg install_requires/extras_require; setup.py install_requires/extras_require. Not covered: Pipfile, Poetry, uv/pdm lockfiles, conda, provider/version selection inside libraries (pyOpenSSL defaults, row 164)."
+
+[[ecosystems.spellings]]
+id = "os-environ-get-default"
+spelling = "os.environ.get(NAME, \"RSA-PSS\")"
+source = "https://docs.python.org/3/library/os.html"
+quote = "A mapping object where keys and values are strings that represent the process environment."
+file = "sign.py"
+snippet = '''
+import os
+alg = os.environ.get("SIGN_ALG", "RSA-PSS")
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2, default = "RSA-PSS", overridable = true, default_family = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "os-getenv-default"
+spelling = "os.getenv(NAME, \"RSA-PSS\")"
+source = "https://docs.python.org/3/library/os.html"
+quote = "os. getenv ( key , default = None ) ¶ Return the value of the environment variable key as a string if it exists, or default if it doesn"
+file = "sign.py"
+snippet = '''
+import os
+alg = os.getenv("SIGN_ALG", "RSA-PSS")
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2, default = "RSA-PSS", overridable = true, default_family = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "os-environ-item"
+spelling = "os.environ[NAME]"
+source = "https://docs.python.org/3/library/os.html"
+quote = "For example, environ['HOME']"
+file = "sign.py"
+snippet = '''
+import os
+alg = os.environ["SIGN_ALG"]
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "os-environ-get"
+spelling = "os.environ.get(NAME)"
+source = "https://docs.python.org/3/library/os.html"
+quote = "A mapping object where keys and values are strings that represent the process environment."
+file = "sign.py"
+snippet = '''
+import os
+alg = os.environ.get("SIGN_ALG")
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "os-getenv"
+spelling = "os.getenv(NAME)"
+source = "https://docs.python.org/3/library/os.html"
+quote = "Return the value of the environment variable key as a string if it exists"
+file = "sign.py"
+snippet = '''
+import os
+alg = os.getenv("SIGN_ALG")
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "os-getenvb"
+spelling = "os.getenvb(NAME)"
+source = "https://docs.python.org/3/library/os.html"
+quote = "os. getenvb ( key , default = None ) ¶ Return the value of the environment varia"
+file = "sign.py"
+snippet = '''
+import os
+alg = os.getenvb(b"SIGN_ALG")
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "os-environb-item"
+spelling = "os.environb[NAME]"
+source = "https://docs.python.org/3/library/os.html"
+quote = "getenvb() uses os.environb"
+file = "sign.py"
+snippet = '''
+import os
+alg = os.environb[b"SIGN_ALG"]
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "pyproject-dependencies"
+spelling = "[project] dependencies"
+source = "https://packaging.python.org/en/latest/specifications/pyproject-toml/"
+quote = "dependencies ¶ TOML type: Array of dependency specifier strings"
+file = "pyproject.toml"
+snippet = '''
+[project]
+name = "a"
+dependencies = ["cryptography>=42.0"]
+[project.optional-dependencies]
+ssh = ["paramiko==3.4.0"]
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "pyproject.toml", line = 3, package = "cryptography", requested = ">=42.0"}}]}
+
+[[ecosystems.spellings]]
+id = "pyproject-optional-dependencies"
+spelling = "[project.optional-dependencies]"
+source = "https://packaging.python.org/en/latest/specifications/pyproject-toml/"
+quote = "optional-dependencies ¶ TOML type: table with string keys mapping to arrays of"
+file = "pyproject.toml"
+snippet = '''
+[project]
+name = "a"
+dependencies = ["cryptography>=42.0"]
+[project.optional-dependencies]
+ssh = ["paramiko==3.4.0"]
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "pyproject.toml", line = 5, package = "paramiko", version = "3.4.0"}}]}
+
+[[ecosystems.spellings]]
+id = "pyproject-dependency-groups"
+spelling = "[dependency-groups]"
+source = "https://packaging.python.org/en/latest/specifications/dependency-groups/"
+quote = "[dependency-groups] Table ¶ Dependency groups are defined as a table in pyproject.toml"
+file = "pyproject.toml"
+snippet = '''
+[project]
+name = "a"
+[dependency-groups]
+test = ["pycryptodome>=3.20"]
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "pyproject.toml", line = 4, package = "pycryptodome", requested = ">=3.20"}}]}
+
+[[ecosystems.spellings]]
+id = "requirements-pin"
+spelling = "name==version"
+source = "https://pip.pypa.io/en/stable/reference/requirements-file-format/"
+quote = "docopt == 0.6.1"
+file = "requirements.txt"
+snippet = '''
+cryptography==42.0.5
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "requirements.txt", line = 1, package = "cryptography", version = "42.0.5"}}]}
+
+[[ecosystems.spellings]]
+id = "requirements-marker"
+spelling = "name==version ; marker"
+source = "https://pip.pypa.io/en/stable/reference/requirements-file-format/"
+quote = "; python_version < \"2.7\""
+file = "requirements.txt"
+snippet = '''
+cryptography==42.0.5 ; python_version >= "3.8"
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "requirements.txt", line = 1, package = "cryptography", version = "42.0.5"}}]}
+
+[[ecosystems.spellings]]
+id = "requirements-hash"
+spelling = "name==version --hash=sha256:..."
+source = "https://pip.pypa.io/en/stable/reference/requirements-file-format/"
+quote = "--hash (for Hash-checking Mode )"
+file = "requirements.txt"
+snippet = '''
+pyOpenSSL==24.1.0 --hash=sha256:17ed5be5936449c5418d1cd269a1a9e9081bc54c17aed272b45856a3d3dc86ad
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "requirements.txt", line = 1, package = "pyOpenSSL", version = "24.1.0"}}]}
+
+[[ecosystems.spellings]]
+id = "requirements-range"
+spelling = "name>=version"
+source = "https://pip.pypa.io/en/stable/reference/requirements-file-format/"
+quote = "requests [ security ] >= 2.8.1"
+file = "requirements.txt"
+snippet = '''
+cryptography>=42.0
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "requirements.txt", line = 1, package = "cryptography", requested = ">=42.0"}}]}
+
+[[ecosystems.spellings]]
+id = "setup-cfg-install-requires"
+spelling = "setup.cfg [options] install_requires"
+source = "https://setuptools.pypa.io/en/latest/userguide/declarative_config.html"
+quote = "install_requires = requests importlib-metadata; python_version<\"3.10\""
+file = "setup.cfg"
+snippet = '''
+[options]
+install_requires =
+    cryptography>=42
+    paramiko==3.4.0
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "setup.cfg", line = 3, package = "cryptography", requested = ">=42"}}]}
+
+[[ecosystems.spellings]]
+id = "setup-cfg-extras-require"
+spelling = "setup.cfg [options.extras_require]"
+source = "https://setuptools.pypa.io/en/latest/userguide/declarative_config.html"
+quote = "[options.extras_require] pdf = ReportLab>=1.2"
+file = "setup.cfg"
+snippet = '''
+[options.extras_require]
+ssh = paramiko==3.4.0
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "setup.cfg", line = 2, package = "paramiko", version = "3.4.0"}}]}
+
+[[ecosystems.spellings]]
+id = "setup-py-install-requires"
+spelling = "setup(install_requires=[...])"
+source = "https://setuptools.pypa.io/en/latest/userguide/dependency_management.html"
+quote = "setup.py setup ( ... , install_requires = [ 'docutils"
+file = "setup.py"
+snippet = '''
+from setuptools import setup
+setup(
+    name="a",
+    install_requires=["cryptography>=42"],
+)
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "setup.py", line = 4, package = "cryptography", requested = ">=42"}}]}
+
+[[ecosystems.spellings]]
+id = "setup-py-extras-require"
+spelling = "setup(extras_require={...})"
+source = "https://setuptools.pypa.io/en/latest/userguide/dependency_management.html"
+quote = "quirements list for that feature in its extras_require argument"
+file = "setup.py"
+snippet = '''
+from setuptools import setup
+setup(
+    name="a",
+    extras_require={"ssh": ["paramiko==3.4.0"]},
+)
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "setup.py", line = 4, package = "paramiko", version = "3.4.0"}}]}
