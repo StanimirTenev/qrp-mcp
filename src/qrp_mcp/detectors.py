@@ -4707,9 +4707,13 @@ _CNG_KEY_PAIR = re.compile(r"\bBCryptGenerateKeyPair\s*\([^,]*,[^,]*,\s*(\d{3,5}
 def _cng_key_pair_size(findings: list[dict[str, Any]], lines: list[str]) -> None:
     sizes = [int(m.group(1)) for line in lines if "BCryptGenerateKeyPair" in line
              for m in _CNG_KEY_PAIR.finditer(line)]
+    providers = sum(line.count("BCryptOpenAlgorithmProvider(") for line in lines)
     opened = [f for f in findings if f.get("description") in
               {CNG_MACRO_RULE % fam for fam in ("RSA", "DSA", "DH")}]
-    if len(sizes) == 1 and len(opened) == 1 and sizes[0] in registry._SIZES and "key_size" not in opened[0]:
+    # one provider of any kind opened in the file, by macro or by string: else the handle the
+    # call takes may be another's
+    if (len(sizes) == 1 and len(opened) == 1 and providers == 1 and sizes[0] in registry._SIZES
+            and "key_size" not in opened[0]):
         opened[0]["key_size"] = sizes[0]
 
 
