@@ -288,7 +288,8 @@ def _protocol_label(asset: dict[str, Any]) -> str:
     if asset.get("listener"):
         return f"TLS listener ({asset['listener']})"
     if asset.get("peer_verification"):
-        return f"TLS peer verification off ({asset['verification_setting']})"
+        # "off" for every row but nginx's ssl_verify_client on / optional (stage 3b).
+        return f"TLS peer verification {asset['peer_verification']} ({asset['verification_setting']})"
     if asset.get("basis") == "firmware_defaults":
         return f"FortiOS firmware defaults ({asset['firmware']})"
     if asset.get("channel"):

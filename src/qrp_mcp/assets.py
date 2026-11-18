@@ -1145,6 +1145,25 @@ _NGINX_VERIFY_SET = re.compile(r"^\s*(proxy|grpc|uwsgi)_ssl_verify\s", re.M)
 _NGINX_TLS_UPSTREAM = re.compile(r"^\s*(?:(proxy)_pass\s+https://|(grpc)_pass\s+grpcs://|"
                                  r"(uwsgi)_pass\s+suwsgi://|(proxy)_ssl\s+on\s*;)")
 _CADDY_SKIP_VERIFY = re.compile(r"^\s*tls_insecure_skip_verify\s*$")
+# The other direction: nginx's check of the client's certificate, `ssl_verify_client`
+# (ngx_http_ssl_module, "Syntax: ssl_verify_client on | off | optional | optional_no_ca"),
+# reported as written (stage 3b, KANDIDATI-119 row 102). Its absence is nginx's default off and is
+# not inferred: that would be every listener without client certificates.
+_NGINX_VERIFY_CLIENT = re.compile(r"^\s*ssl_verify_client\s+(on|off|optional|optional_no_ca)\s*;")
+_CLIENT_VERIFICATION = {
+    "on": ("on", "nginx verifies the client's certificate (\"Enables verification of client "
+                 "certificates\") against ssl_client_certificate: the client authenticates with "
+                 "a certificate, by that certificate's signature algorithm."),
+    "optional": ("optional", "nginx requests the client's certificate and verifies it if the client "
+                             "presents one (\"verifies it if the certificate is present\"); a client "
+                             "without one is let through unauthenticated."),
+    "optional_no_ca": ("off", "nginx requests the client's certificate but does not verify it against "
+                              "a trusted CA (\"does not require it to be signed by a trusted CA "
+                              "certificate\"): any check happens outside nginx, which this file does "
+                              "not show."),
+    "off": ("off", "nginx does not ask the client for a certificate (also nginx's default): "
+                   "clients are not authenticated by TLS here."),
+}
 _HAPROXY_GLOBAL_VERIFY_NONE = re.compile(r"^\s*ssl-server-verify\s+none(?:\s|$)")
 
 
@@ -1209,6 +1228,16 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
                 verify_off = (f"{module}_ssl_verify not set",
                               f"nginx's default is off, and the file does not set "
                               f"{module}_ssl_verify")
+        client = _NGINX_VERIFY_CLIENT.match(text)
+        if client:
+            verified, what = _CLIENT_VERIFICATION[client.group(1)]
+            out.append({
+                "path": rel_path, "line": number, "protocol": "tls", "version": None,
+                "basis": "configured_verification", "peer_verification": verified,
+                "verification_setting": f"ssl_verify_client {client.group(1)}", "deprecated": False,
+                "excerpt": text.strip()[:200],
+                "description": f"The client's certificate (ssl_verify_client {client.group(1)}): {what}",
+            })
         if verify_off:
             setting, where = verify_off
             out.append({
