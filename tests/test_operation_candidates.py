@@ -13,6 +13,7 @@ The file never fetches anything: the tool does that, by hand, and this test only
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
@@ -25,18 +26,29 @@ from test_operation_closure import _check, _write
 CANDIDATES = Path(__file__).parent / "fixtures" / "operation_candidates.json"
 
 
-def _in_catalogue() -> set[tuple[str, str, str]]:
-    return {(doc["operation"], eco["ecosystem"], word.lower())
-            for doc in operations.catalogue() for eco in doc["ecosystems"]
-            for s in eco["spellings"] for word in s["spelling"].replace("(", " ").split()}
+def _tool():
+    spec = importlib.util.spec_from_file_location(
+        "catalogue_refresh", Path(__file__).resolve().parents[1] / "tools" / "catalogue_refresh.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _confirmed(catalogue: list[dict]):
+    """Whether a candidate is in the catalogue now, by the tool's own test of "known"."""
+    tool = _tool()
+    known = {(doc["operation"], eco["ecosystem"]): tool.Known(eco)
+             for doc in catalogue for eco in doc["ecosystems"]}
+    return lambda c: (c["operation"], c["ecosystem"]) in known and c["candidate"].lower() in known[
+        (c["operation"], c["ecosystem"])]
 
 
 def _cases():
     if not CANDIDATES.exists():
         return
-    confirmed = _in_catalogue()
+    confirmed = _confirmed(operations.catalogue())
     for c in json.loads(CANDIDATES.read_text(encoding="utf-8"))["candidates"]:
-        if (c["operation"], c["ecosystem"], c["candidate"].lower()) in confirmed:
+        if confirmed(c):
             continue
         yield pytest.param(c, id=f"{c['operation']}/{c['ecosystem']}/{c['candidate']}",
                            marks=pytest.mark.xfail(reason="candidate, unconfirmed", strict=False))
@@ -56,3 +68,13 @@ def test_every_candidate_names_its_page():
     assert data["by"] == "tools/catalogue_refresh.py"
     for c in data["candidates"]:
         assert c["source"].startswith("https://") and c["context"] and c["candidate"] in c["snippet"], c
+
+
+def test_a_confirmed_candidate_leaves_this_file():
+    catalogue = [{"operation": "ssh", "ecosystem": "SSH", "ecosystems": [{"ecosystem": "SSH", "spellings": [
+        {"spelling": "KexAlgorithms sntrup761x25519-sha512@openssh.com", "snippet": "x"},
+        {"spelling": "-----BEGIN PRIVATE KEY-----", "snippet": "x"}]}]}]
+    confirmed = _confirmed(catalogue)
+    assert confirmed({"operation": "ssh", "ecosystem": "SSH", "candidate": "sntrup761x25519-sha512@openssh.com"})
+    assert confirmed({"operation": "ssh", "ecosystem": "SSH", "candidate": "PRIVATE KEY"})
+    assert not confirmed({"operation": "ssh", "ecosystem": "SSH", "candidate": "sntrup761x25519-sha512"})

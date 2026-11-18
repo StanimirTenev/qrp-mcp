@@ -11785,26 +11785,6 @@
   {
    "operation": "ssh",
    "ecosystem": "SSH",
-   "candidate": "sntrup761x25519-sha512@openssh.com",
-   "source": "https://man.openbsd.org/sshd_config",
-   "context": "sntrup761x25519-sha512@openssh.com",
-   "file": "sshd_config",
-   "snippet": "KexAlgorithms sntrup761x25519-sha512@openssh.com\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "sshd_config",
-       "line": 1
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "ssh",
-   "ecosystem": "SSH",
    "candidate": "ssh-agent",
    "source": "https://man.openbsd.org/sshd_config",
    "context": "ssh-agent(1).",
