@@ -5152,9 +5152,11 @@ _RUNTIME_JCA = re.compile(
 # environment variable read says it as well. Not a secret or a location held in such a variable
 # (`CIPHER_KEY`, `CURVE_FILE`), nor a switch for debugging (OpenSSH's fuzz harness reads
 # `getenv("KEX_FUZZ_DEBUG")`; caught on the positive control).
+# Python's bytes forms too: os.environb and os.getenvb (os module: "getenvb() uses
+# os.environb"), whose names are bytes literals.
 _RUNTIME_ENV_NAME = re.compile(
-    r"(?:os\.environ(?:\.get)?\s*[\[(]|os\.getenv\s*\(|\bgetenv\s*\(|os\.(?:Getenv|LookupEnv)\s*\(|"
-    r"System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\()\s*[\"']([A-Za-z_][\w.-]*)[\"']|"
+    r"(?:os\.environb?(?:\.get)?\s*[\[(]|os\.getenvb?\s*\(|\bgetenv\s*\(|os\.(?:Getenv|LookupEnv)\s*\(|"
+    r"System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\()\s*b?[\"']([A-Za-z_][\w.-]*)[\"']|"
     r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])")
 _NOT_A_CHOICE = re.compile(r"(?:^|_)(?:KEY|SECRET|PASS(?:WORD)?|TOKEN|SALT|IV|PATH|FILE|DIR|URL|"
                            r"DEBUG|TRACE|LOG|VERBOSE)$",
