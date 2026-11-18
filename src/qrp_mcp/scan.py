@@ -549,7 +549,12 @@ def _upstream_verification_across_includes(scan_result: dict[str, Any], root: Pa
         return
     read = set(scan_result.get("files_read") or [])
     sets: dict[str, set[str]] = {}
-    parents: dict[str, set[str]] = {}
+    # A file's include links, each the files one `include` resolves to. A target resolves the
+    # same from every file of a directory, so each (target, directory) is resolved once and its
+    # list shared (third review of 0.50.0, 18.11: 3000 files that each `include *.conf;` were
+    # 3000 globs and nine million links held twice).
+    children: dict[str, list[list[str]]] = {}
+    resolved: dict[tuple[str, str], list[str]] = {}
     for rel in sorted(read):
         if Path(rel).suffix.lower() not in adaptive._INCLUDE_SUFFIXES:
             continue
@@ -565,26 +570,43 @@ def _upstream_verification_across_includes(scan_result: dict[str, Any], root: Pa
             if not m or m.group(1) != "include":
                 continue
             target = m.group(2).split("#", 1)[0].strip().rstrip(";").strip().strip("\"'")
-            resolved = adaptive._resolve(target, rel, read, root, None) if target else {}
-            for child in resolved.get("files") or []:
-                parents.setdefault(child, set()).add(rel)
-
-    def set_above(path: str, module: str) -> bool:
-        seen, todo = {path}, list(parents.get(path, ()))
-        while todo:
-            parent = todo.pop()
-            if parent in seen:
+            if not target:
                 continue
-            seen.add(parent)
-            if module in sets.get(parent, ()):
-                return True
-            todo.extend(parents.get(parent, ()))
-        return False
+            key = (target, rel.rsplit("/", 1)[0] if "/" in rel else "")
+            if key not in resolved:
+                resolved[key] = adaptive._resolve(target, rel, read, root, None).get("files") or []
+            children.setdefault(rel, []).append(resolved[key])
 
-    drop = {id(r) for r in claims
-            if set_above(r["path"], r["verification_setting"].split("_ssl_verify", 1)[0])}
+    covered: dict[str, set[str]] = {}
+    drop = set()
+    for r in claims:
+        module = r["verification_setting"].split("_ssl_verify", 1)[0]
+        if module not in covered:
+            covered[module] = _covered_below(children, [f for f in sets if module in sets[f]])
+        if r["path"] in covered[module]:
+            drop.add(id(r))
     if drop:
         rows[:] = [r for r in rows if id(r) not in drop]
+
+
+def _covered_below(children: dict[str, list[list[str]]], setters: list[str]) -> set[str]:
+    """The files that a setting file other than themselves includes, directly or through other
+    includes (a file is not below itself, even through a cycle). One walk from all the setting
+    files: each file keeps at most two of the setting files that reach it, which is enough to
+    know whether one of them is not the file itself, so each file is expanded at most twice and
+    the walk is linear in the include links (third review of 0.50.0, 18.11, item 5: the walk up
+    from each row was repeated per row, quadratic, and did not end in 600 s on 3000 files)."""
+    reached: dict[str, list[str]] = {}
+    todo = [(setter, setter) for setter in setters]
+    while todo:
+        node, source = todo.pop()
+        for group in children.get(node, ()):
+            for child in group:
+                have = reached.setdefault(child, [])
+                if len(have) < 2 and source not in have:
+                    have.append(source)
+                    todo.append((child, source))
+    return {f for f, have in reached.items() if any(s != f for s in have)}
 
 
 def _declared_not_known(root: Path, files_read: list[str]) -> dict[str, Any]:
