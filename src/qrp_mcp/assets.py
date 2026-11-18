@@ -654,6 +654,10 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
             run.clear()
         if kind == "o" and word in "([{":
             depth += 1
+            if operand_ended() and not frame["cond"]:
+                # A call or a subscript computes the element (fourth review of 0.50.0, 18.11:
+                # `["requests", "paramiko"][:1]` gave paramiko).
+                frame["spoilt"] = True
             if len(value) < 200:
                 value.append(new_frame(word, operand_ended() or frame["cond"]))
             else:
@@ -675,7 +679,8 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
         elif kind == "o" and word == ",":
             end_element(frame)
             frame["tuple"] = frame["opener"] == "("
-        elif kind == "o" and word == ":" and frame["opener"] == "{":
+        elif kind == "o" and word == ":" and frame["opener"] == "{" and not frame["keyed"]:
+            # Only the key's `:`; a later one (`lambda:`) keeps the element spoilt.
             frame["element"], frame["spoilt"], frame["keyed"] = [], False, True
         elif kind == "n" and word == "if" and not frame["cond"]:
             # `A if C else B`: both branches are read (either may be what is installed), the

@@ -148,12 +148,14 @@ What changes for an existing user:
   around them, both branches of `A if C else B` (not the condition), the values of a dict,
   adjacent strings joined, a string read a line at a time as setuptools reads it (blank and `#`
   lines dropped, a ` #` comment cut), an f-string with no placeholder, the leading literal name
-  of one with (`f"acme>={version}"`). A variable, a call, a subscript, a tuple, a set, and an
-  element with any other operator or keyword (`%`, `.format`, `and`, a comprehension) is
+  of one with (`f"acme>={version}"`). A variable, a call, a subscript (also of a literal:
+  `["requests", "paramiko"][:1]`), a parenthesised tuple, a set, a lambda, and an element with
+  any other operator or keyword (`%`, `.format`, `and`, a comprehension) is
   skipped, not guessed; so is an annotated or augmented assignment (`install_requires +=`).
   All 33 setup.py in the corpus and the control give the rows they gave before, on 3.10 and
   3.12. `setup_requires` and `tests_require` are not read
-  (`tests/test_setup_py_arguments_only.py`, `tests/test_setup_py_never_crashes.py`). With
+  A bare tuple (`install_requires = "a", "b"`) gives its first element only. (`tests/test_setup_py_arguments_only.py`, `tests/test_setup_py_never_crashes.py`,
+  `tests/test_setup_py_subscript_lambda.py`). With
   every row of such a file now read, a setup.py with 200 000 requirements on one line made
   `qrp-mcp cbom` run past 15 minutes: the CBOM's confidence properties were quadratic in the
   rows that share a line (older code, reached now). Each file:line is graded once
