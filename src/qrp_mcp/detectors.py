@@ -4743,8 +4743,10 @@ def _powershell_statement_size(findings: list[dict[str, Any]], lines: list[str],
         if size is None:
             # the @{ ... } the row's line is in
             start = next((i for i in range(f["line"] - 1, max(f["line"] - 30, -1), -1) if "@{" in lines[i]), None)
-            end = next((i for i in range(f["line"] - 1, min(f["line"] + 30, len(lines))) if lines[i].strip() == "}"), None)
-            if start is not None and end is not None:
+            # the hashtable's end is the first lone `}` after its `@{`; the row must be inside
+            end = (next((i for i in range(start, min(start + 30, len(lines))) if lines[i].strip() == "}"), None)
+                   if start is not None else None)
+            if end is not None and start <= f["line"] - 1 <= end:
                 found = {int(m.group(1)) for line in lines[start:end] for m in [_SPLAT_KEY_LENGTH.match(line)] if m}
                 size = found.pop() if len(found) == 1 else None
         if size in registry._SIZES:
