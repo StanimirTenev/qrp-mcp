@@ -1429,7 +1429,9 @@ def scan_protocols(line: str) -> list[dict[str, Any]]:
 # algorithm was already found, so `groups = admin` in an .ini configures nothing.
 _TLS_GROUP_SETTING = re.compile(
     r"ssl_ecdh_curve|set_ecdh_curve|ecdhCurve|ecdh_curves|"
-    r"(?:ssl_conf_command|SSLOpenSSLConfCmd)\s+(?:groups|curves)|"
+    # nginx's upstream directives, proxy_/grpc_/uwsgi_ssl_conf_command, set the groups of the
+    # connection to the upstream, not of the listener: the setting is named as written.
+    r"(?:(?:proxy_|grpc_|uwsgi_)?ssl_conf_command|SSLOpenSSLConfCmd)\s+(?:groups|curves)|"
     r"^\s*(?:groups|curves)\s*=|CurvePreferences|namedGroups|"
     r"set1_(?:groups|curves)|supported_groups|"
     # HAProxy's global defaults (Configuration Manual 3.5; ZA-OPRAVYANE row 30). Its
