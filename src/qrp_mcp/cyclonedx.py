@@ -552,13 +552,20 @@ def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[s
             continue
         levels, kinds = [], []
         own = (family_by_ref or {}).get(component["bom-ref"], component["name"])
+        # Each file:line graded once: occurrences sharing a line (200 000 requirements on one
+        # setup.py line) made this quadratic (third review of 0.50.0, 18.11).
+        graded: dict[tuple[str, Any], tuple[str, str]] = {}
         for o in occurrences:
-            rows = at.get((o["location"], o.get("line")), [])
-            mine = [lv for name, lv in rows if name == own] or [lv for _, lv in rows]
-            levels.append(min(mine, key=confidence.LEVELS.index) if mine else "unknown")
-            said = kinds_at.get((o["location"], o.get("line")), [])
-            mine_kinds = sorted({k for name, k in said if name == own} or {k for _, k in said})
-            kinds.append("+".join(mine_kinds) or "not graded")
+            where = (o["location"], o.get("line"))
+            if where not in graded:
+                rows = at.get(where, [])
+                mine = [lv for name, lv in rows if name == own] or [lv for _, lv in rows]
+                said = kinds_at.get(where, [])
+                mine_kinds = sorted({k for name, k in said if name == own} or {k for _, k in said})
+                graded[where] = (min(mine, key=confidence.LEVELS.index) if mine else "unknown",
+                                 "+".join(mine_kinds) or "not graded")
+            levels.append(graded[where][0])
+            kinds.append(graded[where][1])
         component.setdefault("properties", []).append(
             {"name": f"{NS}confidence", "value": json.dumps(levels)})
         component["properties"].append({"name": f"{NS}evidence_kind", "value": json.dumps(kinds)})
