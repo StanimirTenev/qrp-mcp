@@ -5748,7 +5748,10 @@ _NIST_CURVE = re.compile(
     r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))"
     r"(?![0-9]|[Kk]1)|"
     # Not ecp256bp: brainpoolP256r1 (IANA group 28), below.
-    r"(?<![A-Za-z])ecp(256|384|521)(?![0-9]|bp)",
+    r"(?<![A-Za-z])ecp(256|384|521)(?![0-9]|bp)|"
+    # The classical half of an SSH hybrid, glued to the ML-KEM set: mlkem768nistp256-sha256
+    # (sshd_config(5) KexAlgorithms), mlkem1024nistp384-sha384.
+    r"(?:(?<=mlkem768)|(?<=mlkem1024))nistp(256|384|521)(?![0-9])",
     re.IGNORECASE)
 
 
