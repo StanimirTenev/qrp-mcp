@@ -98,6 +98,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     else:
         scan_result = detectors.scan_repo(repo_path)
     seconds, finished_at = time.monotonic() - clock, _now()
+    _upstream_verification_across_includes(scan_result, repo_path)
     roles = _read_roles(scan_result)
     _mark_unread_sizes(scan_result)
     _read_order(scan_result)
@@ -532,6 +533,58 @@ LIBRARY_DEFAULT_KEY_EXCHANGE = (
     "No TLS group or curve is set in the files read: the key exchange is the TLS library's "
     "default, which depends on the library version that runs (OpenSSL 3.5 offers a hybrid "
     "first, earlier versions a classical group), and this scan does not resolve it.")
+
+
+def _upstream_verification_across_includes(scan_result: dict[str, Any], root: Path) -> None:
+    """Review S2 (18.11): "<module>_ssl_verify not set" is a claim about one file, and nginx
+    inherits the directive from the blocks around an include. A row in a file that a file read
+    includes -- directly or through another include -- is dropped when one of those files sets
+    the module's `*_ssl_verify`: `off` there is its own row on its own line, `on` is not a
+    finding. Includes are resolved as `leads` resolves them (adaptive._resolve), before any
+    digest, confidence, suppression or fingerprint is taken from the rows."""
+    rows = scan_result.get("protocol_findings") or []
+    claims = [r for r in rows if r.get("basis") == "configured_verification"
+              and str(r.get("verification_setting", "")).endswith("_ssl_verify not set")]
+    if not claims:
+        return
+    read = set(scan_result.get("files_read") or [])
+    sets: dict[str, set[str]] = {}
+    parents: dict[str, set[str]] = {}
+    for rel in sorted(read):
+        if Path(rel).suffix.lower() not in adaptive._INCLUDE_SUFFIXES:
+            continue
+        try:
+            text = (root / rel).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "include" not in text:
+            continue
+        sets[rel] = set(assets._NGINX_VERIFY_SET.findall(text))
+        for raw in text.splitlines():
+            m = adaptive._INCLUDE.match(raw)
+            if not m or m.group(1) != "include":
+                continue
+            target = m.group(2).split("#", 1)[0].strip().rstrip(";").strip().strip("\"'")
+            resolved = adaptive._resolve(target, rel, read, root) if target else {}
+            for child in resolved.get("files") or []:
+                parents.setdefault(child, set()).add(rel)
+
+    def set_above(path: str, module: str) -> bool:
+        seen, todo = {path}, list(parents.get(path, ()))
+        while todo:
+            parent = todo.pop()
+            if parent in seen:
+                continue
+            seen.add(parent)
+            if module in sets.get(parent, ()):
+                return True
+            todo.extend(parents.get(parent, ()))
+        return False
+
+    drop = {id(r) for r in claims
+            if set_above(r["path"], r["verification_setting"].split("_ssl_verify", 1)[0])}
+    if drop:
+        rows[:] = [r for r in rows if id(r) not in drop]
 
 
 def _declared_not_known(root: Path, files_read: list[str]) -> dict[str, Any]:

@@ -106,6 +106,16 @@ What changes for an existing user:
   `setup.py` and `setup.cfg` as sources and with them two more ways in. Below `full` the userinfo
   is now masked as a line is, on every dependency row; `full` is unchanged, and the fingerprint
   does not read `requested` (`tests/test_masking_dependency_url.py`).
+- **"proxy_ssl_verify not set" is not claimed across an include.** Found by the independent
+  review: with `http { proxy_ssl_verify on; include sites/*.conf; }` in `nginx.conf`, the
+  `proxy_pass https://` of `sites/a.conf` was reported as verification `off`, "not set", while
+  `leads` showed the include followed. nginx inherits the directive from around the include. A
+  "not set" row is now dropped when a file read that includes its file (directly or through
+  another include, resolved as `leads` resolves them) sets that module's `*_ssl_verify`; `off`
+  there is its own row on its own line. Not resolved: whether the directive and the include are
+  in the same block (any setting above suppresses the claim, so this errs toward silence, never
+  toward "off"), and a file included from outside the tree, which keeps the single-file rule
+  (`tests/test_upstream_verify_across_include.py`).
 - **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
   `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
   A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the
