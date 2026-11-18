@@ -823,9 +823,10 @@ meaning_source = "https://doc.libsodium.org/public-key_cryptography/public-key_s
 meaning_quote = "Single-part signature: Ed25519"
 file = "a.c"
 snippet = '''
+#include <sodium.h>
 crypto_sign_keypair(sig, NULL, msg, len, sk);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
 
 [[ecosystems.spellings]]
 id = "libsodium-crypto-sign-detached"
@@ -875,9 +876,10 @@ meaning_source = "https://doc.libsodium.org/public-key_cryptography/public-key_s
 meaning_quote = "Single-part signature: Ed25519"
 file = "a.c"
 snippet = '''
+#include <sodium.h>
 crypto_sign_open(sig, NULL, msg, len, sk);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
 
 [[ecosystems.spellings]]
 id = "libsodium-crypto-box-keypair"
