@@ -83,8 +83,10 @@ What changes for an existing user:
 - **`findings_fingerprint` moves** where the new and changed rows appear. On the positive control
   (OpenSSH 7fe3b24, certbot 56ee049, Vault 41e571b, 0.49.0 against this release): OpenSSH 71 -> 72
   findings (+1 XEdDSA, `pkcs11.h:817`), four `CKK/CKM_EC_EDWARDS` rows EC -> EdDSA, sizes on 13
-  `.pub` files and P-256 on two `mlkem768nistp256` rows; certbot 41 -> 41 findings, two dependency
-  rows from `setup.py`; Vault 74 -> 74 findings, 5,435 -> 5,437 files read (two `.crl`). Every
+  `.pub` files (10 x RSA-1024, 2 x 2048, 1 x 3072) and P-256 on three EC/ECDH rows of
+  `mlkem768nistp256-sha256` (`kex-names.c:70`, `kex.h:61`); certbot 41 -> 41 findings, two dependency
+  rows from `setup.py` and `requested` (the pinned version) on four `tools/requirements.txt` rows;
+  Vault 74 -> 74 findings, 5,435 -> 5,437 files read (two `.crl`). Every
   change is traced to its fix in the stage logs.
 - The `tls_groups` rows of `proxy_/grpc_/uwsgi_ssl_conf_command Groups` carry a different
   `setting`: in a baseline they close and reopen. The CBOM label of a TLS verification row names
