@@ -901,7 +901,12 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # pycryptodome and RustCrypto. A short name only glued to an API word or in a call.
     ("GOST R 34.10", "GOST R 34.10 usage", re.compile(
         r"(?:(?<![A-Za-z])|(?<=with))(?:EC)?GOST[-_ ]?R?[-_ ]?34\.?10|"
-        r"(?<![A-Za-z0-9])ECVKO|\bgost20(?:01|12)(?:_(?:256|512))?\b",
+        r"(?<![A-Za-z0-9])ECVKO|\bgost20(?:01|12)(?:_(?:256|512))?\b|"
+        # GnuTLS's keys and signatures, which spell it GOST_01 / GOST_12_256 / GOST_94 (gnutls.h,
+        # gnutls_pk_algorithm_t and gnutls_sign_algorithm_t: "GOST R 34.10-2001 algorithm per
+        # rfc5832"; stage 3b). Not GNUTLS_CIPHER_GOST28147_*, GNUTLS_DIG_GOSTR_94 or the PARAMSETs:
+        # a cipher, a hash, the cipher's parameters.
+        r"\bGNUTLS_(?:PK_GOST_(?:01|12_256|12_512)|SIGN_GOST_(?:94|256|512))\b",
         re.IGNORECASE)),
     ("SM2", "SM2 usage", re.compile(
         r"\bSM2(?:Engine|Signer|KeyPairGenerator|KeyExchange|ParameterSpec|WITH|with)|"
