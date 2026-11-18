@@ -294,7 +294,8 @@ def test_an_environment_name_must_say_key_or_certificate_as_a_word(tmp_path):
 
 def test_a_command_before_a_key_path_is_not_a_setting(tmp_path):
     result = scan_directory(_write(tmp_path, {
-        ".github/workflows/ci.yml": "steps:\n  - run: |\n      sha256sum ./support/private_key.pem\n",
+        ".github/workflows/ci.yml":
+            "steps:\n  - run: |\n      sha256sum ./support/private_key.pem\n",
         "vpn/client.conf": "client\nca ca.crt\n"}))
     assert [(l["path"], l["setting"]) for l in _leads(result)] == [("vpn/client.conf", "ca")]
 
@@ -319,3 +320,16 @@ def test_a_symlinked_target_is_in_the_tree_not_read(tmp_path):
     assert lead["status"] == "in_the_tree_not_read"
     assert not [c for c in result["angles"]["contradictions"]
                 if c["rule"] == "named_key_file_absent"]
+
+
+def test_a_placeholder_or_a_format_string_is_templated_not_absent(tmp_path):
+    # The hand-judged sample of the control (etap3/izvadka-10.jsonl): certbot's MAGICDIR and
+    # 'archive/{0}/privkey4.pem', Vault's /path/to/cacert.pem.
+    result = scan_directory(_write(tmp_path, {
+        "conf/renewal.conf": "privkey = MAGICDIR/live/x/privkey.pem\n",
+        "agent.hcl": 'tls_cert_file = "/path/to/cacert.pem"\n',
+        "app/t.py": "with open(join(d, 'archive/{0}/privkey4.pem').format(n)) as f:\n    pass\n"}))
+    assert {l["target"]: l["status"] for l in _leads(result)} == {
+        "MAGICDIR/live/x/privkey.pem": "templated", "/path/to/cacert.pem": "templated",
+        "archive/{0}/privkey4.pem": "templated"}
+    assert not result["angles"]["contradictions"]
