@@ -7,7 +7,7 @@ documented spellings, each with a test, says in its output which (operation, eco
 closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository
 re-reads the documentation and proposes new spellings, which enter only with a source and a test.
 
-[![The scanner's fix list as a network: gaps come in families of the same operation](docs/media/gap-network-cover.png)](docs/media/gap-network.mp4)
+[![The scanner's fix list as a network: gaps come in families of the same operation](https://raw.githubusercontent.com/StanimirTenev/qrp-mcp/main/docs/media/gap-network-cover.png)](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/media/gap-network.mp4)
 *34 s: the fix list drawn as a network, and why closure is by operation. The method and the closure savings theorem: Tenev (2026), Zenodo, [doi:10.5281/zenodo.24336932](https://doi.org/10.5281/zenodo.24336932).*
 
 Every signature in your wallet, contract and validator rests on elliptic-curve cryptography, and
