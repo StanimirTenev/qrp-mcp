@@ -66,10 +66,12 @@ def page_text(raw: bytes) -> str:
 
 def words(text: str) -> set[str]:
     """The words of a spelling or snippet, lower-cased, whole and cut at punctuation
-    (`ECCurve.NamedCurves.nistP256` is also `nistp256`)."""
+    (`ECCurve.NamedCurves.nistP256` is also `nistp256`), and without the dashes at their ends
+    (`-----BEGIN PKCS7-----` is also `begin` and `pkcs7`)."""
     out: set[str] = set()
     for w in _WORD.findall(text):
         out.add(w.lower())
+        out.add(w.strip("-").lower())
         out.update(p.lower() for p in re.split(r"[(),;:=\"'/.]", w) if p)
     return out
 
