@@ -84,8 +84,10 @@ def test_a_family_named_only_by_a_certificate_path_is_marked_and_lower(tmp_path)
 def test_the_findings_and_the_cbom_components_stay(tmp_path):
     root = _tree(tmp_path / "r")
     result = scan_directory(root)
+    # No ECDH: both group lists are X25519 (alone and in X25519MLKEM768), and the ECDH that
+    # `ssl_ecdh_curve`'s name gave was row 492's false row (operacii stage 2, 5ff9d27).
     assert {f["algorithm_family"] for f in result["findings"]} == {
-        "ECDH", "ECDSA", "ML-DSA", "ML-KEM", "X25519"}
+        "ECDSA", "ML-DSA", "ML-KEM", "X25519"}
     out = tmp_path / "c.json"
     _cli(["cbom", str(root), "--out", str(out)])
     for doc in (json.loads(out.read_text()), export_cbom(str(root)), build(result)):
