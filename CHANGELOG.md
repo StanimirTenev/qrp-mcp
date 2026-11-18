@@ -99,6 +99,13 @@ What changes for an existing user:
   (`tests/test_masking_stage3_sections.py`). Not changed, and older than 0.50.0:
   `chosen_outside_files.places` keeps the name of a setting read from the environment at
   every level.
+- **A credential in a dependency URL is masked below `full`.** Found by the independent
+  review: `evidence.dependencies[].requested` keeps a PEP 508 request as written, and its URL's
+  userinfo (`paramiko @ git+https://tok:secret@host/p.git`) was in the clear at `masked` and
+  `trimmed`. From `pyproject.toml` (and Pipfile) this is older than 0.50.0; 0.50.0 added
+  `setup.py` and `setup.cfg` as sources and with them two more ways in. Below `full` the userinfo
+  is now masked as a line is, on every dependency row; `full` is unchanged, and the fingerprint
+  does not read `requested` (`tests/test_masking_dependency_url.py`).
 - **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
   `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
   A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the

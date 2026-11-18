@@ -404,6 +404,9 @@ def _mask_excerpts(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+_URL_USERINFO = re.compile(r"(://)([^/@\s]+)@")
+
+
 def _mask_owners(result: dict[str, Any]) -> None:
     """CODEOWNERS handles are names of people and teams: below `full` they are masked as
     a line is, on every occurrence, and so in the CBOM built from it (ZA-OPRAVYANE row 112)."""
@@ -418,6 +421,15 @@ def _mask_owners(result: dict[str, Any]) -> None:
             for item in items:
                 if isinstance(item, dict) and isinstance(item.get("wraps"), dict):
                     item["wraps"]["name"] = _mask_excerpt(str(item["wraps"]["name"]), "")
+    # Review S1 (18.11): a dependency's request keeps a PEP 508 URL as written, and its userinfo
+    # (`git+https://tok:secret@host/p.git`) is a credential, masked as a line is.
+    for items in _evidence_lists(result):
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict) and isinstance(item.get("requested"), str):
+                    item["requested"] = _URL_USERINFO.sub(
+                        lambda m: m.group(1) + _mask_excerpt(m.group(2), "") + "@",
+                        item["requested"])
     # Row 490: a listener's server names are host names, masked as owners are.
     for place in (result.get("tls_listeners") or {}).get("places") or []:
         place["server_name"] = [_mask_excerpt(str(n), "") for n in place["server_name"]]
