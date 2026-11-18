@@ -379,8 +379,9 @@ _CODE_LOAD = re.compile(
 _LITERAL_KEY_PATH = re.compile(r"[\"']([^\"'\s]{1,200}?" + _KEY_SUFFIX + r")[\"']", re.IGNORECASE)
 # A key or certificate file read from an environment variable: a name that says a certificate,
 # key, CA or trust store and a file, path or directory, or one of the names libraries read.
-_ENV_NAME = (r"((?:[A-Z0-9_]*(?:CERT|KEY|CA|TLS|SSL|PEM|KEYSTORE|TRUSTSTORE)[A-Z0-9_]*"
-             r"(?:FILE|PATH|DIR|BUNDLE|LOCATION)S?[A-Z0-9_]*)|SSL_CERT_FILE|SSL_CERT_DIR|"
+# Each as a word between underscores: CERTBOT_PLUGIN_PATH says neither (certbot, 18.11).
+_ENV_NAME = (r"((?:[A-Z0-9]+_)*(?:CERTS?|CRT|KEY|CA|CACERT|TLS|SSL|PEM|KEYSTORE|TRUSTSTORE)_"
+             r"(?:[A-Z0-9]+_)*(?:FILE|PATH|DIR|BUNDLE|LOCATION)S?(?![A-Za-z0-9_])|"
              r"REQUESTS_CA_BUNDLE|CURL_CA_BUNDLE|NODE_EXTRA_CA_CERTS)")
 _ENV_KEY_READ = re.compile(
     r"(?:os\.environ(?:\.get)?\s*[\[(]\s*|os\.getenv\s*\(\s*|os\.(?:Getenv|LookupEnv)\s*\(\s*|"
