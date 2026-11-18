@@ -128,21 +128,32 @@ What changes for an existing user:
   including file's own directory does not have it, as `leads` resolves it: `a/nginx.conf`
   with `include sites/*.conf;` is linked to a root-level `sites/x.conf`, which nginx run from
   `a/` would not read, and the claim there is dropped -- toward silence again
-  (`tests/test_upstream_verify_across_include.py`).
-- **setup.py is parsed as Python.** Found by the independent review:
+  (`tests/test_upstream_verify_across_include.py`). The third review found the walk quadratic:
+  3000 files that each `include *.conf;` did not finish in 600 s. Each (target, directory) is
+  now resolved once and the files below a setting file are found by one walk, linear in the
+  include links (`tests/test_include_walk_linear.py`).
+- **setup.py is read token by token.** Found by the independent review:
   `setup(install_requires=["requests"], description="cryptography")` gave a dependency row
   `cryptography`, because every string after `install_requires=[` on that line was read. The
   first fix ended the list at its bracket, and the second review found what that broke:
   `["paramiko"] + ["ecdsa"]` gave paramiko alone, and a `#` inside a string
   (`"foo @ git+https://h/x.git#egg=foo"`) was taken for a comment, so `description="paramiko"`
-  on the next line became a row. setup.py is now read with Python's `ast`: the value of
-  `install_requires` or `extras_require` (a keyword or a top-level assignment) -- literal lists,
-  `+` of them, the values of a dict, a string, the leading literal name of an f-string
-  (`f"acme>={version}"`). A variable, a call or a tuple is skipped, not guessed. A setup.py the
-  running Python cannot parse -- Python 2 syntax, or syntax newer than the interpreter -- gives
-  no dependency row (none of the 33 in the corpus and the control fails, on 3.10 or 3.12; all 33
-  give the rows they gave before). `setup_requires` and `tests_require` are not read
-  (`tests/test_setup_py_arguments_only.py`).
+  on the next line became a row. The second fix parsed setup.py with Python's `ast`, and the
+  third review found that `ast.parse` segfaults CPython 3.10 on a deeply nested expression
+  (`x = a+a+...`, 150 000 terms: exit 139, the whole scan gone) and that a file Python cannot
+  parse (Python 2) silently gave no row. setup.py is now read by one pass of a lexer with an
+  explicit, bounded stack: nothing recurses, each character is matched once, and a Python 2 or
+  broken file is read like any other. What is read: the value of `install_requires` or
+  `extras_require` (a keyword or an assignment) -- literal lists, `+` of them, parentheses
+  around them, both branches of `A if C else B` (not the condition), the values of a dict,
+  adjacent strings joined, a string read a line at a time as setuptools reads it (blank and `#`
+  lines dropped, a ` #` comment cut), an f-string with no placeholder, the leading literal name
+  of one with (`f"acme>={version}"`). A variable, a call, a subscript, a tuple, a set, and an
+  element with any other operator or keyword (`%`, `.format`, `and`, a comprehension) is
+  skipped, not guessed; so is an annotated or augmented assignment (`install_requires +=`).
+  All 33 setup.py in the corpus and the control give the rows they gave before, on 3.10 and
+  3.12. `setup_requires` and `tests_require` are not read
+  (`tests/test_setup_py_arguments_only.py`, `tests/test_setup_py_never_crashes.py`).
 - **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
   `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
   A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the
