@@ -1452,7 +1452,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # ALGORITHMS.md; row 81). OV_* only in liboqs's own capitalisation.
     ("UOV", "UOV usage", re.compile(
         r"(?<![A-Za-z])uov[-_]?(i|ip|iii|v|s|pkc)|(?<![A-Za-z])uov[-_]ov[-_]|"
-        r"(?-i:(?<![A-Za-z0-9])OV_(?:Is|Ip|III|V)(?:_pkc(?:_skc)?)?(?![A-Za-z0-9]))",
+        r"(?-i:(?<![A-Za-z0-9])OV_(?:Is|Ip|III|V)(?:_pkc(?:_skc)?)?(?![A-Za-z0-9]))|"
+        # The strings the liboqs macros stand for, as OQS_SIG_new takes them (sig.h: "OV-Is",
+        # "OV-Ip-pkc-skc"), quoted whole only.
+        r"(?-i:(?<=[\"'])OV-(?:Is|Ip|III|V)(?:-pkc(?:-skc)?)?(?=[\"']))",
         re.IGNORECASE)),
     ("MAYO", "MAYO usage", re.compile(r"(?<![A-Za-z])mayo[-_]?[1235]", re.IGNORECASE)),
     ("CROSS", "CROSS usage (dropped by NIST)", re.compile(
