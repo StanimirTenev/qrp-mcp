@@ -5615,6 +5615,8 @@ _NIST_CURVE = re.compile(
 # `curve=SECP256k1` (a registry name, read as its own token) gave secp256k1. SEC 2 v2.0 section
 # 2.4.1: secp256k1, a Koblitz curve over a 256-bit prime field.
 _SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])|\bECC_SECG_P256K1\b", re.IGNORECASE)
+_BRAINPOOL_CURVE = re.compile(r"(?<![A-Za-z0-9])brainpoolP(160|192|224|256|320|384|512)([rt])1(?![0-9])",
+                             re.IGNORECASE)
 _CURVE_SIZE = {"P-256": 256, "P-384": 384, "P-521": 521, "secp256k1": 256}
 _ECDSA_SIZE_NAME = re.compile(r"(?<![A-Za-z0-9])ecdsa(256|384|521)(?![0-9])", re.IGNORECASE)
 # .NET's ECDsaCng(int keySize), ECDsaOpenSsl(int keySize), ECDiffieHellmanCng(int keySize): the
@@ -5640,8 +5642,15 @@ def _tag_curves(items: list[dict[str, Any]]) -> None:
             if _SECP256K1.search(excerpt) or (item.get("description") == SECP256K1_RULE
                                               and _SECP256K1_ONLY.search(excerpt)):
                 found.add("secp256k1")
+            if not found:
+                # The Brainpool curves by their RFC 5639 names, as .NET's ECCurve.NamedCurves
+                # spells all fourteen (closure keysize/NET); the size is the field's.
+                found = {f"brainpoolP{m.group(1)}{m.group(2).lower()}1"
+                         for m in _BRAINPOOL_CURVE.finditer(excerpt)}
             if len(found) == 1:
                 item["curve"] = found.pop()
+        if str(item.get("curve", "")).startswith("brainpoolP") and "key_size" not in item:
+            item["key_size"] = int(item["curve"][10:13])
         # strongSwan's keywords for the groups no NIST name above covers (ecp192, ecp224, the
         # Brainpool ecpNNNbp): the curve and size of their IANA group (ike.STRONGSWAN_GROUPS).
         if not item.get("curve") and "key_size" not in item:
