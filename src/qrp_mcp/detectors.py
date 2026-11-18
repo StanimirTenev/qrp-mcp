@@ -4503,6 +4503,7 @@ def scan_source_file(path: Path, rel_path: str,
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
     _powershell_statement_size(findings, lines, rel_path)
+    findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
@@ -4727,6 +4728,36 @@ def _powershell_statement_size(findings: list[dict[str, Any]], lines: list[str],
                 size = found.pop() if len(found) == 1 else None
         if size in registry._SIZES:
             f["key_size"] = size
+
+
+# Row 376: Schannel's minimum key length for the TLS client, a DWORD under
+# SCHANNEL\KeyExchangeAlgorithms\Diffie-Hellman (DH) or \PKCS (RSA): "To specify a minimum
+# supported range of ... key bit length for the TLS client, create a ClientMinKeyBitLength
+# entry" (Learn, TLS registry settings). In a .reg export, the value line is a row of that family
+# with the length as its size: the weakest key the client accepts. ServerMinKeyBitLength is not
+# on that page and is not read.
+_REG_SECTION = re.compile(r"^\s*\[")
+_SCHANNEL_KEX_SECTION = re.compile(r"\\SCHANNEL\\KeyExchangeAlgorithms\\(Diffie-Hellman|PKCS)\]\s*$", re.IGNORECASE)
+_CLIENT_MIN_KEY_LENGTH = re.compile(r"^\s*\"ClientMinKeyBitLength\"\s*=\s*dword:([0-9A-Fa-f]{8})\s*$")
+
+
+def _schannel_min_key_length(findings: list[dict[str, Any]], lines: list[str],
+                             rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith(".reg"):
+        return findings
+    added, family = [], None
+    for n, line in enumerate(lines, 1):
+        if _REG_SECTION.match(line):
+            section = _SCHANNEL_KEX_SECTION.search(line)
+            family = ({"diffie-hellman": "DH", "pkcs": "RSA"}[section.group(1).lower()] if section else None)
+            continue
+        m = _CLIENT_MIN_KEY_LENGTH.match(line) if family else None
+        if m and int(m.group(1), 16) in registry._SIZES:
+            added.append({"path": rel_path, "line": n, "algorithm": family,
+                          "description": f"{family} minimum key length of the Schannel TLS client",
+                          "excerpt": line.strip()[:200], "evidence_kind": "declaration",
+                          "key_size": int(m.group(1), 16), "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 # Row 371: .NET's AsymmetricAlgorithm.KeySize ("Gets or sets the size, in bits, of the key
