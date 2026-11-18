@@ -37,7 +37,9 @@ def scan(lines: list[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                              "description": "private key material: a WireGuard X25519 "
                                             "private key (wg genkey)",
                              "key_algorithm": "X25519"})
-    if not any(s["kind"] == "Interface" and "PrivateKey" in s["names"] for s in sections):
+    # A peer list kept apart from the interface (a `[Peer]` with its PublicKey) is the same
+    # key exchange: "PublicKey -- a base64 public key calculated by wg pubkey".
+    if not any(s["names"] & {"PrivateKey", "PublicKey"} for s in sections):
         return [], []
     rows = []
     for s in sections:
