@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!-- Saved for tests/test_catalogue_refresh.py: the KexAlgorithms entry of
+     https://man.openbsd.org/sshd_config, fetched 2026-11-18, cut to that entry. -->
+<html><head><title>sshd_config(5)</title></head><body><dl class="Bl-tag">
+<dt id="KexAlgorithms"><a class="permalink" href="#KexAlgorithms"><code class="Cm">KexAlgorithms</code></a></dt>
+  <dd>Specifies the permitted KEX (Key Exchange) algorithms that the server will
+      offer to clients. The ordering of this list is not important, as the
+      client specifies the preference order. Multiple algorithms must be
+      comma-separated.
+    <p class="Pp">If the specified list begins with a &#x2018;+&#x2019;
+        character, then the specified algorithms will be appended to the default
+        set instead of replacing them. If the specified list begins with a
+        &#x2018;-&#x2019; character, then the specified algorithms (including
+        wildcards) will be removed from the default set instead of replacing
+        them. If the specified list begins with a &#x2018;^&#x2019; character,
+        then the specified algorithms will be placed at the head of the default
+        set.</p>
+    <p class="Pp">The supported algorithms are:</p>
+    <p class="Pp"></p>
+    <ul class="Bl-item Bd-indent Bl-compact">
+      <li>curve25519-sha256</li>
+      <li>curve25519-sha256@libssh.org</li>
+      <li>diffie-hellman-group1-sha1</li>
+      <li>diffie-hellman-group14-sha1</li>
+      <li>diffie-hellman-group14-sha256</li>
+      <li>diffie-hellman-group16-sha512</li>
+      <li>diffie-hellman-group18-sha512</li>
+      <li>diffie-hellman-group-exchange-sha1</li>
+      <li>diffie-hellman-group-exchange-sha256</li>
+      <li>ecdh-sha2-nistp256</li>
+      <li>ecdh-sha2-nistp384</li>
+      <li>ecdh-sha2-nistp521</li>
+      <li>mlkem768nistp256-sha256</li>
+      <li>mlkem768x25519-sha256</li>
+      <li>sntrup761x25519-sha512</li>
+      <li>sntrup761x25519-sha512@openssh.com</li>
+    </ul>
+    <p class="Pp">The default is:</p>
+    <div class="Bd Pp Bd-indent Li">
+    <pre>mlkem768x25519-sha256,
+sntrup761x25519-sha512,sntrup761x25519-sha512@openssh.com,
+curve25519-sha256,curve25519-sha256@libssh.org,
+ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521</pre>
+    </div>
+    <p class="Pp">The list of supported key exchange algorithms may also be
+        obtained using &quot;ssh -Q KexAlgorithms&quot;.</p>
+  </dd>
+  </dl></body></html>
