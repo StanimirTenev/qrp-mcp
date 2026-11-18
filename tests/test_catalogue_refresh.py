@@ -283,3 +283,63 @@ def test_a_pem_label_of_one_word_is_known_when_a_spelling_holds_it():
                                           "snippet": "-----BEGIN PKCS7-----"}]})
     assert "curve25519-sha256" not in other and "curve25519-sha256@libssh.org" in other
     assert "begin" in other and "pkcs7-----" in other
+
+
+def test_each_entry_carries_a_positive_and_a_negative_control(tmp_path):
+    """Stage 3b: a candidate's xfail means silence only if a name the catalogue holds passes
+    through the same snippet and expectation (positive control), and a name that exists nowhere
+    does not (negative control). Without both, XFAIL and XPASS in that entry say nothing
+    (KANDIDATI-119 §2: tlsend, keyfile, keysize/PKI and external failed the positive one)."""
+    result = _tool().refresh(_catalogue(tmp_path, _refresh()), PAGES)
+    (entry,) = result["controls"]
+    assert entry["source"] == URL and entry["discriminates"] is True
+    # the first name on the page the catalogue knows, in page order
+    assert entry["positive"]["candidate"] == "curve25519-sha256"
+    assert entry["positive"]["snippet"] == "KexAlgorithms curve25519-sha256\n"
+    neg = entry["negative"]
+    assert neg["candidate"] == _tool().NEGATIVE and neg["snippet"] == f"KexAlgorithms {_tool().NEGATIVE}\n"
+    assert neg["expect"] == entry["positive"]["expect"]
+
+
+def test_an_entry_names_its_control_and_says_when_it_cannot_discriminate(tmp_path):
+    result = _tool().refresh(_catalogue(tmp_path, _refresh(
+        extra='control = "ecdh-sha2-nistp256"\ndiscriminates = false\n')), PAGES)
+    (entry,) = result["controls"]
+    assert entry["positive"]["candidate"] == "ecdh-sha2-nistp256" and entry["discriminates"] is False
+    assert all(c["discriminates"] is False for c in result["candidates"])
+
+
+def test_a_material_entry_puts_the_candidate_into_the_label(tmp_path):
+    page = tmp_path / "labels.txt"
+    page.write_text("-----BEGIN CERTIFICATE-----\n-----BEGIN NEW LABEL-----\n", encoding="utf-8")
+    d = tmp_path / "operations"
+    d.mkdir()
+    (d / "keyfile.toml").write_text('''operation = "keyfile"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "PKI"
+scope = "test"
+
+[[ecosystems.spellings]]
+id = "cert"
+spelling = "-----BEGIN CERTIFICATE-----"
+source = "https://example.org/labels"
+quote = "x"
+file = "c.pem"
+material = "CERT_RSA2048_PEM"
+expect = {detected = ["RSA"]}
+
+[[ecosystems.refresh]]
+source = "https://example.org/labels"
+pattern = '-----BEGIN ([A-Z0-9 ]+)-----'
+file = "candidate.pem"
+material = "CERT_RSA2048_PEM"
+relabel = "{candidate}"
+expect = {detected = ["RSA"]}
+''', encoding="utf-8")
+    result = _tool().refresh(d, {"https://example.org/labels": page})
+    (c,) = result["candidates"]
+    assert (c["candidate"], c["material"], c["relabel"]) == ("NEW LABEL", "CERT_RSA2048_PEM", "NEW LABEL")
+    assert "snippet" not in c
+    assert result["controls"][0]["positive"]["relabel"] == "CERTIFICATE"
