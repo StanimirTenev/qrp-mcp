@@ -9,9 +9,9 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 from typing import Any
 
-from . import (__version__, assets, aws_tls, baseline as baseline_mod, certificates, confidence,
-               config, coverage, detectors, dnssec, ike, opcua, operations, profiles, remediation,
-               suppression)
+from . import (__version__, adaptive, assets, aws_tls, baseline as baseline_mod, certificates,
+               confidence, config, coverage, detectors, dnssec, ike, opcua, operations, profiles,
+               remediation, suppression)
 from .classifier import (_OID_FAMILIES, SIZED_FAMILIES, FingerprintRequest, classical_status,
                          fingerprint, known_algorithms, summarize)
 
@@ -451,6 +451,10 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     # What this version was tested against, operation by operation (data/operations); after the
     # fingerprint and outside findings and evidence, so it can move neither.
     result["operation_closure"] = operations.closure_section()
+    # Stage 3: the ecosystems used and how far the catalogue closes them, the angles that
+    # contradict each other, the leads followed or not, and where to look first. Built here, after
+    # the fingerprint and on the finished result, for the same reason: they can move nothing.
+    adaptive.annotate(result, repo_path)
     return result
 
 
