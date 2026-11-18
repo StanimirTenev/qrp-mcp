@@ -136,3 +136,22 @@ def test_a_confirmed_candidate_leaves_this_file():
     assert confirmed({"operation": "ssh", "ecosystem": "SSH", "candidate": "sntrup761x25519-sha512@openssh.com"})
     assert confirmed({"operation": "ssh", "ecosystem": "SSH", "candidate": "PRIVATE KEY"})
     assert not confirmed({"operation": "ssh", "ecosystem": "SSH", "candidate": "sntrup761x25519-sha512"})
+
+
+def test_the_candidates_file_is_from_this_catalogue():
+    """The controls above run what the file says, so a refresh entry changed without rerunning the
+    tool would go untested. Each control must be what the entry gives today (same order: the tool
+    walks the catalogue in order)."""
+    data = _data()
+    if not data:
+        pytest.skip("no candidates file")
+    tool = _tool()
+    entries = [(doc["operation"], eco["ecosystem"], e) for doc in operations.catalogue()
+               for eco in doc["ecosystems"] for e in eco.get("refresh", [])]
+    assert len(entries) == len(data["controls"]), "rerun tools/catalogue_refresh.py"
+    for (operation, ecosystem, entry), c in zip(entries, data["controls"]):
+        assert (c["operation"], c["ecosystem"], c["source"]) == (operation, ecosystem, entry["source"])
+        assert c["discriminates"] == entry.get("discriminates", True), entry["source"]
+        for kind in ("positive", "negative"):
+            if c[kind]:
+                assert c[kind] == tool._case(entry, c[kind]["candidate"]), (entry["source"], kind)
