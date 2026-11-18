@@ -244,7 +244,7 @@ def _cli(tmp_path, tag):
 def test_every_exit_carries_the_sections(tmp_path):
     src = _write(tmp_path / "src", INVARIANT_TREE)
     direct = scan_directory(src)
-    tool = getattr(scan_repo, "fn", scan_repo)(str(src))
+    tool = getattr(scan_repo, "fn", scan_repo)(str(src), level="full")
     cli, _ = _cli(tmp_path, "cli")
     for key in ("ecosystems", "angles", "where_to_look"):
         assert direct[key] == tool[key] == cli[key], key

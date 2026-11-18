@@ -75,6 +75,14 @@ doi:10.5281/zenodo.24336932, now in `CITATION.cff`. The scan stays deterministic
 
 What changes for an existing user:
 
+- **The new sections quote at the level the rest of the result does.** Found before the tag:
+  at `masked` (the default) and `trimmed`, `where_to_look` wrote out a trust-store path that
+  `trust_stores` masks, and `chosen_outside_files.leads` the target of an include, a key file
+  named by path and the name of an environment variable. Below `full` such a target, a path
+  in `angles` and the certificate path of `tls_termination.authentication_not_read` (in the
+  clear since 0.49.0) are masked as a line is; a lead followed to the files read keeps its
+  target, and `where_to_look` is built again from the masked sections. `full` is unchanged
+  (`tests/test_masking_stage3_sections.py`).
 - **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
   `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
   A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the

@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from . import __version__, buildgap, certificates, closure, config, control, coverage, cyclonedx, jsonout, mandates, profiles, sarif
+from . import __version__, adaptive, buildgap, certificates, closure, config, control, coverage, cyclonedx, jsonout, mandates, profiles, sarif
 from . import baseline as baseline_mod
 from .classifier import known_algorithms
 from .scan import scan_directory
@@ -426,6 +426,26 @@ def _mask_owners(result: dict[str, Any]) -> None:
     for place in (result.get("trust_stores") or {}).get("places") or []:
         if place.get("file") and not place.get("file_read"):
             place["file"] = _mask_excerpt(str(place["file"]), "")
+    # The same for the certificate a TLS server loads from outside the files read (row 200).
+    tls = (result.get("tls_termination") or {}).get("authentication_not_read") or {}
+    for place in tls.get("places") or []:
+        place["file"] = _mask_excerpt(str(place["file"]), "")
+    # Stage 3 (NAHODKA 18.11): a lead's target that is not files read -- an include, a key file
+    # named by path, an environment name -- is source text, masked as row 517's path is.
+    leads = (result.get("chosen_outside_files") or {}).get("leads") or {}
+    for lead in leads.get("items") or []:
+        if lead.get("status") not in adaptive._FOLLOWED:
+            lead["target"] = _mask_excerpt(str(lead["target"]), "")
+    for c in (result.get("angles") or {}).get("contradictions") or []:
+        if c.get("file"):
+            masked = _mask_excerpt(str(c["file"]), "")
+            c["statement"] = str(c["statement"]).replace(f" names {c['file']}, ",
+                                                         f" names {masked}, ", 1)
+            c["file"] = masked
+    # where_to_look quotes the sections above: built again from them as masked, never apart.
+    if leads and isinstance(result.get("where_to_look"), dict):
+        result["where_to_look"] = adaptive._where_to_look(
+            result["ecosystems"], result["angles"], leads, result)
 
 
 def _at_level(result: dict[str, Any], level: str) -> dict[str, Any]:
