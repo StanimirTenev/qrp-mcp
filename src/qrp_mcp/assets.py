@@ -525,6 +525,7 @@ def _requirement_request(text: str) -> str | None:
 _CFG_SECTION = re.compile(r"^\s*\[([^\]]+)\]\s*$")
 _CFG_KEY = re.compile(r"^([A-Za-z0-9_.-]+)\s*=\s*(.*)$")
 _SETUP_ARGUMENT = re.compile(r"\b(?:install_requires|extras_require)\s*=\s*[\[{]")
+_SETUP_TOKEN = re.compile(_TOML_STRING.pattern + r"|[\[\]{}]")
 
 
 def _setuptools_requests(name: str, lines: list[str]) -> list[tuple[str, int, str | None]]:
@@ -552,21 +553,28 @@ def _setuptools_requests(name: str, lines: list[str]) -> list[tuple[str, int, st
                                   or (section == "options" and key == "install_requires")):
                 add(value.strip(), number)
         return out
+    # Strings and brackets in order, so the list ends at its own bracket: a string after it on
+    # the same line (`description="cryptography"`) is not a dependency (review S3, 18.11).
     depth = 0
     for number, text in enumerate(lines, 1):
-        code, start = text.split("#", 1)[0], 0
-        if not depth:
-            opened = _SETUP_ARGUMENT.search(code)
-            if not opened:
-                continue
-            depth, start = 1, opened.end()
-        rest = code[start:]
-        for string in _TOML_STRING.finditer(rest):
-            # A dict key (`"ssh": [...]`) names an extra, not a package.
-            if not rest[string.end():].lstrip().startswith(":"):
-                add(string.group(1) or string.group(2) or "", number)
-        bare = _TOML_STRING.sub("", rest)
-        depth = max(0, depth + bare.count("[") + bare.count("{") - bare.count("]") - bare.count("}"))
+        code, pos = text.split("#", 1)[0], 0
+        while True:
+            if not depth:
+                opened = _SETUP_ARGUMENT.search(code, pos)
+                if not opened:
+                    break
+                depth, pos = 1, opened.end()
+            token = _SETUP_TOKEN.search(code, pos)
+            if not token:
+                break
+            pos, word = token.end(), token.group(0)
+            if word in ("[", "{"):
+                depth += 1
+            elif word in ("]", "}"):
+                depth -= 1
+            elif not code[token.end():].lstrip().startswith(":"):
+                # A dict key (`"ssh": [...]`) names an extra, not a package.
+                add(token.group(1) or token.group(2) or "", number)
     return out
 
 

@@ -116,6 +116,13 @@ What changes for an existing user:
   in the same block (any setting above suppresses the claim, so this errs toward silence, never
   toward "off"), and a file included from outside the tree, which keeps the single-file rule
   (`tests/test_upstream_verify_across_include.py`).
+- **setup.py: the list ends at its bracket.** Found by the independent review:
+  `setup(install_requires=["requests"], description="cryptography")` gave a dependency row
+  `cryptography`, because every string after `install_requires=[` on that line was read. Only
+  the values of `install_requires` and `extras_require` count, up to the bracket that closes
+  them; a second argument on the same line is read on its own
+  (`tests/test_setup_py_arguments_only.py`). `setup_requires` and `tests_require` are not read,
+  as before.
 - **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
   `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
   A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the
