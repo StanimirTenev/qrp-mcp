@@ -79,7 +79,38 @@ def _make_material() -> dict[str, bytes]:
     ssh2 = ("---- BEGIN SSH2 PUBLIC KEY ----\n"
             + "".join(b64[i:i + 70] + "\n" for i in range(0, len(b64), 70))
             + "---- END SSH2 PUBLIC KEY ----\n").encode()
+    # keysize/PKI: the sizes the catalogue reads back (keysize.toml).
+    from cryptography.hazmat.primitives.asymmetric import dsa
+    rsa1024 = rsa.generate_private_key(public_exponent=65537, key_size=1024)
+    ec384 = ec.generate_private_key(ec.SECP384R1())
+    ec521 = ec.generate_private_key(ec.SECP521R1())
+    dsa1024 = dsa.generate_private_key(key_size=1024)
+    cert1024 = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                .public_key(rsa1024.public_key()).serial_number(2)
+                .not_valid_before(now).not_valid_after(now + datetime.timedelta(days=3650))
+                .sign(rsa1024, hashes.SHA256()))
+    cert384 = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+               .public_key(ec384.public_key()).serial_number(3)
+               .not_valid_before(now).not_valid_after(now + datetime.timedelta(days=3650))
+               .sign(ec384, hashes.SHA384()))
+    csr384 = x509.CertificateSigningRequestBuilder().subject_name(name).sign(ec384, hashes.SHA384())
+    n1024 = rsa1024.public_key().public_numbers().n.to_bytes(128, "big")
+    SPKI = serialization.PublicFormat.SubjectPublicKeyInfo
     return {
+        "RSA1024_PKCS8_PEM": rsa1024.private_bytes(E.PEM, P.PKCS8, none),
+        "RSA1024_SPKI_PEM": rsa1024.public_key().public_bytes(E.PEM, SPKI),
+        "RSA1024_OPENSSH_PUBLIC": rsa1024.public_key().public_bytes(
+            E.OpenSSH, serialization.PublicFormat.OpenSSH) + b" closure@example\n",
+        "RSA1024_JWK_N": base64.urlsafe_b64encode(n1024).rstrip(b"="),
+        "EC384_PKCS8_PEM": ec384.private_bytes(E.PEM, P.PKCS8, none),
+        "EC384_OPENSSH_PUBLIC": ec384.public_key().public_bytes(
+            E.OpenSSH, serialization.PublicFormat.OpenSSH) + b" closure@example\n",
+        "EC521_SPKI_PEM": ec521.public_key().public_bytes(E.PEM, SPKI),
+        "DSA1024_PKCS8_PEM": dsa1024.private_bytes(E.PEM, P.PKCS8, none),
+        "CERT_RSA1024_PEM": cert1024.public_bytes(E.PEM),
+        "CERT_RSA1024_DER": cert1024.public_bytes(E.DER),
+        "CERT_EC384_PEM": cert384.public_bytes(E.PEM),
+        "CSR_EC384_PEM": csr384.public_bytes(E.PEM),
         "RSA2048_PKCS1_PEM": rsa_key.private_bytes(E.PEM, P.TraditionalOpenSSL, none),
         "RSA2048_PKCS8_PEM": rsa_key.private_bytes(E.PEM, P.PKCS8, none),
         "RSA2048_PKCS8_ENCRYPTED_PEM": rsa_key.private_bytes(
@@ -145,7 +176,12 @@ def _check(result: dict, expect: dict) -> list[str]:
             missing.append(f"{family} detected, should not be")
     for row in expect.get("rows", []):
         items = _at(result, row["at"]) or []
-        if not any(all(item.get(k) == v for k, v in row["match"].items()) for item in items):
+        found = any(all(item.get(k) == v for k, v in row["match"].items()) for item in items)
+        if row.get("absent"):
+            # A spelling that must not be read as a use: a removal, a revoked key, a hybrid's half.
+            if found:
+                missing.append(f"a row in {row['at']} with {row['match']}, should be none")
+        elif not found:
             missing.append(f"no row in {row['at']} with {row['match']}")
     for check in expect.get("value", []):
         got = _at(result, check["at"])

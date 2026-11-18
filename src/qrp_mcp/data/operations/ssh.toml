@@ -1,0 +1,769 @@
+# Operation `ssh`, ecosystem SSH (OpenSSH): the key exchange and signature algorithms an OpenSSH
+# configuration, key list or key command names. Pages fetched 18.11.2026 from man.openbsd.org
+# (OpenBSD-current): sshd_config(5), ssh_config(5), sshd(8), ssh-keygen(1).
+# `expect`: a classical key exchange is an ssh_kex row (family, offered alone); a hybrid is its
+# post-quantum row with parameter set and a row for its classical half, and no ssh_kex row; a
+# list after '-' and a key after @revoked are not uses.
+
+operation = "ssh"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "SSH"
+scope = "sshd_config KexAlgorithms (all 15 supported names, +/-/^ prefixes), HostKeyAlgorithms (every name of the default, certificates included), PubkeyAcceptedAlgorithms, HostbasedAcceptedAlgorithms, CASignatureAlgorithms, HostKey default files; ssh_config KexAlgorithms, HostKeyAlgorithms, PubkeyAcceptedAlgorithms; authorized_keys key types and known_hosts @revoked/@cert-authority markers (sshd(8)); ssh-keygen -t and -b. Not covered: Ciphers/MACs (operation ciphers), RevokedKeys and KRL files, Match blocks, Include, GSSAPIKexAlgorithms, the size of a key inside authorized_keys (operation keysize), the pre-release ML-DSA name of row 18 (not on these pages), other SSH servers (Dropbear, libssh, Tectia)."
+
+[[ecosystems.spellings]]
+id = "kex-curve25519-sha256"
+spelling = "KexAlgorithms curve25519-sha256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms curve25519-sha256
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "curve25519-sha256", family = "X25519", offered = "alone", setting = "KexAlgorithms"}}]}
+
+[[ecosystems.spellings]]
+id = "kex-curve25519-sha256@libssh.org"
+spelling = "KexAlgorithms curve25519-sha256@libssh.org"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms curve25519-sha256@libssh.org
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "curve25519-sha256@libssh.org", family = "X25519", offered = "alone", setting = "KexAlgorithms"}}]}
+
+[[ecosystems.spellings]]
+id = "kex-diffie-hellman-group1-sha1"
+spelling = "KexAlgorithms diffie-hellman-group1-sha1"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms diffie-hellman-group1-sha1
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "diffie-hellman-group1-sha1", family = "DH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "DH", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "kex-diffie-hellman-group14-sha1"
+spelling = "KexAlgorithms diffie-hellman-group14-sha1"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms diffie-hellman-group14-sha1
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "diffie-hellman-group14-sha1", family = "DH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "DH", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "kex-diffie-hellman-group14-sha256"
+spelling = "KexAlgorithms diffie-hellman-group14-sha256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms diffie-hellman-group14-sha256
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "diffie-hellman-group14-sha256", family = "DH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "DH", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "kex-diffie-hellman-group16-sha512"
+spelling = "KexAlgorithms diffie-hellman-group16-sha512"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms diffie-hellman-group16-sha512
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "diffie-hellman-group16-sha512", family = "DH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "DH", key_size = 4096}}]}
+
+[[ecosystems.spellings]]
+id = "kex-diffie-hellman-group18-sha512"
+spelling = "KexAlgorithms diffie-hellman-group18-sha512"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms diffie-hellman-group18-sha512
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "diffie-hellman-group18-sha512", family = "DH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "DH", key_size = 8192}}]}
+
+[[ecosystems.spellings]]
+id = "kex-diffie-hellman-group-exchange-sha1"
+spelling = "KexAlgorithms diffie-hellman-group-exchange-sha1"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms diffie-hellman-group-exchange-sha1
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "diffie-hellman-group-exchange-sha1", family = "DH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "DH", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings]]
+id = "kex-diffie-hellman-group-exchange-sha256"
+spelling = "KexAlgorithms diffie-hellman-group-exchange-sha256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms diffie-hellman-group-exchange-sha256
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "diffie-hellman-group-exchange-sha256", family = "DH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "DH", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings]]
+id = "kex-ecdh-sha2-nistp256"
+spelling = "KexAlgorithms ecdh-sha2-nistp256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms ecdh-sha2-nistp256
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "ecdh-sha2-nistp256", family = "ECDH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDH", curve = "P-256", key_size = 256}}]}
+
+[[ecosystems.spellings]]
+id = "kex-ecdh-sha2-nistp384"
+spelling = "KexAlgorithms ecdh-sha2-nistp384"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms ecdh-sha2-nistp384
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "ecdh-sha2-nistp384", family = "ECDH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDH", curve = "P-384", key_size = 384}}]}
+
+[[ecosystems.spellings]]
+id = "kex-ecdh-sha2-nistp521"
+spelling = "KexAlgorithms ecdh-sha2-nistp521"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms ecdh-sha2-nistp521
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1, group = "ecdh-sha2-nistp521", family = "ECDH", offered = "alone", setting = "KexAlgorithms"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDH", curve = "P-521", key_size = 521}}]}
+
+[[ecosystems.spellings]]
+id = "kex-mlkem768nistp256-sha256"
+spelling = "KexAlgorithms mlkem768nistp256-sha256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms mlkem768nistp256-sha256
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "EC", curve = "P-256"}}, {at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "kex-mlkem768x25519-sha256"
+spelling = "KexAlgorithms mlkem768x25519-sha256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms mlkem768x25519-sha256
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "X25519"}}, {at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "kex-sntrup761x25519-sha512"
+spelling = "KexAlgorithms sntrup761x25519-sha512"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms sntrup761x25519-sha512
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "NTRU", parameter_set = "sntrup761"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "X25519"}}, {at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "kex-plus"
+spelling = "KexAlgorithms +diffie-hellman-group14-sha1"
+source = "https://man.openbsd.org/sshd_config"
+quote = "If the specified list begins with a ‘+’ character, then the specified algorithms will be appended to the default set instead of replacing them."
+file = "sshd_config"
+snippet = '''
+KexAlgorithms +diffie-hellman-group14-sha1
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "DH", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "kex-minus"
+spelling = "KexAlgorithms -diffie-hellman-group14-sha1"
+source = "https://man.openbsd.org/sshd_config"
+quote = "If the specified list begins with a ‘-’ character, then the specified algorithms (including wildcards) will be removed from the default set instead of replacing them."
+file = "sshd_config"
+snippet = '''
+KexAlgorithms -diffie-hellman-group14-sha1
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1}, absent = true}], absent = ["DH"]}
+
+[[ecosystems.spellings]]
+id = "kex-minus-wildcard"
+spelling = "KexAlgorithms -diffie-hellman-*"
+source = "https://man.openbsd.org/sshd_config"
+quote = "If the specified list begins with a ‘-’ character, then the specified algorithms (including wildcards) will be removed from the default set instead of replacing them."
+file = "sshd_config"
+snippet = '''
+KexAlgorithms -diffie-hellman-*
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1}, absent = true}], absent = ["DH"]}
+
+[[ecosystems.spellings]]
+id = "kex-minus-list"
+spelling = "KexAlgorithms -ecdh-sha2-nistp256,diffie-hellman-group14-sha1"
+source = "https://man.openbsd.org/sshd_config"
+quote = "If the specified list begins with a ‘-’ character, then the specified algorithms (including wildcards) will be removed from the default set instead of replacing them."
+file = "sshd_config"
+snippet = '''
+KexAlgorithms -ecdh-sha2-nistp256,diffie-hellman-group14-sha1
+'''
+expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1}, absent = true}], absent = ["DH", "ECDH"]}
+
+[[ecosystems.spellings]]
+id = "kex-head"
+spelling = "KexAlgorithms ^mlkem768x25519-sha256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "If the specified list begins with a ‘^’ character, then the specified algorithms will be placed at the head of the default set."
+file = "sshd_config"
+snippet = '''
+KexAlgorithms ^mlkem768x25519-sha256
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ssh-ed25519"
+spelling = "HostKeyAlgorithms ssh-ed25519"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ssh-ed25519
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ecdsa-sha2-nistp256"
+spelling = "HostKeyAlgorithms ecdsa-sha2-nistp256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ecdsa-sha2-nistp256
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ecdsa-sha2-nistp384"
+spelling = "HostKeyAlgorithms ecdsa-sha2-nistp384"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ecdsa-sha2-nistp384
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ecdsa-sha2-nistp521"
+spelling = "HostKeyAlgorithms ecdsa-sha2-nistp521"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ecdsa-sha2-nistp521
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-521"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-sk-ssh-ed25519@openssh.com"
+spelling = "HostKeyAlgorithms sk-ssh-ed25519@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms sk-ssh-ed25519@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-sk-ecdsa-sha2-nistp256@openssh.com"
+spelling = "HostKeyAlgorithms sk-ecdsa-sha2-nistp256@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms sk-ecdsa-sha2-nistp256@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-webauthn-sk-ecdsa-sha2-nistp256@openssh.com"
+spelling = "HostKeyAlgorithms webauthn-sk-ecdsa-sha2-nistp256@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms webauthn-sk-ecdsa-sha2-nistp256@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-rsa-sha2-512"
+spelling = "HostKeyAlgorithms rsa-sha2-512"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms rsa-sha2-512
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-rsa-sha2-256"
+spelling = "HostKeyAlgorithms rsa-sha2-256"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms rsa-sha2-256
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ssh-mldsa44-ed25519"
+spelling = "HostKeyAlgorithms ssh-mldsa44-ed25519"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ssh-mldsa44-ed25519
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ML-DSA", parameter_set = "44"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ssh-ed25519-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ecdsa-sha2-nistp256-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms ecdsa-sha2-nistp256-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ecdsa-sha2-nistp256-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ecdsa-sha2-nistp384-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms ecdsa-sha2-nistp384-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ecdsa-sha2-nistp384-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ecdsa-sha2-nistp521-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms ecdsa-sha2-nistp521-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ecdsa-sha2-nistp521-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-521"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-sk-ssh-ed25519-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms sk-ssh-ed25519-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms sk-ssh-ed25519-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms sk-ecdsa-sha2-nistp256-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms webauthn-sk-ecdsa-sha2-nistp256-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-rsa-sha2-512-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms rsa-sha2-512-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms rsa-sha2-512-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-rsa-sha2-256-cert-v01@openssh.com"
+spelling = "HostKeyAlgorithms rsa-sha2-256-cert-v01@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms rsa-sha2-256-cert-v01@openssh.com
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-ssh-mldsa44-ed25519-cert"
+spelling = "HostKeyAlgorithms ssh-mldsa44-ed25519-cert"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the server offers. The default for this option is:"
+file = "sshd_config"
+snippet = '''
+HostKeyAlgorithms ssh-mldsa44-ed25519-cert
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ML-DSA", parameter_set = "44"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "pubkeyaccepted"
+spelling = "PubkeyAcceptedAlgorithms ecdsa-sha2-nistp384"
+source = "https://man.openbsd.org/sshd_config"
+quote = "PubkeyAcceptedAlgorithms Specifies the signature algorithms that will be accepted for public key authentication"
+file = "sshd_config"
+snippet = '''
+PubkeyAcceptedAlgorithms ecdsa-sha2-nistp384
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "hostbasedaccepted"
+spelling = "HostbasedAcceptedAlgorithms ecdsa-sha2-nistp384"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostbasedAcceptedAlgorithms Specifies the signature algorithms that will be accepted for hostbased authentication"
+file = "sshd_config"
+snippet = '''
+HostbasedAcceptedAlgorithms ecdsa-sha2-nistp384
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "casignature"
+spelling = "CASignatureAlgorithms ecdsa-sha2-nistp384"
+source = "https://man.openbsd.org/sshd_config"
+quote = "CASignatureAlgorithms Specifies which algorithms are allowed for signing of certificates by certificate authorities (CAs)."
+file = "sshd_config"
+snippet = '''
+CASignatureAlgorithms ecdsa-sha2-nistp384
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-config-hostkeyalgorithms"
+spelling = "HostKeyAlgorithms ecdsa-sha2-nistp384"
+source = "https://man.openbsd.org/ssh_config"
+quote = "HostKeyAlgorithms Specifies the host key signature algorithms that the client wants to use in order of preference."
+file = "ssh_config"
+snippet = '''
+HostKeyAlgorithms ecdsa-sha2-nistp384
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "ssh_config", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-config-pubkeyaccepted"
+spelling = "PubkeyAcceptedAlgorithms ecdsa-sha2-nistp384"
+source = "https://man.openbsd.org/ssh_config"
+quote = "PubkeyAcceptedAlgorithms Specifies the signature algorithms that will be used for public key authentication"
+file = "ssh_config"
+snippet = '''
+PubkeyAcceptedAlgorithms ecdsa-sha2-nistp384
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "ssh_config", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "pubkeyaccepted-minus"
+spelling = "PubkeyAcceptedAlgorithms -ssh-rsa"
+source = "https://man.openbsd.org/sshd_config"
+quote = "PubkeyAcceptedAlgorithms Specifies the signature algorithms that will be accepted for public key authentication"
+file = "sshd_config"
+snippet = '''
+PubkeyAcceptedAlgorithms -rsa-sha2-256,rsa-sha2-512
+'''
+expect = {absent = ["RSA"]}
+
+[[ecosystems.spellings]]
+id = "ssh-config-kexalgorithms"
+spelling = "ssh_config KexAlgorithms"
+source = "https://man.openbsd.org/ssh_config"
+quote = "KexAlgorithms Specifies the permitted KEX (Key Exchange) algorithms that will be used and their preference order."
+file = "ssh_config"
+snippet = '''
+Host *
+  KexAlgorithms mlkem768x25519-sha256,curve25519-sha256
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "ssh_config", line = 2, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.ssh_kex", match = {path = "ssh_config", line = 2, group = "curve25519-sha256", family = "X25519", offered = "alone", setting = "KexAlgorithms"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-file-ecdsa"
+spelling = "HostKey /etc/ssh/ssh_host_ecdsa_key"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKey Specifies a file containing a private host key used by SSH. The defaults are /etc/ssh/ssh_host_ecdsa_key , /etc/ssh/ssh_host_ed25519_key , /etc/ssh/ssh_host_mldsa44_ed25519_key , and /etc/ssh/ssh_host_rsa_key ."
+file = "sshd_config"
+snippet = '''
+HostKey /etc/ssh/ssh_host_ecdsa_key
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-file-ed25519"
+spelling = "HostKey /etc/ssh/ssh_host_ed25519_key"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKey Specifies a file containing a private host key used by SSH. The defaults are /etc/ssh/ssh_host_ecdsa_key , /etc/ssh/ssh_host_ed25519_key , /etc/ssh/ssh_host_mldsa44_ed25519_key , and /etc/ssh/ssh_host_rsa_key ."
+file = "sshd_config"
+snippet = '''
+HostKey /etc/ssh/ssh_host_ed25519_key
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-file-mldsa44_ed25519"
+spelling = "HostKey /etc/ssh/ssh_host_mldsa44_ed25519_key"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKey Specifies a file containing a private host key used by SSH. The defaults are /etc/ssh/ssh_host_ecdsa_key , /etc/ssh/ssh_host_ed25519_key , /etc/ssh/ssh_host_mldsa44_ed25519_key , and /etc/ssh/ssh_host_rsa_key ."
+file = "sshd_config"
+snippet = '''
+HostKey /etc/ssh/ssh_host_mldsa44_ed25519_key
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "ML-DSA", parameter_set = "44"}}]}
+
+[[ecosystems.spellings]]
+id = "hostkey-file-rsa"
+spelling = "HostKey /etc/ssh/ssh_host_rsa_key"
+source = "https://man.openbsd.org/sshd_config"
+quote = "HostKey Specifies a file containing a private host key used by SSH. The defaults are /etc/ssh/ssh_host_ecdsa_key , /etc/ssh/ssh_host_ed25519_key , /etc/ssh/ssh_host_mldsa44_ed25519_key , and /etc/ssh/ssh_host_rsa_key ."
+file = "sshd_config"
+snippet = '''
+HostKey /etc/ssh/ssh_host_rsa_key
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "authorized-keys-sk-ecdsa-sha2-nistp256@openssh.com"
+spelling = "authorized_keys: sk-ecdsa-sha2-nistp256@openssh.com AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "The supported key types are: sk-ecdsa-sha2-nistp256@openssh.com ecdsa-sha2-nistp256 ecdsa-sha2-nistp384 ecdsa-sha2-nistp521 sk-ssh-ed25519@openssh.com ssh-ed25519 ssh-mldsa44-ed25519 ssh-rsa"
+file = "authorized_keys"
+snippet = '''
+sk-ecdsa-sha2-nistp256@openssh.com AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb20AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= user@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "authorized_keys", line = 1, algorithm = "ECDSA", curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "authorized-keys-ecdsa-sha2-nistp256"
+spelling = "authorized_keys: ecdsa-sha2-nistp256 AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "The supported key types are: sk-ecdsa-sha2-nistp256@openssh.com ecdsa-sha2-nistp256 ecdsa-sha2-nistp384 ecdsa-sha2-nistp521 sk-ssh-ed25519@openssh.com ssh-ed25519 ssh-mldsa44-ed25519 ssh-rsa"
+file = "authorized_keys"
+snippet = '''
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= user@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "authorized_keys", line = 1, algorithm = "ECDSA", curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "authorized-keys-ecdsa-sha2-nistp384"
+spelling = "authorized_keys: ecdsa-sha2-nistp384 AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "The supported key types are: sk-ecdsa-sha2-nistp256@openssh.com ecdsa-sha2-nistp256 ecdsa-sha2-nistp384 ecdsa-sha2-nistp521 sk-ssh-ed25519@openssh.com ssh-ed25519 ssh-mldsa44-ed25519 ssh-rsa"
+file = "authorized_keys"
+snippet = '''
+ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= user@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "authorized_keys", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "authorized-keys-ecdsa-sha2-nistp521"
+spelling = "authorized_keys: ecdsa-sha2-nistp521 AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "The supported key types are: sk-ecdsa-sha2-nistp256@openssh.com ecdsa-sha2-nistp256 ecdsa-sha2-nistp384 ecdsa-sha2-nistp521 sk-ssh-ed25519@openssh.com ssh-ed25519 ssh-mldsa44-ed25519 ssh-rsa"
+file = "authorized_keys"
+snippet = '''
+ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= user@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "authorized_keys", line = 1, algorithm = "ECDSA", curve = "P-521"}}]}
+
+[[ecosystems.spellings]]
+id = "authorized-keys-sk-ssh-ed25519@openssh.com"
+spelling = "authorized_keys: sk-ssh-ed25519@openssh.com AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "The supported key types are: sk-ecdsa-sha2-nistp256@openssh.com ecdsa-sha2-nistp256 ecdsa-sha2-nistp384 ecdsa-sha2-nistp521 sk-ssh-ed25519@openssh.com ssh-ed25519 ssh-mldsa44-ed25519 ssh-rsa"
+file = "authorized_keys"
+snippet = '''
+sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA user@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "authorized_keys", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "authorized-keys-ssh-ed25519"
+spelling = "authorized_keys: ssh-ed25519 AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "The supported key types are: sk-ecdsa-sha2-nistp256@openssh.com ecdsa-sha2-nistp256 ecdsa-sha2-nistp384 ecdsa-sha2-nistp521 sk-ssh-ed25519@openssh.com ssh-ed25519 ssh-mldsa44-ed25519 ssh-rsa"
+file = "authorized_keys"
+snippet = '''
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA user@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "authorized_keys", line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "authorized-keys-ssh-mldsa44-ed25519"
+spelling = "authorized_keys: ssh-mldsa44-ed25519 AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "The supported key types are: sk-ecdsa-sha2-nistp256@openssh.com ecdsa-sha2-nistp256 ecdsa-sha2-nistp384 ecdsa-sha2-nistp521 sk-ssh-ed25519@openssh.com ssh-ed25519 ssh-mldsa44-ed25519 ssh-rsa"
+file = "authorized_keys"
+snippet = '''
+ssh-mldsa44-ed25519 AAAAE3NzaC1tbGRzYTQ0LWVkMjU1MTkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= user@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "authorized_keys", line = 1, algorithm = "ML-DSA", parameter_set = "44"}}]}
+
+[[ecosystems.spellings]]
+id = "authorized-keys-ssh-rsa"
+spelling = "authorized_keys: ssh-rsa AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "The supported key types are: sk-ecdsa-sha2-nistp256@openssh.com ecdsa-sha2-nistp256 ecdsa-sha2-nistp384 ecdsa-sha2-nistp521 sk-ssh-ed25519@openssh.com ssh-ed25519 ssh-mldsa44-ed25519 ssh-rsa"
+file = "authorized_keys"
+snippet = '''
+ssh-rsa AAAAB3NzaC1yc2EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= user@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "authorized_keys", line = 1, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "known-hosts-revoked"
+spelling = "@revoked host ssh-rsa AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "“@revoked”, to indicate that the key contained on the line is revoked and must not ever be accepted."
+file = "known_hosts"
+snippet = '''
+@revoked *.example.com ssh-rsa AAAAB3NzaC1yc2EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= old@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "known_hosts", line = 1, algorithm = "RSA", evidence_kind = "reference"}, absent = true}], absent = ["RSA"]}
+
+[[ecosystems.spellings]]
+id = "known-hosts-cert-authority"
+spelling = "@cert-authority host ecdsa-sha2-nistp384 AAAA..."
+source = "https://man.openbsd.org/sshd"
+quote = "“@cert-authority”, to indicate that the line contains a certification authority (CA) key"
+file = "known_hosts"
+snippet = '''
+@cert-authority *.example.com ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= ca@example
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "known_hosts", line = 1, algorithm = "ECDSA", curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-keygen-t-ecdsa"
+spelling = "ssh-keygen -t ecdsa"
+source = "https://man.openbsd.org/ssh-keygen"
+quote = "-t ecdsa | ecdsa-sk | ed25519 | ed25519-sk | mldsa44-ed25519 | rsa Specifies the type of key to create."
+file = "make-keys.sh"
+snippet = '''
+#!/bin/sh
+ssh-keygen -t ecdsa -f /etc/ssh/host_key -N ''
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "make-keys.sh", line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-keygen-t-ecdsa-sk"
+spelling = "ssh-keygen -t ecdsa-sk"
+source = "https://man.openbsd.org/ssh-keygen"
+quote = "-t ecdsa | ecdsa-sk | ed25519 | ed25519-sk | mldsa44-ed25519 | rsa Specifies the type of key to create."
+file = "make-keys.sh"
+snippet = '''
+#!/bin/sh
+ssh-keygen -t ecdsa-sk -f /etc/ssh/host_key -N ''
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "make-keys.sh", line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-keygen-t-ed25519"
+spelling = "ssh-keygen -t ed25519"
+source = "https://man.openbsd.org/ssh-keygen"
+quote = "-t ecdsa | ecdsa-sk | ed25519 | ed25519-sk | mldsa44-ed25519 | rsa Specifies the type of key to create."
+file = "make-keys.sh"
+snippet = '''
+#!/bin/sh
+ssh-keygen -t ed25519 -f /etc/ssh/host_key -N ''
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "make-keys.sh", line = 2, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-keygen-t-ed25519-sk"
+spelling = "ssh-keygen -t ed25519-sk"
+source = "https://man.openbsd.org/ssh-keygen"
+quote = "-t ecdsa | ecdsa-sk | ed25519 | ed25519-sk | mldsa44-ed25519 | rsa Specifies the type of key to create."
+file = "make-keys.sh"
+snippet = '''
+#!/bin/sh
+ssh-keygen -t ed25519-sk -f /etc/ssh/host_key -N ''
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "make-keys.sh", line = 2, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-keygen-t-mldsa44-ed25519"
+spelling = "ssh-keygen -t mldsa44-ed25519"
+source = "https://man.openbsd.org/ssh-keygen"
+quote = "-t ecdsa | ecdsa-sk | ed25519 | ed25519-sk | mldsa44-ed25519 | rsa Specifies the type of key to create."
+file = "make-keys.sh"
+snippet = '''
+#!/bin/sh
+ssh-keygen -t mldsa44-ed25519 -f /etc/ssh/host_key -N ''
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "make-keys.sh", line = 2, algorithm = "ML-DSA", parameter_set = "44"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-keygen-t-rsa"
+spelling = "ssh-keygen -t rsa"
+source = "https://man.openbsd.org/ssh-keygen"
+quote = "-t ecdsa | ecdsa-sk | ed25519 | ed25519-sk | mldsa44-ed25519 | rsa Specifies the type of key to create."
+file = "make-keys.sh"
+snippet = '''
+#!/bin/sh
+ssh-keygen -t rsa -f /etc/ssh/host_key -N ''
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "make-keys.sh", line = 2, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ssh-keygen-t-rsa-b"
+spelling = "ssh-keygen -t rsa -b 1024"
+source = "https://man.openbsd.org/ssh-keygen"
+quote = "-b bits Specifies the number of bits in the key to create."
+file = "make-keys.sh"
+snippet = '''
+#!/bin/sh
+ssh-keygen -t rsa -b 1024 -f /etc/ssh/host_key -N ''
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "make-keys.sh", line = 2, algorithm = "RSA", key_size = 1024}}]}

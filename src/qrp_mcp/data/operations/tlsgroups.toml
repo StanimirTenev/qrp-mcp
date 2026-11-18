@@ -1,0 +1,1321 @@
+# Operation `tlsgroups`, ecosystem nginx (nginx and nginx-like servers: nginx, HAProxy, Caddy): the
+# key-exchange groups a TLS terminator is configured to offer. Every named group of the IANA TLS
+# Supported Groups registry once, in ssl_ecdh_curve; every directive or keyword that sets the list
+# once; the list syntax of OpenSSL 3.5 (SSL_CTX_set1_groups_list(3)). Pages fetched 18.11.2026.
+# `expect`: a classical group offered alone is a tls_groups row (family, offered alone, the
+# setting); a hybrid is an ML-KEM row with its parameter set and a row for its classical half, and
+# no tls_groups row, since its half is not offered alone; ML-KEM alone is no ECDH and no X25519.
+
+operation = "tlsgroups"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "nginx"
+scope = "nginx http/stream ssl_ecdh_curve, ssl_conf_command Groups/Curves, proxy/grpc/uwsgi and stream proxy_ssl_conf_command Groups; HAProxy ssl-default-bind-curves, ssl-default-server-curves, bind and server curves; Caddy tls curves; group names from the IANA registry (bign-curve256v1, bign-curve384v1, bign-curve512v1 left out: the classifier has no family for STB 34.101.45); OpenSSL 3.5 list syntax (NIST and OID names, case, / tuples, * and ? prefixes, - removal). Not covered: DEFAULT and the library's default list (row 41: what the pinned library supports), groups unsupported by the pinned OpenSSL, ssl_ecdh_curve in an included file, HAProxy ssl-default-*-sigalgs, Envoy, Traefik."
+
+[[ecosystems.spellings]]
+id = "iana-sect163k1"
+spelling = "ssl_ecdh_curve sect163k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "1,sect163k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect163k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect163k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect163r1"
+spelling = "ssl_ecdh_curve sect163r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "2,sect163r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect163r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect163r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect163r2"
+spelling = "ssl_ecdh_curve sect163r2;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "3,sect163r2,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect163r2;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect163r2", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect193r1"
+spelling = "ssl_ecdh_curve sect193r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "4,sect193r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect193r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect193r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect193r2"
+spelling = "ssl_ecdh_curve sect193r2;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "5,sect193r2,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect193r2;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect193r2", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect233k1"
+spelling = "ssl_ecdh_curve sect233k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "6,sect233k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect233k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect233k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect233r1"
+spelling = "ssl_ecdh_curve sect233r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "7,sect233r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect233r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect233r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect239k1"
+spelling = "ssl_ecdh_curve sect239k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "8,sect239k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect239k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect239k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect283k1"
+spelling = "ssl_ecdh_curve sect283k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "9,sect283k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect283k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect283k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect283r1"
+spelling = "ssl_ecdh_curve sect283r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "10,sect283r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect283r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect283r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect409k1"
+spelling = "ssl_ecdh_curve sect409k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "11,sect409k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect409k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect409k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect409r1"
+spelling = "ssl_ecdh_curve sect409r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "12,sect409r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect409r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect409r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect571k1"
+spelling = "ssl_ecdh_curve sect571k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "13,sect571k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect571k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect571k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-sect571r1"
+spelling = "ssl_ecdh_curve sect571r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "14,sect571r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve sect571r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "sect571r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp160k1"
+spelling = "ssl_ecdh_curve secp160k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "15,secp160k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp160k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp160k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp160r1"
+spelling = "ssl_ecdh_curve secp160r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "16,secp160r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp160r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp160r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp160r2"
+spelling = "ssl_ecdh_curve secp160r2;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "17,secp160r2,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp160r2;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp160r2", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp192k1"
+spelling = "ssl_ecdh_curve secp192k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "18,secp192k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp192k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp192k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp192r1"
+spelling = "ssl_ecdh_curve secp192r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "19,secp192r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp192r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp192r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp224k1"
+spelling = "ssl_ecdh_curve secp224k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "20,secp224k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp224k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp224k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp224r1"
+spelling = "ssl_ecdh_curve secp224r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "21,secp224r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp224r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp224r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp256k1"
+spelling = "ssl_ecdh_curve secp256k1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "22,secp256k1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp256k1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp256k1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp256r1"
+spelling = "ssl_ecdh_curve secp256r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "23,secp256r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp256r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp256r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp384r1"
+spelling = "ssl_ecdh_curve secp384r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "24,secp384r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp384r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp384r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-secp521r1"
+spelling = "ssl_ecdh_curve secp521r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "25,secp521r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve secp521r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "secp521r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-brainpoolp256r1"
+spelling = "ssl_ecdh_curve brainpoolP256r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "26,brainpoolP256r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve brainpoolP256r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "brainpoolP256r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-brainpoolp384r1"
+spelling = "ssl_ecdh_curve brainpoolP384r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "27,brainpoolP384r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve brainpoolP384r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "brainpoolP384r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-brainpoolp512r1"
+spelling = "ssl_ecdh_curve brainpoolP512r1;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "28,brainpoolP512r1,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve brainpoolP512r1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "brainpoolP512r1", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-x25519"
+spelling = "ssl_ecdh_curve x25519;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "29,x25519,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve x25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "x25519", family = "X25519", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-x448"
+spelling = "ssl_ecdh_curve x448;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "30,x448,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve x448;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "x448", family = "X448", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-brainpoolp256r1tls13"
+spelling = "ssl_ecdh_curve brainpoolP256r1tls13;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "31,brainpoolP256r1tls13,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve brainpoolP256r1tls13;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "brainpoolP256r1tls13", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-brainpoolp384r1tls13"
+spelling = "ssl_ecdh_curve brainpoolP384r1tls13;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "32,brainpoolP384r1tls13,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve brainpoolP384r1tls13;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "brainpoolP384r1tls13", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-brainpoolp512r1tls13"
+spelling = "ssl_ecdh_curve brainpoolP512r1tls13;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "33,brainpoolP512r1tls13,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve brainpoolP512r1tls13;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "brainpoolP512r1tls13", family = "ECDH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-gc256a"
+spelling = "ssl_ecdh_curve GC256A;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "34,GC256A,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve GC256A;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "GC256A", family = "GOST R 34.10", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-gc256b"
+spelling = "ssl_ecdh_curve GC256B;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "35,GC256B,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve GC256B;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "GC256B", family = "GOST R 34.10", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-gc256c"
+spelling = "ssl_ecdh_curve GC256C;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "36,GC256C,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve GC256C;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "GC256C", family = "GOST R 34.10", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-gc256d"
+spelling = "ssl_ecdh_curve GC256D;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "37,GC256D,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve GC256D;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "GC256D", family = "GOST R 34.10", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-gc512a"
+spelling = "ssl_ecdh_curve GC512A;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "38,GC512A,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve GC512A;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "GC512A", family = "GOST R 34.10", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-gc512b"
+spelling = "ssl_ecdh_curve GC512B;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "39,GC512B,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve GC512B;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "GC512B", family = "GOST R 34.10", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-gc512c"
+spelling = "ssl_ecdh_curve GC512C;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "40,GC512C,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve GC512C;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "GC512C", family = "GOST R 34.10", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-curvesm2"
+spelling = "ssl_ecdh_curve curveSM2;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "41,curveSM2,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve curveSM2;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "curveSM2", family = "SM2", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-ffdhe2048"
+spelling = "ssl_ecdh_curve ffdhe2048;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "256,ffdhe2048,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve ffdhe2048;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "ffdhe2048", family = "DH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-ffdhe3072"
+spelling = "ssl_ecdh_curve ffdhe3072;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "257,ffdhe3072,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve ffdhe3072;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "ffdhe3072", family = "DH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-ffdhe4096"
+spelling = "ssl_ecdh_curve ffdhe4096;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "258,ffdhe4096,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve ffdhe4096;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "ffdhe4096", family = "DH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-ffdhe6144"
+spelling = "ssl_ecdh_curve ffdhe6144;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "259,ffdhe6144,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve ffdhe6144;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "ffdhe6144", family = "DH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-ffdhe8192"
+spelling = "ssl_ecdh_curve ffdhe8192;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "260,ffdhe8192,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve ffdhe8192;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "ffdhe8192", family = "DH", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "iana-mlkem512"
+spelling = "ssl_ecdh_curve MLKEM512;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "512,MLKEM512,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve MLKEM512;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "512"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
+
+[[ecosystems.spellings]]
+id = "iana-mlkem768"
+spelling = "ssl_ecdh_curve MLKEM768;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "513,MLKEM768,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve MLKEM768;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
+
+[[ecosystems.spellings]]
+id = "iana-mlkem1024"
+spelling = "ssl_ecdh_curve MLKEM1024;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "514,MLKEM1024,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve MLKEM1024;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "1024"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
+
+[[ecosystems.spellings]]
+id = "iana-secp256r1mlkem512"
+spelling = "ssl_ecdh_curve SecP256r1MLKEM512;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "4585,SecP256r1MLKEM512,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve SecP256r1MLKEM512;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "512"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "EC", curve = "P-256"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "iana-mlkem512x25519"
+spelling = "ssl_ecdh_curve MLKEM512X25519;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "4586,MLKEM512X25519,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve MLKEM512X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "512"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "X25519"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH"]}
+
+[[ecosystems.spellings]]
+id = "iana-secp256r1mlkem768"
+spelling = "ssl_ecdh_curve SecP256r1MLKEM768;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "4587,SecP256r1MLKEM768,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve SecP256r1MLKEM768;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "EC", curve = "P-256"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "iana-x25519mlkem768"
+spelling = "ssl_ecdh_curve X25519MLKEM768;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "4588,X25519MLKEM768,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve X25519MLKEM768;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "X25519"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH"]}
+
+[[ecosystems.spellings]]
+id = "iana-secp384r1mlkem1024"
+spelling = "ssl_ecdh_curve SecP384r1MLKEM1024;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "4589,SecP384r1MLKEM1024,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve SecP384r1MLKEM1024;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "1024"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "EC", curve = "P-384"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "iana-curvesm2mlkem768"
+spelling = "ssl_ecdh_curve curveSM2MLKEM768;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "4590,curveSM2MLKEM768,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve curveSM2MLKEM768;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "SM2"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH"]}
+
+[[ecosystems.spellings]]
+id = "iana-mlkem1024x448"
+spelling = "ssl_ecdh_curve MLKEM1024X448;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "4591,MLKEM1024X448,"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve MLKEM1024X448;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "1024"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "X448"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH"]}
+
+[[ecosystems.spellings]]
+id = "iana-x25519kyber768draft00"
+spelling = "ssl_ecdh_curve X25519Kyber768Draft00;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "25497,X25519Kyber768Draft00 (OBSOLETE),"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve X25519Kyber768Draft00;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "Kyber"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "X25519"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH"]}
+
+[[ecosystems.spellings]]
+id = "iana-secp256r1kyber768draft00"
+spelling = "ssl_ecdh_curve SecP256r1Kyber768Draft00;"
+source = "https://www.iana.org/assignments/tls-parameters/tls-parameters-8.csv"
+quote = "25498,SecP256r1Kyber768Draft00 (OBSOLETE),"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve SecP256r1Kyber768Draft00;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "Kyber"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "EC", curve = "P-256"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-ecdh-curve-list"
+spelling = "ssl_ecdh_curve X25519MLKEM768:X25519"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "Syntax: ssl_ecdh_curve curve ; Default: ssl_ecdh_curve auto;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "ssl_ecdh_curve"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-ecdh-curve-auto"
+spelling = "ssl_ecdh_curve auto"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "Syntax: ssl_ecdh_curve curve ; Default: ssl_ecdh_curve auto;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_ecdh_curve auto;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
+
+[[ecosystems.spellings]]
+id = "nginx-stream-ssl-ecdh-curve"
+spelling = "stream ssl_ecdh_curve"
+source = "https://nginx.org/en/docs/stream/ngx_stream_ssl_module.html"
+quote = "Syntax: ssl_ecdh_curve curve ; D"
+file = "nginx.conf"
+snippet = '''
+stream {
+  server {
+    listen 12345 ssl;
+    ssl_ecdh_curve X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "ssl_ecdh_curve"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-conf-command-groups"
+spelling = "ssl_conf_command Groups X25519MLKEM768:X25519"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "Syntax: ssl_conf_command name valu"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Groups X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "ssl_conf_command Groups"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-conf-command-curves"
+spelling = "ssl_conf_command Curves X25519MLKEM768:X25519"
+source = "https://docs.openssl.org/3.5/man3/SSL_CONF_cmd/"
+quote = "Curves This is a synonym for the \"Groups\" command."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Curves X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "ssl_conf_command Curves"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-proxy-ssl-conf-command-groups"
+spelling = "proxy_ssl_conf_command Groups X25519MLKEM768:X25519"
+source = "https://nginx.org/en/docs/http/ngx_http_proxy_module.html"
+quote = "Syntax: proxy_ssl_conf_command name valu"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    proxy_ssl_conf_command Groups X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "proxy_ssl_conf_command Groups"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-grpc-ssl-conf-command-groups"
+spelling = "grpc_ssl_conf_command Groups X25519MLKEM768:X25519"
+source = "https://nginx.org/en/docs/http/ngx_http_grpc_module.html"
+quote = "Syntax: grpc_ssl_conf_command name valu"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    grpc_ssl_conf_command Groups X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "grpc_ssl_conf_command Groups"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-uwsgi-ssl-conf-command-groups"
+spelling = "uwsgi_ssl_conf_command Groups X25519MLKEM768:X25519"
+source = "https://nginx.org/en/docs/http/ngx_http_uwsgi_module.html"
+quote = "Syntax: uwsgi_ssl_conf_command name valu"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    uwsgi_ssl_conf_command Groups X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "uwsgi_ssl_conf_command Groups"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-stream-proxy-ssl-conf-command-groups"
+spelling = "stream proxy_ssl_conf_command Groups X25519MLKEM768:X25519"
+source = "https://nginx.org/en/docs/stream/ngx_stream_proxy_module.html"
+quote = "Syntax: proxy_ssl_conf_command name valu"
+file = "nginx.conf"
+snippet = '''
+stream {
+  server {
+    listen 12345;
+    proxy_ssl_conf_command Groups X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "proxy_ssl_conf_command Groups"}}, {at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-ssl-default-bind-curves"
+spelling = "global ssl-default-bind-curves X25519MLKEM768:X25519"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "ssl-default-bind-curves <curves> This setting is only available when support for OpenSSL was built in."
+file = "haproxy.cfg"
+snippet = '''
+global
+  ssl-default-bind-curves X25519MLKEM768:X25519
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "haproxy.cfg", line = 2, group = "X25519", family = "X25519", offered = "alone", setting = "ssl-default-bind-curves"}}, {at = "evidence.source_code", match = {path = "haproxy.cfg", line = 2, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-ssl-default-server-curves"
+spelling = "global ssl-default-server-curves X25519MLKEM768:X25519"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "ssl-default-server-curves <curves> This setting is only available when support for O"
+file = "haproxy.cfg"
+snippet = '''
+global
+  ssl-default-server-curves X25519MLKEM768:X25519
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "haproxy.cfg", line = 2, group = "X25519", family = "X25519", offered = "alone", setting = "ssl-default-server-curves"}}, {at = "evidence.source_code", match = {path = "haproxy.cfg", line = 2, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-bind-curves"
+spelling = "bind :443 ssl crt ... curves X25519MLKEM768:X25519"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "curves <curves> This setting is only available when support for OpenSSL was built in. It sets the string describing the list of elliptic curves algorithms (\"curve suite\") that are negotiated during the SSL/TLS handshake with ECDHE. The format of the string is a colon-delimited list of curve name. Example: \"X25519:P-256\""
+file = "haproxy.cfg"
+snippet = '''
+frontend f
+  bind :443 ssl crt /etc/haproxy/site.pem curves X25519MLKEM768:X25519
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "haproxy.cfg", line = 2, group = "X25519", family = "X25519", offered = "alone", setting = "curves"}}, {at = "evidence.source_code", match = {path = "haproxy.cfg", line = 2, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "haproxy-server-curves"
+spelling = "server ... ssl curves X25519MLKEM768:X25519"
+source = "https://docs.haproxy.org/3.0/configuration.html"
+quote = "curves <curves> May be used in the following contexts: tcp, http, log, peers, ring"
+file = "haproxy.cfg"
+snippet = '''
+backend b
+  server s1 10.0.0.1:443 ssl verify required ca-file /etc/ssl/ca.pem curves X25519MLKEM768:X25519
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "haproxy.cfg", line = 2, group = "X25519", family = "X25519", offered = "alone", setting = "curves"}}, {at = "evidence.source_code", match = {path = "haproxy.cfg", line = 2, algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings]]
+id = "caddy-curves-x25519mlkem768"
+spelling = "tls { curves x25519mlkem768 }"
+source = "https://caddyserver.com/docs/caddyfile/directives/tls"
+quote = "curves specifies the list of EC groups to support. It is recommended to not change the defaults. Supported values are: x25519mlkem768 (PQC) x25519 secp256r1 secp384r1 secp521r1"
+file = "Caddyfile"
+snippet = '''
+example.com {
+  tls {
+    curves x25519mlkem768
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Caddyfile", line = 3, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.source_code", match = {path = "Caddyfile", line = 3, algorithm = "X25519"}}, {at = "evidence.tls_groups", match = {path = "Caddyfile", line = 3}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "caddy-curves-x25519"
+spelling = "tls { curves x25519 }"
+source = "https://caddyserver.com/docs/caddyfile/directives/tls"
+quote = "curves specifies the list of EC groups to support. It is recommended to not change the defaults. Supported values are: x25519mlkem768 (PQC) x25519 secp256r1 secp384r1 secp521r1"
+file = "Caddyfile"
+snippet = '''
+example.com {
+  tls {
+    curves x25519
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "Caddyfile", line = 3, group = "x25519", family = "X25519", offered = "alone", setting = "curves"}}]}
+
+[[ecosystems.spellings]]
+id = "caddy-curves-secp256r1"
+spelling = "tls { curves secp256r1 }"
+source = "https://caddyserver.com/docs/caddyfile/directives/tls"
+quote = "curves specifies the list of EC groups to support. It is recommended to not change the defaults. Supported values are: x25519mlkem768 (PQC) x25519 secp256r1 secp384r1 secp521r1"
+file = "Caddyfile"
+snippet = '''
+example.com {
+  tls {
+    curves secp256r1
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "Caddyfile", line = 3, group = "secp256r1", family = "ECDH", offered = "alone", setting = "curves"}}]}
+
+[[ecosystems.spellings]]
+id = "caddy-curves-secp384r1"
+spelling = "tls { curves secp384r1 }"
+source = "https://caddyserver.com/docs/caddyfile/directives/tls"
+quote = "curves specifies the list of EC groups to support. It is recommended to not change the defaults. Supported values are: x25519mlkem768 (PQC) x25519 secp256r1 secp384r1 secp521r1"
+file = "Caddyfile"
+snippet = '''
+example.com {
+  tls {
+    curves secp384r1
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "Caddyfile", line = 3, group = "secp384r1", family = "ECDH", offered = "alone", setting = "curves"}}]}
+
+[[ecosystems.spellings]]
+id = "caddy-curves-secp521r1"
+spelling = "tls { curves secp521r1 }"
+source = "https://caddyserver.com/docs/caddyfile/directives/tls"
+quote = "curves specifies the list of EC groups to support. It is recommended to not change the defaults. Supported values are: x25519mlkem768 (PQC) x25519 secp256r1 secp384r1 secp521r1"
+file = "Caddyfile"
+snippet = '''
+example.com {
+  tls {
+    curves secp521r1
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "Caddyfile", line = 3, group = "secp521r1", family = "ECDH", offered = "alone", setting = "curves"}}]}
+
+[[ecosystems.spellings]]
+id = "ossl-nist-name-p256"
+spelling = "ssl_conf_command Groups P-256;"
+source = "https://docs.openssl.org/3.5/man3/SSL_CTX_set1_curves/"
+quote = "Each group can be either the NIST name (e.g. P-256 )"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Groups P-256;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "P-256", family = "ECDH", offered = "alone", setting = "ssl_conf_command Groups"}}]}
+
+[[ecosystems.spellings]]
+id = "ossl-oid-name-prime256v1"
+spelling = "ssl_conf_command Groups prime256v1;"
+source = "https://docs.openssl.org/3.5/man3/SSL_CTX_set1_curves/"
+quote = "or an OpenSSL OID name (e.g. prime256v1 )"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Groups prime256v1;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "prime256v1", family = "ECDH", offered = "alone", setting = "ssl_conf_command Groups"}}]}
+
+[[ecosystems.spellings]]
+id = "ossl-case-insensitive"
+spelling = "ssl_conf_command Groups x25519mlkem768:X25519;"
+source = "https://docs.openssl.org/3.5/man3/SSL_CTX_set1_curves/"
+quote = "Group names are case-insensitive in OpenSSL 3.5 and later."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Groups x25519mlkem768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "ssl_conf_command Groups"}}]}
+
+[[ecosystems.spellings]]
+id = "ossl-tuple-separator"
+spelling = "ssl_conf_command Groups X25519MLKEM768/X25519;"
+source = "https://docs.openssl.org/3.5/man3/SSL_CTX_set1_curves/"
+quote = "separating them from each other with / characters."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Groups X25519MLKEM768/X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "ssl_conf_command Groups"}}]}
+
+[[ecosystems.spellings]]
+id = "ossl-keyshare-prefix"
+spelling = "ssl_conf_command Groups *X25519MLKEM768:*X25519;"
+source = "https://docs.openssl.org/3.5/man3/SSL_CTX_set1_curves/"
+quote = "adding a * prefix to the associated group name."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Groups *X25519MLKEM768:*X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "ssl_conf_command Groups"}}]}
+
+[[ecosystems.spellings]]
+id = "ossl-ignore-unknown-prefix"
+spelling = "ssl_conf_command Groups ?X25519MLKEM768:X25519;"
+source = "https://docs.openssl.org/3.5/man3/SSL_CTX_set1_curves/"
+quote = "If a group name is prefixed with the ? character, it will be ignored if an implementation is missing."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Groups ?X25519MLKEM768:X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519", family = "X25519", offered = "alone", setting = "ssl_conf_command Groups"}}]}
+
+[[ecosystems.spellings]]
+id = "ossl-removal-prefix"
+spelling = "ssl_conf_command Groups X25519MLKEM768:X25519:-X25519;"
+source = "https://docs.openssl.org/3.5/man3/SSL_CTX_set1_curves/"
+quote = "If a group name is prefixed with the - character, it will be removed from the list of groups specified up to that point."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_conf_command Groups X25519MLKEM768:X25519:-X25519;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "X25519"}, absent = true}]}

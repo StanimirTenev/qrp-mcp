@@ -1,0 +1,962 @@
+# Operation `keysize`: the size of an asymmetric key where it is written. Two ecosystems.
+# NET: the .NET constructors and factories that take a size or a curve, the KeySize property,
+# CNG BCryptGenerateKeyPair, CryptoAPI CryptGenKey, PowerShell New-SelfSignedCertificate and the
+# Schannel minimum key lengths, from learn.microsoft.com (fetched 18.11.2026).
+# PKI: the size inside a certificate, key or request (RFC 7468 labels), an OpenSSH public key,
+# a JWK (RFC 7518, RFC 8037) and the key requests of cfssl and Hyperledger Fabric CA.
+# `expect` is a row on the line (or in the file) with the family and the size the page gives.
+
+operation = "keysize"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "NET"
+scope = "System.Security.Cryptography constructors and Create(int|ECCurve) of RSA, DSA, ECDsa, ECDiffieHellman and their Cng/CryptoServiceProvider/OpenSsl classes; ECCurve.NamedCurves; AsymmetricAlgorithm.KeySize set on the next line; BCryptGenerateKeyPair dwLength with the algorithm of the handle; CryptGenKey upper 16 bits; New-SelfSignedCertificate -KeyLength/-KeyAlgorithm, splatted and with backtick continuation; Schannel ClientMinKeyBitLength. Not covered: ImportParameters/ImportFromPem (the size comes from the key), CngKey.Create with CngKeyCreationParameters, ECCurve.CreateFromFriendlyName/CreateFromOid, certreq .inf files, Schannel ServerMinKeyBitLength (not on the fetched page)."
+
+[[ecosystems.spellings]]
+id = "rsa-create-int"
+spelling = "RSA.Create(1024)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsa.create"
+quote = "public static System.Security.Cryptography.RSA Create(int keySizeInBits)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = RSA.Create(1024);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "RSA", key_size = 1024, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "rsacsp-int"
+spelling = "new RSACryptoServiceProvider(512)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsacryptoserviceprovider.-ctor"
+quote = "public RSACryptoServiceProvider(int dwKeySize)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new RSACryptoServiceProvider(512);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "RSA", key_size = 512, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "rsacsp-int-csp"
+spelling = "new RSACryptoServiceProvider(1024, cspParams)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsacryptoserviceprovider.-ctor"
+quote = "public RSACryptoServiceProvider(int dwKeySize, System.Security.Cryptography.CspParameters parameters)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new RSACryptoServiceProvider(1024, cspParams);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "RSA", key_size = 1024, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "rsacng-int"
+spelling = "new RSACng(1024)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsacng.-ctor"
+quote = "public RSACng(int keySize)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new RSACng(1024);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "RSA", key_size = 1024, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "rsaopenssl-int"
+spelling = "new RSAOpenSsl(1024)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsaopenssl.-ctor"
+quote = "public RSAOpenSsl(int keySize)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new RSAOpenSsl(1024);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "RSA", key_size = 1024, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "dsa-create-int"
+spelling = "DSA.Create(1024)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.dsa.create"
+quote = "public static System.Security.Cryptography.DSA Create(int keySizeInBits)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = DSA.Create(1024);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "DSA", key_size = 1024, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "dsacsp-int"
+spelling = "new DSACryptoServiceProvider(1024)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.dsacryptoserviceprovider.-ctor"
+quote = "public DSACryptoServiceProvider(int dwKeySize)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new DSACryptoServiceProvider(1024);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "DSA", key_size = 1024, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "dsacsp-int-csp"
+spelling = "new DSACryptoServiceProvider(1024, cspParams)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.dsacryptoserviceprovider.-ctor"
+quote = "public DSACryptoServiceProvider(int dwKeySize, System.Security.Cryptography.CspParameters parameters)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new DSACryptoServiceProvider(1024, cspParams);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "DSA", key_size = 1024, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "dsacng-int"
+spelling = "new DSACng(1024)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.dsacng.-ctor"
+quote = "public DSACng(int keySize)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new DSACng(1024);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "DSA", key_size = 1024, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsacng-int"
+spelling = "new ECDsaCng(384)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdsacng.-ctor"
+quote = "public ECDsaCng(int keySize)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new ECDsaCng(384);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 384, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsaopenssl-int"
+spelling = "new ECDsaOpenSsl(521)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdsaopenssl.-ctor"
+quote = "public ECDsaOpenSsl(int keySize)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new ECDsaOpenSsl(521);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 521, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "ecdhcng-int"
+spelling = "new ECDiffieHellmanCng(384)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdiffiehellmancng.-ctor"
+quote = "public ECDiffieHellmanCng(int keySize)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new ECDiffieHellmanCng(384);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDH", key_size = 384, line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-nistP256"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.nistP256)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "nistP256"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 256, line = 2, curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-nistP384"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.nistP384)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "nistP384"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.nistP384);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 384, line = 2, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-nistP521"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.nistP521)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "nistP521"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.nistP521);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 521, line = 2, curve = "P-521"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP160r1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP160r1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP160r1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP160r1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 160, line = 2, curve = "brainpoolP160r1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP160t1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP160t1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP160t1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP160t1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 160, line = 2, curve = "brainpoolP160t1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP192r1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP192r1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP192r1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP192r1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 192, line = 2, curve = "brainpoolP192r1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP192t1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP192t1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP192t1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP192t1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 192, line = 2, curve = "brainpoolP192t1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP224r1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP224r1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP224r1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP224r1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 224, line = 2, curve = "brainpoolP224r1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP224t1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP224t1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP224t1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP224t1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 224, line = 2, curve = "brainpoolP224t1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP256r1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP256r1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP256r1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP256r1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 256, line = 2, curve = "brainpoolP256r1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP256t1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP256t1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP256t1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP256t1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 256, line = 2, curve = "brainpoolP256t1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP320r1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP320r1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP320r1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP320r1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 320, line = 2, curve = "brainpoolP320r1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP320t1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP320t1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP320t1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP320t1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 320, line = 2, curve = "brainpoolP320t1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP384r1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP384r1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP384r1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP384r1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 384, line = 2, curve = "brainpoolP384r1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP384t1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP384t1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP384t1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP384t1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 384, line = 2, curve = "brainpoolP384t1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP512r1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP512r1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP512r1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP512r1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 512, line = 2, curve = "brainpoolP512r1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-create-brainpoolP512t1"
+spelling = "ECDsa.Create(ECCurve.NamedCurves.brainpoolP512t1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
+quote = "brainpoolP512t1"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDsa.Create(ECCurve.NamedCurves.brainpoolP512t1);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 512, line = 2, curve = "brainpoolP512t1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdh-create-curve"
+spelling = "ECDiffieHellman.Create(ECCurve.NamedCurves.nistP384)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdiffiehellman.create"
+quote = "public static System.Security.Cryptography.ECDiffieHellman Create(System.Security.Cryptography.ECCurve curve)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP384);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDH", key_size = 384, line = 2, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsacng-curve"
+spelling = "new ECDsaCng(ECCurve.NamedCurves.nistP384)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdsacng.-ctor"
+quote = "public ECDsaCng(System.Security.Cryptography.ECCurve curve)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new ECDsaCng(ECCurve.NamedCurves.nistP384);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 384, line = 2, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsaopenssl-curve"
+spelling = "new ECDsaOpenSsl(ECCurve.NamedCurves.nistP384)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdsaopenssl.-ctor"
+quote = "public ECDsaOpenSsl(System.Security.Cryptography.ECCurve curve)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new ECDsaOpenSsl(ECCurve.NamedCurves.nistP384);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDSA", key_size = 384, line = 2, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdhcng-curve"
+spelling = "new ECDiffieHellmanCng(ECCurve.NamedCurves.nistP384)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdiffiehellmancng.-ctor"
+quote = "public ECDiffieHellmanCng(System.Security.Cryptography.ECCurve curve)"
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new ECDiffieHellmanCng(ECCurve.NamedCurves.nistP384);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "ECDH", key_size = 384, line = 2, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "rsa-keysize-next-line"
+spelling = "RSA.Create(); key.KeySize = 1024"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.asymmetricalgorithm.keysize"
+quote = "Gets or sets the size, in bits, of the key modulus used by the asymmetric algorithm."
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = RSA.Create();
+key.KeySize = 1024;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "dsa-keysize-next-line"
+spelling = "DSA.Create(); key.KeySize = 1024"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.asymmetricalgorithm.keysize"
+quote = "Gets or sets the size, in bits, of the key modulus used by the asymmetric algorithm."
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = DSA.Create();
+key.KeySize = 1024;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "DSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "rsacsp-keysize-next-line"
+spelling = "new RSACryptoServiceProvider(); key.KeySize = 1024"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.asymmetricalgorithm.keysize"
+quote = "Gets or sets the size, in bits, of the key modulus used by the asymmetric algorithm."
+file = "Keys.cs"
+snippet = '''
+using System.Security.Cryptography;
+var key = new RSACryptoServiceProvider();
+key.KeySize = 1024;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "bcrypt-generatekeypair-bcrypt_rsa_algorithm"
+spelling = "BCryptGenerateKeyPair(hAlg /* BCRYPT_RSA_ALGORITHM */, &hKey, 1024, 0)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgeneratekeypair"
+quote = "dwLength The length, in bits, of the key."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <bcrypt.h>
+BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_RSA_ALGORITHM, NULL, 0);
+BCryptGenerateKeyPair(hAlg, &hKey, 1024, 0);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "bcrypt-generatekeypair-bcrypt_dsa_algorithm"
+spelling = "BCryptGenerateKeyPair(hAlg /* BCRYPT_DSA_ALGORITHM */, &hKey, 1024, 0)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgeneratekeypair"
+quote = "dwLength The length, in bits, of the key."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <bcrypt.h>
+BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_DSA_ALGORITHM, NULL, 0);
+BCryptGenerateKeyPair(hAlg, &hKey, 1024, 0);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "bcrypt-generatekeypair-bcrypt_dh_algorithm"
+spelling = "BCryptGenerateKeyPair(hAlg /* BCRYPT_DH_ALGORITHM */, &hKey, 1024, 0)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgeneratekeypair"
+quote = "dwLength The length, in bits, of the key."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <bcrypt.h>
+BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_DH_ALGORITHM, NULL, 0);
+BCryptGenerateKeyPair(hAlg, &hKey, 1024, 0);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "bcrypt-generatekeypair-bcrypt_ecdsa_p384_algorithm"
+spelling = "BCryptGenerateKeyPair(hAlg /* BCRYPT_ECDSA_P384_ALGORITHM */, &hKey, 384, 0)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgeneratekeypair"
+quote = "dwLength The length, in bits, of the key."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <bcrypt.h>
+BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_ECDSA_P384_ALGORITHM, NULL, 0);
+BCryptGenerateKeyPair(hAlg, &hKey, 384, 0);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "ECDSA", key_size = 384}}]}
+
+[[ecosystems.spellings]]
+id = "bcrypt-generatekeypair-bcrypt_ecdh_p384_algorithm"
+spelling = "BCryptGenerateKeyPair(hAlg /* BCRYPT_ECDH_P384_ALGORITHM */, &hKey, 384, 0)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgeneratekeypair"
+quote = "dwLength The length, in bits, of the key."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <bcrypt.h>
+BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_ECDH_P384_ALGORITHM, NULL, 0);
+BCryptGenerateKeyPair(hAlg, &hKey, 384, 0);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "ECDH", key_size = 384}}]}
+
+[[ecosystems.spellings]]
+id = "cryptgenkey-shift"
+spelling = "CryptGenKey(hProv, CALG_RSA_KEYX, (1024 << 16) | CRYPT_EXPORTABLE, &hKey)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey"
+quote = "The key size, representing the length of the key modulus in bits, is set with the upper 16 bits of this parameter."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <wincrypt.h>
+CryptGenKey(hProv, CALG_RSA_KEYX, (1024 << 16) | CRYPT_EXPORTABLE, &hKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 1024, line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "cryptgenkey-rsa1024bit-key"
+spelling = "CryptGenKey(hProv, CALG_RSA_KEYX, RSA1024BIT_KEY | CRYPT_EXPORTABLE, &hKey)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey"
+quote = "RSA1024BIT_KEY value can be used to specify a 1024-bit RSA key"
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <wincrypt.h>
+CryptGenKey(hProv, CALG_RSA_KEYX, RSA1024BIT_KEY | CRYPT_EXPORTABLE, &hKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 1024, line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "cryptgenkey-hex"
+spelling = "CryptGenKey(hProv, CALG_RSA_KEYX, 0x08000000, &hKey)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey"
+quote = "The upper 16 bits of 0x08000000 is 0x0800, or decimal 2,048."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <wincrypt.h>
+CryptGenKey(hProv, CALG_RSA_KEYX, 0x08000000, &hKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 2048, line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "newselfsigned-keylength"
+spelling = "New-SelfSignedCertificate -KeyAlgorithm RSA -KeyLength 1024"
+source = "https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate"
+quote = "[-KeyLength <Int32>] [-KeyAlgorithm <String>]"
+file = "cert.ps1"
+snippet = '''
+New-SelfSignedCertificate -DnsName www.example.com -KeyAlgorithm RSA -KeyLength 1024 -CertStoreLocation Cert:\LocalMachine\My
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", algorithm = "RSA", key_size = 1024, line = 1}}]}
+
+[[ecosystems.spellings]]
+id = "newselfsigned-splat"
+spelling = "$params = @{ KeyAlgorithm = 'RSA'; KeyLength = 1024 }; New-SelfSignedCertificate @params"
+source = "https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate"
+quote = "KeyAlgorithm = 'RSA' KeyLength = 2048"
+file = "cert.ps1"
+snippet = '''
+$params = @{
+  Subject = 'CN=www.example.com'
+  KeyAlgorithm = 'RSA'
+  KeyLength = 1024
+}
+New-SelfSignedCertificate @params
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "newselfsigned-ecdsa-curve"
+spelling = "KeyAlgorithm = 'ECDSA_nistP384'"
+source = "https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate"
+quote = "KeyAlgorithm = 'ECDSA_nistP256'"
+file = "cert.ps1"
+snippet = '''
+$params = @{
+  Subject = 'CN=www.example.com'
+  KeyAlgorithm = 'ECDSA_nistP384'
+}
+New-SelfSignedCertificate @params
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", algorithm = "ECDSA", key_size = 384, line = 3, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "powershell-backtick-continuation"
+spelling = "New-SelfSignedCertificate ... `<newline> -KeyLength 512"
+source = "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_parsing"
+quote = "The backtick character can also be used at the end of a line to allow you to continue the input on the next line."
+file = "cert.ps1"
+snippet = '''
+New-SelfSignedCertificate -DnsName www.example.com `
+  -KeyAlgorithm RSA `
+  -KeyLength 512
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", algorithm = "RSA", key_size = 512}}]}
+
+[[ecosystems.spellings]]
+id = "schannel-dh-clientminkeybitlength"
+spelling = "KeyExchangeAlgorithms\\Diffie-Hellman ClientMinKeyBitLength"
+source = "https://learn.microsoft.com/en-us/windows-server/security/tls/tls-registry-settings"
+quote = "To specify a minimum supported range of Diffie-Hellman key bit length for the TLS client, create a ClientMinKeyBitLength entry."
+file = "schannel.reg"
+snippet = '''
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\KeyExchangeAlgorithms\Diffie-Hellman]
+"ClientMinKeyBitLength"=dword:00000400
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "schannel.reg", algorithm = "DH", key_size = 1024, line = 4}}]}
+
+[[ecosystems.spellings]]
+id = "schannel-pkcs-clientminkeybitlength"
+spelling = "KeyExchangeAlgorithms\\PKCS ClientMinKeyBitLength"
+source = "https://learn.microsoft.com/en-us/windows-server/security/tls/tls-registry-settings"
+quote = "To specify a minimum supported range of RSA key bit length for the TLS client, create a ClientMinKeyBitLength entry."
+file = "schannel.reg"
+snippet = '''
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\KeyExchangeAlgorithms\PKCS]
+"ClientMinKeyBitLength"=dword:00000800
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "schannel.reg", algorithm = "RSA", key_size = 2048, line = 4}}]}
+
+[[ecosystems.spellings]]
+id = "schannel-dh-serverminkeybitlength"
+spelling = "KeyExchangeAlgorithms\\Diffie-Hellman ServerMinKeyBitLength"
+source = "none"
+quote = ""
+file = "schannel.reg"
+snippet = '''
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\KeyExchangeAlgorithms\Diffie-Hellman]
+"ServerMinKeyBitLength"=dword:00000800
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "schannel.reg", algorithm = "DH", key_size = 2048, line = 4}}]}
+
+[[ecosystems]]
+ecosystem = "PKI"
+scope = "Certificates, SPKI and PKCS#8 keys and CSRs in PEM and DER for RSA, DSA and NIST EC; OpenSSH ssh-rsa and ecdsa-sha2 public keys; JWK RSA n, EC crv, OKP crv; cfssl key and Fabric CA csr.keyrequest. Not covered: encrypted keys and PKCS#12 (the size is behind a password), XML RSAKeyValue, the small-private-scalar check of rows 32/51/154/155 (a property of the key, not a spelling), JWK x5c chains."
+
+[[ecosystems.spellings]]
+id = "cert-pem-rsa1024"
+spelling = "CERTIFICATE (RSA 1024)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN CERTIFICATE-----"
+file = "server.crt"
+material = "CERT_RSA1024_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {path = "server.crt", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "cert-der-rsa1024"
+spelling = "CERTIFICATE (RSA 1024)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN CERTIFICATE-----"
+file = "server.der"
+material = "CERT_RSA1024_DER"
+expect = {rows = [{at = "evidence.source_code", match = {path = "server.der", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "cert-pem-ec384"
+spelling = "CERTIFICATE (EC 384)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN CERTIFICATE-----"
+file = "server-ec.crt"
+material = "CERT_EC384_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {path = "server-ec.crt", algorithm = "EC", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "spki-pem-rsa1024"
+spelling = "PUBLIC KEY (RSA 1024)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN PUBLIC KEY-----"
+file = "key.pub.pem"
+material = "RSA1024_SPKI_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pub.pem", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "spki-pem-ec521"
+spelling = "PUBLIC KEY (EC 521)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN PUBLIC KEY-----"
+file = "key-ec.pub.pem"
+material = "EC521_SPKI_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key-ec.pub.pem", algorithm = "EC", key_size = 521, curve = "P-521"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs8-pem-rsa1024"
+spelling = "PRIVATE KEY (RSA 1024)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN PRIVATE KEY-----"
+file = "key.pem"
+material = "RSA1024_PKCS8_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs8-pem-dsa1024"
+spelling = "PRIVATE KEY (DSA 1024)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN PRIVATE KEY-----"
+file = "dsa.pem"
+material = "DSA1024_PKCS8_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {path = "dsa.pem", algorithm = "DSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs8-pem-ec384"
+spelling = "PRIVATE KEY (EC 384)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN PRIVATE KEY-----"
+file = "ec.pem"
+material = "EC384_PKCS8_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {path = "ec.pem", algorithm = "EC", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "csr-pem-ec384"
+spelling = "CERTIFICATE REQUEST (EC 384)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = "-----BEGIN CERTIFICATE REQUEST-----"
+file = "req.csr"
+material = "CSR_EC384_PEM"
+expect = {rows = [{at = "evidence.source_code", match = {path = "req.csr", algorithm = "EC", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "openssh-public-rsa1024"
+spelling = "ssh-rsa AAAA... (1024-bit modulus)"
+source = "https://www.rfc-editor.org/rfc/rfc4253.txt"
+quote = "The \"ssh-rsa\" key format has the following specific encoding:"
+file = "id_rsa.pub"
+material = "RSA1024_OPENSSH_PUBLIC"
+expect = {rows = [{at = "evidence.source_code", match = {path = "id_rsa.pub", algorithm = "RSA", key_size = 1024, line = 1}}]}
+
+[[ecosystems.spellings]]
+id = "openssh-public-ec384"
+spelling = "ecdsa-sha2-nistp384 AAAA..."
+source = "https://www.rfc-editor.org/rfc/rfc5656.txt"
+quote = "The \"ecdsa-sha2-*\" key formats all have the following encoding:"
+file = "id_ecdsa.pub"
+material = "EC384_OPENSSH_PUBLIC"
+expect = {rows = [{at = "evidence.source_code", match = {path = "id_ecdsa.pub", algorithm = "ECDSA", key_size = 384, line = 1, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-rsa-n"
+spelling = "{\"kty\": \"RSA\", \"n\": <1024-bit modulus>}"
+source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+quote = "The \"n\" (modulus) parameter contains the modulus value for the RSA public key."
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {"kty": "RSA", "kid": "k1", "n": "{{RSA1024_JWK_N}}", "e": "AQAB"}
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", algorithm = "RSA", key_size = 1024, line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-rsa-n-multiline"
+spelling = "\"kty\": \"RSA\" and \"n\" on their own lines"
+source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+quote = "The \"n\" (modulus) parameter contains the modulus value for the RSA public key."
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "k1",
+      "n": "{{RSA1024_JWK_N}}",
+      "e": "AQAB"
+    }
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-ec-p-256"
+spelling = "{\"kty\": \"EC\", \"crv\": \"P-256\"}"
+source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+quote = "\"P-256\""
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {"kty": "EC", "kid": "k1", "crv": "P-256", "x": "AA", "y": "AA"}
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", algorithm = "EC", key_size = 256, line = 3, curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-ec-p-384"
+spelling = "{\"kty\": \"EC\", \"crv\": \"P-384\"}"
+source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+quote = "\"P-384\""
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {"kty": "EC", "kid": "k1", "crv": "P-384", "x": "AA", "y": "AA"}
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", algorithm = "EC", key_size = 384, line = 3, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-ec-p-521"
+spelling = "{\"kty\": \"EC\", \"crv\": \"P-521\"}"
+source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+quote = "\"P-521\""
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {"kty": "EC", "kid": "k1", "crv": "P-521", "x": "AA", "y": "AA"}
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", algorithm = "EC", key_size = 521, line = 3, curve = "P-521"}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-okp-ed25519"
+spelling = "{\"kty\": \"OKP\", \"crv\": \"Ed25519\"}"
+source = "https://www.rfc-editor.org/rfc/rfc8037.txt"
+quote = "The parameter \"crv\" MUST be present and contain the subtype of the key"
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {"kty": "OKP", "kid": "k1", "crv": "Ed25519", "x": "AA"}
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", line = 3, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-okp-ed448"
+spelling = "{\"kty\": \"OKP\", \"crv\": \"Ed448\"}"
+source = "https://www.rfc-editor.org/rfc/rfc8037.txt"
+quote = "The parameter \"crv\" MUST be present and contain the subtype of the key"
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {"kty": "OKP", "kid": "k1", "crv": "Ed448", "x": "AA"}
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", line = 3, algorithm = "Ed448"}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-okp-x25519"
+spelling = "{\"kty\": \"OKP\", \"crv\": \"X25519\"}"
+source = "https://www.rfc-editor.org/rfc/rfc8037.txt"
+quote = "The parameter \"crv\" MUST be present and contain the subtype of the key"
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {"kty": "OKP", "kid": "k1", "crv": "X25519", "x": "AA"}
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", line = 3, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "jwk-okp-x448"
+spelling = "{\"kty\": \"OKP\", \"crv\": \"X448\"}"
+source = "https://www.rfc-editor.org/rfc/rfc8037.txt"
+quote = "The parameter \"crv\" MUST be present and contain the subtype of the key"
+file = "jwks.json"
+snippet = '''
+{
+  "keys": [
+    {"kty": "OKP", "kid": "k1", "crv": "X448", "x": "AA"}
+  ]
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", line = 3, algorithm = "X448"}}]}
+
+[[ecosystems.spellings]]
+id = "cfssl-key-rsa"
+spelling = "\"key\": {\"algo\": \"rsa\", \"size\": 1024}"
+source = "https://raw.githubusercontent.com/cloudflare/cfssl/master/README.md"
+quote = "\"key\": { \"algo\": \"rsa\", \"size\": 2048 }"
+file = "csr.json"
+snippet = '''
+{
+  "CN": "example.com",
+  "key": {
+    "algo": "rsa",
+    "size": 1024
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "csr.json", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "fabric-ca-keyrequest-rsa"
+spelling = "csr.keyrequest.algo: rsa, size: 1024"
+source = "https://hyperledger-fabric-ca.readthedocs.io/en/latest/serverconfig.html"
+quote = "keyrequest : algo : ecdsa size : 256"
+file = "fabric-ca-server-config.yaml"
+snippet = '''
+csr:
+  cn: ca.example.com
+  keyrequest:
+    algo: rsa
+    size: 1024
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "fabric-ca-server-config.yaml", algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "cfssl-key-ecdsa"
+spelling = "\"key\": {\"algo\": \"ecdsa\", \"size\": 384}"
+source = "https://raw.githubusercontent.com/cloudflare/cfssl/master/README.md"
+quote = "\"key\": { \"algo\": \"rsa\", \"size\": 2048 }"
+file = "csr.json"
+snippet = '''
+{
+  "CN": "example.com",
+  "key": {
+    "algo": "ecdsa",
+    "size": 384
+  }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "csr.json", algorithm = "ECDSA", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "fabric-ca-keyrequest-ecdsa"
+spelling = "csr.keyrequest.algo: ecdsa, size: 384"
+source = "https://hyperledger-fabric-ca.readthedocs.io/en/latest/serverconfig.html"
+quote = "keyrequest : algo : ecdsa size : 256"
+file = "fabric-ca-server-config.yaml"
+snippet = '''
+csr:
+  cn: ca.example.com
+  keyrequest:
+    algo: ecdsa
+    size: 384
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "fabric-ca-server-config.yaml", algorithm = "ECDSA", key_size = 384, curve = "P-384"}}]}
