@@ -5569,7 +5569,8 @@ _NIST_CURVE = re.compile(
     # Not `P256K1`: AWS KMS's ECC_SECG_P256K1 is secp256k1 (row 528, audit #10).
     r"(?<![A-Za-z0-9])(?:secp(256|384|521)r1|prime(256)v1|(?:nist)?[_-]?p-?(256|384|521))"
     r"(?![0-9]|[Kk]1)|"
-    r"(?<![A-Za-z])ecp(256|384|521)(?![0-9])",
+    # Not ecp256bp: brainpoolP256r1 (IANA group 28), below.
+    r"(?<![A-Za-z])ecp(256|384|521)(?![0-9]|bp)",
     re.IGNORECASE)
 
 
@@ -5600,6 +5601,12 @@ def _tag_curves(items: list[dict[str, Any]]) -> None:
                 found.add("secp256k1")
             if len(found) == 1:
                 item["curve"] = found.pop()
+        # strongSwan's keywords for the groups no NIST name above covers (ecp192, ecp224, the
+        # Brainpool ecpNNNbp): the curve and size of their IANA group (ike.STRONGSWAN_GROUPS).
+        if not item.get("curve") and "key_size" not in item:
+            group = ike.keyword_group(item.get("excerpt") or "")
+            if group and group[0] == "ECDH":
+                item["curve"], item["key_size"] = group[3], group[2]
         # Row 435: a NIST prime curve on the row is its size, so it reaches the finding and
         # `algorithm_key_sizes` as the suite rows' P-256 already did.
         if item.get("curve") in _CURVE_SIZE and "key_size" not in item:
@@ -6133,7 +6140,7 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         _ssh_public_keys(src, lines)
         # The IKE and setting rows say more than a generic row on the same line (its size,
         # the setting), so they replace it rather than sit beside it.
-        ike_rows = (ike.scan_groups(lines) + ike.scan_auth(lines)
+        ike_rows = (ike.scan_groups(lines) + ike.scan_auth(lines) + ike.scan_libreswan(lines)
                     + config_values.scan(path.name, lines))
         if dnssec.KEY_FILE_NAME.match(path.name) and path.suffix == ".private":
             private_rows = dnssec.private_key_file(lines)

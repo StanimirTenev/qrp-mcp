@@ -192,6 +192,69 @@ IKE_GROUPS: dict[int, tuple[str, str, int | None, str | None]] = {
     32: ("X448", "Curve448", None, None),
 }
 
+# The same groups by the keyword strongSwan writes in a proposal (proposals page, "Key Exchange
+# Methods", https://docs.strongswan.org/docs/latest/config/proposals.html, read 18.11.2026): each
+# keyword's row there gives its IANA number, e.g. "ecp256bp | 256 bits | 28", "curve25519 or
+# x25519 | 256 bits | 31". Libreswan writes `dhN` for group N (ipsec.conf(5): "For all
+# Diffie-Hellman groups, the "dh" keyword can be used instead of the "modp" keyword", "Curve25519
+# ... is supported as "dh31"").
+STRONGSWAN_GROUPS = {
+    "modp768": 1, "modp1024": 2, "modp1536": 5, "modp2048": 14, "modp3072": 15, "modp4096": 16,
+    "modp6144": 17, "modp8192": 18, "modp1024s160": 22, "modp2048s224": 23, "modp2048s256": 24,
+    "ecp192": 25, "ecp224": 26, "ecp256": 19, "ecp384": 20, "ecp521": 21, "ecp224bp": 27,
+    "ecp256bp": 28, "ecp384bp": 29, "ecp512bp": 30, "curve25519": 31, "x25519": 31,
+    "curve448": 32, "x448": 32,
+}
+_KEYWORD = re.compile(r"(?<![A-Za-z0-9])(%s)(?![A-Za-z0-9])"
+                      % "|".join(sorted(STRONGSWAN_GROUPS, key=len, reverse=True)), re.I)
+
+
+def keyword_group(text: str) -> tuple[str, str, int | None, str | None] | None:
+    """The IKE group a line names by strongSwan keyword, when it names exactly one."""
+    found = {STRONGSWAN_GROUPS[m.group(1).lower()] for m in _KEYWORD.finditer(text)}
+    return IKE_GROUPS[found.pop()] if len(found) == 1 else None
+
+
+_LIBRESWAN_ALG = re.compile(r"^\s*(?:ike|esp|ah|phase2alg)\s*=\s*(\S+)", re.I)
+_LIBRESWAN_DH = re.compile(r"(?<![A-Za-z0-9])(?:dh(\d+)|(modp\d+(?:s\d+)?))(?![A-Za-z0-9])", re.I)
+
+
+def scan_libreswan(lines: list[str]) -> list[dict[str, Any]]:
+    """Libreswan `ike=`/`esp=` lines that name a group as `dhN`: one row per family on the line,
+    with the weakest size the line offers (as key_size_on_line reads modp lines)."""
+    out: list[dict[str, Any]] = []
+    for number, line in enumerate(lines, 1):
+        match = _LIBRESWAN_ALG.match(line.split("#", 1)[0])
+        if not match:
+            continue
+        groups = []
+        for m in _LIBRESWAN_DH.finditer(match.group(1)):
+            n = int(m.group(1)) if m.group(1) else STRONGSWAN_GROUPS.get(m.group(2).lower())
+            if n in IKE_GROUPS:
+                groups.append((n, m.group(0)))
+        if not any(word.lower().startswith("dh") for _, word in groups):
+            continue
+        by_family: dict[str, list[tuple[int, str]]] = {}
+        for n, word in groups:
+            by_family.setdefault(IKE_GROUPS[n][0], []).append((n, word))
+        for family, named in by_family.items():
+            sized = [(IKE_GROUPS[n][2], n, w) for n, w in named if IKE_GROUPS[n][2]]
+            n, word = min(sized)[1:] if sized else named[0]
+            _family, name, size, curve = IKE_GROUPS[n]
+            item: dict[str, Any] = {
+                "line": number, "algorithm": family, "ike_group": n,
+                "description": (f"IKE key exchange group {n} ({name}, IANA IKEv2 Transform "
+                                f"Type 4), named by Libreswan `{word}`"),
+                "excerpt": line.strip()[:200], "evidence_kind": "declaration",
+            }
+            if size:
+                item["key_size"] = size
+            if curve and len(named) == 1:
+                item["curve"] = curve
+            out.append(item)
+    return out
+
+
 _FORTIOS_DHGRP = re.compile(r"^\s*set\s+dhgrp\s+(\d+(?:\s+\d+)*)\s*$", re.I)
 _JUNOS_GROUP = re.compile(r"(?:\bdh-group\s+|\bperfect-forward-secrecy\s+keys\s+|^\s*keys\s+)"
                           r"group(\d+)\s*;?\s*$", re.I)
