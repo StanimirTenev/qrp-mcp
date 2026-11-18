@@ -2,7 +2,11 @@
 description: Inventory the cryptography in a codebase that a quantum computer would break, and report what the scan could not read. Use when asked about post-quantum readiness, cryptographic inventory, a CBOM, or which algorithms a project signs with.
 ---
 
-# Cryptographic inventory
+# Post-quantum readiness scan
+
+qrp-mcp is an adaptive post-quantum readiness scanner. It closes each operation it claims, tests
+every documented spelling, proposes new spellings from the libraries' own documentation, and
+carries its coverage and limits inside the CBOM.
 
 Scan the directory the user names with the `scan_repo` tool from the `qrp` MCP server. If they
 name none, scan the current working directory.
@@ -37,6 +41,12 @@ If the skipped list contains something that could hold cryptography — `.env`, 
 `.json`, a Dockerfile, a binary — say so, and offer to look at those files yourself. You are
 holding the tree; the scanner is not. That question is the one thing you can answer that it
 cannot.
+
+**4. Where the scan may miss.** If `ecosystems` lists an ecosystem as `not_closed` or
+`partially_closed`, give its `may_miss` sentence as written, and name the first items of
+`where_to_look`. Do not call an ecosystem covered because the scan found nothing in it: even
+`closed` says no more than that this version tests the documented spellings of every operation in which
+a gap has been recorded for that ecosystem.
 
 Then stop.
 

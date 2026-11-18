@@ -139,6 +139,15 @@ def scan_repo(
     `coverage.suppressed`; a marker past its `until=YYYY-MM-DD` no longer applies and is
     listed as expired.
 
+    The result also says where this version may miss, read from the finished result
+    without changing any row: `operation_closure` (the (operation, ecosystem) pairs whose
+    documented spellings this version tests one by one), `ecosystems` (each ecosystem of
+    the files read, closed, partially closed or not closed against that catalogue),
+    `angles` (dependency, code and configuration where they disagree),
+    `chosen_outside_files.leads` (includes and key paths followed to the files read) and
+    `where_to_look`. None of these enters the findings or their fingerprint, and the CBOM
+    from `export_cbom` does not carry them.
+
     Cost scales with the size of the tree, so a large monorepo takes proportionally
     longer; there is no cache and no partial mode.
 

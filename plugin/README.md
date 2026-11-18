@@ -1,4 +1,8 @@
-# QRP cryptographic inventory — Claude Code plugin
+# QRP post-quantum readiness scanner — Claude Code plugin
+
+An adaptive post-quantum readiness scanner. It closes each operation it claims, tests every
+documented spelling, proposes new spellings from the libraries' own documentation, and carries its
+coverage and limits inside the CBOM.
 
 Wraps the [`qrp-mcp`](https://github.com/StanimirTenev/qrp-mcp) server as an installable
 Claude Code plugin: one MCP server and one skill, `/qrp:pqc-scan`.

@@ -2,8 +2,9 @@
 
 <!-- mcp-name: eu.quantumreadiness/qrp-mcp -->
 
-**A local cryptographic inventory for developers and AI agents that carries verifiable coverage
-and its own limits inside the CBOM.**
+**An adaptive post-quantum readiness scanner.** It closes each operation it claims, tests every
+documented spelling, proposes new spellings from the libraries' own documentation, and carries its
+coverage and limits inside the CBOM.
 
 Every signature in your wallet, contract and validator rests on elliptic-curve cryptography, and
 a large quantum computer breaks it. Plenty of tools will tell you what they found. This one also
@@ -254,6 +255,57 @@ the K - J list; the families on one side only; and a Go binary's `DefaultGODEBUG
 settings as recorded. It reads only tables the toolchain wrote (`*.deps.json`, .NET metadata
 names, `go version -m`, `go tool nm`), never code, and never a key size from the build —
 **robustness on known patterns**, not recall or coverage of the build. [Source against build](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/build-gap.md).
+
+## How it adapts
+
+"Adaptive" means one thing here: what the scanner claims is tested against the documentation of
+the libraries and formats it claims, and that documentation is re-read for spellings it does not
+know yet. The scan itself stays deterministic and offline. Nothing is learned at run time, and no
+rule enters the scanner without a source and a test.
+
+- **An operation is closed, not a line.** For each (operation, ecosystem) pair it claims, the
+  package carries a catalogue of the documented spellings (`src/qrp_mcp/data/operations/*.toml`),
+  each with the page it comes from and the words quoted from it. Every spelling is a test: it is
+  written to a file, scanned, and expected on its line (`tests/test_operation_closure.py`). In
+  0.50.0 the catalogue holds 10 pairs and 1,261 sourced spellings: IKE/IPsec, the public-key names
+  of seven C libraries, key files and key sizes in PKI, key sizes in .NET, TLS endpoints and TLS
+  groups in nginx-style configuration, SSH algorithms, liboqs and hash-based signatures in C, and
+  Python dependencies and environment reads.
+- **`operation_closure`** in the result lists those pairs, with `spellings_count` and the
+  catalogue version. It says what this version was tested against, not what your code contains.
+  It does not enter the findings, their fingerprint, a gate or the exit code.
+- **`ecosystems`, `angles`, `chosen_outside_files.leads`, `where_to_look`.** These sections
+  are read from the finished result and change no row of it:
+  - `ecosystems` names every ecosystem among the files read, with the rule that put it there, and
+    says `closed`, `partially_closed` or `not_closed` against the catalogue, with "here we may
+    miss" where it is not closed;
+  - `angles` sets dependency, code and configuration against each other: "declared, not seen",
+    "seen, not declared", and `not_compared` where the imports of an ecosystem are not read (Go,
+    Rust, Java, .NET, Ruby, PHP);
+  - `leads` follows an `include`, a key file path or a key path read from the environment to the
+    files read, and says where each one ends (`followed`, `outside_the_tree`, `not_found`,
+    `templated`, `read_at_run_time`, ...). Nothing new is opened, so a lead adds no finding;
+  - `where_to_look` puts the three in one list, production code first.
+
+  `operation_closure` and these four sections are in the scan JSON, the `scan_repo` tool and
+  `scan --out`. The CBOM and SARIF do not carry them.
+- **Self-tuning, for the maintainer.** `tools/catalogue_refresh.py` is in the repository, not in
+  the installed package, and is run by hand. It fetches each page the catalogue cites (or reads a
+  saved copy with `--pages`), looks for names with that page's own pattern, and writes what the
+  catalogue does not hold as candidates. Each candidate is an expected-failure test
+  (`tests/test_operation_candidates.py`). Every page also carries a positive control (a name the
+  catalogue knows, which must be read) and a negative one (a name that exists nowhere, which must
+  not be). A page where the negative control is read is named as not discriminating, and its
+  candidates are not run.
+
+**The boundary.** Self-tuning proposes; a person or an agent confirms, with a source and a
+quotation, and after that a candidate becomes a closure test. In the first judged round, of
+the 119 candidates the scanner was silent on, 21 were real spellings of their operation and 12 of
+those were gaps the scanner missed (they are closed in 0.50.0); the other candidates were noise or
+unclear. That figure is for those 119, not for all the candidates. Under the strict rule no
+ecosystem is `closed` today: an ecosystem is closed when the catalogue holds every operation
+in which a gap has been recorded for it, and PKI, the nearest, still lacks one. A spelling the
+documentation does not list, or a page the catalogue does not cite, can still be missed.
 
 ## What it reads
 

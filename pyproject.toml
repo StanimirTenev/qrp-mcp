@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "qrp-mcp"
 version = "0.49.0"
-description = "A local cryptographic inventory for developers and AI agents that carries verifiable coverage and its own limits inside the CBOM"
+description = "An adaptive post-quantum readiness scanner. It closes each operation it claims, tests every documented spelling, proposes new spellings from the libraries' own documentation, and carries its coverage and limits inside the CBOM"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
