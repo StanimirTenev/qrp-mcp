@@ -2,14 +2,15 @@
 # terminates, whether the peer's certificate is verified, and which trust anchor verifies it. Pages
 # fetched 18.11.2026. `expect` follows the page: a `*_ssl_verify` directive that is off -- or absent,
 # where the page gives off as the default -- is a TLS hop that is not authenticated; a
-# `*_trusted_certificate` or `ca-file` is a trust store.
+# `*_trusted_certificate` or `ca-file` is a trust store; `ssl_verify_client` is the check of the client's
+# certificate, reported as written (on, optional, and off for optional_no_ca and off).
 
 operation = "tlsend"
 catalogue_version = "1"
 
 [[ecosystems]]
 ecosystem = "nginx"
-scope = "nginx http/stream listen ssl, proxy/grpc/uwsgi ssl_verify and *_ssl_trusted_certificate, ssl_client_certificate, ssl_trusted_certificate; HAProxy bind ssl, verify none (server, default-server, ssl-server-verify), server ca-file; Caddy reverse_proxy tls_insecure_skip_verify. Not covered: ssl_verify_client optional_no_ca, the upstream direction of *_ssl_protocols (row 193), Envoy, Traefik, listen quic, grpc/uwsgi verification by default."
+scope = "nginx http/stream listen ssl, proxy/grpc/uwsgi ssl_verify and *_ssl_trusted_certificate, ssl_client_certificate, ssl_trusted_certificate, ssl_verify_client as written; HAProxy bind ssl, verify none (server, default-server, ssl-server-verify), server ca-file; Caddy reverse_proxy tls_insecure_skip_verify. Not covered: ssl_verify_client by default (off), HAProxy bind verify (the client side), the upstream direction of *_ssl_protocols (row 193), Envoy, Traefik, listen quic, grpc/uwsgi verification by default."
 
 [[ecosystems.spellings]]
 id = "nginx-http-listen-ssl"
@@ -199,6 +200,74 @@ example.com {
 }
 '''
 expect = {rows = [{at = "evidence.protocols", match = {line = 4, basis = "configured_verification", peer_verification = "off"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-verify-client-on"
+spelling = "ssl_verify_client on"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "Enables verification of client certificates."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_client_certificate /etc/ssl/clients-ca.pem;
+    ssl_verify_client on;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 5, basis = "configured_verification", peer_verification = "on", verification_setting = "ssl_verify_client on"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-verify-client-optional"
+spelling = "ssl_verify_client optional"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "The optional parameter (0.8.7+) requests the client certificate and verifies it if the certificate is present."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_client_certificate /etc/ssl/clients-ca.pem;
+    ssl_verify_client optional;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 5, basis = "configured_verification", peer_verification = "optional", verification_setting = "ssl_verify_client optional"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-verify-client-optional-no-ca"
+spelling = "ssl_verify_client optional_no_ca"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "requests the client certificate but does not require it to be signed by a trusted CA certificate."
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_client_certificate /etc/ssl/clients-ca.pem;
+    ssl_verify_client optional_no_ca;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 5, basis = "configured_verification", peer_verification = "off", verification_setting = "ssl_verify_client optional_no_ca"}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-ssl-verify-client-off"
+spelling = "ssl_verify_client off"
+source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
+quote = "Syntax: ssl_verify_client on | off | optional | optional_no_ca ; Default: ssl_verify_client off;"
+file = "nginx.conf"
+snippet = '''
+http {
+  server {
+    listen 443 ssl;
+    ssl_client_certificate /etc/ssl/clients-ca.pem;
+    ssl_verify_client off;
+  }
+}
+'''
+expect = {rows = [{at = "evidence.protocols", match = {line = 5, basis = "configured_verification", peer_verification = "off", verification_setting = "ssl_verify_client off"}}]}
 
 [[ecosystems.spellings]]
 id = "nginx-ssl-client-certificate"

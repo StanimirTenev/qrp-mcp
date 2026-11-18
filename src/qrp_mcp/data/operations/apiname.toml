@@ -1661,6 +1661,45 @@ CK_MECHANISM m = { CKM_EC_MONTGOMERY_KEY_PAIR_GEN, NULL, 0 };
 expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "EC"}}]}
 
 [[ecosystems.spellings]]
+id = "pkcs-11-ckm-xeddsa"
+spelling = "CKM_XEDDSA"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_XEDDSA"
+meaning_source = "https://signal.org/docs/specifications/xeddsa/"
+meaning_quote = "public key and private key formats initially defined for the X25519 and X448 elliptic curve Diffie-Hellman functions"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_XEDDSA, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "XEdDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-x3dh-initialize"
+spelling = "CKM_X3DH_INITIALIZE"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_X3DH_INITIALIZE"
+meaning_source = "https://signal.org/docs/specifications/x3dh/"
+meaning_quote = "The Elliptic Curve Diffie-Hellman function will be either the X25519 or X448 function"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_X3DH_INITIALIZE, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X3DH"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs-11-ckm-x3dh-respond"
+spelling = "CKM_X3DH_RESPOND"
+source = "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html"
+quote = "CKM_X3DH_RESPOND"
+meaning_source = "https://signal.org/docs/specifications/x3dh/"
+meaning_quote = "The Elliptic Curve Diffie-Hellman function will be either the X25519 or X448 function"
+file = "a.c"
+snippet = '''
+CK_MECHANISM m = { CKM_X3DH_RESPOND, NULL, 0 };
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "X3DH"}}]}
+
+[[ecosystems.spellings]]
 id = "gnutls-gnutls-pk-rsa"
 spelling = "GNUTLS_PK_RSA"
 source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
@@ -1813,6 +1852,84 @@ snippet = '''
 int alg = GNUTLS_SIGN_EDDSA_ED25519;
 '''
 expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-gost-01"
+spelling = "GNUTLS_PK_GOST_01"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_GOST_01"
+meaning_source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+meaning_quote = "GOST R 34.10-2001 algorithm per rfc5832."
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_GOST_01;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "GOST R 34.10"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-gost-12-256"
+spelling = "GNUTLS_PK_GOST_12_256"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_GOST_12_256"
+meaning_source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+meaning_quote = "GOST R 34.10-2012 algorithm, 256-bit key per rfc7091."
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_GOST_12_256;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "GOST R 34.10"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-pk-gost-12-512"
+spelling = "GNUTLS_PK_GOST_12_512"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_PK_GOST_12_512"
+meaning_source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+meaning_quote = "GOST R 34.10-2012 algorithm, 512-bit key per rfc7091."
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_PK_GOST_12_512;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "GOST R 34.10"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-sign-gost-94"
+spelling = "GNUTLS_SIGN_GOST_94"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_SIGN_GOST_94"
+meaning_source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+meaning_quote = "Digital signature algorithm GOST R 34.10-2001 with GOST R 34.11-94"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_SIGN_GOST_94;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "GOST R 34.10"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-sign-gost-256"
+spelling = "GNUTLS_SIGN_GOST_256"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_SIGN_GOST_256"
+meaning_source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+meaning_quote = "Digital signature algorithm GOST R 34.10-2012 with GOST R 34.11-2012 256 bit"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_SIGN_GOST_256;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "GOST R 34.10"}}]}
+
+[[ecosystems.spellings]]
+id = "gnutls-gnutls-sign-gost-512"
+spelling = "GNUTLS_SIGN_GOST_512"
+source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+quote = "GNUTLS_SIGN_GOST_512"
+meaning_source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
+meaning_quote = "Digital signature algorithm GOST R 34.10-2012 with GOST R 34.11-2012 512 bit"
+file = "a.c"
+snippet = '''
+int alg = GNUTLS_SIGN_GOST_512;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "GOST R 34.10"}}]}
 
 [[ecosystems.spellings]]
 id = "libgcrypt-gcry-pk-rsa"

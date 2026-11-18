@@ -11,7 +11,7 @@ catalogue_version = "1"
 
 [[ecosystems]]
 ecosystem = "NET"
-scope = "System.Security.Cryptography constructors and Create(int|ECCurve) of RSA, DSA, ECDsa, ECDiffieHellman and their Cng/CryptoServiceProvider/OpenSsl classes; ECCurve.NamedCurves; AsymmetricAlgorithm.KeySize set on the next line; BCryptGenerateKeyPair dwLength with the algorithm of the handle; CryptGenKey upper 16 bits; New-SelfSignedCertificate -KeyLength/-KeyAlgorithm, splatted and with backtick continuation; Schannel ClientMinKeyBitLength. Not covered: ImportParameters/ImportFromPem (the size comes from the key), CngKey.Create with CngKeyCreationParameters, ECCurve.CreateFromFriendlyName/CreateFromOid, certreq .inf files, Schannel ServerMinKeyBitLength (not on the fetched page)."
+scope = "System.Security.Cryptography constructors and Create(int|ECCurve) of RSA, DSA, ECDsa, ECDiffieHellman and their Cng/CryptoServiceProvider/OpenSsl classes; ECCurve.NamedCurves; AsymmetricAlgorithm.KeySize set on the next line; BCryptGenerateKeyPair dwLength with the algorithm of the handle; CryptGenKey upper 16 bits (CALG_RSA_*, CALG_DH_*); New-SelfSignedCertificate -KeyLength/-KeyAlgorithm, splatted and with backtick continuation; Schannel ClientMinKeyBitLength. Not covered: ImportParameters/ImportFromPem (the size comes from the key), CngKey.Create with CngKeyCreationParameters, ECCurve.CreateFromFriendlyName/CreateFromOid, certreq .inf files, Schannel ServerMinKeyBitLength (not on the fetched page)."
 
 [[ecosystems.spellings]]
 id = "rsa-create-int"
@@ -556,6 +556,32 @@ snippet = '''
 CryptGenKey(hProv, CALG_RSA_KEYX, 0x08000000, &hKey);
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 2048, line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "cryptgenkey-calg-dh-ephem"
+spelling = "CryptGenKey(hProv, CALG_DH_EPHEM, (2048 << 16) | CRYPT_EXPORTABLE, &hKey)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey"
+quote = "Specifies an \"Ephemeral\" Diffie-Hellman key."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <wincrypt.h>
+CryptGenKey(hProv, CALG_DH_EPHEM, (2048 << 16) | CRYPT_EXPORTABLE, &hKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = 2048, line = 3}}]}
+
+[[ecosystems.spellings]]
+id = "cryptgenkey-calg-dh-sf"
+spelling = "CryptGenKey(hProv, CALG_DH_SF, (2048 << 16) | CRYPT_EXPORTABLE, &hKey)"
+source = "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey"
+quote = "Specifies a \"Store and Forward\" Diffie-Hellman key."
+file = "keys.c"
+snippet = '''
+#include <windows.h>
+#include <wincrypt.h>
+CryptGenKey(hProv, CALG_DH_SF, (2048 << 16) | CRYPT_EXPORTABLE, &hKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = 2048, line = 3}}]}
 
 [[ecosystems.spellings]]
 id = "newselfsigned-keylength"
