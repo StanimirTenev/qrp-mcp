@@ -356,6 +356,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bRSACryptoServiceProvider\b|\bRSACng\b|\bRSAOpenSsl\b|\bRSA\.Create\b|"
         r"\bRSACertificateExtensions\b|\bGetRSAPublicKey\b|\bGetRSAPrivateKey\b|"
         r"\bCngAlgorithm\.Rsa\b|"                       # CngAlgorithm.cs, row 70
+        # CryptoAPI's CryptGenKey with an RSA algorithm id (Learn, CryptGenKey; row 373).
+        r"\bCryptGenKey\s*\([^,]*,\s*CALG_RSA_(?:KEYX|SIGN)\b|"
         r"-KeyAlgorithm\s+[\"']?RSA",
         re.IGNORECASE,
     )),
@@ -2377,8 +2379,14 @@ _KEY_SIZE = re.compile(
     # And RSAOpenSsl(int), and the (int dwKeySize, CspParameters) overload (learn.microsoft.com,
     # RSAOpenSsl and RSACryptoServiceProvider constructors; closure keysize/NET).
     r"\bRSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:RSACryptoServiceProvider|RSACng|RSAOpenSsl)\(\s*(\d{3,5})\s*[,)]|"
-    r"\bNew-SelfSignedCertificate\b[^\n]*?\s-KeyLength\s+(\d{3,5})\b|" + _SIZE_OPTIONS,
+    r"\bNew-SelfSignedCertificate\b[^\n]*?\s-KeyLength\s+(\d{3,5})\b|"
+    # Row 373: CryptGenKey's dwFlags, "the key size ... is set with the upper 16 bits": written
+    # as `(1024 << 16) | ...` or by the RSA1024BIT_KEY constant (Learn, CryptGenKey). The hex
+    # form is read in key_size_on_line.
+    r"\bCryptGenKey\s*\([^,]*,[^,]*,\s*\(?\s*(\d{3,5})\s*<<\s*16\b|\bRSA(\d{3,5})BIT_KEY\b|"
+    + _SIZE_OPTIONS,
     re.IGNORECASE)
+_CRYPTGENKEY_HEX = re.compile(r"\bCryptGenKey\s*\([^,]*,[^,]*,\s*0x([0-9A-Fa-f]{1,4})0000\b")
 # The same for DSA and DH (release 3d): only the forms that name no algorithm themselves.
 _KEY_SIZE_GENERIC = re.compile(
     r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|(?:\.|\b)initialize\(\s*(\d{3,5})\b|"
@@ -2403,6 +2411,10 @@ def key_size_on_line(line: str, family: str = "RSA") -> int | None:
         offered = [int(n) for n in _MODP_GROUP.findall(line) if int(n) in registry._SIZES]
         if offered:
             return min(offered)
+    if family == "RSA" and "CryptGenKey" in line:
+        hexed = _CRYPTGENKEY_HEX.search(line)
+        if hexed and int(hexed.group(1), 16) in registry._SIZES:
+            return int(hexed.group(1), 16)
     for m in (_KEY_SIZE if family == "RSA" else _KEY_SIZE_GENERIC).finditer(line):
         if family == "RSA" and _digest_in_a_name(m, line):
             continue
