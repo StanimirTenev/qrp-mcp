@@ -2,7 +2,7 @@
   "name": "qrp",
   "description": "An adaptive post-quantum readiness scanner. It closes each operation it claims, tests every documented spelling, proposes new spellings from the libraries' own documentation, and carries its coverage and limits inside the CBOM.",
   "icon": "./icon.png",
-  "version": "0.49.0",
+  "version": "0.50.0",
   "author": {
     "name": "Stanimir Tenev",
     "url": "https://quantumreadiness.eu"

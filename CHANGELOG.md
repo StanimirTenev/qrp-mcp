@@ -4,6 +4,101 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.50.0 (2026-11-18)
+
+**An adaptive post-quantum readiness scanner.** It closes each operation it claims, tests every
+documented spelling, proposes new spellings from the libraries' own documentation, and carries its
+coverage and limits inside the CBOM. This release changes how gaps are closed: by the operation and
+its documented spellings, not by the line a report named. The reasoning is in Tenev (2026),
+doi:10.5281/zenodo.24336932, now in `CITATION.cff`. The scan stays deterministic and offline.
+
+- **A catalogue of operations, kept as tests.** `src/qrp_mcp/data/operations/*.toml` holds, for
+  10 (operation, ecosystem) pairs, 1,261 documented spellings, each with its source page and the
+  words quoted from it (every quotation checked against a saved copy of its page: 1,261 found, 0
+  not found): IKE/IPsec; the public-key names of
+  OpenSSL, wolfCrypt, libsodium, Mbed TLS/PSA, PKCS#11, GnuTLS and Libgcrypt; key files and key
+  sizes in PKI; key sizes in .NET; TLS endpoints and TLS groups in nginx, HAProxy and Caddy; SSH
+  algorithms; liboqs, wolfSSL LMS/XMSS and hash-sigs; Python dependencies and environment reads.
+  Every spelling is written to a file,
+  scanned and expected on its line (`tests/test_operation_closure.py`). What each catalogue leaves
+  out is written in its `scope`.
+- **Gaps found before anyone reported them.** Run before the fixes, the closure tests failed on 48
+  spellings in the five pairs of the first stage and on 64 in the five of the second (47 -> 48 and 65 -> 64 after
+  expectations were corrected, each in its own commit). Each fix was then reverted on its own (by
+  hand where a later commit touches the same lines) and its cases went red again: the reds add up
+  to 48 and to 64. A further 12 came from the first judged round of
+  self-tuning (below). Among them: strongSwan and Libreswan group keywords with their IANA sizes and
+  curves (brainpool `ecpNNNbp` was reported as P-256/P-384), peer authentication in Libreswan and
+  strongSwan, WireGuard peer lists, Libgcrypt S-expressions, libsodium `crypto_sign*`, `.crl`
+  files, RFC 4716 SSH2 public keys, private keys in DER, nginx's upstream trust stores and
+  verification (`proxy_/grpc_/uwsgi_ssl_*`, the default `off`), HAProxy `ca-file`, Caddy
+  `tls_insecure_skip_verify`, setup.cfg/setup.py and hashed requirements, `os.environb`, .NET
+  sizes in the constructors, `KeySize` on a later line, CNG and CryptoAPI sizes, Brainpool curves,
+  Schannel `ClientMinKeyBitLength`, the size of an `ssh-rsa` line, the P-256 half of
+  `mlkem768nistp256-sha256`, liboqs's UOV strings and every hash-sigs entry point.
+- **`operation_closure`** in the result: the pairs this version tests, with `spellings_count` and
+  `catalogue_version`. A statement about this version's tests, not about the scanned code; not in
+  the findings, their fingerprint, a gate or the exit code (pinned by a test that scans one tree
+  with the catalogue and with an empty one).
+- **Adaptive sections** (`src/qrp_mcp/adaptive.py`), read from the finished result, changing no row
+  of it: `ecosystems` (each ecosystem of the files read, by named rules, `closed` /
+  `partially_closed` / `not_closed` against the catalogue, with "here we may miss"), `angles`
+  ("declared, not seen", "seen, not declared", `not_compared` for Go, Rust, Java, .NET, Ruby, PHP),
+  `chosen_outside_files.leads` (include, key file path, key path from the environment, each
+  followed to the files read or said to end outside the tree, not found, templated or read at run
+  time) and `where_to_look` (the three in one list, production code first). `places` and `count`
+  of `chosen_outside_files` are byte for byte what they were. In the scan JSON, `scan_repo` and
+  `scan --out`; the CBOM and SARIF do not carry `operation_closure` or these sections.
+  **Under the strict rule no ecosystem is `closed` today**: an ecosystem is closed when the
+  catalogue holds every operation in which a gap has been recorded for it (the fix list labelled on
+  18.11), and PKI, the nearest, lacks `pqc`.
+- **Self-tuning, the maintainer's self-audit tool.** `tools/catalogue_refresh.py`, in the repository
+  and not in the installed package, run by hand: it fetches each page the catalogue cites (or
+  reads saved copies, `--pages`), applies that page's own pattern, and writes the names the
+  catalogue lacks to `tests/fixtures/operation_candidates.json`; each is an expected-failure test.
+  Each of the 52 source entries carries a positive and a negative control; an entry whose negative
+  control is read says `discriminates = false` and its candidates are skipped. A test pins the
+  candidates file to the one the catalogue gives. It proposes; a person or an agent confirms with
+  a source and a quotation. In the first judged round, of the 119 candidates the scanner was silent
+  on, 21 were real spellings and 12 were gaps the scanner missed; the rest were noise (89) or
+  unclear (9). That figure is for those 119, not for the other candidates.
+- **The 12 gaps of that round, closed.** GnuTLS `GNUTLS_PK_GOST_01/12_256/12_512` and
+  `GNUTLS_SIGN_GOST_94/256/512` are GOST R 34.10; `CryptGenKey` with `CALG_DH_EPHEM`/`CALG_DH_SF`
+  is DH with its size; nginx `ssl_verify_client` is a `configured_verification` row with its value
+  (`on`, `optional`; `optional_no_ca` and `off` read as `off`); PKCS#11 `CKM_XEDDSA`,
+  `CKM_X3DH_INITIALIZE`, `CKM_X3DH_RESPOND`.
+- **New families XEdDSA and X3DH.** XEdDSA is a signature, X3DH a key agreement; both are
+  classical and quantum-vulnerable (Montgomery-curve keys, PKCS#11 3.1 §6.3.15 and §6.5.2; Signal's
+  XEdDSA and X3DH specifications). Replacements ML-DSA/SLH-DSA and ML-KEM; CBOM `signature` and
+  `key-agree`, nistQuantumSecurityLevel 0. No classical security level is given: the mechanism does
+  not say which of the two curves it is.
+
+What changes for an existing user:
+
+- **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
+  `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
+  A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the
+  directive's name alone (`tests/test_row_491_algorithm_named_in_a_path.py`; what row 491 pins,
+  ML-DSA-65 and ECDSA-P-256 from the path, is unchanged).
+- **`findings_fingerprint` moves** where the new and changed rows appear. On the positive control
+  (OpenSSH 7fe3b24, certbot 56ee049, Vault 41e571b, 0.49.0 against this release): OpenSSH 71 -> 72
+  findings (+1 XEdDSA, `pkcs11.h:817`), four `CKK/CKM_EC_EDWARDS` rows EC -> EdDSA, sizes on 13
+  `.pub` files and P-256 on two `mlkem768nistp256` rows; certbot 41 -> 41 findings, two dependency
+  rows from `setup.py`; Vault 74 -> 74 findings, 5,435 -> 5,437 files read (two `.crl`). Every
+  change is traced to its fix in the stage logs.
+- The `tls_groups` rows of `proxy_/grpc_/uwsgi_ssl_conf_command Groups` carry a different
+  `setting`: in a baseline they close and reopen. The CBOM label of a TLS verification row names
+  its value (`ssl_verify_client on`); rows from before are all `off`, and their label is the same.
+- Corpus regression against 0.49.0 (185 repositories, labels by an independent model): A' and B'
+  unchanged in both splits. This is disagreement with a model, not recall or precision; it says
+  nothing got worse, not that anything was gained.
+
+Not claimed: that a closed pair catches every spelling (the catalogue is what the cited pages
+document); that a catalogue of 10 pairs closes an ecosystem; any recall or precision figure. Left
+out on purpose, and written in the catalogues' `scope`: the rest of the C APIs, Envoy and Traefik,
+legacy `ipsec.conf`, JKS, Pipfile and Poetry, the `bign-*` groups, the parameter sets of HQC, BIKE,
+FrodoKEM, Classic McEliece, Falcon, MAYO and the other schemes the scanner has no field for.
+
 ## 0.49.0 (2026-11-17)
 
 Eight rows of the fix list, from five probes of LinkedIn rooms and one thread (17.11). Each was
