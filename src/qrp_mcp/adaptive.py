@@ -437,6 +437,12 @@ _FOLLOWED = ("followed", "followed_from_parent")
 _FIXED_SPACE_SETTING = re.compile(r"(?:" + _SPACE_KEY_SETTINGS + r")", re.IGNORECASE)
 _FIXED_SSH_SETTING = re.compile(r"HostKey|HostCertificate|TrustedUserCAKeys|IdentityFile|"
                                 r"CertificateFile|RevokedKeys")
+# _CODE_LOAD's names with `load_pem_\w+` closed to the ones cryptography gives: any key or call
+# that begins with `load_pem_` (`load_pem_zzcodehost: keys/z.pem`) is source text (second
+# review, 18.11).
+_FIXED_CODE_LOAD = re.compile(_CODE_LOAD.pattern.replace(
+    r"load_pem_\w+", r"load_pem_(?:private_key|public_key|parameters|x509_certificates?|x509_csr|"
+                     r"x509_crl)"))
 
 
 def fixed_setting(lead: dict[str, Any]) -> bool:
@@ -448,7 +454,7 @@ def fixed_setting(lead: dict[str, Any]) -> bool:
     if rule == "include" or rule == "key_file_from_environment":
         return True
     return bool(_FIXED_SPACE_SETTING.fullmatch(setting) or _FIXED_SSH_SETTING.fullmatch(setting)
-                or _CODE_LOAD.fullmatch(setting + "("))
+                or _FIXED_CODE_LOAD.fullmatch(setting + "("))
 # A path built at run time or written as a placeholder: a variable ($X, %h), a template or format
 # field ({{ x }}, {0}), a home directory (~), a first segment in capitals that a program replaces
 # (certbot's MAGICDIR/live/...), or documentation's /path/to/ (the control's sample, 18.11).

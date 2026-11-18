@@ -275,3 +275,21 @@ def test_b2_reproduction_through_scan_out(tmp_path):
         assert "zzhost" not in _text(_cli(root, tmp_path / "m.json", *args)), args
     assert "zzhost.corp.example" in _text(_cli(root, tmp_path / "f.json", "scan", "--level",
                                                "full"))
+
+
+@pytest.mark.parametrize("level", ("masked", "trimmed"))
+def test_a_key_that_looks_like_a_load_call_is_masked_below_full(tmp_path, level):
+    # Second review (18.11, fixture mask): `load_pem_\w+` let any key that begins with
+    # `load_pem_` (`load_pem_zzcodehost: keys/z.pem` in YAML, or a call of the code's own) count
+    # as the module's vocabulary. Only the names cryptography gives stay.
+    root = _write(tmp_path / "t", {
+        "app.yaml": "load_pem_zzcodehost: keys/z.pem\n",
+        "main.py": 'k = load_pem_zzcustom(open("keys/y.pem").read())\n'
+                   'p = load_pem_private_key(open("keys/x.pem", "rb").read(), None)\n'})
+    leads = scan_repo(path=str(root), level=level)["chosen_outside_files"]["leads"]["items"]
+    settings = sorted(l["setting"] for l in leads)
+    assert "zz" not in _text(leads)
+    assert settings == ["****_***_********", "****_***_**********", "load_pem_private_key"]
+    full = scan_repo(path=str(root), level="full")["chosen_outside_files"]["leads"]["items"]
+    assert sorted(l["setting"] for l in full) == ["load_pem_private_key", "load_pem_zzcodehost",
+                                                  "load_pem_zzcustom"]
