@@ -180,7 +180,12 @@ key establishment, and the CBOM has a component, `ecp256 (IKE key exchange offer
 `trust_stores` (row 517) lists each place that loads a trust store -- the certificates a client or
 server accepts as roots: Python `load_verify_locations` or `create_default_context` with a
 `cafile`/`capath`, Go `AppendCertsFromPEM` with the path of an `os.ReadFile` in the ten lines
-above it, nginx `ssl_client_certificate` and `ssl_trusted_certificate`. Each place gives the path
+above it, nginx `ssl_client_certificate` and `ssl_trusted_certificate`, and from 0.50.0 the upstream
+trust anchors `proxy_ssl_trusted_certificate`, `grpc_ssl_trusted_certificate` and
+`uwsgi_ssl_trusted_certificate` (also in the stream module) and HAProxy's `ca-file`. From 0.50.0
+nginx `ssl_verify_client` is a row of its own in `evidence.protocols` (`basis:
+configured_verification`, `verification_setting` as written, `peer_verification` `on`, `optional`,
+or `off` for `optional_no_ca` and `off`), and the CBOM label names the setting. Each place gives the path
 it names (`file`), the files read that path is (`file_read`, linked as `tls_listeners` links a
 certificate: relative to the root or to the file's directory), the anchors in them with their
 families, sizes and `self_signed`, and `outside_the_tree` for an absolute path, which is said and
