@@ -307,6 +307,12 @@ ecosystem is `closed` today: an ecosystem is closed when the catalogue holds eve
 in which a gap has been recorded for it, and PKI, the nearest, still lacks one. A spelling the
 documentation does not list, or a page the catalogue does not cite, can still be missed.
 
+Why the operation and not the line, and what waiting for the first report costs, is set out in
+Tenev, S. (2026), *Close the operation, not the line: a closure savings formula for maintaining a
+cryptographic-inventory scanner*, version 1.0, Zenodo,
+[doi:10.5281/zenodo.24336932](https://doi.org/10.5281/zenodo.24336932). `CITATION.cff` in this
+repository gives the same reference.
+
 ## What it reads
 
 Every file under the path is either read or named with the reason it was not. The full list of

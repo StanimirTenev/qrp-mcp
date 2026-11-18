@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: >-
+  If you use qrp-mcp, or its method of closing an operation rather than a line, please cite the
+  note below.
+title: qrp-mcp
+type: software
+authors:
+  - family-names: Tenev
+    given-names: Stanimir
+    orcid: "https://orcid.org/0009-0003-0106-863X"
+license: Apache-2.0
+repository-code: "https://github.com/StanimirTenev/qrp-mcp"
+url: "https://quantumreadiness.eu"
+version: 0.50.0
+preferred-citation:
+  type: report
+  title: >-
+    Close the operation, not the line: a closure savings formula for maintaining a
+    cryptographic-inventory scanner
+  authors:
+    - family-names: Tenev
+      given-names: Stanimir
+      orcid: "https://orcid.org/0009-0003-0106-863X"
+      affiliation: Elkan Electronic Ltd
+  doi: 10.5281/zenodo.24336932
+  publisher:
+    name: Zenodo
+  year: 2026
+  month: 11
+  version: "1.0"
+  license: CC-BY-4.0
