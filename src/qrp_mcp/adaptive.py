@@ -417,7 +417,8 @@ LEADS_MEANING = (
     "the files read; "
     "`outside_the_tree` -- an absolute path (same_name_read lists files read with that name, "
     "a possible copy, not linked); `not_found` -- a relative path the tree does not have; "
-    "`templated` -- a path built from a variable or a template, not resolved; "
+    "`templated` -- a path built from a variable, a template or a format field, or written as "
+    "a placeholder (/path/to/, a first segment in capitals), not resolved; "
     "`read_at_run_time` -- an environment variable. Following never opens a new file: what "
     "the scan found in a followed file is in the findings already. Certificate lines of a TLS "
     "server are in tls_listeners and tls_termination.authentication_not_read, trust stores "
@@ -427,10 +428,14 @@ LEADS_MEANING = (
 
 
 _FOLLOWED = ("followed", "followed_from_parent")
+# A path built at run time or written as a placeholder: a variable ($X, %h), a template or format
+# field ({{ x }}, {0}), a home directory (~), a first segment in capitals that a program replaces
+# (certbot's MAGICDIR/live/...), or documentation's /path/to/ (the control's sample, 18.11).
+_TEMPLATED = re.compile(r"[$%{}]|^~|^[A-Z][A-Z0-9_]{3,}/|(?:^|/)path/to/")
 
 
 def _resolve(target: str, rel: str, read: set[str], root: Path) -> dict[str, Any]:
-    if "$" in target or "{{" in target or "%" in target or "~" in target[:1]:
+    if _TEMPLATED.search(target):
         return {"status": "templated"}
     if target.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", target):
         name = target.rsplit("/", 1)[-1]
