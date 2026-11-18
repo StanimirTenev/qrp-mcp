@@ -333,3 +333,13 @@ def test_a_placeholder_or_a_format_string_is_templated_not_absent(tmp_path):
         "MAGICDIR/live/x/privkey.pem": "templated", "/path/to/cacert.pem": "templated",
         "archive/{0}/privkey4.pem": "templated"}
     assert not result["angles"]["contradictions"]
+
+
+def test_a_name_joined_to_a_directory_of_the_run_is_templated(tmp_path):
+    # Vault's tests: os.ReadFile(filepath.Join(tempDir, "ca_cert.pem")), a file the test writes.
+    result = scan_directory(_write(tmp_path, {
+        "cert_test.go": 'package x\nfunc f() { b, _ := os.ReadFile(filepath.Join(tempDir, '
+                        '"ca_cert.pem")); _ = b }\n',
+        "t.py": "data = open(os.path.join(config_dir, 'live', 'cert.pem')).read()\n"}))
+    assert {l["status"] for l in _leads(result)} == {"templated"}
+    assert not result["angles"]["contradictions"]
