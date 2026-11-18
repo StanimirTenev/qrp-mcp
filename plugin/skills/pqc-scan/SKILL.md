@@ -4,9 +4,10 @@ description: Inventory the cryptography in a codebase that a quantum computer wo
 
 # Post-quantum readiness scan
 
-qrp-mcp is an adaptive post-quantum readiness scanner. It closes each operation it claims, tests
-every documented spelling, proposes new spellings from the libraries' own documentation, and
-carries its coverage and limits inside the CBOM.
+qrp-mcp is an adaptive post-quantum readiness scanner. It closes operations against a catalogue of
+their documented spellings, each with a test, says in its output which (operation, ecosystem) pairs
+are closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository
+re-reads the documentation and proposes new spellings, which enter only with a source and a test.
 
 Scan the directory the user names with the `scan_repo` tool from the `qrp` MCP server. If they
 name none, scan the current working directory.

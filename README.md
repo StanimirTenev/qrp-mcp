@@ -2,9 +2,10 @@
 
 <!-- mcp-name: eu.quantumreadiness/qrp-mcp -->
 
-**An adaptive post-quantum readiness scanner.** It closes each operation it claims, tests every
-documented spelling, proposes new spellings from the libraries' own documentation, and carries its
-coverage and limits inside the CBOM.
+**An adaptive post-quantum readiness scanner.** It closes operations against a catalogue of their
+documented spellings, each with a test, says in its output which (operation, ecosystem) pairs are
+closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository
+re-reads the documentation and proposes new spellings, which enter only with a source and a test.
 
 Every signature in your wallet, contract and validator rests on elliptic-curve cryptography, and
 a large quantum computer breaks it. Plenty of tools will tell you what they found. This one also
@@ -258,12 +259,13 @@ names, `go version -m`, `go tool nm`), never code, and never a key size from the
 
 ## How it adapts
 
-"Adaptive" means one thing here: what the scanner claims is tested against the documentation of
-the libraries and formats it claims, and that documentation is re-read for spellings it does not
-know yet. The scan itself stays deterministic and offline. Nothing is learned at run time, and no
-rule enters the scanner without a source and a test.
+"Adaptive" means one thing here: the operations in the scanner's catalogue are tested against the
+documentation of the libraries and formats the catalogue cites, and a maintainer tool re-reads that
+documentation for spellings the catalogue does not hold yet. The scan itself stays deterministic
+and offline. Nothing is learned at run time, and no rule enters the scanner without a source and a
+test.
 
-- **An operation is closed, not a line.** For each (operation, ecosystem) pair it claims, the
+- **An operation is closed, not a line.** For each of its (operation, ecosystem) pairs, the
   package carries a catalogue of the documented spellings (`src/qrp_mcp/data/operations/*.toml`),
   each with the page it comes from and the words quoted from it. Every spelling is a test: it is
   written to a file, scanned, and expected on its line (`tests/test_operation_closure.py`). In

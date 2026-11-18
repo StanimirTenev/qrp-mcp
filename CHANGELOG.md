@@ -6,11 +6,13 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## 0.50.0 (2026-11-18)
 
-**An adaptive post-quantum readiness scanner.** It closes each operation it claims, tests every
-documented spelling, proposes new spellings from the libraries' own documentation, and carries its
-coverage and limits inside the CBOM. This release changes how gaps are closed: by the operation and
-its documented spellings, not by the line a report named. The reasoning is in Tenev (2026),
-doi:10.5281/zenodo.24336932, now in `CITATION.cff`. The scan stays deterministic and offline.
+**An adaptive post-quantum readiness scanner.** It closes operations against a catalogue of their
+documented spellings, each with a test, says in its output which (operation, ecosystem) pairs are
+closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository
+re-reads the documentation and proposes new spellings, which enter only with a source and a test.
+This release changes how gaps are closed: by the operation and its documented spellings, not by the
+line a report named. The reasoning is in Tenev (2026), doi:10.5281/zenodo.24336932, now in
+`CITATION.cff`. The scan stays deterministic and offline.
 
 - **A catalogue of operations, kept as tests.** `src/qrp_mcp/data/operations/*.toml` holds, for
   10 (operation, ecosystem) pairs, 1,261 documented spellings, each with its source page and the

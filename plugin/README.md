@@ -1,8 +1,9 @@
 # QRP post-quantum readiness scanner — Claude Code plugin
 
-An adaptive post-quantum readiness scanner. It closes each operation it claims, tests every
-documented spelling, proposes new spellings from the libraries' own documentation, and carries its
-coverage and limits inside the CBOM.
+An adaptive post-quantum readiness scanner. It closes operations against a catalogue of their
+documented spellings, each with a test, says in its output which (operation, ecosystem) pairs are
+closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository
+re-reads the documentation and proposes new spellings, which enter only with a source and a test.
 
 Wraps the [`qrp-mcp`](https://github.com/StanimirTenev/qrp-mcp) server as an installable
 Claude Code plugin: one MCP server and one skill, `/qrp:pqc-scan`.
