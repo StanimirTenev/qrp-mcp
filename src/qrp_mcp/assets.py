@@ -720,17 +720,25 @@ def _setup_rows(strings: list[list[tuple[str, str, int]]]) -> list[tuple[str, in
                 break
         if written is None:
             continue
-        number = parts[0][2]
-        formatted = formatted and "{" in written  # `f"pyopenssl"` is a plain literal
-        requirement = _PEP508.match(written.split("{", 1)[0] if formatted else written)
-        if formatted:
-            # `f"acme>={version}"`: the name is literal when the literal goes on past it.
-            head = written.split("{", 1)[0]
-            if requirement and requirement.end(1) < len(head):
-                out.append((requirement.group(1), number,
-                            _requested(_PEP508.match(written).group(2))))
-        elif requirement:
-            out.append((requirement.group(1), number, _requested(requirement.group(2))))
+        # setuptools reads a string a line at a time: blank and `#` lines dropped, a ` #`
+        # comment cut (third review of 0.50.0, 18.11: "cryptography\nparamiko" was one row).
+        # A line's number is its own when the literal's lines are the file's lines.
+        own = len(parts) == 1 and parts[0][1].count("\n") == written.count("\n")
+        for offset, text in enumerate(written.splitlines()):
+            text = text.partition(" #")[0].strip()
+            if not text or text.startswith("#"):
+                continue
+            number = parts[0][2] + (offset if own else 0)
+            braced = formatted and "{" in text  # `f"pyopenssl"` is a plain literal
+            head = text.split("{", 1)[0] if braced else text
+            requirement = _PEP508.match(head)
+            if braced:
+                # `f"acme>={version}"`: the name is literal when the literal goes on past it.
+                if requirement and requirement.end(1) < len(head):
+                    out.append((requirement.group(1), number,
+                                _requested(_PEP508.match(text).group(2))))
+            elif requirement:
+                out.append((requirement.group(1), number, _requested(requirement.group(2))))
     return out
 
 

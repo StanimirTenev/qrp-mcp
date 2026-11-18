@@ -129,3 +129,20 @@ def test_an_unterminated_string_or_bracket_ends_nothing():
 ])
 def test_a_conditional_value_and_a_plain_f_string_are_read(text, expected):
     assert _names(text) == expected
+
+
+# Third review, item 4: `install_requires="cryptography\nparamiko"` gave one wrong row,
+# ('cryptography', requested='paramiko'). setuptools reads a string a line at a time (blank
+# lines and `#` lines dropped, a ` #` comment cut), and so does the reader.
+@pytest.mark.parametrize("text, expected", [
+    (H + 'setup(install_requires="cryptography\\nparamiko")\n',
+     [("cryptography", 2, None), ("paramiko", 2, None)]),
+    ('setup(install_requires="""\n    cryptography>=41  # zzcomment\n\n    # pynacl\n'
+     '    paramiko\n""")', [("cryptography", 2, ">=41"), ("paramiko", 5, None)]),
+    ('setup(extras_require={"x": "pyopenssl\\necdsa>=1"})',
+     [("pyopenssl", 1, None), ("ecdsa", 1, ">=1")]),
+    ('setup(install_requires=["cryptography>=41; python_version>\'3.7\'"])',
+     [("cryptography", 1, ">=41")]),
+])
+def test_a_string_value_is_read_a_line_at_a_time(text, expected):
+    assert _setuptools_requests("setup.py", text.splitlines()) == expected
