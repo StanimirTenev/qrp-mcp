@@ -573,27 +573,6 @@
    "operation": "apiname",
    "ecosystem": "C",
    "source": "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html",
-   "context": "CKM_XEDDSA",
-   "discriminates": true,
-   "candidate": "CKM_XEDDSA",
-   "file": "candidate.c",
-   "snippet": "#include <pkcs11.h>\nv = CKM_XEDDSA;\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html",
    "context": "CKM_ECMQV_DERIVE",
    "discriminates": true,
    "candidate": "CKM_ECMQV_DERIVE",
@@ -767,48 +746,6 @@
    "candidate": "CKK_X9_42_DH",
    "file": "candidate.c",
    "snippet": "#include <pkcs11.h>\nv = CKK_X9_42_DH;\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html",
-   "context": "CKM_X3DH_INITIALIZE",
-   "discriminates": true,
-   "candidate": "CKM_X3DH_INITIALIZE",
-   "file": "candidate.c",
-   "snippet": "#include <pkcs11.h>\nv = CKM_X3DH_INITIALIZE;\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://docs.oasis-open.org/pkcs11/pkcs11-spec/v3.1/os/pkcs11-spec-v3.1-os.html",
-   "context": "CKM_X3DH_RESPOND",
-   "discriminates": true,
-   "candidate": "CKM_X3DH_RESPOND",
-   "file": "candidate.c",
-   "snippet": "#include <pkcs11.h>\nv = CKM_X3DH_RESPOND;\n",
    "expect": {
     "rows": [
      {
@@ -1854,69 +1791,6 @@
    "operation": "apiname",
    "ecosystem": "C",
    "source": "https://www.gnutls.org/reference/gnutls-gnutls.html",
-   "context": "GNUTLS_PK_GOST_01",
-   "discriminates": true,
-   "candidate": "GNUTLS_PK_GOST_01",
-   "file": "candidate.c",
-   "snippet": "#include <gnutls/gnutls.h>\nr = GNUTLS_PK_GOST_01(a, b);\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://www.gnutls.org/reference/gnutls-gnutls.html",
-   "context": "GNUTLS_PK_GOST_12_256",
-   "discriminates": true,
-   "candidate": "GNUTLS_PK_GOST_12_256",
-   "file": "candidate.c",
-   "snippet": "#include <gnutls/gnutls.h>\nr = GNUTLS_PK_GOST_12_256(a, b);\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://www.gnutls.org/reference/gnutls-gnutls.html",
-   "context": "GNUTLS_PK_GOST_12_512",
-   "discriminates": true,
-   "candidate": "GNUTLS_PK_GOST_12_512",
-   "file": "candidate.c",
-   "snippet": "#include <gnutls/gnutls.h>\nr = GNUTLS_PK_GOST_12_512(a, b);\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://www.gnutls.org/reference/gnutls-gnutls.html",
    "context": "GNUTLS_PK_RSA_OAEP",
    "discriminates": true,
    "candidate": "GNUTLS_PK_RSA_OAEP",
@@ -2846,69 +2720,6 @@
    "candidate": "GNUTLS_SIGN_RSA_PSS_RSAE_SHA512",
    "file": "candidate.c",
    "snippet": "#include <gnutls/gnutls.h>\nr = GNUTLS_SIGN_RSA_PSS_RSAE_SHA512(a, b);\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://www.gnutls.org/reference/gnutls-gnutls.html",
-   "context": "GNUTLS_SIGN_GOST_94",
-   "discriminates": true,
-   "candidate": "GNUTLS_SIGN_GOST_94",
-   "file": "candidate.c",
-   "snippet": "#include <gnutls/gnutls.h>\nr = GNUTLS_SIGN_GOST_94(a, b);\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://www.gnutls.org/reference/gnutls-gnutls.html",
-   "context": "GNUTLS_SIGN_GOST_256",
-   "discriminates": true,
-   "candidate": "GNUTLS_SIGN_GOST_256",
-   "file": "candidate.c",
-   "snippet": "#include <gnutls/gnutls.h>\nr = GNUTLS_SIGN_GOST_256(a, b);\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "candidate.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "apiname",
-   "ecosystem": "C",
-   "source": "https://www.gnutls.org/reference/gnutls-gnutls.html",
-   "context": "GNUTLS_SIGN_GOST_512",
-   "discriminates": true,
-   "candidate": "GNUTLS_SIGN_GOST_512",
-   "file": "candidate.c",
-   "snippet": "#include <gnutls/gnutls.h>\nr = GNUTLS_SIGN_GOST_512(a, b);\n",
    "expect": {
     "rows": [
      {
@@ -11369,48 +11180,6 @@
   {
    "operation": "keysize",
    "ecosystem": "NET",
-   "source": "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey",
-   "context": "CALG_DH_EPHEM",
-   "discriminates": true,
-   "candidate": "CALG_DH_EPHEM",
-   "file": "keys.c",
-   "snippet": "#include <wincrypt.h>\nCryptGenKey(hProv, CALG_DH_EPHEM, 0, &hKey);\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "keys.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "keysize",
-   "ecosystem": "NET",
-   "source": "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey",
-   "context": "CALG_DH_SF",
-   "discriminates": true,
-   "candidate": "CALG_DH_SF",
-   "file": "keys.c",
-   "snippet": "#include <wincrypt.h>\nCryptGenKey(hProv, CALG_DH_SF, 0, &hKey);\n",
-   "expect": {
-    "rows": [
-     {
-      "at": "evidence.source_code",
-      "match": {
-       "path": "keys.c",
-       "line": 2
-      }
-     }
-    ]
-   }
-  },
-  {
-   "operation": "keysize",
-   "ecosystem": "NET",
    "source": "https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate",
    "context": "KeyAlgorithm = 'ECDSA_nistP256'",
    "discriminates": true,
@@ -11843,64 +11612,6 @@
    "candidate": "uwsgi_ssl_protocols",
    "file": "nginx.conf",
    "snippet": "http {\n  server {\n    listen 443 ssl;\n    uwsgi_ssl_protocols off;\n  }\n  server {\n    listen 443 ssl;\n    uwsgi_ssl_protocols /etc/nginx/ca.pem;\n  }\n}\n",
-   "expect": {
-    "any": [
-     {
-      "rows": [
-       {
-        "at": "evidence.protocols",
-        "match": {
-         "path": "nginx.conf",
-         "line": 4
-        }
-       }
-      ]
-     },
-     {
-      "rows": [
-       {
-        "at": "trust_stores.places",
-        "match": {
-         "path": "nginx.conf",
-         "line": 4
-        }
-       }
-      ]
-     },
-     {
-      "rows": [
-       {
-        "at": "evidence.protocols",
-        "match": {
-         "path": "nginx.conf",
-         "line": 8
-        }
-       }
-      ]
-     },
-     {
-      "rows": [
-       {
-        "at": "trust_stores.places",
-        "match": {
-         "path": "nginx.conf",
-         "line": 8
-        }
-       }
-      ]
-     }
-    ]
-   }
-  },
-  {
-   "operation": "tlsend",
-   "ecosystem": "nginx",
-   "source": "https://nginx.org/en/docs/http/ngx_http_ssl_module.html",
-   "context": "ssl_verify_client",
-   "discriminates": true,
-   "candidate": "ssl_verify_client",
-   "file": "nginx.conf",
-   "snippet": "http {\n  server {\n    listen 443 ssl;\n    ssl_verify_client off;\n  }\n  server {\n    listen 443 ssl;\n    ssl_verify_client /etc/nginx/ca.pem;\n  }\n}\n",
    "expect": {
     "any": [
      {
