@@ -318,10 +318,21 @@ _JUNOS_AUTH = re.compile(r"\bauthentication-method\s+(rsa|dsa|ecdsa)-signatures(
 _CISCO_PROFILE = re.compile(r"^crypto\s+ikev2\s+profile\b", re.I)
 _CISCO_AUTH = re.compile(r"^\s+authentication\s+(?:remote|local)\s+rsa-sig\s*$", re.I)
 _AUTH_FAMILY = {"rsa": "RSA", "dsa": "DSA", "ecdsa": "ECDSA"}
+# Libreswan ipsec.conf(5) `authby=` (and `leftauth=`/`rightauth=`, which take the same methods):
+# "rsasig", "rsa-sha1", "rsa-sha2", "rsa-sha2_256", ..., "ecdsa", "ecdsa-sha2", "ecdsa-sha2_384".
+# strongSwan swanctl.conf `auth`: "specify the key type followed by the minimum strength in bits
+# (e.g. ecdsa-384 or rsa-2048-ecdsa-256 )", "use rsa/pss instead of pubkey or rsa", and after an
+# EAP method's colon ("eap-tls:ecdsa-384-sha384").
+_LIBRESWAN_AUTH = re.compile(r"^\s*(?:left|right)?auth(?:by)?\s*=\s*([\w,+-]+)\s*$", re.I)
+_LIBRESWAN_METHOD = re.compile(r"^(?:(rsasig|rsa-sha1|rsa-sha2(?:_\d+)?)|(ecdsa(?:-sha2(?:_\d+)?)?))$", re.I)
+_SWANCTL_AUTH = re.compile(r"^\s*auth\s*=\s*(?:eap-\w+:)?((?:rsa(?:/pss)?|ecdsa|ed25519|ed448|pubkey)"
+                           r"(?:-[\w/]+)*)\s*$", re.I)
+_SWANCTL_KEY = re.compile(r"(?<![\w/])(rsa(?:/pss)?|ecdsa)(?:-(\d{3,5}))?(?![\w/])", re.I)
 
 
 def scan_auth(lines: list[str]) -> list[dict[str, Any]]:
-    """IKE peer authentication methods that sign with a named family (Cisco IOS XE, Junos)."""
+    """IKE peer authentication methods that sign with a named family (Cisco IOS XE, Junos,
+    Libreswan, strongSwan)."""
     out: list[dict[str, Any]] = []
     in_profile = False
     for number, line in enumerate(lines, 1):
@@ -335,6 +346,9 @@ def scan_auth(lines: list[str]) -> list[dict[str, Any]]:
             setting = f"Junos authentication-method {junos.group(0).split()[-1].rstrip(';')}"
         elif in_profile and _CISCO_AUTH.match(line):
             family, size, setting = "RSA", None, "Cisco IOS XE IKEv2 profile authentication rsa-sig"
+        elif _LIBRESWAN_AUTH.match(line) or _SWANCTL_AUTH.match(line):
+            out.extend(_constraint_rows(number, line))
+            continue
         else:
             continue
         item: dict[str, Any] = {
@@ -346,6 +360,36 @@ def scan_auth(lines: list[str]) -> list[dict[str, Any]]:
             item["key_size"], item["curve"] = int(size), f"P-{size}"
         out.append(item)
     return out
+
+
+def _constraint_rows(number: int, line: str) -> list[dict[str, Any]]:
+    """Libreswan authby/leftauth/rightauth methods and strongSwan auth key constraints that
+    name a signature family: one row per family, with the strength strongSwan states."""
+    found: dict[str, int | None] = {}
+    libreswan = _LIBRESWAN_AUTH.match(line)
+    if libreswan:
+        for method in libreswan.group(1).split(","):
+            m = _LIBRESWAN_METHOD.match(method.strip())
+            if m:
+                found.setdefault("RSA" if m.group(1) else "ECDSA", None)
+        setting = "Libreswan " + line.strip().split("=", 1)[0].strip()
+    else:
+        for m in _SWANCTL_KEY.finditer(_SWANCTL_AUTH.match(line).group(1)):
+            family = "RSA" if m.group(1).lower().startswith("rsa") else "ECDSA"
+            size = int(m.group(2)) if m.group(2) else None
+            if found.get(family) is None:
+                found[family] = size
+        setting = "strongSwan auth"
+    rows = []
+    for family, size in found.items():
+        item: dict[str, Any] = {
+            "line": number, "algorithm": family, "excerpt": line.strip()[:200],
+            "evidence_kind": "declaration",
+            "description": f"IKE peer authentication by {family} signature ({setting})"}
+        if size:
+            item["key_size"] = size
+        rows.append(item)
+    return rows
 
 
 # Row 526: an RFC 8784 PPK whose secret is written in swanctl.conf. swanctl.conf(5): "secrets.
