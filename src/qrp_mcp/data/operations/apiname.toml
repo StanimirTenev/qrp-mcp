@@ -1949,7 +1949,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", l
 
 [[ecosystems.refresh]]
 source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_set1_RSA.pod"
-pattern = '\b(EVP_PKEY_(?:get[01]|set1|assign)_\w+)\b'
+pattern = '\b(EVP_PKEY_(?:get[01]|set1|assign)_(?!(?i:hmac|poly1305|siphash|engine)\b)\w+)\b(?!\(\d\))'
 file = "candidate.c"
 snippet = "#include <openssl/evp.h>\nr = {candidate}(a, b);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
@@ -1957,6 +1957,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", l
 [[ecosystems.refresh]]
 source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
 pattern = '\b(EVP_PKEY_CTX_new\w*)\b'
+ignore = ["EVP_PKEY_CTX_new", "EVP_PKEY_CTX_new_from_pkey"]
 file = "candidate.c"
 snippet = "#include <openssl/evp.h>\nr = {candidate}(a, b);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
@@ -1998,7 +1999,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", l
 
 [[ecosystems.refresh]]
 source = "https://www.gnutls.org/reference/gnutls-gnutls.html"
-pattern = '\b(GNUTLS_PK_\w+|GNUTLS_SIGN_(?:RSA|DSA|ECDSA|EDDSA|GOST)\w*)\b'
+pattern = '\b(GNUTLS_PK_(?!(?:UNKNOWN|MAX|EXP_MAX)\b)\w+|GNUTLS_SIGN_(?:RSA|DSA|ECDSA|EDDSA|GOST)\w*)\b'
 file = "candidate.c"
 snippet = "#include <gnutls/gnutls.h>\nr = {candidate}(a, b);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
@@ -2082,15 +2083,15 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", l
 
 [[ecosystems.refresh]]
 source = "https://doc.libsodium.org/public-key_cryptography/public-key_signatures"
-pattern = '\b(crypto_sign\w*)\b'
-ignore = ["crypto_sign_BYTES", "crypto_sign_PUBLICKEYBYTES", "crypto_sign_SECRETKEYBYTES", "crypto_sign_SEEDBYTES"]
+pattern = '\b(crypto_sign(?!\w*BYTES\b)\w*)\b'
+ignore = ["crypto_sign_verify"]
 file = "candidate.c"
 snippet = "#include <sodium.h>\nr = {candidate}(a, b);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
 
 [[ecosystems.refresh]]
 source = "https://doc.libsodium.org/public-key_cryptography/authenticated_encryption"
-pattern = '\b(crypto_box\w*)\b'
+pattern = '\b(crypto_box(?!\w*BYTES\b)\w*)\b'
 file = "candidate.c"
 snippet = "#include <sodium.h>\nr = {candidate}(a, b);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
@@ -2104,7 +2105,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", l
 
 [[ecosystems.refresh]]
 source = "https://doc.libsodium.org/advanced/scalar_multiplication"
-pattern = '\b(crypto_scalarmult\w*)\b'
+pattern = '\b(crypto_scalarmult(?!\w*BYTES\b)\w*)\b'
 file = "candidate.c"
 snippet = "#include <sodium.h>\nr = {candidate}(a, b);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}

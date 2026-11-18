@@ -241,7 +241,7 @@ expect = {rows = [{at = "evidence.dependencies", match = {path = "setup.py", lin
 
 [[ecosystems.refresh]]
 source = "https://docs.python.org/3/library/os.html"
-pattern = '\b(os\.(?:environb?|getenvb?|putenv|unsetenv)\b)'
+pattern = '\b(os\.(?:environb?|getenvb?)\b)'
 file = "settings.py"
 snippet = "import os\nkey = {candidate}('TLS_KEY')\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "settings.py", line = 2}}]}

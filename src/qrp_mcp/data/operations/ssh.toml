@@ -788,7 +788,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", l
 
 [[ecosystems.refresh]]
 source = "https://man.openbsd.org/sshd_config"
-pattern = '\b((?:ssh|rsa|ecdsa|sk|webauthn)-[a-z0-9][\w@.-]*)'
+pattern = '\b((?:ssh|rsa|ecdsa|sk|webauthn)-[a-z0-9][\w@.-]*)(?![\w@.-]|\s*\(\d)'
 window = 400
 file = "sshd_config"
 snippet = "HostKeyAlgorithms {candidate}\n"
@@ -796,7 +796,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", l
 
 [[ecosystems.refresh]]
 source = "https://man.openbsd.org/sshd"
-pattern = '\b((?:ssh|rsa|ecdsa|sk|webauthn)-[a-z0-9][\w@.-]*)'
+pattern = '\b((?:ssh|rsa|ecdsa|sk|webauthn)-[a-z0-9][\w@.-]*)(?![\w@.-]|\s*\(\d)'
 window = 300
 file = "authorized_keys"
 snippet = "{candidate} AAAAC3NzaC1lZDI1NTE5AAAAIA== user@example\n"

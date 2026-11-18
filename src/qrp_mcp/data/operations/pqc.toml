@@ -8908,21 +8908,21 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "pq.c", line = 2
 
 [[ecosystems.refresh]]
 source = "https://openquantumsafe.org/liboqs/api/doxygen/kem_8h.html"
-pattern = '\b(OQS_KEM_alg_\w+)\b'
+pattern = '\b(OQS_KEM_alg_(?!(?:identifier|count|is_enabled)\b)\w+)\b'
 file = "candidate.c"
 snippet = "#include <oqs/oqs.h>\nv = {candidate};\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
 
 [[ecosystems.refresh]]
 source = "https://openquantumsafe.org/liboqs/api/doxygen/sig_8h.html"
-pattern = '\b(OQS_SIG_alg_\w+)\b'
+pattern = '\b(OQS_SIG_alg_(?!(?:identifier|count|is_enabled)\b)\w+)\b'
 file = "candidate.c"
 snippet = "#include <oqs/oqs.h>\nv = {candidate};\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
 
 [[ecosystems.refresh]]
 source = "https://openquantumsafe.org/liboqs/api/doxygen/sig__stfl_8h.html"
-pattern = '\b(OQS_SIG_STFL_alg_\w+)\b'
+pattern = '\b(OQS_SIG_STFL_alg_(?!(?:identifier|count|is_enabled)\b)\w+)\b'
 file = "candidate.c"
 snippet = "#include <oqs/oqs.h>\nv = {candidate};\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
@@ -8943,7 +8943,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", l
 
 [[ecosystems.refresh]]
 source = "https://raw.githubusercontent.com/cisco/hash-sigs/master/read.me"
-pattern = '\b(hss_[a-z_]+)\b'
+pattern = '\b(hss_[a-z_]+)\b(?!\.a\b)'
 ignore = ["hss_error_none", "hss_extra_info", "hss_working_key", "hss_lib", "hss_lib_thread", "hss_lib_threaded"]
 file = "candidate.c"
 snippet = "#include <hss.h>\nr = {candidate}(a, b);\n"

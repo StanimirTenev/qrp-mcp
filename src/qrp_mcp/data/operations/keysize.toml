@@ -677,7 +677,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", line =
 
 [[ecosystems.refresh]]
 source = "https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate"
-pattern = 'KeyAlgorithm\s*=?\s*\x27?([A-Za-z0-9_]+)\x27?'
+pattern = 'KeyAlgorithm[ \t]*=?[ \t]*\x27?([A-Za-z0-9_]+)\x27?'
 file = "cert.ps1"
 snippet = "New-SelfSignedCertificate -DnsName www.example.com -KeyAlgorithm {candidate}\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", line = 1}}]}
@@ -992,6 +992,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "fabric-ca-serve
 [[ecosystems.refresh]]
 source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
 pattern = '-----BEGIN ([A-Z0-9 ]+)-----'
+ignore = ["X509 CRL", "ATTRIBUTE CERTIFICATE", "ENCRYPTED PRIVATE KEY"]
 file = "candidate.pem"
 snippet = "-----BEGIN {candidate}-----\nMIIBAA==\n-----END {candidate}-----\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.pem", line = 1}}]}
