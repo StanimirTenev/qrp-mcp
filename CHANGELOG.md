@@ -153,9 +153,9 @@ What changes for an existing user:
   any other operator or keyword (`%`, `.format`, `and`, a comprehension) is
   skipped, not guessed; so is an annotated or augmented assignment (`install_requires +=`).
   All 33 setup.py in the corpus and the control give the rows they gave before, on 3.10 and
-  3.12. `setup_requires` and `tests_require` are not read
-  A bare tuple (`install_requires = "a", "b"`) gives its first element only. (`tests/test_setup_py_arguments_only.py`, `tests/test_setup_py_never_crashes.py`,
-  `tests/test_setup_py_subscript_lambda.py`). With
+  3.12. `setup_requires` and `tests_require` are not read (`tests/test_setup_py_arguments_only.py`,
+  `tests/test_setup_py_never_crashes.py`, `tests/test_setup_py_subscript_lambda.py`). A bare
+  tuple (`install_requires = "a", "b"`) gives its first element only. With
   every row of such a file now read, a setup.py with 200 000 requirements on one line made
   `qrp-mcp cbom` run past 15 minutes: the CBOM's confidence properties were quadratic in the
   rows that share a line (older code, reached now). Each file:line is graded once
