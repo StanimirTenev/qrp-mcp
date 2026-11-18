@@ -286,7 +286,8 @@ test.
     Rust, Java, .NET, Ruby, PHP);
   - `leads` follows an `include`, a key file path or a key path read from the environment to the
     files read, and says where each one ends (`followed`, `outside_the_tree`, `not_found`,
-    `templated`, `read_at_run_time`, ...). Nothing new is opened, so a lead adds no finding;
+    `templated`, `read_at_run_time`, `pattern_not_followed`, ...). Nothing new is opened, so a lead
+    adds no finding;
   - `where_to_look` puts the three in one list, production code first.
 
   `operation_closure` and these four sections are in the scan JSON, the `scan_repo` tool and
