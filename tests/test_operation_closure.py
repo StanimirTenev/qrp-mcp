@@ -140,7 +140,14 @@ def _write(directory: Path, spelling: dict) -> None:
     path = directory / spelling["file"]
     path.parent.mkdir(parents=True, exist_ok=True)
     if "material" in spelling:
-        path.write_bytes(_material(spelling["material"]))
+        data = _material(spelling["material"])
+        if "relabel" in spelling:
+            # A refresh candidate (tools/catalogue_refresh.py): real material under the PEM
+            # label the page names, so that what is tried is a file the scanner would meet.
+            import re
+            data = re.sub(rb"(-----(?:BEGIN|END) )[A-Z0-9 ]+(-----)",
+                          lambda m: m.group(1) + spelling["relabel"].encode() + m.group(2), data)
+        path.write_bytes(data)
         return
     text = spelling["snippet"]
     while "{{" in text:
@@ -166,6 +173,11 @@ def _at(result: dict, dotted: str):
 
 
 def _check(result: dict, expect: dict) -> list[str]:
+    if "any" in expect:
+        # A refresh entry that tries one name in several real forms (a switch and a path):
+        # read if any form is.
+        tried = [_check(result, e) for e in expect["any"]]
+        return [] if not all(tried) else ["none of: " + " | ".join("; ".join(m) for m in tried)]
     missing = []
     detected = set(result["detected_algorithms"])
     for family in expect.get("detected", []):

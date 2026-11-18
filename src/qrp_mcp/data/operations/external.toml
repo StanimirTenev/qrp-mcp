@@ -243,5 +243,5 @@ expect = {rows = [{at = "evidence.dependencies", match = {path = "setup.py", lin
 source = "https://docs.python.org/3/library/os.html"
 pattern = '\b(os\.(?:environb?|getenvb?)\b)'
 file = "settings.py"
-snippet = "import os\nkey = {candidate}('TLS_KEY')\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "settings.py", line = 2}}]}
+snippet = "import os\nalg = {candidate}(\"SIGN_ALG\")\nalg = {candidate}[\"SIGN_ALG\"]\n"
+expect = {any = [{rows = [{at = "chosen_outside_files.places", match = {path = "settings.py", line = 2}}]}, {rows = [{at = "chosen_outside_files.places", match = {path = "settings.py", line = 3}}]}]}

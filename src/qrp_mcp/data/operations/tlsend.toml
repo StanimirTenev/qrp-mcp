@@ -309,29 +309,29 @@ source = "https://nginx.org/en/docs/http/ngx_http_proxy_module.html"
 pattern = '\b(proxy_ssl_\w+)\b'
 ignore = ["proxy_ssl_certificate", "proxy_ssl_certificate_cache", "proxy_ssl_certificate_key", "proxy_ssl_ciphers", "proxy_ssl_conf_command", "proxy_ssl_key_log", "proxy_ssl_name", "proxy_ssl_password_file", "proxy_ssl_server_name", "proxy_ssl_session_reuse", "proxy_ssl_verify_depth"]
 file = "nginx.conf"
-snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} on;\n  }\n}\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} off;\n  }\n  server {\n    listen 443 ssl;\n    {candidate} /etc/nginx/ca.pem;\n  }\n}\n"
+expect = {any = [{rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 4}}]}, {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 4}}]}, {rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 8}}]}, {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 8}}]}]}
 
 [[ecosystems.refresh]]
 source = "https://nginx.org/en/docs/http/ngx_http_grpc_module.html"
 pattern = '\b(grpc_ssl_\w+)\b'
 ignore = ["grpc_ssl_certificate", "grpc_ssl_certificate_cache", "grpc_ssl_certificate_key", "grpc_ssl_ciphers", "grpc_ssl_conf_command", "grpc_ssl_key_log", "grpc_ssl_name", "grpc_ssl_password_file", "grpc_ssl_server_name", "grpc_ssl_session_reuse", "grpc_ssl_verify_depth"]
 file = "nginx.conf"
-snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} on;\n  }\n}\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} off;\n  }\n  server {\n    listen 443 ssl;\n    {candidate} /etc/nginx/ca.pem;\n  }\n}\n"
+expect = {any = [{rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 4}}]}, {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 4}}]}, {rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 8}}]}, {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 8}}]}]}
 
 [[ecosystems.refresh]]
 source = "https://nginx.org/en/docs/http/ngx_http_uwsgi_module.html"
 pattern = '\b(uwsgi_ssl_\w+)\b'
 ignore = ["uwsgi_ssl_certificate", "uwsgi_ssl_certificate_cache", "uwsgi_ssl_certificate_key", "uwsgi_ssl_ciphers", "uwsgi_ssl_conf_command", "uwsgi_ssl_key_log", "uwsgi_ssl_name", "uwsgi_ssl_password_file", "uwsgi_ssl_server_name", "uwsgi_ssl_session_reuse", "uwsgi_ssl_verify_depth"]
 file = "nginx.conf"
-snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} on;\n  }\n}\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} off;\n  }\n  server {\n    listen 443 ssl;\n    {candidate} /etc/nginx/ca.pem;\n  }\n}\n"
+expect = {any = [{rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 4}}]}, {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 4}}]}, {rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 8}}]}, {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 8}}]}]}
 
 [[ecosystems.refresh]]
 source = "https://nginx.org/en/docs/http/ngx_http_ssl_module.html"
 pattern = '(?<!\$)\b(ssl_(?:verify|trusted|client)\w*)\b'
 ignore = ["ssl_verify_depth"]
 file = "nginx.conf"
-snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} on;\n  }\n}\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+snippet = "http {\n  server {\n    listen 443 ssl;\n    {candidate} off;\n  }\n  server {\n    listen 443 ssl;\n    {candidate} /etc/nginx/ca.pem;\n  }\n}\n"
+expect = {any = [{rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 4}}]}, {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 4}}]}, {rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 8}}]}, {rows = [{at = "trust_stores.places", match = {path = "nginx.conf", line = 8}}]}]}

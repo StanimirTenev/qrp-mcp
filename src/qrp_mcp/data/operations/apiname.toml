@@ -1958,8 +1958,9 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", l
 source = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.0/doc/man3/EVP_PKEY_CTX_new.pod"
 pattern = '\b(EVP_PKEY_CTX_new\w*)\b'
 ignore = ["EVP_PKEY_CTX_new", "EVP_PKEY_CTX_new_from_pkey"]
+discriminates = false
 file = "candidate.c"
-snippet = "#include <openssl/evp.h>\nr = {candidate}(a, b);\n"
+snippet = "#include <openssl/evp.h>\nr = {candidate}(EVP_PKEY_RSA, NULL);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
 
 [[ecosystems.refresh]]
@@ -2113,6 +2114,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", l
 [[ecosystems.refresh]]
 source = "https://www.gnupg.org/documentation/manuals/gcrypt/General-public_002dkey-related-Functions.html"
 pattern = '\(\s*((?:genkey|public-key|private-key|sig-val|enc-val|data|rsa|dsa|ecc|ecdsa|elg|eddsa|ecdh)\b)'
+control = "rsa"
 file = "candidate.c"
 snippet = "#include <gcrypt.h>\nrc = gcry_sexp_build(&parms, NULL, \"(genkey ({candidate} (nbits 4:2048)))\");\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}

@@ -19,6 +19,15 @@ For every `[[ecosystems.refresh]]` entry of src/qrp_mcp/data/operations/*.toml:
 A candidate is confirmed by moving it into the catalogue with its source and quote; from then
 on it is an ordinary closure case, and it fails until the detector covers it.
 
+Every entry also gets two controls, written beside the candidates: a positive one -- the first
+name on the page the catalogue knows (or the entry's `control`), through the same snippet and
+expectation -- and a negative one, NEGATIVE (or the entry's `negative`, where NEGATIVE does not
+have the shape of the page's names), a name that exists nowhere. A candidate's XFAIL is
+silence only if the positive control passes and the negative one fails. An entry whose
+negative control is read anyway says `discriminates = false`, and its candidates are listed,
+not tried. A file entry gives `material` (key material made by the test) and `relabel` (the
+PEM label to put on it, `{candidate}`) instead of a snippet.
+
 Every source is reported with how it went, so that silence is never read as "nothing new":
   fetched / saved copy / unreachable, its sha256, the known spellings of that page the pattern
   finds again (k of n; 0 of n is a blind pattern), and the candidates. A source the catalogue
@@ -49,6 +58,7 @@ except ModuleNotFoundError:  # Python 3.10
 ROOT = Path(__file__).resolve().parents[1]
 CATALOGUE = ROOT / "src" / "qrp_mcp" / "data" / "operations"
 CANDIDATES = ROOT / "tests" / "fixtures" / "operation_candidates.json"
+NEGATIVE = "QRP_NO_SUCH_NAME"
 USER_AGENT = "catalogue-refresh/1 (documentation re-read; maintainer tool)"
 _WORD = re.compile(r"[A-Za-z0-9_@.+:/-]+")
 _BLOCK_TAG = re.compile(r"</?(?:p|div|br|li|tr|td|th|h[1-6]|pre|dt|dd|table|section|code)\b[^>]*>", re.I)
@@ -113,6 +123,7 @@ def examine(entry: dict[str, Any], text: str, known: Known, cited: list[dict[str
     window = int(entry.get("window", 0))
     hits = [(m.group(1) if pattern.groups else m.group(0), m.start()) for m in pattern.finditer(text)]
     known_at = [pos for cand, pos in hits if cand.lower() in known]
+    control = entry.get("control") or next((cand for cand, _ in hits if cand.lower() in known), None)
     found_known = {cand.lower() for cand, _ in hits if cand.lower() in known}
     # the spellings citing this page whose words the pattern finds there again
     refound = sum(1 for s in cited
@@ -132,7 +143,7 @@ def examine(entry: dict[str, Any], text: str, known: Known, cited: list[dict[str
         seen.add(key)
         candidates[cand] = line if len(line) <= 300 else line[max(0, pos - start - 140):pos - start + 160]
     return {"matches": len(hits), "known_refound": refound, "known_cited": len(cited),
-            "candidates": candidates}
+            "candidates": candidates, "control": control}
 
 
 def _fill(value: Any, candidate: str) -> Any:
@@ -145,8 +156,17 @@ def _fill(value: Any, candidate: str) -> Any:
     return value
 
 
+def _case(entry: dict[str, Any], candidate: str) -> dict[str, Any]:
+    """The entry's file, snippet (or material and relabel) and expectation, with the name in."""
+    case: dict[str, Any] = {"candidate": candidate, "file": entry["file"]}
+    for key in ("snippet", "material", "relabel", "expect"):
+        if key in entry:
+            case[key] = _fill(entry[key], candidate)
+    return case
+
+
 def refresh(catalogue: Path = CATALOGUE, pages: dict[str, Path] | None = None) -> dict[str, Any]:
-    sources, cases, not_examined = [], [], []
+    sources, cases, not_examined, controls = [], [], [], []
     for path in sorted(catalogue.glob("*.toml")):
         doc = tomllib.loads(path.read_text(encoding="utf-8"))
         for eco in doc["ecosystems"]:
@@ -166,15 +186,20 @@ def refresh(catalogue: Path = CATALOGUE, pages: dict[str, Path] | None = None) -
                 row["sha256"] = hashlib.sha256(raw).hexdigest()
                 cited = [s for s in eco["spellings"] if s["source"] == entry["source"]]
                 row.update(examine(entry, page_text(raw), known, cited))
+                control = row.pop("control")
+                discriminates = entry.get("discriminates", True)
+                controls.append({"operation": doc["operation"], "ecosystem": eco["ecosystem"],
+                                 "source": entry["source"], "discriminates": discriminates,
+                                 "positive": _case(entry, control) if control else None,
+                                 "negative": _case(entry, entry.get("negative", NEGATIVE))})
                 if row["known_cited"] and not row["known_refound"]:
                     row["status"] += "; blind pattern (finds none of the page's known spellings)"
                 sources.append(row)
                 for cand, context in row["candidates"].items():
                     cases.append({"operation": doc["operation"], "ecosystem": eco["ecosystem"],
-                                  "candidate": cand, "source": entry["source"], "context": context,
-                                  "file": entry["file"], "snippet": _fill(entry["snippet"], cand),
-                                  "expect": _fill(entry["expect"], cand)})
-    return {"sources": sources, "not_examined": not_examined, "candidates": cases}
+                                  "source": entry["source"], "context": context,
+                                  "discriminates": discriminates, **_case(entry, cand)})
+    return {"sources": sources, "not_examined": not_examined, "candidates": cases, "controls": controls}
 
 
 def report(result: dict[str, Any], when: str) -> str:
@@ -221,7 +246,8 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(text)
     a.candidates.parent.mkdir(parents=True, exist_ok=True)
     a.candidates.write_text(json.dumps({"generated": when, "by": "tools/catalogue_refresh.py",
-                                        "candidates": result["candidates"]}, indent=1, ensure_ascii=False) + "\n",
+                                        "candidates": result["candidates"], "controls": result["controls"]},
+                                       indent=1, ensure_ascii=False) + "\n",
                             encoding="utf-8")
     return 0
 

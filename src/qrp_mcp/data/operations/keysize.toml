@@ -657,6 +657,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "schannel.reg", 
 [[ecosystems.refresh]]
 source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.eccurve.namedcurves"
 pattern = '\b((?:brainpool|nist)P\d{3}[rt]?1?)\b'
+discriminates = false
 file = "Keys.cs"
 snippet = "using System.Security.Cryptography;\nvar key = ECDsa.Create(ECCurve.NamedCurves.{candidate});\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.cs", line = 2}}]}
@@ -671,6 +672,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", line =
 [[ecosystems.refresh]]
 source = "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenkey"
 pattern = '\b(CALG_\w+|RSA\d+BIT_KEY)\b'
+control = "CALG_RSA_KEYX"
 file = "keys.c"
 snippet = "#include <wincrypt.h>\nCryptGenKey(hProv, {candidate}, 0, &hKey);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", line = 2}}]}
@@ -993,16 +995,19 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "fabric-ca-serve
 source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
 pattern = '-----BEGIN ([A-Z0-9 ]+)-----'
 ignore = ["X509 CRL", "ATTRIBUTE CERTIFICATE", "ENCRYPTED PRIVATE KEY"]
+negative = "NO SUCH LABEL"
+discriminates = false
 file = "candidate.pem"
-snippet = "-----BEGIN {candidate}-----\nMIIBAA==\n-----END {candidate}-----\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.pem", line = 1}}]}
+material = "CERT_RSA2048_PEM"
+relabel = "{candidate}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.pem", algorithm = "RSA", key_size = 2048}}]}
 
 [[ecosystems.refresh]]
 source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
 pattern = '"crv":\s*"([A-Za-z0-9-]+)"'
 file = "jwks.json"
 snippet = "{\n  \"keys\": [\n    {\"kty\": \"EC\", \"crv\": \"{candidate}\", \"x\": \"AA\", \"y\": \"AA\"}\n  ]\n}\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", line = 3}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "jwks.json", line = 3, curve = "{candidate}"}}]}
 
 [[ecosystems.refresh]]
 source = "https://www.rfc-editor.org/rfc/rfc8037.txt"

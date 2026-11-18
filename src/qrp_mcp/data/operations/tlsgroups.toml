@@ -1326,14 +1326,14 @@ pattern = '(?m)^\d+,([A-Za-z][A-Za-z0-9_-]*)'
 ignore = ["Reserved", "Unassigned"]
 file = "nginx.conf"
 snippet = "http {\n  server {\n    listen 443 ssl;\n    ssl_ecdh_curve {candidate};\n  }\n}\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "{candidate}"}}]}
 
 [[ecosystems.refresh]]
 source = "https://docs.openssl.org/3.5/man3/SSL_CTX_set1_curves/"
 pattern = '\b((?:X25519|X448|SecP\d{3}r1|MLKEM|ffdhe|secp\d{3}[rk]1|brainpoolP\d{3}r1|P-\d{3})\w*)\b'
 file = "nginx.conf"
 snippet = "http {\n  server {\n    listen 443 ssl;\n    ssl_ecdh_curve {candidate};\n  }\n}\n"
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4}}]}
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4, group = "{candidate}"}}]}
 
 [[ecosystems.refresh]]
 source = "https://caddyserver.com/docs/caddyfile/directives/tls"
