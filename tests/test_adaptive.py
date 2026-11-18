@@ -343,3 +343,22 @@ def test_a_name_joined_to_a_directory_of_the_run_is_templated(tmp_path):
         "t.py": "data = open(os.path.join(config_dir, 'live', 'cert.pem')).read()\n"}))
     assert {l["status"] for l in _leads(result)} == {"templated"}
     assert not result["angles"]["contradictions"]
+
+
+# --- pins the mutation round found missing ----------------------------------------------------
+
+def test_a_key_file_named_and_absent_is_a_contradiction(tmp_path):
+    result = scan_directory(_write(tmp_path, LEAD_TREE))
+    rows = [c for c in result["angles"]["contradictions"] if c["rule"] == "named_key_file_absent"]
+    assert [(r["path"], r["line"], r["file"]) for r in rows] == [
+        ("app/serve.py", 3, "certs/server.key")]
+    assert rows[0]["kind"] == "declared, not seen"
+
+
+def test_a_dangling_symlink_is_still_in_the_tree(tmp_path):
+    _write(tmp_path, {"conf/renewal/site.conf": "cert = live/cert.pem\n"})
+    (tmp_path / "conf/live").mkdir()
+    (tmp_path / "conf/live/cert.pem").symlink_to("/etc/letsencrypt/archive/x/cert1.pem")
+    result = scan_directory(tmp_path)
+    lead = next(l for l in _leads(result) if l["target"] == "live/cert.pem")
+    assert lead["status"] == "in_the_tree_not_read"
