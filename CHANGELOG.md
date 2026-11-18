@@ -116,7 +116,9 @@ What changes for an existing user:
   another include, resolved as `leads` resolves them) sets that module's `*_ssl_verify`; `off`
   there is its own row on its own line. Not resolved: whether the directive and the include are
   in the same block (any setting above suppresses the claim, so this errs toward silence, never
-  toward "off"), and a file included from outside the tree, which keeps the single-file rule
+  toward "off"); a file included from outside the tree, which keeps the single-file rule; and a
+  directive set in a file the claim's own file includes below it (`include snippets/proxy.conf;`
+  holding `proxy_ssl_verify on`), which still gives "not set"
   (`tests/test_upstream_verify_across_include.py`).
 - **setup.py: the list ends at its bracket.** Found by the independent review:
   `setup(install_requires=["requests"], description="cryptography")` gave a dependency row
