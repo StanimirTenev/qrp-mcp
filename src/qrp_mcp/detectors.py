@@ -3683,6 +3683,11 @@ _CLASSICAL_EC_VALUE = re.compile(r"x25519|x448|secp|sect|p-?256|p-?384|p-?521|pr
 
 
 _PQ_GROUP_VALUE = re.compile(r"mlkem|ml-kem|kyber|frodo|hqc|bike|mceliece", re.IGNORECASE)
+# The classical values that are ECDH in the classifier's families (X25519, X448 and SM2 are
+# families of their own), and the start of a value list (not a table's `': [`).
+_ECDH_GROUP_VALUE = re.compile(r"secp|sect|p-?256|p-?384|p-?521|prime\d|brainpool|curvep",
+                               re.IGNORECASE)
+_GROUP_LIST_START = re.compile(r"\s*[\"']?[?*]?[A-Za-z]")
 
 
 def _drop_ecdh_named_only_by_the_setting(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -3699,7 +3704,13 @@ def _drop_ecdh_named_only_by_the_setting(findings: list[dict[str, Any]]) -> list
         values = excerpt[setting.end():]
         # Only where the values are there and are post-quantum: a table that names the
         # directive (crossplane's `'ssl_ecdh_curve': [`) has no values and keeps its row.
-        return bool(_PQ_GROUP_VALUE.search(values)) and not _CLASSICAL_EC_VALUE.search(values)
+        if bool(_PQ_GROUP_VALUE.search(values)) and not _CLASSICAL_EC_VALUE.search(values):
+            return True
+        # Row 492: the same where the values are a group list whose classical groups are all of
+        # other families -- X25519, X448, curveSM2 -- as in `ssl_ecdh_curve X25519MLKEM768;`:
+        # the ECDH came from the directive's name. A NIST, SEC, Brainpool or Go curve keeps it.
+        return (bool(_GROUP_LIST_START.match(values)) and _CLASSICAL_EC_VALUE.search(values) is not None
+                and not _ECDH_GROUP_VALUE.search(values))
     return [f for f in findings if not named_only_by_setting(f)]
 
 
