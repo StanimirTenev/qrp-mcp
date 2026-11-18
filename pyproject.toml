@@ -43,6 +43,10 @@ qrp-mcp = "qrp_mcp.server:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/qrp_mcp"]
 
+# The README's video and its cover stay in the repository, not in the PyPI artifacts.
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/media"]
+
 # The commit a build is made from, as qrp_mcp/_build_info.py (hatch_build.py).
 [tool.hatch.build.hooks.custom]
 path = "hatch_build.py"
