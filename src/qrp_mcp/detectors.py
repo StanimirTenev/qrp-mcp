@@ -494,7 +494,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bDHBasicAgreement\b|\bDHKeyPairGenerator\b|\bDHParametersGenerator\b|"
         # IKE modp groups: modp2048 is group 14, and Shor breaks it like any
         # finite-field Diffie-Hellman.
-        r"(?<![A-Za-z])modp(?:768|1024|1536|2048|3072|4096|6144|8192)(?![0-9])",   # 768: row 141
+        r"(?<![A-Za-z])modp(?:768|1024|1536|2048|3072|4096|6144|8192)(?![0-9])|"   # 768: row 141
+        # CryptoAPI's CryptGenKey with a Diffie-Hellman ALG_ID (Learn, CryptGenKey: CALG_DH_EPHEM
+        # "Ephemeral", CALG_DH_SF "Store and Forward"), as for RSA (row 373; stage 3b).
+        r"\bCryptGenKey\s*\([^,]*,\s*CALG_DH_(?:EPHEM|SF)\b",
         re.IGNORECASE,
     )),
     ("MD5", "MD5 usage", re.compile(
@@ -2407,6 +2410,8 @@ _KEY_SIZE_GENERIC = re.compile(
     r"\b(?:DSA|DH)\.(?:new|generate)\(\s*(\d{3,5})\b|\bcreateDiffieHellman\(\s*(\d{3,5})\b|"
     r"set_dsa_paramgen_bits\([^,]*,\s*(\d{3,5})\b|set_dh_paramgen_prime_len\([^,]*,\s*(\d{3,5})\b|"
     r"\bDSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:DSACryptoServiceProvider|DSACng)\(\s*(\d{3,5})\s*[,)]|"
+    # CryptGenKey's upper 16 bits for a Diffie-Hellman ALG_ID, as for RSA above (stage 3b).
+    r"\bCryptGenKey\s*\([^,]*,\s*CALG_DH_(?:EPHEM|SF)\s*,\s*\(?\s*(\d{3,5})\s*<<\s*16\b|"
     + _SIZE_OPTIONS,
     re.IGNORECASE)
 
