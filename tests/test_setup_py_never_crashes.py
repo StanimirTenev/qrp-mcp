@@ -111,3 +111,21 @@ def test_an_unterminated_string_or_bracket_ends_nothing():
     for text in ('setup(install_requires=["cryptography', 'setup(install_requires=["""a',
                  'setup(install_requires=[' * 3, 'install_requires = "a\\', "install_requires="):
         _names(text)
+
+
+# Third review, item 3: rows lost on valid Python. A conditional value is read in both branches
+# (either may be the one installed); an f-string with no placeholder is a plain literal.
+@pytest.mark.parametrize("text, expected", [
+    (H + 'import sys\nsetup(install_requires=["cryptography"] if sys.version_info>(3,) '
+     'else ["paramiko"])\n', [("cryptography", 3), ("paramiko", 3)]),
+    ('setup(install_requires=["a", "b" if sys.platform == "win32" else "c"])',
+     [("a", 1), ("b", 1), ("c", 1)]),
+    ('setup(extras_require={"x": ["p"] if "zzcond" in os.environ else []})', [("p", 1)]),
+    ('setup(install_requires=["a"] if f("zzcall") else ["b"] + ["c"])',
+     [("a", 1), ("b", 1), ("c", 1)]),
+    (H + 'v="41"\nsetup(install_requires=[f"cryptography>={v}", f"{v}paramiko", f"pyopenssl"])\n',
+     [("cryptography", 3), ("pyopenssl", 3)]),
+    ('setup(install_requires=[f"pyopenssl>=23", rf"paramiko"])', [("pyopenssl", 1), ("paramiko", 1)]),
+])
+def test_a_conditional_value_and_a_plain_f_string_are_read(text, expected):
+    assert _names(text) == expected

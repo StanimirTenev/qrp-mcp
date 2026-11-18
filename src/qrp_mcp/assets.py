@@ -582,7 +582,8 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
     """setup.py read token by token, so a list ends where Python ends it and a `#` in a string
     is not a comment (second review of 0.50.0, 18.11). The value of `install_requires=` or
     `extras_require=` (a keyword or an assignment): literal lists, `+` of them, `(...)` around
-    them, the values of a dict, a string, an f-string's leading literal name. A variable, a
+    them, both branches of `A if C else B`, the values of a dict, a string, an f-string's
+    leading literal name. A variable, a
     call, a tuple, a set and an element that computes something are skipped, not guessed."""
     text = "\n".join(lines).lstrip("\ufeff")
     if "install_requires" not in text and "extras_require" not in text:
@@ -598,7 +599,7 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
 
     def new_frame(opener: str, call: bool) -> dict[str, Any]:
         return {"opener": opener, "kept": [], "element": [], "spoilt": False, "keyed": False,
-                "tuple": False, "call": call}
+                "tuple": False, "call": call, "cond": False}
 
     def end_element(frame: dict[str, Any]) -> None:
         if run:
@@ -606,7 +607,7 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
             run.clear()
         if not frame["spoilt"] and (frame["opener"] != "{" or frame["keyed"]):
             frame["kept"].extend(frame["element"])
-        frame["element"], frame["spoilt"], frame["keyed"] = [], False, False
+        frame["element"], frame["spoilt"], frame["keyed"], frame["cond"] = [], False, False, False
 
     def operand_ended() -> bool:
         return previous in {")", "]", "}", "'"} or (
@@ -644,7 +645,8 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
             continue
         frame = value[-1]
         if kind == "s":
-            run.append((match.group("p") or "", word[len(match.group("p") or ""):], at))
+            if not frame["cond"]:
+                run.append((match.group("p") or "", word[len(match.group("p") or ""):], at))
             previous, before = "'", previous
             continue
         if run:
@@ -653,7 +655,7 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
         if kind == "o" and word in "([{":
             depth += 1
             if len(value) < 200:
-                value.append(new_frame(word, operand_ended()))
+                value.append(new_frame(word, operand_ended() or frame["cond"]))
             else:
                 # Deeper brackets are read into the 200th frame, so memory stays bounded.
                 excess += 1
@@ -675,6 +677,14 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
             frame["tuple"] = frame["opener"] == "("
         elif kind == "o" and word == ":" and frame["opener"] == "{":
             frame["element"], frame["spoilt"], frame["keyed"] = [], False, True
+        elif kind == "n" and word == "if" and not frame["cond"]:
+            # `A if C else B`: both branches are read (either may be what is installed), the
+            # condition is not.
+            frame["cond"] = True
+        elif kind == "n" and word == "else" and frame["cond"]:
+            frame["cond"] = False
+        elif frame["cond"]:
+            pass
         elif kind == "n" and word in _PY_KEYWORDS or kind == "o" and word not in _SETUP_KEEPS:
             frame["spoilt"] = True
         previous, before = word, previous
@@ -711,6 +721,7 @@ def _setup_rows(strings: list[list[tuple[str, str, int]]]) -> list[tuple[str, in
         if written is None:
             continue
         number = parts[0][2]
+        formatted = formatted and "{" in written  # `f"pyopenssl"` is a plain literal
         requirement = _PEP508.match(written.split("{", 1)[0] if formatted else written)
         if formatted:
             # `f"acme>={version}"`: the name is literal when the literal goes on past it.
