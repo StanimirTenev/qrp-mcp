@@ -1685,8 +1685,14 @@ def scan_tls_groups(line: str) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for token in _GROUP_TOKEN.finditer(line, setting.end()):
-        # OpenSSL 3.5 removes a group with a leading '-'; a removal is not an offer.
+        # OpenSSL 3.5 removes a group with a leading '-'; a removal is not an offer, and it
+        # takes out the group "from the list of groups specified up to that point"
+        # (SSL_CTX_set1_groups_list(3)), so one listed before it is not offered either.
         if token.start() > 0 and line[token.start() - 1] in "-!":
+            if line[token.start() - 1] == "-":
+                gone = token.group(0).lower().replace("-", "").replace("_", "")
+                out = [o for o in out if o["group"].lower().replace("-", "").replace("_", "") != gone]
+                seen.discard(gone)
             continue
         group = token.group(0)
         key = group.lower().replace("-", "").replace("_", "")
