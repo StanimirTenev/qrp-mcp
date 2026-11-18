@@ -565,7 +565,7 @@ def _upstream_verification_across_includes(scan_result: dict[str, Any], root: Pa
             if not m or m.group(1) != "include":
                 continue
             target = m.group(2).split("#", 1)[0].strip().rstrip(";").strip().strip("\"'")
-            resolved = adaptive._resolve(target, rel, read, root) if target else {}
+            resolved = adaptive._resolve(target, rel, read, root, None) if target else {}
             for child in resolved.get("files") or []:
                 parents.setdefault(child, set()).add(rel)
 

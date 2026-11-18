@@ -455,7 +455,9 @@ def fixed_setting(lead: dict[str, Any]) -> bool:
 _TEMPLATED = re.compile(r"[$%{}]|^~|^[A-Z][A-Z0-9_]{3,}/|(?:^|/)path/to/")
 
 
-def _resolve(target: str, rel: str, read: set[str], root: Path) -> dict[str, Any]:
+def _resolve(target: str, rel: str, read: set[str], root: Path,
+             limit: int | None = 20) -> dict[str, Any]:
+    """`limit` bounds the files a lead reports; None (scan.py's include link) gives them all."""
     if _TEMPLATED.search(target):
         return {"status": "templated"}
     if target.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", target):
@@ -476,8 +478,8 @@ def _resolve(target: str, rel: str, read: set[str], root: Path) -> dict[str, Any
                          if (fnmatch.fnmatchcase(f, pattern) if glob else f == pattern))
         if matched:
             if base in (here, PurePosixPath(".")):
-                return {"status": "followed", "files": matched[:20]}
-            return {"status": "followed_from_parent", "base": str(base), "files": matched[:20]}
+                return {"status": "followed", "files": matched[:limit]}
+            return {"status": "followed_from_parent", "base": str(base), "files": matched[:limit]}
     # A symlink is in the tree though the scan does not follow it (certbot's live/*.pem).
     for _base, pattern in candidates:
         # The pattern is source text: `**` inside a component (`sites/**.conf`) makes pathlib

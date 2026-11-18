@@ -79,3 +79,16 @@ def test_off_in_the_including_file_is_reported_there_once(tmp_path):
 def test_not_set_stays_where_nothing_read_sets_it_above(tmp_path, files):
     rows = _verification(scan_directory(_write(tmp_path, files)))
     assert rows == [("sites/a.conf", 3, "off", "proxy_ssl_verify not set")]
+
+
+def test_every_file_of_a_glob_include_inherits(tmp_path):
+    # Second review (18.11, fixture ngglob): the link took `leads`' first 20 files of the glob,
+    # so s21-s25 of `include conf.d/*.conf` still got "not set". The link is every matched file;
+    # `leads` still reports 20 of them.
+    sites = {f"conf.d/s{i:02}.conf": SITE for i in range(1, 26)}
+    root = _write(tmp_path, {"nginx.conf": "http {\n proxy_ssl_verify on;\n include conf.d/*.conf;\n}\n",
+                             **sites})
+    result = scan_directory(root)
+    assert _verification(result) == []
+    lead = [l for l in result["chosen_outside_files"]["leads"]["items"] if l["rule"] == "include"]
+    assert [(l["status"], len(l["files"])) for l in lead] == [("followed", 20)]
