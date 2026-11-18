@@ -358,7 +358,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bCngAlgorithm\.Rsa\b|"                       # CngAlgorithm.cs, row 70
         # CryptoAPI's CryptGenKey with an RSA algorithm id (Learn, CryptGenKey; row 373).
         r"\bCryptGenKey\s*\([^,]*,\s*CALG_RSA_(?:KEYX|SIGN)\b|"
-        r"-KeyAlgorithm\s+[\"']?RSA",
+        r"-KeyAlgorithm\s+[\"']?RSA|"
+        # The same parameter as a key of a splatted hashtable, as Learn's own examples of
+        # New-SelfSignedCertificate write it: `KeyAlgorithm = 'RSA'`.
+        r"^\s*KeyAlgorithm\s*=\s*[\"']RSA[\"']",
         re.IGNORECASE,
     )),
     ("DSA", "DSA usage", re.compile(
@@ -4499,6 +4502,7 @@ def scan_source_file(path: Path, rel_path: str,
     _android_keystore_spec(findings, lines)
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
+    _powershell_statement_size(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
@@ -4689,6 +4693,40 @@ def _cng_key_pair_size(findings: list[dict[str, Any]], lines: list[str]) -> None
               {CNG_MACRO_RULE % fam for fam in ("RSA", "DSA", "DH")}]
     if len(sizes) == 1 and len(opened) == 1 and sizes[0] in registry._SIZES and "key_size" not in opened[0]:
         opened[0]["key_size"] = sizes[0]
+
+
+# Rows 374, 375: a PowerShell statement over several lines. A line that ends in a backtick
+# continues on the next (about_Parsing, "Line continuation"), and a hashtable splatted into a
+# command holds its parameters one per line (New-SelfSignedCertificate's examples:
+# `KeyAlgorithm = 'RSA'` and `KeyLength = 2048` inside `$params = @{ ... }`). An RSA, DSA or DH
+# row with no size gets the size the whole statement or hashtable names. PowerShell files only:
+# elsewhere a backtick at the end of a line is a Go raw string or a template literal.
+_POWERSHELL_FILE = (".ps1", ".psm1", ".psd1")
+_SPLAT_KEY_LENGTH = re.compile(r"^\s*KeyLength\s*=\s*(\d{3,5})\s*$", re.IGNORECASE)
+
+
+def _powershell_statement_size(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> None:
+    if not rel_path.lower().endswith(_POWERSHELL_FILE):
+        return
+    for f in findings:
+        if (f.get("algorithm") not in ("RSA", "DSA", "DH") or f.get("key_size") not in (None, "undetermined")
+                or f.get("evidence_kind") in ("comment", "ban")):
+            continue
+        first = last = f["line"] - 1
+        while first > 0 and lines[first - 1].rstrip().endswith("`"):
+            first -= 1
+        while last + 1 < len(lines) and lines[last].rstrip().endswith("`"):
+            last += 1
+        size = key_size_on_line(" ".join(l.rstrip().rstrip("`") for l in lines[first:last + 1]), f["algorithm"])
+        if size is None:
+            # the @{ ... } the row's line is in
+            start = next((i for i in range(f["line"] - 1, max(f["line"] - 30, -1), -1) if "@{" in lines[i]), None)
+            end = next((i for i in range(f["line"] - 1, min(f["line"] + 30, len(lines))) if lines[i].strip() == "}"), None)
+            if start is not None and end is not None:
+                found = {int(m.group(1)) for line in lines[start:end] for m in [_SPLAT_KEY_LENGTH.match(line)] if m}
+                size = found.pop() if len(found) == 1 else None
+        if size in registry._SIZES:
+            f["key_size"] = size
 
 
 # Row 371: .NET's AsymmetricAlgorithm.KeySize ("Gets or sets the size, in bits, of the key
