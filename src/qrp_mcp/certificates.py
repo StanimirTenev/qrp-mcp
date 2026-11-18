@@ -38,6 +38,9 @@ CERTIFICATE_EXTENSIONS = {
     ".jks", ".keystore",
     # PKCS#7 certificate bundles (release C): a chain as one file, read with `cryptography`.
     ".p7b", ".p7c",
+    # A revocation list, signed by its issuer (RFC 2585: "File extension(s): .CRL"; RFC 7468:
+    # "Certificate Revocation Lists (CRLs) are encoded using the "X509 CRL" label").
+    ".crl",
 }
 
 _PEM_BLOCK = re.compile(
