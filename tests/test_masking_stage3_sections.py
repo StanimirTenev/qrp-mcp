@@ -3,10 +3,11 @@
 
 At `masked`, the default, and at `trimmed`, `where_to_look` wrote out the path of a trust store
 that `trust_stores` masks (row 517), and `chosen_outside_files.leads` wrote out the target of an
-include, a key file named by path and the name of an environment variable -- source text that
-every other section quotes only inside a masked line. The same held for the path a TLS server
-loads its certificate from (`tls_termination.authentication_not_read`, shipped in 0.49.0), which
-`where_to_look` repeats.
+include, a key file named by path and the name of an environment variable -- source text. The
+same held for the path a TLS server loads its certificate from
+(`tls_termination.authentication_not_read`, in the clear since 0.41.0), which `where_to_look`
+repeats. Not changed here: `chosen_outside_files.places` keeps the name of a setting read from
+the environment in `setting` and `read_from` at every level, as it has since before 0.50.0.
 
 Below `full`, a path that is not a file read is masked as a line is, on every occurrence: a lead
 that was followed keeps its target (it is files read), as a trust store read keeps its path.
@@ -202,7 +203,7 @@ def test_a_followed_lead_keeps_its_target(tmp_path):
     assert lead["status"] == "followed" and lead["target"] == "conf.d/*.conf"
 
 
-# --- 0.49.0's tls_termination.authentication_not_read ----------------------------------------
+# --- tls_termination.authentication_not_read (since 0.41.0) ---------------------------------
 
 @pytest.mark.parametrize("level", ("masked", "trimmed"))
 def test_a_certificate_path_outside_the_files_read_is_masked_below_full(scanned, level):
