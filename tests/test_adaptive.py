@@ -282,3 +282,40 @@ def test_the_same_tree_gives_the_same_sections_under_any_hash_seed(tmp_path):
                                    capture_output=True, text=True, check=True).stdout)
     assert outs[0] == outs[1] and outs[0].strip()
 
+
+# --- found on the positive control (certbot, Vault), pinned before the fix ----------------------
+
+def test_an_environment_name_must_say_key_or_certificate_as_a_word(tmp_path):
+    result = scan_directory(_write(tmp_path, {
+        "app/a.py": "import os\np = os.environ.get('CERTBOT_PLUGIN_PATH')\n"
+                    "q = os.environ.get('SSL_CERT_FILE')\n"}))
+    assert [l["target"] for l in _leads(result)] == ["SSL_CERT_FILE"]
+
+
+def test_a_command_before_a_key_path_is_not_a_setting(tmp_path):
+    result = scan_directory(_write(tmp_path, {
+        ".github/workflows/ci.yml": "steps:\n  - run: |\n      sha256sum ./support/private_key.pem\n",
+        "vpn/client.ovpn": "client\nca ca.crt\n"}))
+    assert [(l["path"], l["setting"]) for l in _leads(result)] == [("vpn/client.ovpn", "ca")]
+
+
+def test_a_relative_path_is_followed_from_the_nearest_parent_that_has_it(tmp_path):
+    result = scan_directory(_write(tmp_path, {
+        "etc/nginx/fastcgi.conf": "fastcgi_param A b;\n",
+        "etc/nginx/sites-available/site.conf": "server {\n  include fastcgi.conf;\n}\n"}))
+    lead = next(l for l in _leads(result) if l["rule"] == "include")
+    assert lead["status"] == "followed_from_parent"
+    assert lead["files"] == ["etc/nginx/fastcgi.conf"]
+    assert not result["angles"]["contradictions"]
+
+
+def test_a_symlinked_target_is_in_the_tree_not_read(tmp_path):
+    _write(tmp_path, {"conf/archive/cert1.pem": "x\n",
+                      "conf/renewal/site.conf": "cert = live/cert.pem\n"})
+    (tmp_path / "conf/live").mkdir()
+    (tmp_path / "conf/live/cert.pem").symlink_to(tmp_path / "conf/archive/cert1.pem")
+    result = scan_directory(tmp_path)
+    lead = next(l for l in _leads(result) if l["target"] == "live/cert.pem")
+    assert lead["status"] == "in_the_tree_not_read"
+    assert not [c for c in result["angles"]["contradictions"]
+                if c["rule"] == "named_key_file_absent"]
