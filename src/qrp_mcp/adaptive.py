@@ -17,8 +17,10 @@ code (tests/test_adaptive.py scans one tree with them and without them).
 from __future__ import annotations
 
 import fnmatch
+import os
+import posixpath
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from . import assets, confidence, detectors, operations
@@ -408,8 +410,11 @@ LEAD_RULES = {
 LEADS_MEANING = (
     "the leads the files read point to -- an include directive, a key or certificate file named "
     "by path or read from an environment variable -- each followed to the files this scan read: "
-    "`followed` -- the target is among them (files) and was scanned with the rest; "
-    "`in_the_tree_not_read` -- the target exists in the tree but is not among the files read; "
+    "`followed` -- the target, from the file's directory or the root, is among them (files) "
+    "and was scanned with the rest; `followed_from_parent` -- the same from a directory "
+    "between (base), as nginx reads an include from its prefix; "
+    "`in_the_tree_not_read` -- the target exists in the tree, a symlink too, but is not among "
+    "the files read; "
     "`outside_the_tree` -- an absolute path (same_name_read lists files read with that name, "
     "a possible copy, not linked); `not_found` -- a relative path the tree does not have; "
     "`templated` -- a path built from a variable or a template, not resolved; "
@@ -421,6 +426,9 @@ LEADS_MEANING = (
     "their fingerprint, a gate or the exit code")
 
 
+_FOLLOWED = ("followed", "followed_from_parent")
+
+
 def _resolve(target: str, rel: str, read: set[str], root: Path) -> dict[str, Any]:
     if "$" in target or "{{" in target or "%" in target or "~" in target[:1]:
         return {"status": "templated"}
@@ -429,21 +437,26 @@ def _resolve(target: str, rel: str, read: set[str], root: Path) -> dict[str, Any
         same = sorted(f for f in read if fnmatch.fnmatchcase(f.rsplit("/", 1)[-1], name))[:10] \
             if name and name != "*" else []
         return {"status": "outside_the_tree", **({"same_name_read": same} if same else {})}
-    base = str(Path(rel).parent)
-    patterns = {target.lstrip("./") if target.startswith("./") else target}
-    if base not in ("", "."):
-        patterns.add(str(Path(base) / target))
-    patterns = {str(Path(p)) for p in patterns}
+    # The file's directory, then the root, then the directories between, nearest first: nginx
+    # reads a relative include from its prefix, the directory of nginx.conf, not of the file
+    # that includes (certbot's sites-available/*.conf, 18.11).
+    here = PurePosixPath(rel).parent
+    bases = list(dict.fromkeys([here, PurePosixPath("."), *here.parents]))
     glob = any(c in target for c in "*?[")
-    matched = sorted({f for f in read for p in patterns
-                      if (fnmatch.fnmatchcase(f, p) if glob else f == p)})
-    if matched:
-        return {"status": "followed", "files": matched[:20]}
-    if glob:
-        exists = any(any(root.glob(p)) for p in patterns if not p.startswith(".."))
-    else:
-        exists = any((root / p).is_file() for p in patterns)
-    return {"status": "in_the_tree_not_read" if exists else "not_found"}
+    candidates = [(b, posixpath.normpath(str(b / target))) for b in bases]
+    candidates = [(b, p) for b, p in candidates if not p.startswith("..")]
+    for base, pattern in candidates:
+        matched = sorted(f for f in read
+                         if (fnmatch.fnmatchcase(f, pattern) if glob else f == pattern))
+        if matched:
+            if base in (here, PurePosixPath(".")):
+                return {"status": "followed", "files": matched[:20]}
+            return {"status": "followed_from_parent", "base": str(base), "files": matched[:20]}
+    # A symlink is in the tree though the scan does not follow it (certbot's live/*.pem).
+    for _base, pattern in candidates:
+        if any(root.glob(pattern)) if glob else os.path.lexists(root / pattern):
+            return {"status": "in_the_tree_not_read"}
+    return {"status": "not_found"}
 
 
 def _elsewhere(result: dict[str, Any]) -> tuple[set[tuple[str, int]], set[tuple[str, str]],
@@ -524,7 +537,7 @@ def _leads(result: dict[str, Any], root: Path) -> dict[str, Any]:
                     add("key_file_from_environment", rel, n, "environment variable", variable,
                         {"status": "read_at_run_time"})
     items.sort(key=lambda i: (i["path"], i["line"], i["rule"], i["target"]))
-    followed = sum(1 for i in items if i["status"] == "followed")
+    followed = sum(1 for i in items if i["status"] in _FOLLOWED)
     return {"meaning": LEADS_MEANING, "rules": LEAD_RULES, "count": len(items),
             "followed": followed, "not_followed": len(items) - followed, "items": items,
             "reported_elsewhere": elsewhere}
@@ -567,7 +580,7 @@ def _where_to_look(ecosystems: dict[str, Any], angles: dict[str, Any], leads: di
     absent = {(c["path"], c["line"]) for c in angles["contradictions"]
               if c["rule"] == "named_key_file_absent"}
     for lead in leads["items"]:
-        if lead["status"] == "followed" or (lead["path"], lead["line"]) in absent:
+        if lead["status"] in _FOLLOWED or (lead["path"], lead["line"]) in absent:
             continue
         add("lead_not_followed", lead["in_test_code"], 0, lead["path"], lead["line"],
             {"rule": lead["rule"], "path": lead["path"], "line": lead["line"],
