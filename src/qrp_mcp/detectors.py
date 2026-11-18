@@ -1435,8 +1435,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # hash-sigs' hss_* entry points, Bouncy Castle's LMS/HSS signers. Whole names only:
         # bare `hss` is a home subscriber server and bare `lms` a learning system.
         r"\bwc_LmsKey_\w+|"
+        # Every entry point hash-sigs' read.me documents (closure pqc/C): the working key, the
+        # reservation and the incremental sign and verify too.
         r"\bhss_(?:validate_signature\w*|generate_private_key|generate_signature|"
-        r"load_private_key)\b|\b(?:LMS|HSS)Signer\b",
+        r"load_private_key|generate_working_key|load_working_key|reserve_signature|"
+        r"set_autoreserve|sign_inc|validate_inc|init_extra_info)\b|\b(?:LMS|HSS)Signer\b",
         re.IGNORECASE,
     )),
     # The nine schemes NIST advanced to the third additional-signatures round on
