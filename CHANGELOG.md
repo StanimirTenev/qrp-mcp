@@ -97,7 +97,8 @@ What changes for an existing user:
   (`zzhost.corp.example: certs/c.pem`) was in the clear in `leads.items[].setting` and in
   `where_to_look`, for followed leads too. Below `full` such a key is masked, whatever the
   lead's status; the module's own words (`include`, `HostKey`, `cert`, `ssl_dhparam`, a call's
-  name, `environment variable`) stay. `full` is unchanged
+  name, `environment variable`) stay, and of the `load_pem_` calls only cryptography's own names
+  (a key such as `load_pem_zzcodehost:` is masked, found by the second review). `full` is unchanged
   (`tests/test_masking_stage3_sections.py`). Not changed, and older than 0.50.0:
   `chosen_outside_files.places` keeps the name of a setting read from the environment at
   every level.
@@ -105,28 +106,43 @@ What changes for an existing user:
   review: `evidence.dependencies[].requested` keeps a PEP 508 request as written, and its URL's
   userinfo (`paramiko @ git+https://tok:secret@host/p.git`) was in the clear at `masked` and
   `trimmed`. From `pyproject.toml` (and Pipfile) this is older than 0.50.0; 0.50.0 added
-  `setup.py` and `setup.cfg` as sources and with them two more ways in. Below `full` the userinfo
-  is now masked as a line is, on every dependency row; `full` is unchanged, and the fingerprint
-  does not read `requested` (`tests/test_masking_dependency_url.py`).
+  `setup.py` and `setup.cfg` as sources and with them two more ways in. The second review found
+  more of the URL in the clear: a query token, the host, a home directory in a `file:` URL, and
+  `user:p@ss@host` past its first `@`. Below `full` everything after a URL's scheme -- userinfo,
+  host, path, query, fragment -- is now masked as a line is, at `masked` and `trimmed` alike (as a
+  listener's server names are), on every dependency row; the scheme stays (`git+https://`,
+  `file:`). `full` is unchanged, and the fingerprint does not read `requested`
+  (`tests/test_masking_dependency_url.py`).
 - **"proxy_ssl_verify not set" is not claimed across an include.** Found by the independent
   review: with `http { proxy_ssl_verify on; include sites/*.conf; }` in `nginx.conf`, the
   `proxy_pass https://` of `sites/a.conf` was reported as verification `off`, "not set", while
   `leads` showed the include followed. nginx inherits the directive from around the include. A
   "not set" row is now dropped when a file read that includes its file (directly or through
-  another include, resolved as `leads` resolves them) sets that module's `*_ssl_verify`; `off`
-  there is its own row on its own line. Not resolved: whether the directive and the include are
-  in the same block (any setting above suppresses the claim, so this errs toward silence, never
-  toward "off"); a file included from outside the tree, which keeps the single-file rule; and a
-  directive set in a file the claim's own file includes below it (`include snippets/proxy.conf;`
-  holding `proxy_ssl_verify on`), which still gives "not set"
+  another include, resolved as `leads` resolves them, every file a glob matches, not only the 20
+  a lead lists) sets that module's `*_ssl_verify`; `off` there is its own row on its own line.
+  Not resolved: whether the directive and the include are in the same block (any setting above
+  suppresses the claim, so this errs toward silence, never toward "off"); a file included from
+  outside the tree, which keeps the single-file rule; a directive set in a file the claim's own
+  file includes below it (`include snippets/proxy.conf;` holding `proxy_ssl_verify on`), which
+  still gives "not set"; and a relative include resolved from the root of the tree when the
+  including file's own directory does not have it, as `leads` resolves it: `a/nginx.conf`
+  with `include sites/*.conf;` is linked to a root-level `sites/x.conf`, which nginx run from
+  `a/` would not read, and the claim there is dropped -- toward silence again
   (`tests/test_upstream_verify_across_include.py`).
-- **setup.py: the list ends at its bracket.** Found by the independent review:
+- **setup.py is parsed as Python.** Found by the independent review:
   `setup(install_requires=["requests"], description="cryptography")` gave a dependency row
-  `cryptography`, because every string after `install_requires=[` on that line was read. Only
-  the values of `install_requires` and `extras_require` count, up to the bracket that closes
-  them; a second argument on the same line is read on its own
-  (`tests/test_setup_py_arguments_only.py`). `setup_requires` and `tests_require` are not read,
-  as before.
+  `cryptography`, because every string after `install_requires=[` on that line was read. The
+  first fix ended the list at its bracket, and the second review found what that broke:
+  `["paramiko"] + ["ecdsa"]` gave paramiko alone, and a `#` inside a string
+  (`"foo @ git+https://h/x.git#egg=foo"`) was taken for a comment, so `description="paramiko"`
+  on the next line became a row. setup.py is now read with Python's `ast`: the value of
+  `install_requires` or `extras_require` (a keyword or a top-level assignment) -- literal lists,
+  `+` of them, the values of a dict, a string, the leading literal name of an f-string
+  (`f"acme>={version}"`). A variable, a call or a tuple is skipped, not guessed. A setup.py the
+  running Python cannot parse -- Python 2 syntax, or syntax newer than the interpreter -- gives
+  no dependency row (none of the 33 in the corpus and the control fails, on 3.10 or 3.12; all 33
+  give the rows they gave before). `setup_requires` and `tests_require` are not read
+  (`tests/test_setup_py_arguments_only.py`).
 - **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
   `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
   A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the

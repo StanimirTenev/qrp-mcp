@@ -424,8 +424,9 @@ A **free inventory tool**, not a readiness assessment. It deliberately does not 
   postquantum preshared key comes from beyond the files read.
 
 Those live in the [Quantum Readiness Platform](https://quantumreadiness.eu), the product this
-tool is extracted from. Nothing here is crippled to push you there — what it does, it does
-completely.
+tool is extracted from. Nothing here is crippled to push you there. What it does not cover is
+said, not hidden: the scan writes its coverage and limits into the CBOM and claims no
+completeness beyond them.
 
 It also does not tell you that you are about to be hacked. It tells you what you are using.
 

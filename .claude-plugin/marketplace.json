@@ -5,7 +5,7 @@
     "name": "Stanimir Tenev",
     "url": "https://quantumreadiness.eu"
   },
-  "description": "An adaptive post-quantum readiness scanner, local and offline, with its coverage and limits inside the CBOM.",
+  "description": "An adaptive post-quantum readiness scanner, local and offline: it closes operations against a catalogue of their documented spellings, each with a test, says which (operation, ecosystem) pairs are closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository proposes new spellings, which enter only with a source and a test.",
   "plugins": [
     {
       "name": "qrp",
