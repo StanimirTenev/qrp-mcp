@@ -14,7 +14,9 @@ from qrp_mcp.scan import scan_directory
 @pytest.mark.parametrize("family, name", [
     ("RSA", "CKK_RSA"), ("DH", "CKK_DH"), ("DH", "CKK_X9_42_DH"), ("EC", "CKK_EC"),
     ("DSA", "CKK_DSA"), ("DES", "CKK_DES"), ("3DES", "CKK_DES3"), ("3DES", "CKK_DES2"),
-    ("RC4", "CKK_RC4"), ("EC", "CKK_EC_EDWARDS"), ("EC", "CKA_EC_PARAMS"),
+    # CKK_EC_EDWARDS was EC here until the closure of `apiname` (18.11.2026): PKCS#11 3.1 6.3
+    # gives Edwards EC keys to CKM_EDDSA, so EdDSA (tests/test_operation_closure.py).
+    ("RC4", "CKK_RC4"), ("EdDSA", "CKK_EC_EDWARDS"), ("EC", "CKA_EC_PARAMS"),
     ("DH", "CKM_DH_PKCS_DERIVE"), ("DH", "CKM_X9_42_DH_KEY_PAIR_GEN"),
     ("EC", "CKM_EC_KEY_PAIR_GEN"), ("RSA", "CKM_SHA256_RSA_PKCS"), ("SHA1", "CKM_SHA1_RSA_PKCS"),
     ("MD5", "CKM_MD5"), ("SHA1", "CKM_SHA_1"), ("SHA224", "CKM_SHA224"),

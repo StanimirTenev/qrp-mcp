@@ -1041,6 +1041,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bXDH(?:Basic|Unified)Agreement\b|(?<![A-Za-z])XDHwith\w+")),
     ("ElGamal", "ElGamal named by Go's openpgp packages", re.compile(
         r"\belgamal\.\w+|\w+ElGamal\w*")),
+    # Libgcrypt names a key by its algorithm in an S-expression: "(genkey (rsa (nbits
+    # 4:2048)))", "(public-key (rsa (n n-mpi ) (e e-mpi )))", "(private-key (dsa ...",
+    # "(private-key (ecc (curve ..." -- "To create an Elgamal key, substitute "elg" for "rsa""
+    # (Libgcrypt manual, General public-key related Functions; RSA, DSA, ECC key parameters).
+    *[(family, f"{family} key in a Libgcrypt S-expression", re.compile(
+        rf"\((?:genkey|public-key|private-key)\s*\(\s*{name}(?![\w-])"))
+      for family, name in (("RSA", "rsa"), ("DSA", "dsa"), ("ElGamal", "elg"), ("EC", "ecc"))],
     # The digest glued to the scheme in a signature or PBE name (`MD5withRSA`, `MD2/RSA`,
     # `PBEWITHMD5ANDDES`). SHA-1 in the same shapes is row 143.
     *[(family, f"{family} named in a signature or PBE name", re.compile(
