@@ -25,9 +25,11 @@ wording here is ours, and the credit is theirs.
 
 from __future__ import annotations
 
+import ast
 import json
 import posixpath
 import re
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -524,8 +526,6 @@ def _requirement_request(text: str) -> str | None:
 # `install_requires=[...]` and `extras_require={"extra": [...]}`, as string literals.
 _CFG_SECTION = re.compile(r"^\s*\[([^\]]+)\]\s*$")
 _CFG_KEY = re.compile(r"^([A-Za-z0-9_.-]+)\s*=\s*(.*)$")
-_SETUP_ARGUMENT = re.compile(r"\b(?:install_requires|extras_require)\s*=\s*[\[{]")
-_SETUP_TOKEN = re.compile(_TOML_STRING.pattern + r"|[\[\]{}]")
 
 
 def _setuptools_requests(name: str, lines: list[str]) -> list[tuple[str, int, str | None]]:
@@ -553,29 +553,59 @@ def _setuptools_requests(name: str, lines: list[str]) -> list[tuple[str, int, st
                                   or (section == "options" and key == "install_requires")):
                 add(value.strip(), number)
         return out
-    # Strings and brackets in order, so the list ends at its own bracket: a string after it on
-    # the same line (`description="cryptography"`) is not a dependency (review S3, 18.11).
-    depth = 0
-    for number, text in enumerate(lines, 1):
-        code, pos = text.split("#", 1)[0], 0
-        while True:
-            if not depth:
-                opened = _SETUP_ARGUMENT.search(code, pos)
-                if not opened:
-                    break
-                depth, pos = 1, opened.end()
-            token = _SETUP_TOKEN.search(code, pos)
-            if not token:
-                break
-            pos, word = token.end(), token.group(0)
-            if word in ("[", "{"):
-                depth += 1
-            elif word in ("]", "}"):
-                depth -= 1
-            elif not code[token.end():].lstrip().startswith(":"):
-                # A dict key (`"ssh": [...]`) names an extra, not a package.
-                add(token.group(1) or token.group(2) or "", number)
-    return out
+    return _setup_py_requests(lines)
+
+
+_SETUP_NAMES = {"install_requires", "extras_require"}
+
+
+def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
+    """setup.py parsed as Python, so a list ends where Python ends it and a `#` in a string is
+    not a comment (second review of 0.50.0, 18.11). The value of `install_requires=` or
+    `extras_require=` (a keyword or a top-level assignment): literal lists, `+` of them, the
+    values of a dict; a string, or an f-string's leading literal name. Anything else -- a
+    variable, a call, a tuple -- is skipped, not guessed. A file Python cannot parse (Python 2)
+    gives nothing."""
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            tree = ast.parse("\n".join(lines).lstrip("\ufeff"))
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
+        return []
+    values = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.keyword) and node.arg in _SETUP_NAMES:
+            values.append(node.value)
+        elif isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id in _SETUP_NAMES for t in node.targets):
+            values.append(node.value)
+    found: list[tuple[int, int, str, str | None]] = []
+    while values:
+        node = values.pop()
+        if isinstance(node, ast.List):
+            values.extend(node.elts)
+        elif isinstance(node, ast.Dict):
+            values.extend(node.values)
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            values.extend((node.left, node.right))
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            requirement = _PEP508.match(node.value)
+            if requirement:
+                found.append((node.lineno, node.col_offset, requirement.group(1),
+                              _requested(requirement.group(2))))
+        elif (isinstance(node, ast.JoinedStr) and node.values
+              and isinstance(node.values[0], ast.Constant)):
+            # `f"acme>={version}"`: the name is literal when the literal goes on past it.
+            head = str(node.values[0].value)
+            requirement = _PEP508.match(head)
+            if requirement and requirement.end(1) < len(head):
+                written = "".join(str(v.value) if isinstance(v, ast.Constant)
+                                  else "{" + ast.unparse(v.value) + "}"
+                                  for v in node.values if isinstance(v, (ast.Constant,
+                                                                         ast.FormattedValue)))
+                found.append((node.lineno, node.col_offset, requirement.group(1),
+                              _requested(_PEP508.match(written).group(2))))
+    return [(name, line, requested) for line, _, name, requested in sorted(found)]
 
 
 # A version pinned to one release, which is the only version a manifest states as a
