@@ -4470,6 +4470,7 @@ def scan_source_file(path: Path, rel_path: str,
         findings = sorted(findings + by_identifier, key=lambda f: f["line"])
     _settle_names_defined_here(findings)
     _name_not_a_use_rules(findings, lines, denial_lines)
+    findings = _sodium_signatures(findings, lines, rel_path)
     findings = _pq_operations(findings, lines, rel_path)
     _android_keystore_spec(findings, lines)
     _wrapped_key(findings, lines)
@@ -4513,6 +4514,31 @@ _CALL_BEFORE = re.compile(r"(?:^|[=(,!{;?:&|.]|->|\breturn|\(\s*\w+\s*\**\s*\))$
 # A parameter: a type, then a name (`uint8_t *pk,`); a cast (`(const unsigned char *)m`) has none.
 _TYPED_ARGUMENT = re.compile(r"\b(?:u?int\d+_t|size_t|char|void|OQS_KEM|OQS_SIG|unsigned)\b"
                              r"[\s*]*\w+\s*[,)\[]|\b\w+\s+\*+\s*\w+\s*[,)]")
+
+
+# Libsodium's crypto_sign, crypto_sign_keypair and crypto_sign_open are Ed25519 ("Single-part
+# signature: Ed25519", Public-key signatures), but the same three names are the NIST signature
+# API of every post-quantum reference implementation, so the Ed25519 rule leaves them out. In a
+# file that includes sodium.h ("the only header that has to be included", Usage) and names no
+# post-quantum signature, they are libsodium's.
+_SODIUM_HEADER = re.compile(r"^\s*#\s*include\s*[<\"]sodium\.h[>\"]", re.MULTILINE)
+_SODIUM_SIGN_CALL = re.compile(r"(?<![\w.>])crypto_sign(?:_keypair|_open)?\s*\(")
+
+
+def _sodium_signatures(findings: list[dict[str, Any]], lines: list[str],
+                       rel_path: str) -> list[dict[str, Any]]:
+    text = "\n".join(lines)
+    if not _SODIUM_HEADER.search(text) or any(f["algorithm"] in _SIG_SCHEMES for f in findings):
+        return findings
+    have = {f["line"] for f in findings if f["algorithm"] == "Ed25519"}
+    added = [{"path": rel_path, "line": n, "algorithm": "Ed25519",
+              "description": "Ed25519 usage (libsodium crypto_sign)",
+              "excerpt": line.strip()[:200], "evidence_kind": "call",
+              "in_test_code": in_test_code(rel_path)}
+             for n, line in enumerate(lines, 1)
+             if n not in have and _SODIUM_SIGN_CALL.search(line.split("//", 1)[0])
+             and not line.lstrip().startswith(("/*", "*"))]
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 def _pq_operations(findings: list[dict[str, Any]], lines: list[str],
