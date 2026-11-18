@@ -159,6 +159,8 @@ MANIFEST_FILENAMES: dict[str, str] = {
     "requirements.txt": "pypi",
     "pyproject.toml": "pypi",
     "Pipfile": "pypi",
+    "setup.cfg": "pypi",
+    "setup.py": "pypi",
     "go.mod": "go",
     "Cargo.toml": "cargo",
     "pom.xml": "maven",
@@ -510,13 +512,73 @@ def _pep_requests(name: str, lines: list[str]) -> list[tuple[str, int, str | Non
     return out
 
 
+def _requirement_request(text: str) -> str | None:
+    """What a requirements-file line asks for, as written, without its marker or options."""
+    requirement = _PEP508.match(re.split(r"\s--|\s#", text, 1)[0])
+    return _requested(requirement.group(2)) if requirement else None
+
+
+# setuptools (Dependencies Management; Configuring setuptools using setup.cfg files):
+# setup.cfg `[options] install_requires` and `[options.extras_require]`, a PEP 508 string per
+# line (on the key's line or the indented lines below it), and setup.py's
+# `install_requires=[...]` and `extras_require={"extra": [...]}`, as string literals.
+_CFG_SECTION = re.compile(r"^\s*\[([^\]]+)\]\s*$")
+_CFG_KEY = re.compile(r"^([A-Za-z0-9_.-]+)\s*=\s*(.*)$")
+_SETUP_ARGUMENT = re.compile(r"\b(?:install_requires|extras_require)\s*=\s*[\[{]")
+
+
+def _setuptools_requests(name: str, lines: list[str]) -> list[tuple[str, int, str | None]]:
+    out: list[tuple[str, int, str | None]] = []
+
+    def add(spec: str, number: int) -> None:
+        requirement = _PEP508.match(spec)
+        if requirement:
+            out.append((requirement.group(1), number, _requested(requirement.group(2))))
+
+    if name == "setup.cfg":
+        section, key = "", None
+        for number, text in enumerate(lines, 1):
+            if not text.strip() or text.lstrip().startswith(("#", ";")):
+                continue
+            header = _CFG_SECTION.match(text)
+            if header:
+                section, key = header.group(1).strip(), None
+                continue
+            value = text
+            if not text[:1].isspace():
+                pair = _CFG_KEY.match(text)
+                key, value = (pair.group(1), pair.group(2)) if pair else (None, "")
+            if value.strip() and (section == "options.extras_require"
+                                  or (section == "options" and key == "install_requires")):
+                add(value.strip(), number)
+        return out
+    depth = 0
+    for number, text in enumerate(lines, 1):
+        code, start = text.split("#", 1)[0], 0
+        if not depth:
+            opened = _SETUP_ARGUMENT.search(code)
+            if not opened:
+                continue
+            depth, start = 1, opened.end()
+        rest = code[start:]
+        for string in _TOML_STRING.finditer(rest):
+            # A dict key (`"ssh": [...]`) names an extra, not a package.
+            if not rest[string.end():].lstrip().startswith(":"):
+                add(string.group(1) or string.group(2) or "", number)
+        bare = _TOML_STRING.sub("", rest)
+        depth = max(0, depth + bare.count("[") + bare.count("{") - bare.count("]") - bare.count("}"))
+    return out
+
+
 # A version pinned to one release, which is the only version a manifest states as a
 # fact: `cryptography==44.0.0` in requirements.txt, `github.com/x/y v1.2.3` in go.mod.
 # A range (`>=42`) is a request, not a version, and yields nothing. pyproject.toml,
 # Pipfile and the lockfiles are not read for this.
+# pip's per-requirement options may follow the pin ("--config-settings --hash (for
+# Hash-checking Mode )", requirements file format).
 _PY_PIN = re.compile(
     r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*===?\s*"
-    r"([A-Za-z0-9][A-Za-z0-9.+!_-]*)\s*(?:[;#]|$)")
+    r"([A-Za-z0-9][A-Za-z0-9.+!_-]*)\s*(?:[;#]|--|$)")
 _GO_PIN = re.compile(r"^\s*(?:require\s+)?([a-z0-9][\w./-]*\.[a-z]{2,}/[\w./-]+)\s+(v[\w.+-]+)")
 
 
@@ -639,6 +701,11 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
                          for package, number, version in found if version}
     elif path.name in {"pyproject.toml", "Pipfile"}:
         named = _pep_requests(path.name, lines)
+    elif path.name in {"setup.cfg", "setup.py"}:
+        named = _setuptools_requests(path.name, lines)
+    elif path.name == "requirements.txt":
+        named = [(package, number, _requirement_request(lines[number - 1]))
+                 for package, number in _names_from_manifest(ecosystem, path.name, lines)]
     else:
         named = [(package, number, None) for package, number
                  in _names_from_manifest(ecosystem, path.name, lines)]
