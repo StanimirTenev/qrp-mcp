@@ -1067,7 +1067,17 @@ _HAPROXY_SERVER = re.compile(r"^\s*(?:server|default-server)\s")
 _HAPROXY_VERSION_OPTION = re.compile(
     r"(?<!\S)(?:ssl-min-ver|ssl-max-ver|force-(?:sslv3|tlsv1\d?)|no-(?:sslv3|tlsv1\d?))(?!\S)",
     re.IGNORECASE)
-_NGINX_VERIFY_OFF = re.compile(r"^\s*proxy_ssl_verify\s+off\s*;")
+# nginx's three upstream modules verify the proxied server alike: `proxy_ssl_verify`,
+# `grpc_ssl_verify`, `uwsgi_ssl_verify` ("Enables or disables verification of the proxied ...
+# server certificate"), each "Default: ... off". An upstream that speaks TLS -- proxy_pass
+# https://, grpc_pass grpcs://, uwsgi_pass suwsgi://, stream `proxy_ssl on` -- with its
+# module's directive nowhere in the file is off by that default. Caddy's reverse_proxy:
+# "tls_insecure_skip_verify turns off TLS handshake verification".
+_NGINX_VERIFY_OFF = re.compile(r"^\s*((?:proxy|grpc|uwsgi)_ssl_verify)\s+off\s*;")
+_NGINX_VERIFY_SET = re.compile(r"^\s*(proxy|grpc|uwsgi)_ssl_verify\s", re.M)
+_NGINX_TLS_UPSTREAM = re.compile(r"^\s*(?:(proxy)_pass\s+https://|(grpc)_pass\s+grpcs://|"
+                                 r"(uwsgi)_pass\s+suwsgi://|(proxy)_ssl\s+on\s*;)")
+_CADDY_SKIP_VERIFY = re.compile(r"^\s*tls_insecure_skip_verify\s*$")
 _HAPROXY_GLOBAL_VERIFY_NONE = re.compile(r"^\s*ssl-server-verify\s+none(?:\s|$)")
 
 
@@ -1089,6 +1099,7 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
             if words[0] == f"ssl-default-bind-{key}":
                 defaults[key] = True
     out: list[dict[str, Any]] = []
+    verify_set = set(_NGINX_VERIFY_SET.findall("\n".join(lines)))
     said = {"versions": "protocol versions", "ciphers": "TLS 1.2 cipher list",
             "ciphersuites": "TLS 1.3 cipher suites", "curves": "groups"}
     for number, text in enumerate(lines, 1):
@@ -1121,7 +1132,16 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
             verify_off = ("ssl-server-verify none",
                           "HAProxy, for every server line that does not say verify required")
         elif _NGINX_VERIFY_OFF.match(text):
-            verify_off = ("proxy_ssl_verify off", "nginx; off is also nginx's default")
+            verify_off = (f"{_NGINX_VERIFY_OFF.match(text).group(1)} off",
+                          "nginx; off is also nginx's default")
+        elif _CADDY_SKIP_VERIFY.match(text):
+            verify_off = ("tls_insecure_skip_verify", "Caddy, a reverse_proxy transport")
+        elif _NGINX_TLS_UPSTREAM.match(text):
+            module = next(g for g in _NGINX_TLS_UPSTREAM.match(text).groups() if g)
+            if module not in verify_set:
+                verify_off = (f"{module}_ssl_verify not set",
+                              f"nginx's default is off, and the file does not set "
+                              f"{module}_ssl_verify")
         if verify_off:
             setting, where = verify_off
             out.append({
