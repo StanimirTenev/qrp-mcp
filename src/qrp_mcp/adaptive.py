@@ -384,6 +384,9 @@ _CODE_LOAD = re.compile(
     r"ReadAllText|CreateFromPemFile|load_key|load_certificate|use_certificate_file|"
     r"use_PrivateKey_file|SSL_CTX_use_certificate(?:_chain)?_file|SSL_CTX_use_PrivateKey_file|"
     r"SSL_CTX_load_verify_locations)\s*\(")
+# A name joined to a directory known only at run time (Vault's tests:
+# filepath.Join(tempDir, "ca_cert.pem"); certbot's join(config_dir, 'live', ..., 'cert.pem')).
+_PATH_JOIN = re.compile(r"\b(?:[Jj]oin|Combine|resolve)\s*\(")
 _LITERAL_KEY_PATH = re.compile(r"[\"']([^\"'\s]{1,200}?" + _KEY_SUFFIX + r")[\"']", re.IGNORECASE)
 # A key or certificate file read from an environment variable: a name that says a certificate,
 # key, CA or trust store and a file, path or directory, or one of the names libraries read.
@@ -417,7 +420,8 @@ LEADS_MEANING = (
     "the files read; "
     "`outside_the_tree` -- an absolute path (same_name_read lists files read with that name, "
     "a possible copy, not linked); `not_found` -- a relative path the tree does not have; "
-    "`templated` -- a path built from a variable, a template or a format field, or written as "
+    "`templated` -- a path built from a variable, a template or a format field, joined to a "
+    "directory of the run (filepath.Join, os.path.join), or written as "
     "a placeholder (/path/to/, a first segment in capitals), not resolved; "
     "`read_at_run_time` -- an environment variable. Following never opens a new file: what "
     "the scan found in a followed file is in the findings already. Certificate lines of a TLS "
@@ -533,9 +537,11 @@ def _leads(result: dict[str, Any], root: Path) -> dict[str, Any]:
                     add("key_file_path", rel, n, setting, target,
                         _resolve(target, rel, read, root))
             if code and _CODE_LOAD.search(raw):
+                joined = _PATH_JOIN.search(raw)
                 for lit in _LITERAL_KEY_PATH.finditer(raw):
                     add("key_file_path", rel, n, _CODE_LOAD.search(raw).group(1), lit.group(1),
-                        _resolve(lit.group(1), rel, read, root))
+                        {"status": "templated"} if joined
+                        else _resolve(lit.group(1), rel, read, root))
             if "env" in raw or "ENV" in raw or "getenv" in raw.lower():
                 for m in _ENV_KEY_READ.finditer(raw):
                     variable = m.group(1) or m.group(2)
