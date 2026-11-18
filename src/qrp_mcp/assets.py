@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import ast
 import json
+import keyword
 import posixpath
 import re
 import warnings
@@ -557,55 +558,169 @@ def _setuptools_requests(name: str, lines: list[str]) -> list[tuple[str, int, st
 
 
 _SETUP_NAMES = {"install_requires", "extras_require"}
+# setup.py is read by one pass of a regular lexer and an explicit stack, not by `ast`: on
+# CPython 3.10 `ast.parse` segfaults (exit 139, the whole scan dies) on `x = a+a+...` with
+# 150 000 terms, and no size cap in front of it is safe for every stack size (third review of
+# 0.50.0, 18.11). Nothing here recurses, and each character is matched once: an unterminated
+# string ends at its line (a triple-quoted one at the end of the file). A file Python cannot
+# parse -- Python 2, a syntax error -- is read like any other.
+_PY_TOKEN = re.compile(
+    r"[ \t\f]*(?:(?P<c>#[^\r\n]*)"
+    r"|(?P<s>(?P<p>[rRbBuUfF]{1,2})?(?:'''(?:[^'\\]|\\[\s\S]|\\\Z|'(?!''))*(?:'''|\Z)"
+    r'|"""(?:[^"\\]|\\[\s\S]|\\\Z|"(?!""))*(?:"""|\Z)'
+    r"|'(?:[^'\\\r\n]|\\[\s\S]|\\\Z)*(?:'|(?=[\r\n])|\Z)"
+    r'|"(?:[^"\\\r\n]|\\[\s\S]|\\\Z)*(?:"|(?=[\r\n])|\Z)))'
+    r"|(?P<n>\w+)|(?P<l>\r?\n|\r)|\\\r?\n"
+    r"|(?P<o>\*\*=?|//=?|>>=?|<<=?|:=|->|[-+*/%@&|^<>!=]=|[^\s\w])|\s|\Z)")
+_PY_KEYWORDS = frozenset(keyword.kwlist) - {"None", "True", "False"}
+# Anything else an element of the value does -- `%`, `.`, `and`, a comparison, a comprehension,
+# `*` -- means its value is not the literal written, and its strings are not read.
+_SETUP_KEEPS = {"+", ",", ":", "[", "]", "(", ")", "{", "}"}
 
 
 def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
-    """setup.py parsed as Python, so a list ends where Python ends it and a `#` in a string is
-    not a comment (second review of 0.50.0, 18.11). The value of `install_requires=` or
-    `extras_require=` (a keyword or a top-level assignment): literal lists, `+` of them, the
-    values of a dict; a string, or an f-string's leading literal name. Anything else -- a
-    variable, a call, a tuple -- is skipped, not guessed. A file Python cannot parse (Python 2)
-    gives nothing."""
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            tree = ast.parse("\n".join(lines).lstrip("\ufeff"))
-    except (SyntaxError, ValueError, RecursionError, MemoryError):
+    """setup.py read token by token, so a list ends where Python ends it and a `#` in a string
+    is not a comment (second review of 0.50.0, 18.11). The value of `install_requires=` or
+    `extras_require=` (a keyword or an assignment): literal lists, `+` of them, `(...)` around
+    them, the values of a dict, a string, an f-string's leading literal name. A variable, a
+    call, a tuple, a set and an element that computes something are skipped, not guessed."""
+    text = "\n".join(lines).lstrip("\ufeff")
+    if "install_requires" not in text and "extras_require" not in text:
         return []
-    values = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.keyword) and node.arg in _SETUP_NAMES:
-            values.append(node.value)
-        elif isinstance(node, ast.Assign) and any(
-                isinstance(t, ast.Name) and t.id in _SETUP_NAMES for t in node.targets):
-            values.append(node.value)
-    found: list[tuple[int, int, str, str | None]] = []
-    while values:
-        node = values.pop()
-        if isinstance(node, ast.List):
-            values.extend(node.elts)
-        elif isinstance(node, ast.Dict):
-            values.extend(node.values)
-        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-            values.extend((node.left, node.right))
-        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-            requirement = _PEP508.match(node.value)
-            if requirement:
-                found.append((node.lineno, node.col_offset, requirement.group(1),
-                              _requested(requirement.group(2))))
-        elif (isinstance(node, ast.JoinedStr) and node.values
-              and isinstance(node.values[0], ast.Constant)):
+    found: list[tuple[str, int, str | None]] = []
+    # The value being read, innermost bracket last: each frame is a dict with `opener`, `kept`
+    # (strings of finished elements), `element` (strings of the element being read),
+    # `spoilt` (that element computes something), `keyed` (it follows a dict key's `:`),
+    # `tuple` (a `,` in a `(`) and `call` (a call's or subscript's brackets: never read).
+    value: list[dict[str, Any]] | None = None
+    run: list[tuple[str, str, int]] = []  # adjacent string literals: (prefix, token, line)
+    line, depth, excess, previous, before = 1, 0, 0, "", ""
+
+    def new_frame(opener: str, call: bool) -> dict[str, Any]:
+        return {"opener": opener, "kept": [], "element": [], "spoilt": False, "keyed": False,
+                "tuple": False, "call": call}
+
+    def end_element(frame: dict[str, Any]) -> None:
+        if run:
+            frame["element"].append(list(run))
+            run.clear()
+        if not frame["spoilt"] and (frame["opener"] != "{" or frame["keyed"]):
+            frame["kept"].extend(frame["element"])
+        frame["element"], frame["spoilt"], frame["keyed"] = [], False, False
+
+    def operand_ended() -> bool:
+        return previous in {")", "]", "}", "'"} or (
+            previous[:1].isalnum() or previous[:1] == "_") and previous not in _PY_KEYWORDS
+
+    for match in _PY_TOKEN.finditer(text):
+        kind = match.lastgroup
+        if kind == "p":
+            kind = "s"
+        at = line
+        line += match.group(0).count("\n")
+        if kind is None or kind == "c":
+            continue
+        word = match.group(kind)
+        if value is not None and len(value) == 1 and (
+                kind == "l" and depth == 0
+                or (kind == "n" and word not in _PY_KEYWORDS or kind == "s" and previous != "'")
+                and operand_ended()):
+            # The statement ended, or two operands meet with no operator between them: what
+            # follows is not this value (a syntax error, or Python 2, ends the value there).
+            end_element(value[0])
+            found += _setup_rows(value[0]["kept"])
+            value = None
+        if kind == "l":
+            previous = before = ""
+            continue
+        if value is None:
+            if kind == "o" and word in "([{":
+                depth += 1
+            elif kind == "o" and word in ")]}":
+                depth = max(depth - 1, 0)
+            elif kind == "o" and word == "=" and previous in _SETUP_NAMES and before != ".":
+                value = [new_frame("=", False)]
+            previous, before = (word if kind != "s" else "'"), previous
+            continue
+        frame = value[-1]
+        if kind == "s":
+            run.append((match.group("p") or "", word[len(match.group("p") or ""):], at))
+            previous, before = "'", previous
+            continue
+        if run:
+            frame["element"].append(list(run))
+            run.clear()
+        if kind == "o" and word in "([{":
+            depth += 1
+            if len(value) < 200:
+                value.append(new_frame(word, operand_ended()))
+            else:
+                # Deeper brackets are read into the 200th frame, so memory stays bounded.
+                excess += 1
+        elif kind == "o" and word in ")]}" and excess:
+            depth, excess = max(depth - 1, 0), excess - 1
+        elif kind == "o" and word in ")]}" or kind == "o" and word in ",;" and len(value) == 1:
+            if word in ")]}":
+                depth = max(depth - 1, 0)
+            end_element(frame)
+            if len(value) == 1:
+                found += _setup_rows(frame["kept"])
+                value = None
+            else:
+                value.pop()
+                if not frame["call"] and not frame["tuple"]:
+                    value[-1]["element"].extend(frame["kept"])
+        elif kind == "o" and word == ",":
+            end_element(frame)
+            frame["tuple"] = frame["opener"] == "("
+        elif kind == "o" and word == ":" and frame["opener"] == "{":
+            frame["element"], frame["spoilt"], frame["keyed"] = [], False, True
+        elif kind == "n" and word in _PY_KEYWORDS or kind == "o" and word not in _SETUP_KEEPS:
+            frame["spoilt"] = True
+        previous, before = word, previous
+    if value is not None:
+        end_element(value[0])
+        found += _setup_rows(value[0]["kept"])
+    return found
+
+
+def _setup_rows(strings: list[list[tuple[str, str, int]]]) -> list[tuple[str, int, str | None]]:
+    """The rows of a value's string literals, adjacent literals joined as Python joins them.
+    A bytes literal, and one that is not a complete literal, is not a requirement."""
+    out = []
+    for parts in strings:
+        written: str | None = ""
+        formatted = False
+        for prefix, token, _ in parts:
+            quote = token[:3] if token[:3] in ('"""', "'''") else token[:1]
+            if ("b" in prefix.lower() or len(token) < 2 * len(quote)
+                    or not token.endswith(quote)):
+                written = None
+                break
+            if "f" in prefix.lower() or "r" in prefix.lower() or "\\" not in token:
+                written += token[len(quote):-len(quote)]
+                formatted = formatted or "f" in prefix.lower()
+                continue
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    written += ast.literal_eval(prefix + token)
+            except (SyntaxError, ValueError, MemoryError):
+                written = None
+                break
+        if written is None:
+            continue
+        number = parts[0][2]
+        requirement = _PEP508.match(written.split("{", 1)[0] if formatted else written)
+        if formatted:
             # `f"acme>={version}"`: the name is literal when the literal goes on past it.
-            head = str(node.values[0].value)
-            requirement = _PEP508.match(head)
+            head = written.split("{", 1)[0]
             if requirement and requirement.end(1) < len(head):
-                written = "".join(str(v.value) if isinstance(v, ast.Constant)
-                                  else "{" + ast.unparse(v.value) + "}"
-                                  for v in node.values if isinstance(v, (ast.Constant,
-                                                                         ast.FormattedValue)))
-                found.append((node.lineno, node.col_offset, requirement.group(1),
-                              _requested(_PEP508.match(written).group(2))))
-    return [(name, line, requested) for line, _, name, requested in sorted(found)]
+                out.append((requirement.group(1), number,
+                            _requested(_PEP508.match(written).group(2))))
+        elif requirement:
+            out.append((requirement.group(1), number, _requested(requirement.group(2))))
+    return out
 
 
 # A version pinned to one release, which is the only version a manifest states as a

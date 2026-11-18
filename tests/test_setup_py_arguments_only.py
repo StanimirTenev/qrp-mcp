@@ -97,13 +97,14 @@ def test_the_second_review_reproductions_give_no_invented_row(tmp_path):
 
 
 @pytest.mark.parametrize("text, expected", [
-    ('print "python 2"\nsetup(install_requires=["cryptography"])', []),
+    ('print "python 2"\nsetup(install_requires=["cryptography"])', [("cryptography", 2)]),
+    # A NUL after the list is an operator no value has: the element is not read.
     ('setup(install_requires=["cryptography"]\x00)', []),
     ("x = " + "(" * 5000 + "1" + ")" * 5000, []),
     ('setup(install_requires=["\\d", "a"])', [("a", 1)]),
 ])
-def test_a_setup_py_python_cannot_parse_gives_no_row_and_no_error(tmp_path, text, expected):
-    # A Python 2 setup.py is not read (said in CHANGELOG 0.50.0); nothing in it ends the scan.
+def test_a_setup_py_python_cannot_parse_gives_its_rows_and_no_error(tmp_path, text, expected):
+    # Third review (18.11): a Python 2 setup.py is read like any other; nothing in it ends the scan.
     assert _names(text) == expected
     (tmp_path / "setup.py").write_text(text)
     scan_directory(tmp_path)
