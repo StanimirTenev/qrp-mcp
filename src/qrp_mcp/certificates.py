@@ -762,6 +762,16 @@ def _load_private_key(pem: bytes) -> dict[str, Any]:
     return _key_fields(_key_info(key))
 
 
+def _load_der_private_key(raw: bytes) -> dict[str, Any]:
+    """A private key in DER (openssl pkey -outform DER: PKCS#8 or the traditional form), read
+    as its PEM is. Nothing for anything else, a password-protected key included."""
+    from cryptography.hazmat.primitives import serialization
+    try:
+        return _key_fields(_key_info(serialization.load_der_private_key(raw, None)))
+    except Exception:  # noqa: BLE001 -- never raises: the corpus is edge cases
+        return {}
+
+
 # Row 507: two key formats no reader claimed. A public key written as a byte array, as
 # `imgtool getpub --lang rust` / `--lang c` writes one (`&[0x30, 0x59, ...]`): the DER
 # SubjectPublicKeyInfo, one `0x..` per byte. And a Chromium vboot private key (.vbprivk): an
@@ -1013,7 +1023,10 @@ def _material(rel_path: str, raw: bytes) -> dict[str, Any]:
                 add(1, f"{fmt} certificate file", fmt, found)
                 break
             else:
-                if _iter_oids(raw) & _PKCS12_MARKERS:
+                der_key = _load_der_private_key(raw)
+                if der_key:
+                    keys[1] = der_key
+                elif _iter_oids(raw) & _PKCS12_MARKERS:
                     try:
                         bundle = pkcs12.load_pkcs12(raw, None)
                     except Exception:  # noqa: BLE001
@@ -1316,6 +1329,13 @@ def scan_certificate_file(path: Path, rel_path: str,
     if not blobs and not found_blocks and not material["certificates"] \
             and not text.lstrip().startswith("-----BEGIN"):
         blobs.append(raw)
+        if "key_algorithm" in material["keys"].get(1, {}):
+            # A DER private key that parsed: key material, its identifiers named as a parsed
+            # key's below, with its size.
+            parsed_key_blobs[0] = 1
+            keys.append({"path": rel_path, "line": 1, "type": "DER private key",
+                         "description": "private key material in a DER private key file",
+                         **material["keys"][1]})
 
     for line_no, line in enumerate(text.splitlines(), start=1):
         # SSH protocol 1 public key: bits, exponent, modulus, all in decimal.
