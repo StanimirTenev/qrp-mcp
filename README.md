@@ -348,17 +348,17 @@ docstring makes it a rejection test ("... is rejected.") still runs what it call
 
 ## Coverage on three public repositories
 
-What `coverage.scope` says on three trees this project did not write, measured on 4 Nov 2026 with
-the code of this release (the repositories at OpenSSH `7fe3b24`, certbot `56ee049`, Vault
-`41e571b`). `coverage_pct` is the share of the files present that were read; `read_in_full_pct`
-leaves out the files read only in part (a device configuration, a certificate block that did not
-parse).
+What `coverage.scope` says on three trees this project did not write, measured on 18 Nov 2026 with
+qrp-mcp 0.50.0 (the repositories at OpenSSH `7fe3b24`, certbot `56ee049`, Vault `41e571b`).
+`coverage_pct` is the share of the files present that were read; `read_in_full_pct` leaves out the
+files read only in part (a device configuration, a certificate block that did not parse).
+Findings are the entries of `findings`, Weak is `summary.weak_count`.
 
 | Repository | Files present | Read | `coverage_pct` | Read in part | `read_in_full_pct` | Findings | Weak |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| OpenSSH | 873 | 741 | 84.88% | 5 | 84.31% | 70 | 54 |
-| certbot | 1,250 | 850 | 68.00% | 0 | 68.00% | 39 | 28 |
-| Vault | 9,281 | 5,434 | 58.55% | 9 | 58.45% | 74 | 62 |
+| OpenSSH | 873 | 742 | 84.99% | 5 | 84.42% | 72 | 55 |
+| certbot | 1,250 | 850 | 68.00% | 0 | 68.00% | 41 | 28 |
+| Vault | 9,281 | 5,437 | 58.58% | 9 | 58.49% | 74 | 62 |
 
 These are reading figures, not detection figures. How well the rules find what is there is a
 different question; the measurements made of it, each with its date and version, are in
