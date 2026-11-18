@@ -272,6 +272,8 @@ id = "strongswan-ecp224bp"
 spelling = "ecp224bp"
 source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
 quote = "ecp224bp 224 bits 27"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "brainpoolP224r1"
 file = "swanctl.conf"
 snippet = '''
 connections {
@@ -281,13 +283,15 @@ connections {
   }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 224}}, {at = "evidence.ike_proposals", match = {group = "ecp224bp", family = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 224, curve = "brainpoolP224r1"}}, {at = "evidence.ike_proposals", match = {group = "ecp224bp", family = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "strongswan-ecp256bp"
 spelling = "ecp256bp"
 source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
 quote = "ecp256bp 256 bits 28"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "brainpoolP256r1"
 file = "swanctl.conf"
 snippet = '''
 connections {
@@ -297,13 +301,15 @@ connections {
   }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 256}}, {at = "evidence.ike_proposals", match = {group = "ecp256bp", family = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 256, curve = "brainpoolP256r1"}}, {at = "evidence.ike_proposals", match = {group = "ecp256bp", family = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "strongswan-ecp384bp"
 spelling = "ecp384bp"
 source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
 quote = "ecp384bp 384 bits 29"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "brainpoolP384r1"
 file = "swanctl.conf"
 snippet = '''
 connections {
@@ -313,13 +319,15 @@ connections {
   }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 384}}, {at = "evidence.ike_proposals", match = {group = "ecp384bp", family = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 384, curve = "brainpoolP384r1"}}, {at = "evidence.ike_proposals", match = {group = "ecp384bp", family = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "strongswan-ecp512bp"
 spelling = "ecp512bp"
 source = "https://docs.strongswan.org/docs/latest/config/proposals.html"
 quote = "ecp512bp 512 bits 30"
+meaning_source = "https://www.iana.org/assignments/ikev2-parameters/ikev2-parameters.xhtml"
+meaning_quote = "brainpoolP512r1"
 file = "swanctl.conf"
 snippet = '''
 connections {
@@ -329,7 +337,7 @@ connections {
   }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 512}}, {at = "evidence.ike_proposals", match = {group = "ecp512bp", family = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "EC", key_size = 512, curve = "brainpoolP512r1"}}, {at = "evidence.ike_proposals", match = {group = "ecp512bp", family = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "strongswan-curve25519"
@@ -606,7 +614,7 @@ conn gw
     ikev2=insist
     ike=3des-md5;modp1024,aes-sha1;modp1536
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 1024}}, {at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 1536}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 1024}}]}
 
 [[ecosystems.spellings]]
 id = "libreswan-dh19"
@@ -621,7 +629,7 @@ conn gw
     ikev2=insist
     ike=aes256-sha2;dh19
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 256}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDH", key_size = 256}}]}
 
 [[ecosystems.spellings]]
 id = "libreswan-dh20"
@@ -636,7 +644,7 @@ conn gw
     ikev2=insist
     ike=aes256-sha2;dh20
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 384}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDH", key_size = 384}}]}
 
 [[ecosystems.spellings]]
 id = "libreswan-dh21"
@@ -651,7 +659,7 @@ conn gw
     ikev2=insist
     ike=aes256-sha2;dh21
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 521}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDH", key_size = 521}}]}
 
 [[ecosystems.spellings]]
 id = "libreswan-dh31"
@@ -696,7 +704,7 @@ conn gw
     ikev2=insist
     ike=aes_gcm+chacha20_poly1305;dh14+dh19
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 2048}}, {at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 256}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "DH", key_size = 2048}}, {at = "evidence.source_code", match = {line = 3, algorithm = "ECDH", key_size = 256}}]}
 
 [[ecosystems.spellings]]
 id = "libreswan-esp-dh19"
@@ -711,7 +719,7 @@ conn gw
     ikev2=insist
     esp=aes128-sha2_512;dh19
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "EC", key_size = 256}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDH", key_size = 256}}]}
 
 [[ecosystems.spellings]]
 id = "libreswan-authby-rsasig"
