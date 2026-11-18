@@ -1360,6 +1360,13 @@ def scan_certificate_file(path: Path, rel_path: str,
         if named:
             record(named, f"{named} in an SSH {'certificate' if certified else 'key'} "
                    f"of type {head}", line_no, line)
+            # The key field is RFC 4253 Sec. 6.6's encoding, the modulus in it: an RSA key's
+            # size is on the line (closure keysize/PKI). A certificate's blob starts otherwise.
+            field = line.split()[1] if len(line.split()) > 1 else ""
+            if named == "RSA" and not certified and algorithms and algorithms[-1]["algorithm"] == "RSA":
+                fields = _ssh2_public_key_fields(field)
+                if fields.get("key_type") == head and "key_size" in fields:
+                    algorithms[-1]["key_size"] = fields["key_size"]
 
     for index, blob in enumerate(blobs):
         if index in parsed_key_blobs:
