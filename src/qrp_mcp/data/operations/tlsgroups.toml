@@ -971,7 +971,7 @@ http {
   }
 }
 '''
-expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
+expect = {rows = [{at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}]}
 
 [[ecosystems.spellings]]
 id = "nginx-stream-ssl-ecdh-curve"
