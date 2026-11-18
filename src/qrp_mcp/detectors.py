@@ -2364,7 +2364,9 @@ _KEY_SIZE = re.compile(
     r"\bgenerate_keypair\(\s*KeyType\.RSA\s*,\s*(\d{3,5})\b|"
     # Rows 369, 370, 374 (W1): .NET `RSA.Create(1024)`, `new RSACryptoServiceProvider(512)`,
     # `new RSACng(3072)`; PowerShell `New-SelfSignedCertificate ... -KeyLength 1024`.
-    r"\bRSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:RSACryptoServiceProvider|RSACng)\(\s*(\d{3,5})\s*\)|"
+    # And RSAOpenSsl(int), and the (int dwKeySize, CspParameters) overload (learn.microsoft.com,
+    # RSAOpenSsl and RSACryptoServiceProvider constructors; closure keysize/NET).
+    r"\bRSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:RSACryptoServiceProvider|RSACng|RSAOpenSsl)\(\s*(\d{3,5})\s*[,)]|"
     r"\bNew-SelfSignedCertificate\b[^\n]*?\s-KeyLength\s+(\d{3,5})\b|" + _SIZE_OPTIONS,
     re.IGNORECASE)
 # The same for DSA and DH (release 3d): only the forms that name no algorithm themselves.
@@ -2372,7 +2374,7 @@ _KEY_SIZE_GENERIC = re.compile(
     r"key_size\s*=\s*(\d{3,5})|(?<![A-Za-z])bits\s*=\s*(\d{3,5})|(?:\.|\b)initialize\(\s*(\d{3,5})\b|"
     r"\b(?:DSA|DH)\.(?:new|generate)\(\s*(\d{3,5})\b|\bcreateDiffieHellman\(\s*(\d{3,5})\b|"
     r"set_dsa_paramgen_bits\([^,]*,\s*(\d{3,5})\b|set_dh_paramgen_prime_len\([^,]*,\s*(\d{3,5})\b|"
-    r"\bDSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:DSACryptoServiceProvider|DSACng)\(\s*(\d{3,5})\s*\)|"
+    r"\bDSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:DSACryptoServiceProvider|DSACng)\(\s*(\d{3,5})\s*[,)]|"
     + _SIZE_OPTIONS,
     re.IGNORECASE)
 
@@ -5615,6 +5617,10 @@ _NIST_CURVE = re.compile(
 _SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])|\bECC_SECG_P256K1\b", re.IGNORECASE)
 _CURVE_SIZE = {"P-256": 256, "P-384": 384, "P-521": 521, "secp256k1": 256}
 _ECDSA_SIZE_NAME = re.compile(r"(?<![A-Za-z0-9])ecdsa(256|384|521)(?![0-9])", re.IGNORECASE)
+# .NET's ECDsaCng(int keySize), ECDsaOpenSsl(int keySize), ECDiffieHellmanCng(int keySize): the
+# key size, which picks the NIST curve of that size (learn.microsoft.com, the constructors;
+# closure keysize/NET). The curve itself is not written, so only the size is said.
+_DOTNET_EC_SIZE = re.compile(r"\b(?:ECDsaCng|ECDsaOpenSsl|ECDiffieHellmanCng)\(\s*(256|384|521)\s*\)")
 # Row 460: what the secp256k1 rule matched by a library that has no other curve -- ethers'
 # `Wallet.createRandom()`, btcec, bitcoinjs-lib, ECPair, ecrecover, eth_keys, the JSON-RPC
 # signing calls. Not `web3` alone: @solana/web3.js signs with Ed25519.
@@ -5650,6 +5656,10 @@ def _tag_curves(items: list[dict[str, Any]]) -> None:
         # size, as `"rsa2048"` does; the curve is not said. One size on the line, or none.
         if not item.get("curve") and "key_size" not in item:
             named = set(_ECDSA_SIZE_NAME.findall(item.get("excerpt") or ""))
+            if len(named) == 1:
+                item["key_size"] = int(named.pop())
+        if not item.get("curve") and "key_size" not in item:
+            named = set(_DOTNET_EC_SIZE.findall(item.get("excerpt") or ""))
             if len(named) == 1:
                 item["key_size"] = int(named.pop())
 
