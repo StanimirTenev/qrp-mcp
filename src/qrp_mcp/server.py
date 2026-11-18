@@ -404,7 +404,8 @@ def _mask_excerpts(result: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-_URL_USERINFO = re.compile(r"(://)([^/@\s]+)@")
+# A URL in a request: its scheme, then everything after it (userinfo, host, path, query, fragment).
+_URL_AFTER_SCHEME = re.compile(r"(\b[A-Za-z][A-Za-z0-9+.-]*://|\bfile:)(.+)$")
 
 
 def _mask_owners(result: dict[str, Any]) -> None:
@@ -422,13 +423,15 @@ def _mask_owners(result: dict[str, Any]) -> None:
                 if isinstance(item, dict) and isinstance(item.get("wraps"), dict):
                     item["wraps"]["name"] = _mask_excerpt(str(item["wraps"]["name"]), "")
     # Review S1 (18.11): a dependency's request keeps a PEP 508 URL as written, and its userinfo
-    # (`git+https://tok:secret@host/p.git`) is a credential, masked as a line is.
+    # (`git+https://tok:secret@host/p.git`) is a credential. The second review found the query
+    # token, the host, a home directory in `file:` and `p@ss@host` past the first `@` in the
+    # clear: everything after the scheme is masked as a line is; the scheme stays.
     for items in _evidence_lists(result):
         if isinstance(items, list):
             for item in items:
                 if isinstance(item, dict) and isinstance(item.get("requested"), str):
-                    item["requested"] = _URL_USERINFO.sub(
-                        lambda m: m.group(1) + _mask_excerpt(m.group(2), "") + "@",
+                    item["requested"] = _URL_AFTER_SCHEME.sub(
+                        lambda m: m.group(1) + _mask_excerpt(m.group(2), ""),
                         item["requested"])
     # Row 490: a listener's server names are host names, masked as owners are.
     for place in (result.get("tls_listeners") or {}).get("places") or []:
