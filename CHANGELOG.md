@@ -90,8 +90,15 @@ What changes for an existing user:
   named by path and the name of an environment variable. Below `full` such a target, a path
   in `angles` and the certificate path of `tls_termination.authentication_not_read` (in the
   clear since 0.41.0) are masked as a line is; a lead followed to the files read keeps its
-  target, and `where_to_look` is built again from the masked sections. `full` is unchanged
-  (`tests/test_masking_stage3_sections.py`).
+  target, and `where_to_look` is built again from the masked sections. The independent review
+  then found one more: the key a key file is named under in YAML, INI or HCL
+  (`zzhost.corp.example: certs/c.pem`) was in the clear in `leads.items[].setting` and in
+  `where_to_look`, for followed leads too. Below `full` such a key is masked, whatever the
+  lead's status; the module's own words (`include`, `HostKey`, `cert`, `ssl_dhparam`, a call's
+  name, `environment variable`) stay. `full` is unchanged
+  (`tests/test_masking_stage3_sections.py`). Not changed, and older than 0.50.0:
+  `chosen_outside_files.places` keeps the name of a setting read from the environment at
+  every level.
 - **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
   `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
   A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the

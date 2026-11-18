@@ -68,11 +68,17 @@ key = open("/srv/keys/signing-key-qq.pem", "rb").read()
 k2 = open(os.environ["PAYROLL_SIGNING_KEY_PATH"]).read()
 priv = serialization.load_pem_private_key(open("keys/local-absent-r9.pem", "rb").read(), None)
 """
-TREE = {"conf/nginx.conf": NGINX, "conf/sshd_config": SSHD, "app/main.py": PY}
+# Review B2 (PREGLED.md, 18.11): a YAML/INI key before a key file's path is source text too -- a
+# host, a service, a customer -- whether the lead is followed (certs/c.pem is read) or not.
+YAML = """zzhost.corp.example: certs/c.pem
+zzhost2.corp: /opt/zzopt/c.pem
+"""
+TREE = {"conf/nginx.conf": NGINX, "conf/sshd_config": SSHD, "app/main.py": PY,
+        "conf/app.yaml": YAML, "conf/certs/c.pem": "x\n"}
 NEEDLES = ("hidden-host", "token-abc123", "secret-ca", "bundle-q7", "private-trust",
            "secret-xyz789", "missing-k4", "hostkey-vault-77", "hidden-55", "ca-bundle-zz",
            "corp-secret", "signing-key-qq", "srv/keys", "PAYROLL_SIGNING_KEY_PATH",
-           "local-absent-r9")
+           "local-absent-r9", "zzhost", "zzopt")
 
 
 def _write(root: Path, files: dict[str, str]) -> Path:
@@ -234,3 +240,38 @@ def test_where_to_look_keeps_its_order_and_rows_below_full(scanned, level):
         return [(i["rank"], i["kind"], i.get("rule"), i.get("path"), i.get("line"),
                  i.get("status")) for i in result["where_to_look"]["items"]]
     assert shape(scanned[level]) == shape(scanned["full"])
+
+
+# --- review B2: the key a key file is named under ---------------------------------------------
+
+@pytest.mark.parametrize("level", ("masked", "trimmed"))
+def test_a_config_key_before_a_key_path_is_masked_below_full(scanned, level):
+    leads = scanned[level]["chosen_outside_files"]["leads"]["items"]
+    yaml = {l["status"]: l for l in leads if l["path"] == "conf/app.yaml"}
+    assert set(yaml) == {"followed", "outside_the_tree"}
+    assert yaml["followed"]["setting"] == "******.****.*******"
+    assert yaml["followed"]["target"] == "certs/c.pem"          # files read keep their path
+    assert yaml["outside_the_tree"]["setting"] == "*******.****"
+    look = [i for i in scanned[level]["where_to_look"]["items"] if i.get("path") == "conf/app.yaml"]
+    assert look and all("zz" not in i["statement"] for i in look)
+    full = {l["status"]: l["setting"] for l in scanned["full"]["chosen_outside_files"]["leads"]
+            ["items"] if l["path"] == "conf/app.yaml"}
+    assert full == {"followed": "zzhost.corp.example", "outside_the_tree": "zzhost2.corp"}
+
+
+@pytest.mark.parametrize("level", ("masked", "trimmed"))
+def test_the_fixed_vocabulary_of_a_lead_stays_readable(scanned, level):
+    settings = {(l["rule"], l["setting"])
+                for l in scanned[level]["chosen_outside_files"]["leads"]["items"]}
+    assert {("include", "include"), ("include", "Include"), ("key_file_path", "HostKey"),
+            ("key_file_path", "open"),
+            ("key_file_from_environment", "environment variable")} <= settings
+
+
+def test_b2_reproduction_through_scan_out(tmp_path):
+    # pregled/fixtures/v2-e, as the review ran it.
+    root = _write(tmp_path / "e", {"certs/c.pem": "x\n", "app.yaml": YAML})
+    for args in (("scan",), ("scan", "--level", "trimmed")):
+        assert "zzhost" not in _text(_cli(root, tmp_path / "m.json", *args)), args
+    assert "zzhost.corp.example" in _text(_cli(root, tmp_path / "f.json", "scan", "--level",
+                                               "full"))

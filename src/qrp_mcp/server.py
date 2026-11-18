@@ -436,6 +436,10 @@ def _mask_owners(result: dict[str, Any]) -> None:
     for lead in leads.get("items") or []:
         if lead.get("status") not in adaptive._FOLLOWED:
             lead["target"] = _mask_excerpt(str(lead["target"]), "")
+        # Review B2: the key a key file is named under in YAML/INI/HCL is source text, followed
+        # or not; the module's own vocabulary (include, HostKey, cert, open, ...) stays.
+        if not adaptive.fixed_setting(lead):
+            lead["setting"] = _mask_excerpt(str(lead["setting"]), "")
     for c in (result.get("angles") or {}).get("contradictions") or []:
         if c.get("file"):
             masked = _mask_excerpt(str(c["file"]), "")

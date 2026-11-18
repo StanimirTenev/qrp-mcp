@@ -434,6 +434,21 @@ LEADS_MEANING = (
 
 
 _FOLLOWED = ("followed", "followed_from_parent")
+_FIXED_SPACE_SETTING = re.compile(r"(?:" + _SPACE_KEY_SETTINGS + r")", re.IGNORECASE)
+_FIXED_SSH_SETTING = re.compile(r"HostKey|HostCertificate|TrustedUserCAKeys|IdentityFile|"
+                                r"CertificateFile|RevokedKeys")
+
+
+def fixed_setting(lead: dict[str, Any]) -> bool:
+    """Whether a lead's `setting` is this module's own vocabulary -- a directive, an OpenSSH or
+    OpenVPN/nginx/Apache setting, a call's name, `environment variable` -- rather than a key
+    taken from the scanned file (`zzhost.corp.example: certs/c.pem`), which is source text and is
+    masked below `full` (review B2, 18.11)."""
+    setting, rule = str(lead.get("setting") or ""), lead.get("rule")
+    if rule == "include" or rule == "key_file_from_environment":
+        return True
+    return bool(_FIXED_SPACE_SETTING.fullmatch(setting) or _FIXED_SSH_SETTING.fullmatch(setting)
+                or _CODE_LOAD.fullmatch(setting + "("))
 # A path built at run time or written as a placeholder: a variable ($X, %h), a template or format
 # field ({{ x }}, {0}), a home directory (~), a first segment in capitals that a program replaces
 # (certbot's MAGICDIR/live/...), or documentation's /path/to/ (the control's sample, 18.11).
