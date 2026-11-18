@@ -911,6 +911,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # a cipher, a hash, the cipher's parameters.
         r"\bGNUTLS_(?:PK_GOST_(?:01|12_256|12_512)|SIGN_GOST_(?:94|256|512))\b",
         re.IGNORECASE)),
+    # Stage 3b: PKCS#11 3.1's XEdDSA and X3DH mechanisms (6.3.15, 6.5.1), Signal's schemes on
+    # CKK_EC_MONTGOMERY keys. Their own families: not EdDSA, not DH (classifier.py).
+    ("XEdDSA", "XEdDSA usage (PKCS#11 CKM_XEDDSA)", re.compile(r"\bCKM_XEDDSA\b")),
+    ("X3DH", "X3DH usage (PKCS#11 CKM_X3DH_INITIALIZE / CKM_X3DH_RESPOND)",
+     re.compile(r"\bCKM_X3DH_(?:INITIALIZE|RESPOND)\b")),
     ("SM2", "SM2 usage", re.compile(
         r"\bSM2(?:Engine|Signer|KeyPairGenerator|KeyExchange|ParameterSpec|WITH|with)|"
         r"(?:WITH|With|with)SM2\b|\bcurveSM2\b|\bEVP_PKEY_SM2\b|\bsm2p256v1\b")),

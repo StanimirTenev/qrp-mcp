@@ -163,6 +163,16 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     ("GOSTR3410", "GOST R 34.10", "classical_vulnerable", "signature"),
     ("GOST3410", "GOST R 34.10", "classical_vulnerable", "signature"),
     ("SM2", "SM2", "classical_vulnerable", "signature"),
+    # Signal's XEdDSA signatures and X3DH key agreement, on Curve25519 / Curve448 (PKCS#11 3.1
+    # 6.3.15 and 6.5: CKK_EC_MONTGOMERY keys). XEdDSA "create[s] and verif[ies] EdDSA-compatible
+    # signatures using ... the X25519 and X448 elliptic curve Diffie-Hellman functions"; X3DH's DH
+    # "will be either the X25519 or X448 function" (signal.org/docs/specifications). Elliptic-curve
+    # discrete log, which Shor's algorithm breaks; Signal's own PQXDH: "Authentication in PQXDH is
+    # not quantum-secure" -- the XEdDSA signature it keeps. Two families, one role each (stage 3b,
+    # approved 18.11.2026). XEdDSA is not EdDSA: the key is a Montgomery key, and it is the
+    # longer token.
+    ("XEDDSA", "XEdDSA", "classical_vulnerable", "signature"),
+    ("X3DH", "X3DH", "classical_vulnerable", "key_exchange"),
     ("ELGAMAL", "ElGamal", "classical_vulnerable", "public_key"),
     ("DIFFIEHELLMAN", "DH", "classical_vulnerable", "key_exchange"),
     ("DHE", "DH", "classical_vulnerable", "key_exchange"),

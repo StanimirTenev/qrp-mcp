@@ -148,7 +148,7 @@ _PQC_CATEGORY = {
 # discrete-log problems).
 _SHOR_BROKEN = {
     "RSA", "DSA", "DH", "EC", "ECDSA", "ECDH", "EdDSA", "Ed25519", "Ed448", "X25519", "X448",
-    "Schnorr", "BLS", "GOST R 34.10", "SM2", "ElGamal",
+    "Schnorr", "BLS", "GOST R 34.10", "SM2", "ElGamal", "XEdDSA", "X3DH",
 }
 # `classicalSecurityLevel` (bits). NIST SP 800-57 Part 1 Rev. 5, Table 2: IFC/FFC by the
 # modulus size exactly as tabulated (4096 is not in the table, so it gets none); ECC by

@@ -53,9 +53,9 @@ _HYBRID = ("During the transition a hybrid (classical + post-quantum) is accommo
 
 # family -> list of options; an empty list is an explicit "no approved replacement".
 _BY_FAMILY: dict[str, dict[str, Any]] = {}
-for fam in ("X25519", "X448", "ECDH", "DH"):
+for fam in ("X25519", "X448", "ECDH", "DH", "X3DH"):
     _BY_FAMILY[fam] = {"options": [_KEM], "note": _HYBRID}
-for fam in ("ECDSA", "EdDSA", "Ed25519", "Ed448", "DSA", "GOST R 34.10"):
+for fam in ("ECDSA", "EdDSA", "Ed25519", "Ed448", "DSA", "GOST R 34.10", "XEdDSA"):
     _BY_FAMILY[fam] = {"options": [_SIG, _SIG_FIRMWARE], "note": _HYBRID}
 # SM2 and ElGamal sign and encrypt alike (row 139).
 for fam in ("RSA", "EC", "SM2", "ElGamal"):
