@@ -1092,6 +1092,48 @@ _SSHCOM_MAGIC = 0x3F6FF9EB
 _SSHCOM_FAMILIES = {"if-modn": "RSA", "dl-modp": "DSA"}
 
 
+# RFC 4716, the SSH public key file format: "---- BEGIN SSH2 PUBLIC KEY ----", RFC822-style
+# header lines ("Header-tag ':' ' ' Header-value", a trailing backslash continuing one), then
+# the base64 of the key as SSH writes it -- string key type, then the key, an RSA key's
+# string e and string n (RFC 4253 6.6).
+_SSH2_PUBLIC_BLOCK = re.compile(r"^---- BEGIN SSH2 PUBLIC KEY ----[ \t\r]*\n(.*?)"
+                                r"^---- END SSH2 PUBLIC KEY ----", re.M | re.S)
+
+
+def _ssh2_public_key_fields(body: str) -> dict[str, Any]:
+    import struct
+
+    lines, continued = [], False
+    for line in body.splitlines():
+        line = line.strip()
+        if continued or ":" in line:
+            continued = line.endswith("\\")
+            continue
+        lines.append(line)
+    try:
+        blob = base64.b64decode("".join(lines), validate=False)
+        size = struct.unpack(">I", blob[:4])[0]
+        key_type = blob[4:4 + size].decode("ascii")
+    except (ValueError, TypeError, struct.error, UnicodeDecodeError):
+        return {}
+    family = _SSH_KEY_TYPES.get(key_type)
+    if family is None:
+        return {}
+    out: dict[str, Any] = {"key_algorithm": family, "key_type": key_type}
+    if family == "RSA":
+        try:
+            at = 4 + size
+            e_len = struct.unpack(">I", blob[at:at + 4])[0]
+            at += 4 + e_len
+            n_len = struct.unpack(">I", blob[at:at + 4])[0]
+            n = int.from_bytes(blob[at + 4:at + 4 + n_len], "big")
+            if n:
+                out["key_size"] = n.bit_length()
+        except struct.error:
+            pass
+    return out
+
+
 def _sshcom_key_fields(body: str) -> dict[str, Any]:
     import struct
 
@@ -1256,6 +1298,19 @@ def scan_certificate_file(path: Path, rel_path: str,
                            f"its header)", line_no, "---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----")
             if "key_size" in fields and algorithms and algorithms[-1]["algorithm"] == family:
                 algorithms[-1]["key_size"] = fields["key_size"]
+
+    for match in _SSH2_PUBLIC_BLOCK.finditer(text):
+        found_blocks = True
+        line_no = text.count("\n", 0, match.start()) + 1
+        fields = _ssh2_public_key_fields(match.group(1))
+        family = fields.get("key_algorithm")
+        if family:
+            record(family, f"{family} in an RFC 4716 SSH2 public key block of type "
+                           f"{fields['key_type']}", line_no, "---- BEGIN SSH2 PUBLIC KEY ----")
+            if algorithms and algorithms[-1]["algorithm"] == family:
+                algorithms[-1]["key_material"] = "public key"
+                if "key_size" in fields:
+                    algorithms[-1]["key_size"] = fields["key_size"]
 
     # A .der or .p12 is the same content without the armour -- unless it was parsed.
     if not blobs and not found_blocks and not material["certificates"] \
