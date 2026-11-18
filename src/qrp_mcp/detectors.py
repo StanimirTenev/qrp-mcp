@@ -4475,6 +4475,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _sodium_signatures(findings, lines, rel_path)
     findings = _pq_operations(findings, lines, rel_path)
     _android_keystore_spec(findings, lines)
+    _dotnet_key_size_property(findings, lines)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
@@ -4649,6 +4650,27 @@ def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> 
             f["curve"] = f"P-{sizes.pop()}"
         elif not re.search(r"\.set(?:AlgorithmParameterSpec|KeySize)\s*\(", spec):
             f["curve"], f["key_size"], f["curve_basis"] = "P-256", 256, _KEYSTORE_EC_DEFAULT
+
+
+# Row 371: .NET's AsymmetricAlgorithm.KeySize ("Gets or sets the size, in bits, of the key
+# modulus"), set on a later line than the one that makes the key: `var rsa = RSA.Create();` then
+# `rsa.KeySize = 1024;`. The size goes to the RSA or DSA row of the line that assigned that
+# name, up to ten lines above, when that row has none.
+_KEY_SIZE_PROPERTY = re.compile(r"\b([A-Za-z_]\w*)\.KeySize\s*=\s*(\d{3,5})\s*;")
+
+
+def _dotnet_key_size_property(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    for index, line in enumerate(lines):
+        m = _KEY_SIZE_PROPERTY.search(line) if "KeySize" in line else None
+        if not m or int(m.group(2)) not in registry._SIZES:
+            continue
+        assigned = re.compile(rf"\b{re.escape(m.group(1))}\s*=(?!=)")
+        for f in findings:
+            if (f.get("algorithm") in ("RSA", "DSA") and 0 < index + 1 - f["line"] <= 10
+                    and f.get("key_size") in (None, "undetermined")
+                    and f.get("evidence_kind") not in ("comment", "ban")
+                    and assigned.search(lines[f["line"] - 1])):
+                f["key_size"] = int(m.group(2))
 
 
 # Row 495: an RSA key that wraps a symmetric key -- `pub.encrypt(archive_key, padding.OAEP(...))`
