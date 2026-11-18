@@ -1,5 +1,9 @@
 """The catalogue of operations (data/operations/*.toml): for each operation and ecosystem, the
 documented spellings that tests/test_operation_closure.py scans one by one.
+
+The scan reports which (operation, ecosystem) pairs the catalogue holds, as `operation_closure`.
+That list is a statement about this version's tests, never about the scanned code: it does not
+enter the findings, their fingerprint, a gate or the exit code.
 """
 
 from __future__ import annotations
@@ -27,3 +31,19 @@ def _load() -> tuple[dict[str, Any], ...]:
 def catalogue() -> list[dict[str, Any]]:
     return list(_load())
 
+
+def closure_section() -> dict[str, Any]:
+    families = [{"operation": doc["operation"], "ecosystem": eco["ecosystem"],
+                 "spellings_count": sum(1 for s in eco["spellings"] if s["source"] != "none"),
+                 "catalogue_version": doc["catalogue_version"]}
+                for doc in _load() for eco in doc["ecosystems"]]
+    return {
+        "meaning": ("the (operation, ecosystem) pairs whose documented spellings this version "
+                    "tests one by one, each written to a file and scanned "
+                    "(tests/test_operation_closure.py); spellings_count counts those with a "
+                    "documentation source. It says what this version was tested against, not "
+                    "what the scanned code contains, and a spelling outside the catalogue can "
+                    "still be missed. It does not affect the findings, their fingerprint, a "
+                    "gate or the exit code"),
+        "families": families,
+    }

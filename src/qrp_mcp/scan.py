@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from . import (__version__, assets, aws_tls, baseline as baseline_mod, certificates, confidence,
-               config, coverage, detectors, dnssec, ike, opcua, profiles, remediation, suppression)
+               config, coverage, detectors, dnssec, ike, opcua, operations, profiles, remediation,
+               suppression)
 from .classifier import (_OID_FAMILIES, SIZED_FAMILIES, FingerprintRequest, classical_status,
                          fingerprint, known_algorithms, summarize)
 
@@ -447,6 +448,9 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     _unowned(result)
     result["layer_disagreements"] = _layer_disagreements(result)
     result["findings_fingerprint"] = findings_fingerprint(result)
+    # What this version was tested against, operation by operation (data/operations); after the
+    # fingerprint and outside findings and evidence, so it can move neither.
+    result["operation_closure"] = operations.closure_section()
     return result
 
 
