@@ -274,6 +274,9 @@ CONFIG_ONLY = frozenset({SSH_RSA_KEY_FILE, SSH_DSA_KEY_FILE})
 
 SHA1_COMPOUND_NAME = "SHA-1 named in a compound name"
 SECP256K1_RULE = "secp256k1 (ECDSA) usage"
+# The description of the CNG macro rule below (`BCRYPT_RSA_ALGORITHM`), read by _cng_key_pair_size.
+CNG_MACRO_RULE = "%s named by its CNG algorithm identifier macro"
+
 ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("RSA", "RSA usage", re.compile(
         r"Crypto\.PublicKey\.RSA|Crypto\.PublicKey\s+import\s+RSA|"
@@ -1235,6 +1238,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         ("ECDH", "ECDH|ECDH_P256|ECDH_P384|ECDH_P521"),
         ("MD5", "MD5"), ("MD4", "MD4"), ("MD2", "MD2"), ("SHA1", "SHA1"),
         ("3DES", "3DES|3DES_112"), ("DES", "DES|DESX"), ("RC4", "RC4"), ("RC2", "RC2"))],
+    # The same identifiers by their bcrypt.h macros, for the asymmetric providers whose key
+    # BCryptGenerateKeyPair makes (Learn, BCryptGenerateKeyPair: BCRYPT_RSA_ALGORITHM,
+    # BCRYPT_DSA_ALGORITHM, BCRYPT_DH_ALGORITHM; closure keysize/NET). ECDSA_P256 and the
+    # others already name their family.
+    *[(family, CNG_MACRO_RULE % family, re.compile(
+        r"\bBCryptOpenAlgorithmProvider\s*\([^,]*,\s*BCRYPT_" + family + r"(?:_SIGN)?_ALGORITHM\b"))
+      for family in ("RSA", "DSA", "DH")],
     # Rows 379, 382, 383 (W1): the digest a Windows certificate, signing or hashing tool is
     # told to use -- New-SelfSignedCertificate -HashAlgorithm, signtool /fd and /td,
     # certutil -hashfile FILE ALG, makecert -a.
@@ -4476,6 +4486,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _pq_operations(findings, lines, rel_path)
     _android_keystore_spec(findings, lines)
     _dotnet_key_size_property(findings, lines)
+    _cng_key_pair_size(findings, lines)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
     _mark_non_security_use(findings, lines)
@@ -4650,6 +4661,22 @@ def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> 
             f["curve"] = f"P-{sizes.pop()}"
         elif not re.search(r"\.set(?:AlgorithmParameterSpec|KeySize)\s*\(", spec):
             f["curve"], f["key_size"], f["curve_basis"] = "P-256", 256, _KEYSTORE_EC_DEFAULT
+
+
+# BCryptGenerateKeyPair's dwLength, "The length, in bits, of the key" (Learn), for the key of the
+# provider the file opened by its macro (CNG_MACRO_RULE). The handle is not followed: a file
+# that opens one such provider and calls BCryptGenerateKeyPair once with a number gives that
+# number to the provider's row; two of either give nothing.
+_CNG_KEY_PAIR = re.compile(r"\bBCryptGenerateKeyPair\s*\([^,]*,[^,]*,\s*(\d{3,5})\s*,")
+
+
+def _cng_key_pair_size(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    sizes = [int(m.group(1)) for line in lines if "BCryptGenerateKeyPair" in line
+             for m in _CNG_KEY_PAIR.finditer(line)]
+    opened = [f for f in findings if f.get("description") in
+              {CNG_MACRO_RULE % fam for fam in ("RSA", "DSA", "DH")}]
+    if len(sizes) == 1 and len(opened) == 1 and sizes[0] in registry._SIZES and "key_size" not in opened[0]:
+        opened[0]["key_size"] = sizes[0]
 
 
 # Row 371: .NET's AsymmetricAlgorithm.KeySize ("Gets or sets the size, in bits, of the key
