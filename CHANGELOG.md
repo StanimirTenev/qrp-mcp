@@ -153,7 +153,11 @@ What changes for an existing user:
   skipped, not guessed; so is an annotated or augmented assignment (`install_requires +=`).
   All 33 setup.py in the corpus and the control give the rows they gave before, on 3.10 and
   3.12. `setup_requires` and `tests_require` are not read
-  (`tests/test_setup_py_arguments_only.py`, `tests/test_setup_py_never_crashes.py`).
+  (`tests/test_setup_py_arguments_only.py`, `tests/test_setup_py_never_crashes.py`). Not
+  resolved, and older than this release (fddec63 has it): the CBOM's confidence properties are
+  quadratic in the dependency rows that share one line, so a setup.py with tens of thousands of
+  requirements on a single line makes `qrp-mcp cbom` slow (20 000: about a minute; the review's
+  200 000 did not finish in 15 minutes) though `scan` ends in seconds.
 - **Two pinned expectations changed.** PKCS#11 `CKK_EC_EDWARDS` and
   `CKM_EC_EDWARDS_KEY_PAIR_GEN` are EdDSA, not EC (PKCS#11 3.1 §6.3; `tests/test_pkcs11_names.py`).
   A file whose `ssl_ecdh_curve` lists no group but X25519, X448 or curveSM2 no longer gives ECDH from the
