@@ -810,13 +810,21 @@ _TRUST_PYTHON = re.compile(
     r"[\"']([^\"']+)[\"']|\b(load_verify_locations)\s*\(\s*[\"']([^\"']+)[\"']")
 _TRUST_GO = re.compile(r"\b(AppendCertsFromPEM)\s*\(")
 _GO_READ_FILE = re.compile(r"\b(?:os|ioutil)\.ReadFile\(\s*\"([^\"]+)\"")
+# nginx: ssl_client_certificate, ssl_trusted_certificate, and the upstream side's
+# proxy_/grpc_/uwsgi_ssl_trusted_certificate ("Specifies a file with trusted CA certificates in
+# the PEM format used to verify the certificate of the proxied ... server"). HAProxy: `ca-file`
+# on a bind, server or default-server line ("a PEM file from which to load CA certificates used
+# to verify server's certificate"; on bind, the client's).
 _TRUST_NGINX = re.compile(
-    r"^\s*(ssl_client_certificate|ssl_trusted_certificate)\s+[\"']?([^\s;\"']+)")
+    r"^\s*(ssl_client_certificate|(?:proxy_|grpc_|uwsgi_)?ssl_trusted_certificate)\s+"
+    r"[\"']?([^\s;\"']+)"
+    r"|^\s*(?:bind|server|default-server)\s.*?(?<!\S)(ca-file)\s+[\"']?([^\s\"']+)")
 TRUST_STORES_MEANING = (
     "places that load a trust store -- the certificates this code or server accepts as roots: "
-    "the path each names, the files read that it is, and the anchors in them. Read in three "
+    "the path each names, the files read that it is, and the anchors in them. Read in four "
     "forms (Python load_verify_locations/create_default_context cafile or capath, Go "
-    "AppendCertsFromPEM after os.ReadFile, nginx ssl_client_certificate/ssl_trusted_certificate); "
+    "AppendCertsFromPEM after os.ReadFile, nginx ssl_client_certificate and "
+    "[proxy_|grpc_|uwsgi_]ssl_trusted_certificate, HAProxy ca-file); "
     "a path outside the tree is said, not read; a system store used by default is not listed")
 
 
@@ -848,7 +856,7 @@ def _trust_stores(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                 named = found[-1] if found else None
             m = _TRUST_NGINX.match(line.split("#", 1)[0]) if suffix not in ("py", "go") else None
             if m:
-                setting, named = m.group(1), m.group(2)
+                setting, named = m.group(1) or m.group(3), m.group(2) or m.group(4)
             if not setting:
                 continue
             linked = sorted({c for c in (named, str(Path(rel).parent / named))
