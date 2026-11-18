@@ -420,6 +420,8 @@ LEADS_MEANING = (
     "the files read; "
     "`outside_the_tree` -- an absolute path (same_name_read lists files read with that name, "
     "a possible copy, not linked); `not_found` -- a relative path the tree does not have; "
+    "`pattern_not_followed` -- a pattern no file read matches and that is not looked for in "
+    "the tree (`**` inside a path component, or a pattern the file system refuses); "
     "`templated` -- a path built from a variable, a template or a format field, joined to a "
     "directory of the run (filepath.Join, os.path.join), or written as "
     "a placeholder (/path/to/, a first segment in capitals), not resolved; "
@@ -463,8 +465,17 @@ def _resolve(target: str, rel: str, read: set[str], root: Path) -> dict[str, Any
             return {"status": "followed_from_parent", "base": str(base), "files": matched[:20]}
     # A symlink is in the tree though the scan does not follow it (certbot's live/*.pem).
     for _base, pattern in candidates:
-        if any(root.glob(pattern)) if glob else os.path.lexists(root / pattern):
-            return {"status": "in_the_tree_not_read"}
+        # The pattern is source text: `**` inside a component (`sites/**.conf`) makes pathlib
+        # raise on Python 3.10-3.12 and ended the whole scan (review B1, 18.11). Such a pattern
+        # is not globbed on any version, and nothing else pathlib refuses (ValueError, OSError,
+        # IndexError on a pattern that normalises to nothing) ends the scan.
+        if glob and any("**" in part and part != "**" for part in pattern.split("/")):
+            return {"status": "pattern_not_followed"}
+        try:
+            if any(root.glob(pattern)) if glob else os.path.lexists(root / pattern):
+                return {"status": "in_the_tree_not_read"}
+        except Exception:  # noqa: BLE001 -- whatever pathlib refuses, the lead is not followed
+            return {"status": "pattern_not_followed"}
     return {"status": "not_found"}
 
 
@@ -627,12 +638,25 @@ def _where_to_look(ecosystems: dict[str, Any], angles: dict[str, Any], leads: di
 
 
 def annotate(result: dict[str, Any], root: Path) -> None:
-    """The four sections, set on the finished result. Reads it; changes no row of it."""
-    leads = _leads(result, root)
-    ecosystems = _ecosystems(result, root)
-    angles = _angles(result, root, leads["items"])
+    """The four sections, set on the finished result. Reads it; changes no row of it.
+
+    Context only, so it can never fail a scan (review B1, 18.11): all four are built before any
+    is set, and a failure leaves none of them and names its exception class -- not its message,
+    which may quote the scanned text."""
+    try:
+        leads = _leads(result, root)
+        ecosystems = _ecosystems(result, root)
+        angles = _angles(result, root, leads["items"])
+        where = _where_to_look(ecosystems, angles, leads, result)
+    except Exception as error:  # noqa: BLE001 -- a context section must not end the scan
+        result["adaptive_not_built"] = {
+            "error": type(error).__name__,
+            "statement": ("ecosystems, angles, chosen_outside_files.leads and where_to_look were "
+                          "not built for this tree; the findings, the evidence and the exit code "
+                          "do not depend on them")}
+        return
     result["ecosystems"] = ecosystems
     result["angles"] = angles
     if isinstance(result.get("chosen_outside_files"), dict):
         result["chosen_outside_files"]["leads"] = leads
-    result["where_to_look"] = _where_to_look(ecosystems, angles, leads, result)
+    result["where_to_look"] = where

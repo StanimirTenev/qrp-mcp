@@ -75,6 +75,15 @@ doi:10.5281/zenodo.24336932, now in `CITATION.cff`. The scan stays deterministic
 
 What changes for an existing user:
 
+- **A stage-3 section cannot fail a scan.** Found by the independent review before the tag: a
+  lead whose target had `**` inside a path component (`exclude: "**.pem"` in a YAML file,
+  `Include a/**b/c`, `include sites/**.conf;` with nothing under `sites/`) made pathlib raise on
+  Python 3.10-3.12, and the whole scan ended with exit 2 (`scan_repo` raised) where 0.49.0 exited
+  0. Such a lead now says `pattern_not_followed`, and no pattern from the scanned text reaches a
+  glob that can raise. If building `ecosystems`, `angles`, `leads` or `where_to_look` fails for
+  any other reason, none of the four is set and `adaptive_not_built` names the exception class;
+  the findings and the exit code are what they would be without them
+  (`tests/test_stage3_never_fails_a_scan.py`, also run on Python 3.10).
 - **The new sections quote at the level the rest of the result does.** Found before the tag:
   at `masked` (the default) and `trimmed`, `where_to_look` wrote out a trust-store path that
   `trust_stores` masks, and `chosen_outside_files.leads` the target of an include, a key file
