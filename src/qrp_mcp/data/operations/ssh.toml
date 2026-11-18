@@ -10,13 +10,13 @@ catalogue_version = "1"
 
 [[ecosystems]]
 ecosystem = "SSH"
-scope = "sshd_config KexAlgorithms (all 15 supported names, +/-/^ prefixes), HostKeyAlgorithms (every name of the default, certificates included), PubkeyAcceptedAlgorithms, HostbasedAcceptedAlgorithms, CASignatureAlgorithms, HostKey default files; ssh_config KexAlgorithms, HostKeyAlgorithms, PubkeyAcceptedAlgorithms; authorized_keys key types and known_hosts @revoked/@cert-authority markers (sshd(8)); ssh-keygen -t and -b. Not covered: Ciphers/MACs (operation ciphers), RevokedKeys and KRL files, Match blocks, Include, GSSAPIKexAlgorithms, the size of a key inside authorized_keys (operation keysize), the pre-release ML-DSA name of row 18 (not on these pages), other SSH servers (Dropbear, libssh, Tectia)."
+scope = "sshd_config KexAlgorithms (all 16 supported names, +/-/^ prefixes), HostKeyAlgorithms (every name of the default, certificates included), PubkeyAcceptedAlgorithms, HostbasedAcceptedAlgorithms, CASignatureAlgorithms, HostKey default files; ssh_config KexAlgorithms, HostKeyAlgorithms, PubkeyAcceptedAlgorithms; authorized_keys key types and known_hosts @revoked/@cert-authority markers (sshd(8)); ssh-keygen -t and -b. Not covered: Ciphers/MACs (operation ciphers), RevokedKeys and KRL files, Match blocks, Include, GSSAPIKexAlgorithms, the size of a key inside authorized_keys (operation keysize), the pre-release ML-DSA name of row 18 (not on these pages), other SSH servers (Dropbear, libssh, Tectia)."
 
 [[ecosystems.spellings]]
 id = "kex-curve25519-sha256"
 spelling = "KexAlgorithms curve25519-sha256"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms curve25519-sha256
@@ -27,7 +27,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-curve25519-sha256@libssh.org"
 spelling = "KexAlgorithms curve25519-sha256@libssh.org"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms curve25519-sha256@libssh.org
@@ -38,7 +38,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-diffie-hellman-group1-sha1"
 spelling = "KexAlgorithms diffie-hellman-group1-sha1"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms diffie-hellman-group1-sha1
@@ -49,7 +49,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-diffie-hellman-group14-sha1"
 spelling = "KexAlgorithms diffie-hellman-group14-sha1"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms diffie-hellman-group14-sha1
@@ -60,7 +60,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-diffie-hellman-group14-sha256"
 spelling = "KexAlgorithms diffie-hellman-group14-sha256"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms diffie-hellman-group14-sha256
@@ -71,7 +71,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-diffie-hellman-group16-sha512"
 spelling = "KexAlgorithms diffie-hellman-group16-sha512"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms diffie-hellman-group16-sha512
@@ -82,7 +82,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-diffie-hellman-group18-sha512"
 spelling = "KexAlgorithms diffie-hellman-group18-sha512"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms diffie-hellman-group18-sha512
@@ -93,7 +93,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-diffie-hellman-group-exchange-sha1"
 spelling = "KexAlgorithms diffie-hellman-group-exchange-sha1"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms diffie-hellman-group-exchange-sha1
@@ -104,7 +104,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-diffie-hellman-group-exchange-sha256"
 spelling = "KexAlgorithms diffie-hellman-group-exchange-sha256"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms diffie-hellman-group-exchange-sha256
@@ -115,7 +115,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-ecdh-sha2-nistp256"
 spelling = "KexAlgorithms ecdh-sha2-nistp256"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms ecdh-sha2-nistp256
@@ -126,7 +126,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-ecdh-sha2-nistp384"
 spelling = "KexAlgorithms ecdh-sha2-nistp384"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms ecdh-sha2-nistp384
@@ -137,7 +137,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-ecdh-sha2-nistp521"
 spelling = "KexAlgorithms ecdh-sha2-nistp521"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms ecdh-sha2-nistp521
@@ -148,7 +148,7 @@ expect = {rows = [{at = "evidence.ssh_kex", match = {path = "sshd_config", line 
 id = "kex-mlkem768nistp256-sha256"
 spelling = "KexAlgorithms mlkem768nistp256-sha256"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms mlkem768nistp256-sha256
@@ -159,7 +159,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", l
 id = "kex-mlkem768x25519-sha256"
 spelling = "KexAlgorithms mlkem768x25519-sha256"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms mlkem768x25519-sha256
@@ -170,10 +170,21 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", l
 id = "kex-sntrup761x25519-sha512"
 spelling = "KexAlgorithms sntrup761x25519-sha512"
 source = "https://man.openbsd.org/sshd_config"
-quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
 file = "sshd_config"
 snippet = '''
 KexAlgorithms sntrup761x25519-sha512
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "NTRU", parameter_set = "sntrup761"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "X25519"}}, {at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "kex-sntrup761x25519-sha512@openssh.com"
+spelling = "KexAlgorithms sntrup761x25519-sha512@openssh.com"
+source = "https://man.openbsd.org/sshd_config"
+quote = "The supported algorithms are: curve25519-sha256 curve25519-sha256@libssh.org diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group14-sha256 diffie-hellman-group16-sha512 diffie-hellman-group18-sha512 diffie-hellman-group-exchange-sha1 diffie-hellman-group-exchange-sha256 ecdh-sha2-nistp256 ecdh-sha2-nistp384 ecdh-sha2-nistp521 mlkem768nistp256-sha256 mlkem768x25519-sha256 sntrup761x25519-sha512 sntrup761x25519-sha512@openssh.com"
+file = "sshd_config"
+snippet = '''
+KexAlgorithms sntrup761x25519-sha512@openssh.com
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "NTRU", parameter_set = "sntrup761"}}, {at = "evidence.source_code", match = {path = "sshd_config", line = 1, algorithm = "X25519"}}, {at = "evidence.ssh_kex", match = {path = "sshd_config", line = 1}, absent = true}]}
 
