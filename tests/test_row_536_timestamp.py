@@ -247,3 +247,21 @@ def test_printing_an_existing_request_is_not_a_request(tmp_path):
     sh = "#!/bin/sh\nopenssl ts -query -in req.tsq -text\nopenssl ts -query -data f.txt -sha1 -out r.tsq\n"
     places = _places(scan_directory(str(_tree(tmp_path, {"s.sh": sh}))))
     assert ("s.sh", 2) not in places and places[("s.sh", 3)]["hash_choice"] == "sha1"
+
+
+def test_a_generator_assigned_without_its_type_is_read(tmp_path):
+    # Re-review of 0.51.0 (19.11): `var g2 = new TimeStampRequestGenerator()` (Java 10+) and Kotlin's
+    # `val g = TimeStampRequestGenerator()` name no type before the variable, and their generate(...)
+    # was not read.
+    java = ("import org.bouncycastle.tsp.*;\nclass A {\n"
+            "  private final TimeStampRequestGenerator gen = new TimeStampRequestGenerator();\n"
+            "  void a(byte[] d) throws Exception {\n"
+            "    var g2 = new TimeStampRequestGenerator();\n"
+            "    TimeStampRequest r1 = g2.generate(TSPAlgorithms.SHA256, d);\n"
+            "    TimeStampRequest r3 = gen.generate(TSPAlgorithms.SHA3_256, d);\n  }\n}\n")
+    kt = ("import org.bouncycastle.tsp.TimeStampRequestGenerator\n"
+          "fun k(d: ByteArray) { val g = TimeStampRequestGenerator(); g.generate(TSPAlgorithms.SHA256, d) }\n")
+    places = _places(scan_directory(str(_tree(tmp_path, {"A.java": java, "K.kt": kt}))))
+    assert places[("A.java", 6)]["hash_choice"] == "TSPAlgorithms.SHA256"
+    assert places[("A.java", 7)]["hash_choice"] == "TSPAlgorithms.SHA3_256"
+    assert places[("K.kt", 2)]["hash_choice"] == "TSPAlgorithms.SHA256"

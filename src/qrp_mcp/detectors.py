@@ -5575,7 +5575,10 @@ _HASHNAME = re.compile(r"\bhashname\s*=\s*(?:[\"']([\w-]+)[\"'])?")
 # `generate(...)` is the authority's own, local signing (second independent review, 19.11).
 _BC_TSP_GENERATE = re.compile(r"(?:\b(\w+)|\bnew\s+TimeStampRequestGenerator\s*\(\s*\)\s*)"
                               r"\.generate\s*\(\s*([\w.]+)\s*,")
-_BC_TSP_DECLARED = re.compile(r"\bTimeStampRequestGenerator\s+(\w+)\s*[=;,)]")
+# A variable declared with the type, or assigned a new generator without it (Java's `var g =
+# new TimeStampRequestGenerator()`, Kotlin's `val g = TimeStampRequestGenerator()`; re-review, 19.11).
+_BC_TSP_DECLARED = re.compile(r"\bTimeStampRequestGenerator\s+(\w+)\s*[=;,)]"
+                              r"|\b(\w+)\s*=\s*(?:new\s+)?TimeStampRequestGenerator\s*\(")
 # `openssl ts -query -in req.tsq` prints a request made before: not a new one.
 _OPENSSL_TS_PRINT = re.compile(r"\s-in\s")
 # Bouncy Castle's digest identifiers by their class (TSPAlgorithms, the OID classes): a fixed name.
@@ -5627,7 +5630,7 @@ def _call_arguments(window: str, start: int) -> str | None:
 def remote_timestamps(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     text = "\n".join(lines)
     bc = "TimeStampRequestGenerator" in text
-    generators = set(_BC_TSP_DECLARED.findall(text)) if bc else set()
+    generators = {a or b for a, b in _BC_TSP_DECLARED.findall(text)} if bc else set()
     rfc3161ng = "rfc3161ng" in text
     out: list[dict[str, Any]] = []
     for number, line in enumerate(lines, 1):
