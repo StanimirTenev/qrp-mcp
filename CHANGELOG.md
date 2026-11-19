@@ -15,7 +15,7 @@ after a LinkedIn post asked who audits the randomness behind PQC keys. The repro
   generators the code calls, one row per API on a line, in one of three classes from their own
   documentation: `weak` (a non-cryptographic PRNG),
   `csprng` (a named cryptographic generator) and `check` (a call its documentation does not settle
-  by itself, with `why`). It covers Python, Go, Java/Kotlin, JS/TS, C/C++, .NET and PHP: 46
+  by itself, with `why`). It covers Python, Go, Java/Kotlin, JS/TS, C/C++, .NET and PHP: 48
   spellings in `data/operations/rng_source.toml`, each with its page, the words quoted from it and
   a closure test. The reproduction now gives 9 rows.
 - **Places to check.** A `weak` or `check` row becomes a place in the same line, function or file as
@@ -23,10 +23,23 @@ after a LinkedIn post asked who audits the randomness behind PQC keys. The repro
   nonce or iv. `link` is always `co-location`: the value is not followed, and a place is not a
   verdict. A `csprng` row is never a place. In the reproduction: `keys.py` lines 3 and 4 (seed,
   nonce) and `gen.go` line 3; `Gen.java` makes no key, so its Random stays a row.
-- **FIPS 203/204.** Where ML-KEM or ML-DSA has a generator in the same function, the section quotes
-  FIPS 203 §3.3 or FIPS 204 §3.6.1 with the page and the minimum strength per parameter set (for
-  ML-DSA both the seed ξ, shall, and the hedged `rnd`, should). It says the requirement is named,
-  not checked.
+- **FIPS 203/204.** Where an ML-KEM or ML-DSA call draws randomness and has a generator in the
+  same function, the section quotes FIPS 203 §3.3 or FIPS 204 §3.6.1 with the page and the minimum
+  strength per parameter set: ML-KEM key generation and encapsulation get FIPS 203, ML-DSA key
+  generation the seed ξ (shall), ML-DSA signing the hedged `rnd` (should). The operation
+  (`operations`) is read from the names called on the row's line or on the name it assigns; verify-
+  and decapsulation-only code and tables that only name the algorithm get no entry (no statement
+  where the operation is not read). One entry per function, family and parameter set. It says the
+  requirement is named, not checked; the meaning travels into the CBOM
+  (`qrp:randomness:pqc_requirements_meaning`). OpenSSH: 10 entries (17 before the review);
+  smallstep's COSE mapping: none (3 before).
+- **The pessimistic side, after the review of 19.11.** `check`, not `csprng`: `new
+  SecureRandom(seed)` with the seed in a variable (`seed_supplied`); `getInstance("SHA1PRNG")`, with
+  or without a provider, whether or not its file calls setSeed (`sha1prng_seed_not_ruled_out`, or
+  `sha1prng_with_setseed`); a name outside the JDK's standard names (`not_a_standard_name`); C
+  `getrandom(..., GRND_NONBLOCK)` (`may_return_before_the_pool_is_initialised`), which beside a key
+  is now a place. `getrandom` without the flag stays `csprng`. Dense co-location is linear: the
+  section takes 1.6 s on 40,000 lines of weak calls beside key rows in one function (155 s before).
 - **What is not read** for randomness is listed (entropy at boot, VM and container entropy, an
   HSM's generator, a generator injected at run time, a seed from configuration, statistical
   quality), with the counts of calls seen and calls classified. `out_of_scope_by_design` now says
@@ -48,6 +61,19 @@ after a LinkedIn post asked who audits the randomness behind PQC keys. The repro
   from it).
 - **Not covered**: Rust, Ruby, Swift, methods on a generator variable, entropy estimation and
   statistical tests. Not changed: SHA1PRNG keeps its SHA-1 row in `evidence`.
+- **Against us** (said, not left out):
+  - A place is co-location, not data flow. The controls hold known false places: certbot's renewal
+    jitter (`random.uniform`), Vault's jitter and sink, and a Firebase index in a name that says key.
+  - Multi-line strings (a Python docstring, a JS template literal, a Go raw string) are not blanked
+    across lines, so a line inside one can give a `weak` row and a place.
+  - Some weak generators are neither rows nor counted in `calls_seen_not_classified`: C
+    `lrand48`/`drand48`, PHP `uniqid`/`lcg_value`/`str_shuffle`, a .NET alias of `System.Random`
+    (`using R = System.Random`), Java's static-import `random()`, `SplittableRandom`,
+    `kotlin.random`, and a Go dot-import. The count of calls seen is not complete.
+  - The PQC operation is read from names, a heuristic: a seeded call (`_seeded`, `_derand`) is read
+    as the operation it names, so OpenSSH's composite ML-DSA-44/Ed25519 signing, which expands its
+    key from the stored seed, also gets the seed ξ beside `rnd`.
+  - `getRandomValues` is matched on any receiver, so a user-defined one reads `csprng`.
 
 ## 0.51.0 (2026-11-19)
 
