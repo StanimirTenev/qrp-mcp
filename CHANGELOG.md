@@ -4,6 +4,49 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.52.0 (not released; branch `v0.52-rng`)
+
+Random number generators, asked for on 19.11 ("give the random number generator more attention")
+after a LinkedIn post asked who audits the randomness behind PQC keys. The reproduction
+(`random.getrandbits` and `random.randint` beside an EC key, `math/rand` with a fixed seed beside
+`ecdsa.GenerateKey`, `java.util.Random` and SHA1PRNG) gave 0 rows on 0.51.0.
+
+- **A new operation, `rng_source` (rows 531, 539).** A new section, `randomness`, lists each call of a
+  generator in one of three classes from its own documentation: `weak` (a non-cryptographic PRNG),
+  `csprng` (a named cryptographic generator) and `check` (a call its documentation does not settle
+  by itself, with `why`). It covers Python, Go, Java/Kotlin, JS/TS, C/C++, .NET and PHP: 46
+  spellings in `data/operations/rng_source.toml`, each with its page, the words quoted from it and
+  a closure test. The reproduction now gives 9 rows.
+- **Places to check.** A `weak` or `check` row becomes a place in the same line, function or file as
+  a public-key operation the scan reports, or when it is assigned to a name that says key, seed,
+  nonce or iv. `link` is always `co-location`: the value is not followed, and a place is not a
+  verdict. A `csprng` row is never a place. In the reproduction: `keys.py` lines 3 and 4 (seed,
+  nonce) and `gen.go` line 3; `Gen.java` makes no key, so its Random stays a row.
+- **FIPS 203/204.** Where ML-KEM or ML-DSA has a generator in the same function, the section quotes
+  FIPS 203 §3.3 or FIPS 204 §3.6.1 with the page and the minimum strength per parameter set (for
+  ML-DSA both the seed ξ, shall, and the hedged `rnd`, should). It says the requirement is named,
+  not checked.
+- **What is not read** for randomness is listed (entropy at boot, VM and container entropy, an
+  HSM's generator, a generator injected at run time, a seed from configuration, statistical
+  quality), with the counts of calls seen and calls classified. `out_of_scope_by_design` now says
+  where the generators are listed, and that `os.urandom(n)` and the like are read for one thing
+  more, the size of a symmetric key an RSA key wraps (row 531 a, b).
+- **Context, not findings.** The section is built after the fingerprint, outside `evidence`: the
+  findings, their fingerprint, a baseline, `prove_closure`, a gate and the exit code are as before.
+  `excerpt` is masked and trimmed like every row; every other field holds a value from a closed
+  list.
+- **CBOM**: `qrp:randomness:*` properties. A `drbg` component appears where the DRBG family is named
+  on the line, and nowhere else (OpenSSL `EVP_RAND_fetch` with `CTR-DRBG`, `HASH-DRBG`, `HMAC-DRBG`). A weak
+  generator is never a component.
+- **Ecosystem status**: `rng_source` is a recorded gap of the seven ecosystems. It counts where the
+  tree has a row of it outside test code, and not elsewhere (the per-tree rule of 0.51.0), so a Go tree with
+  `crypto/rand` or `math/rand` reads `partially_closed` where it read `not_closed`.
+- **Credited, not copied**: Bandit B311, gosec G404, FindSecBugs, CA5394, Semgrep, CodeQL's
+  insecure-randomness queries and Sonar S2245 (its co-location idea is described, nothing is taken
+  from it).
+- **Not covered**: Rust, Ruby, Swift, methods on a generator variable, entropy estimation and
+  statistical tests. Not changed: SHA1PRNG keeps its SHA-1 row in `evidence`.
+
 ## 0.51.0 (2026-11-19)
 
 Two roles the scan did not name, reported on LinkedIn on 19.11 and reproduced on 0.50.0 from PyPI,

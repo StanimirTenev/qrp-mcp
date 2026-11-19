@@ -585,3 +585,69 @@ s2n-tls, rustls) every piece of evidence is identical before and after.
   file the scan read. A commented line, `openssl enc` and `gpg -c` (a passphrase) are not here, nor
   `gpg -r X` without `-e`. The readiness summary is over families and does not read these rows.
 - **Cipher suites by name** (rows 465, 475): see [The CBOM it emits](cbom.md).
+
+### Random number generators (`rng_source`, next release; rows 531, 539)
+
+Context, not findings: the section `randomness` is built after the findings fingerprint and outside
+`evidence`, so it moves neither the findings, their fingerprint, a baseline, `prove_closure`, a gate
+nor the exit code.
+
+- **Rows** (`randomness.calls`): each call of a generator, with its `ecosystem`, `class` and the
+  catalogue's name for it (`api`). `weak`: Python `random` (its functions and `random.Random`) and
+  `numpy.random`; Go `math/rand` and `math/rand/v2`; Java `new java.util.Random(...)` (with
+  `java.util.Random` or `java.util.*` imported, or the qualified name), `ThreadLocalRandom.current()`,
+  `Math.random()`; JavaScript `Math.random()`; C `rand()`, `srand()`, `rand_r()`, C++
+  `std::mt19937`/`std::mt19937_64`; .NET `new Random(...)`, `Random.Shared`; PHP `rand()`,
+  `mt_rand()`, `srand()`, `mt_srand()`. `csprng`: `secrets`, `os.urandom`, `os.getrandom`,
+  `random.SystemRandom`; `crypto/rand`; `new SecureRandom()`, `getInstanceStrong()`,
+  `getInstance("<standard name>")` (the name is kept if it is one of the JDK's standard names,
+  otherwise it reads `not_a_standard_name`); `crypto.getRandomValues`, Node's `crypto.randomBytes`,
+  `randomFill(Sync)`, `randomInt`, `randomUUID`; `getrandom()`, `arc4random*`, OpenSSL
+  `RAND_bytes`/`RAND_priv_bytes` and `EVP_RAND_fetch` with `CTR-DRBG`, `HASH-DRBG` or `HMAC-DRBG`;
+  `RandomNumberGenerator`, `RNGCryptoServiceProvider`; `random_int()`, `random_bytes()`. `check`,
+  with `why`: `std::random_device` (`may_be_a_prng`), SHA1PRNG in a file that calls `setSeed`
+  (`sha1prng_with_setseed`), `setSeed(<literal>)` or `new SecureRandom(<literal>)` (`fixed_seed`),
+  `getInstance(<a variable>)` and `EVP_RAND_fetch(ctx, <a variable>, ...)`
+  (`algorithm_chosen_at_run_time`), Go's `NewChaCha8`
+  (`strong_type_in_a_package_not_for_security`), Node's `crypto.pseudoRandomBytes`
+  (`deprecated_alias`). A seed written as a literal is `seed: "literal"`. Names resolve through the
+  file's own imports (Python aliases and from-imports, Go import aliases); a comment line is skipped
+  and string contents are blanked before matching. Every field except `path` and `excerpt` holds a
+  value from a closed list. The 46 spellings, each with its page, the words quoted from it and a
+  test, are `data/operations/rng_source.toml`.
+- **Places to check** (`randomness.places`): a `weak` or `check` row with an anchor in its file. An
+  anchor is a public-key call row the scan reports (`public_key_operation`), which may be a key
+  generation, a signature or a key exchange, not told apart. It can also be the row's value
+  assigned on its line to a name whose words include key, seed, nonce or iv (`assigned_to_name`).
+  `link_scope` is `same_line`, `same_function` (a Python `def` by indentation; the innermost brace
+  block opened after `)` or `=>`, a heuristic) or `same_file`. `link` is always `co-location`: the
+  value is not followed. A `csprng` row is never a place.
+- **FIPS 203/204** (`randomness.pqc_requirements`): an ML-KEM or ML-DSA call row with a generator of
+  any class in the same function or on the same line. The entry carries FIPS 203 §3.3 (p. 16, PDF
+  p. 25) or FIPS 204 §3.6.1 (p. 12, PDF p. 22), quoted, with the minimum security strength per
+  parameter set: 128/192/256 bits for ML-KEM-512/768/1024. For ML-DSA it gives the seed ξ (shall:
+  192 bits for ML-DSA-65, 256 for ML-DSA-87; ML-DSA-44 shall 128, should 192) and the hedged `rnd`
+  (should). An ML-DSA row is not told apart as key generation or signing, so both are given. The
+  requirement is named, not checked.
+- **Not read** (`randomness.not_read`, `randomness.counts`): entropy at boot, VM and container
+  entropy, an HSM's or PKCS#11 token's generator, a generator injected at run time, a seed from
+  configuration or the environment, statistical quality. The counts are `calls_seen`,
+  `calls_classified`, `calls_seen_not_classified` (a called name with a randomness word that no
+  spelling classifies), `by_class` and `chosen_at_run_time`.
+- **Ecosystem status**: `rng_source` counts toward Py, Go, Java, JS, C, NET and PHP where
+  `randomness.calls` has a row of that ecosystem outside test code, of any class, and not elsewhere. A `crypto/rand`
+  row counts, so a Go tree that uses it moves from `not_closed` to `partially_closed`.
+- **CBOM**: `qrp:randomness:calls`, `:places`, `:pqc_requirements`, `:not_read` and the counts, without
+  excerpts. A `drbg` component appears for `EVP_RAND_fetch` with a named DRBG, and for nothing else (`CTR_DRBG`,
+  `Hash_DRBG`, `HMAC_DRBG`). A weak generator is never a component.
+- **Not covered**: Rust's `rand` crate, Ruby, Swift, Kotlin's `kotlin.random`, Python docstrings, a
+  method on a generator variable (`r.Int63()`, `rng.nextInt()`), commons-lang `RandomUtils`,
+  `SplittableRandom`, C `random()`/`drand48()`, OpenSSL `RAND_pseudo_bytes`, PHP's Randomizer
+  engines, libsodium, mbedTLS. No entropy is estimated and no statistical test is run. Unchanged:
+  `SecureRandom.getInstance("SHA1PRNG")` still gives its SHA-1 row in `evidence` ("SHA-1 named in a
+  compound name").
+- **Prior art, credited**: Bandit B311, gosec G404, FindSecBugs `PREDICTABLE_RANDOM`, .NET CA5394
+  and Semgrep's rules flag weak generators by pattern. CodeQL's insecure-randomness queries follow a
+  weak generator by data flow to sensitive use, and Sonar S2245 reports one in a security context
+  (crypto imports or key-related names nearby, a co-location heuristic described here, not
+  reused). No code or keyword list is taken from any of them.

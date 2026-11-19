@@ -296,7 +296,33 @@ test.
   of seven C libraries, key files and key sizes in PKI, key sizes in .NET, TLS endpoints and TLS
   groups in nginx-style configuration, SSH algorithms, liboqs and hash-based signatures in C,
   Python dependencies, environment reads and RFC 3161 time-stamp requests, and ECVRF (RFC 9381)
-  in Go and Rust.
+  in Go and Rust. The next release adds `rng_source` for seven ecosystems (19 pairs, 1,319
+  spellings): the random number generators the code calls, below.
+- **`randomness`: the generators the code calls, as context.** Each call of a generator is a row
+  in one of three classes, from the generator's own documentation: `weak` (a non-cryptographic
+  PRNG: Python `random` and `numpy.random`, Go `math/rand` and `math/rand/v2`,
+  `java.util.Random`, `ThreadLocalRandom`, `Math.random`, C `rand`/`srand`, `std::mt19937`,
+  `System.Random`, PHP `rand`/`mt_rand`), `csprng` (a named cryptographic generator: `secrets`,
+  `os.urandom`, `crypto/rand`, `SecureRandom`, `crypto.getRandomValues`, `getrandom`,
+  `arc4random`, `RAND_bytes`, `RandomNumberGenerator`, `random_int`) or `check` (a call its
+  documentation does not settle by itself: `std::random_device`, SHA1PRNG with `setSeed`, a
+  literal seed into a CSPRNG API, Go's ChaCha8, a generator named in a variable). A `weak` or
+  `check` row in the same line, function or file as a public-key operation the scan reports, or
+  assigned to a name that says key, seed, nonce or iv, is a **place to check** with its
+  `link_scope`. The link is co-location: no value is followed from the generator to the key, and
+  a place is not a verdict. Where ML-KEM or ML-DSA has a generator in the same function, the
+  section names the FIPS 203 (3.3) or FIPS 204 (3.6.1) requirement, quoted with its page and the
+  minimum strength per parameter set, and says it is named, not checked. `not_read` says what a
+  code scan cannot know (entropy at boot, VM and container entropy, an HSM's generator, a generator
+  injected at run time, a seed from configuration, statistical quality); no entropy is estimated
+  and no test is run. None of this is a finding: it moves neither the findings, their
+  fingerprint, a gate nor the exit code. In the CBOM it is `qrp:randomness:*` properties, and a
+  `drbg` component where the DRBG family is named on the line, nowhere else (OpenSSL's
+  `EVP_RAND_fetch(..., "CTR-DRBG", ...)`). Pattern rules for weak generators are already free and
+  widespread (Bandit B311, gosec G404, FindSecBugs, CA5394, Semgrep), and CodeQL and Sonar S2245
+  link a weak generator to sensitive use; this section adds the class from the documentation, the
+  FIPS requirement beside ML-KEM and ML-DSA, and what is not read, in the same output as the
+  inventory.
 - **`operation_closure`** in the result lists those pairs, with `spellings_count` and the
   catalogue version. It says what this version was tested against, not what your code contains.
   It does not enter the findings, their fingerprint, a gate or the exit code.
@@ -433,10 +459,12 @@ A **free inventory tool**, not a readiness assessment. It deliberately does not 
 - network or host scanning, or reading a system certificate store,
 - tracking change over time — `prove_closure` compares two scans you give it; nothing keeps a history,
 - symmetric cryptography, hashes and MACs, key derivation (PBKDF2, scrypt, Argon2, HKDF) or
-  random number generation (SecureRandom, DRBG, `os.urandom`, `secrets`, a remote entropy service) —
-  out of scope by design: it reports the public-key cryptography a quantum computer would break. A file
-  holding only these is read and gives no row; the output says so in
-  `coverage.claims.out_of_scope_by_design`. MD5, SHA-1, DES, 3DES and RC4 are still named where
+  random number generation as a finding (SecureRandom, DRBG, `os.urandom`, `secrets`, `math/rand`, a
+  remote entropy service) — out of scope by design: it reports the public-key cryptography a quantum
+  computer would break. A file holding nothing else is read and gives no finding; the output says so
+  in `coverage.claims.out_of_scope_by_design`. From the next release the generators the code calls
+  are listed in `randomness` as context (above, "How it adapts"); the entropy behind them and the
+  quality of a seed are not read. MD5, SHA-1, DES, 3DES and RC4 are still named where
   found. Four `--mandate` documents date AES or SHA sizes (`cnsa-2.0`, `au-ism`, `ca-cccs`,
   `nist-ir-8547`); under them the gate says `not_established` for symmetric rather than pass,
 - which OpenSSL or other TLS library a base image carries: `FROM alpine:3.12` or
