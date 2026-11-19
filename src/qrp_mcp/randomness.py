@@ -442,29 +442,63 @@ def _read(root: Path, rel: str) -> str:
         return ""
 
 
+# A called name holding one of these words, that no spelling classifies, is counted as seen.
+_SEEN_WORDS = frozenset(("rand", "random", "randomness", "rng", "prng", "csprng", "drbg", "urandom",
+                         "getrandom", "randint", "randrange", "randbytes", "randbits",
+                         "getrandbits", "randbelow", "randn", "srand", "entropy"))
+_SEEN_INSIDE = ("mt19937", "urandom", "getrandom", "arc4random")
+_SEEN_HINTS = ("rand", "rng", "drbg", "mt19937", "entropy")
+_CALLED = re.compile(r"([A-Za-z_]\w*)\s*\(")
+
+
+def _seen_word(name: str) -> bool:
+    low = name.lower()
+    if any(w in low for w in _SEEN_INSIDE):
+        return True
+    return any(part.lower() in _SEEN_WORDS
+               for piece in name.split("_") for part in _NAME_PARTS.findall(piece))
+
+
 def _rows(result: dict[str, Any], root: Path, texts: dict[str, tuple[str, str]],
-          columns: list[tuple[int, str]]) -> list[dict[str, Any]]:
+          columns: list[tuple[int, str]], counts: dict[str, int]) -> list[dict[str, Any]]:
     """The rows; `texts` gets each file read that holds one, `columns` the column of each row and
-    its line as matched, in the order of the rows returned."""
+    its line as matched, in the order of the rows returned; `counts` the calls with a randomness
+    word in their name that no row covers."""
     rows: list[tuple[dict[str, Any], tuple[int, str]]] = []
     for rel in result.get("files_read") or []:
         eco = _ECOSYSTEM.get(PurePosixPath(rel).suffix.lower())
         if not eco:
             continue
         text = _read(root, rel)
-        if not any(hint in text for hint in _FILE_HINTS[eco]):
+        lowered = text.lower()
+        if not any(hint in lowered for hint in _SEEN_HINTS + ("secrets",)):
             continue
+        counts["files_looked_at"] += 1
         seen: set[tuple[int, int]] = set()
         code_of = {n: c for n, _, c in _code_lines(text, eco)}
-        for number, line, column, api, cls, extra in _READERS[eco](text, rel):
-            if (number, column) in seen:
+        starts: dict[int, list[int]] = {}
+        if any(hint in text for hint in _FILE_HINTS[eco]):
+            for number, line, column, api, cls, extra in _READERS[eco](text, rel):
+                if (number, column) in seen:
+                    continue
+                seen.add((number, column))
+                starts.setdefault(number, []).append(column)
+                texts[rel] = (text, eco)
+                rows.append(({"path": rel, "line": number, "ecosystem": eco, "class": cls,
+                              "api": api, **extra, "excerpt": line.strip()[:200],
+                              "in_test_code": detectors.in_test_code(rel)},
+                             (column, code_of.get(number, ""))))
+        for number, code in code_of.items():
+            if not any(hint in code.lower() for hint in _SEEN_HINTS):
                 continue
-            seen.add((number, column))
-            texts[rel] = (text, eco)
-            rows.append(({"path": rel, "line": number, "ecosystem": eco, "class": cls, "api": api,
-                          **extra, "excerpt": line.strip()[:200],
-                          "in_test_code": detectors.in_test_code(rel)},
-                         (column, code_of.get(number, ""))))
+            for match in _CALLED.finditer(code):
+                if not _seen_word(match.group(1)):
+                    continue
+                # Covered by a row that starts before it on the line with no call between.
+                if any(s <= match.start() and "(" not in code[s:match.start()]
+                       for s in starts.get(number, ())):
+                    continue
+                counts["calls_seen_not_classified"] += 1
     rows.sort(key=lambda r: (r[0]["path"], r[0]["line"], r[0]["api"]))
     columns.extend(c for _, c in rows)
     return [r for r, _ in rows]
@@ -481,7 +515,7 @@ PLACES_MEANING = (
     "the innermost brace block opened after `)` or `=>` elsewhere, a heuristic. The link is "
     "co-location: no value is followed from the generator to the key, so a place is a place to "
     "check, not a finding and not a verdict. A `csprng` row is never a place")
-# Our own list: the four kinds of value FIPS 203/204 and SP 800-90A name a generator for.
+# Our own list of four words, in singular and plural.
 _KEY_WORDS = frozenset(("key", "keys", "seed", "seeds", "nonce", "nonces", "iv", "ivs"))
 _WORD = {"keys": "key", "seeds": "seed", "nonces": "nonce", "ivs": "iv"}
 _ANCHOR_CLASSES = frozenset(("classical_vulnerable", "pqc_ready", "pqc_pre_standard"))
@@ -729,6 +763,33 @@ def _pqc_requirements(result: dict[str, Any], calls: list[dict[str, Any]],
     return out
 
 
+# --- what a code scan cannot know ------------------------------------------------------------------
+
+NOT_READ = {
+    "meaning": ("what reading the code cannot show about the randomness behind a key, said rather "
+                "than left out: no entropy is estimated, no statistical test is run and nothing is "
+                "probed at run time. A `csprng` row names a generator; it says nothing about these"),
+    "what": [
+        "entropy at boot: whether the kernel's pool was initialised when the first key was made "
+        "(getrandom(2) blocks until then unless GRND_NONBLOCK is given)",
+        "entropy in a virtual machine or a container: what the host passes in, and a snapshot or "
+        "clone that starts from the same generator state",
+        "the quality of an HSM's or a PKCS#11 token's generator (SecureRandom `PKCS11`, a provider)",
+        "a generator injected at run time: passed in as a parameter, by dependency injection, or "
+        "named in a variable (SecureRandom.getInstance(name), EVP_RAND_fetch(ctx, name, ...)); the "
+        "last are counted in counts.chosen_at_run_time",
+        "a seed taken from configuration or the environment",
+        "the statistical quality of any output",
+    ],
+}
+COUNTS_MEANING = (
+    "calls_classified: the rows; calls_seen_not_classified: calls whose called name holds a "
+    "randomness word (rand, random, rng, drbg, entropy, ...) that no spelling of the catalogue "
+    "classifies -- a generator this version does not know, or not a generator at all; calls_seen: "
+    "both; chosen_at_run_time: rows whose generator is named in a variable; files_looked_at: code "
+    "files read that hold one of those words")
+
+
 def section(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
     """The `randomness` section of a finished result. Reads it and the files it read; changes no
     row of it. A failure leaves a statement naming the exception class, never its message (which
@@ -736,7 +797,8 @@ def section(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
     try:
         texts: dict[str, tuple[str, str]] = {}
         columns: list[tuple[int, str]] = []
-        calls = _rows(result, root, texts, columns)
+        counts = {"files_looked_at": 0, "calls_seen_not_classified": 0}
+        calls = _rows(result, root, texts, columns, counts)
         places = _places(calls, _anchor_rows(result), texts, dict(enumerate(columns)))
         pqc = _pqc_requirements(result, calls, texts, dict(enumerate(columns)))
     except Exception as error:  # noqa: BLE001 -- a context section must not end the scan
@@ -745,4 +807,14 @@ def section(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                               "the evidence and the exit code do not depend on it")}
     return {"meaning": MEANING, "count": len(calls), "calls": calls,
             "places_meaning": PLACES_MEANING, "places": places,
-            "pqc_requirements_meaning": PQC_MEANING, "pqc_requirements": pqc}
+            "pqc_requirements_meaning": PQC_MEANING, "pqc_requirements": pqc,
+            "not_read": NOT_READ,
+            "counts": {"meaning": COUNTS_MEANING,
+                       "calls_seen": len(calls) + counts["calls_seen_not_classified"],
+                       "calls_classified": len(calls),
+                       "calls_seen_not_classified": counts["calls_seen_not_classified"],
+                       "by_class": {c: sum(1 for r in calls if r["class"] == c)
+                                    for c in ("weak", "csprng", "check")},
+                       "chosen_at_run_time": sum(1 for r in calls if r.get("why")
+                                                 == "algorithm_chosen_at_run_time"),
+                       "files_looked_at": counts["files_looked_at"]}}

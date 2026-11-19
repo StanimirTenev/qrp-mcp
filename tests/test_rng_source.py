@@ -364,3 +364,40 @@ def test_python_imports_are_read_one_statement_at_a_time(tmp_path):
     assert {(c["path"], c["api"], c["class"]) for c in calls} == {
         ("a.py", "random.randbytes", "weak"), ("b.py", "random.choice", "weak"),
         ("b.py", "random.randint", "weak"), ("b.py", "os.urandom", "csprng")}
+
+
+# --- what a code scan cannot know about randomness, and the counts ----------------------------------
+
+def test_the_not_read_block_names_what_the_code_cannot_show(tmp_path):
+    (tmp_path / "a.py").write_text("import random\nx = random.random()\n")
+    block = scan_directory(tmp_path)["randomness"]["not_read"]
+    text = " ".join(block["what"]).lower()
+    for words in ("boot", "virtual machine", "container", "hsm", "pkcs#11", "injected",
+                  "configuration", "environment", "statistical"):
+        assert words in text, words
+    assert "no entropy is estimated" in block["meaning"]
+
+
+def test_counts_seen_and_classified(tmp_path):
+    (tmp_path / "a.py").write_text(
+        "import random, secrets\nx = random.random()\ny = secrets.token_hex(8)\n"
+        "z = custom_random_source()\nw = rng_draw(3)\nv = operand(2)\n")
+    (tmp_path / "S.java").write_text(
+        "import java.security.SecureRandom;\nclass S { Object f(String n) throws Exception {"
+        " return SecureRandom.getInstance(n); } }\n")
+    counts = scan_directory(tmp_path)["randomness"]["counts"]
+    assert counts["calls_classified"] == 3
+    assert counts["by_class"] == {"weak": 1, "csprng": 1, "check": 1}
+    # The two names with a randomness word that no spelling classifies; `operand` has none.
+    assert counts["calls_seen"] == 5
+    assert counts["calls_seen_not_classified"] == 2
+    assert counts["chosen_at_run_time"] == 1
+
+
+def test_out_of_scope_says_where_randomness_now_is(tmp_path):
+    (tmp_path / "a.py").write_text("import random\nx = random.random()\n")
+    said = scan_directory(tmp_path)["coverage"]["claims"]["out_of_scope_by_design"]
+    rng = next(w for w in said["what"] if "random number generation" in w)
+    assert "`randomness`" in rng and "not findings" in rng
+    # Row 531 b: the one place a generator is read for a size is said, not hidden.
+    assert "os.urandom(n)" in rng and "symmetric key" in rng

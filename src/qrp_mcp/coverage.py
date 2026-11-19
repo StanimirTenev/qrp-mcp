@@ -222,8 +222,12 @@ OUT_OF_SCOPE_BY_DESIGN = {
              "hashes and MACs for integrity (SHA-2, SHA-3, HMAC); MD5, SHA-1, DES, 3DES and RC4 "
              "are named where found, as broken or deprecated",
              "key derivation (PBKDF2, scrypt, Argon2, HKDF) and where a key was derived from",
-             "random number generation (SecureRandom, DRBG, os.urandom, secrets, math/rand, a "
-             "remote entropy service) and the quality of a seed"],
+             "random number generation as a finding (SecureRandom, DRBG, os.urandom, secrets, "
+             "math/rand, a remote entropy service): the generators the code calls are listed in "
+             "`randomness` as context, not findings (rows 531, 539), and the entropy behind them, "
+             "the quality of a seed and the statistical quality of output are not read "
+             "(randomness.not_read); os.urandom(n), secrets.token_bytes(n) and get_random_bytes(n) "
+             "are read for one thing more, the size of a symmetric key an RSA key wraps"],
     "meaning": "not read: this instrument reports the public-key cryptography a "
                "cryptographically relevant quantum computer would break. A file that holds only "
                "these is read and gives no row; that is the scope, not a finding of absence",

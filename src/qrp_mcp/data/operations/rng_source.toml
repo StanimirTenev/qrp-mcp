@@ -373,7 +373,7 @@ class S {
     SecureRandom f(String name) throws Exception { return SecureRandom.getInstance(name); }
 }
 '''
-expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "check", api = "java.security.SecureRandom.getInstance", why = "algorithm_chosen_at_run_time"}}]}
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "check", api = "java.security.SecureRandom.getInstance", why = "algorithm_chosen_at_run_time"}}], value = [{at = "randomness.counts.chosen_at_run_time", is = 1}]}
 
 [[ecosystems]]
 ecosystem = "JS"
