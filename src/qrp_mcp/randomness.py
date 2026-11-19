@@ -8,8 +8,8 @@ data/operations/rng_source.toml, cites the page and quotes it for every spelling
   C `rand`, `std::mt19937`, `System.Random`, PHP `rand`/`mt_rand`, ...);
 - `csprng`: a named cryptographic generator (`secrets`, `os.urandom`, `crypto/rand`, `SecureRandom`,
   `getRandomValues`, `getrandom`, `arc4random`, `RAND_bytes`, `RandomNumberGenerator`, `random_int`);
-- `check`: a call its documentation does not settle by itself (`std::random_device`, SHA1PRNG with
-  `setSeed`, a literal seed into a CSPRNG API, Go's ChaCha8, a generator named in a variable).
+- `check`: a call its documentation does not settle by itself (`std::random_device`, SHA1PRNG,
+  a seed passed into a CSPRNG API, Go's ChaCha8, a generator named in a variable).
 
 The section is built on the finished result, after `findings_fingerprint`, and outside `evidence`:
 a row is no finding, carries no classification of the code and moves neither the findings, their
@@ -354,9 +354,12 @@ def _java(text: str, rel: str):
                        {"why": "algorithm_chosen_at_run_time"})
                 continue
             known = name if name in _JAVA_SECURE_RANDOM_NAMES else "not_a_standard_name"
-            if name == "SHA1PRNG" and sets_seed:
+            if name == "SHA1PRNG":
+                # Its seed decides its output, and a setSeed in another file, or on a value this
+                # file does not show, is not ruled out by reading one file.
                 yield (number, line, match.start(), api, "check",
-                       {"algorithm": known, "why": "sha1prng_with_setseed"})
+                       {"algorithm": known, "why": "sha1prng_with_setseed" if sets_seed
+                        else "sha1prng_seed_not_ruled_out"})
             else:
                 yield number, line, match.start(), api, "csprng", {"algorithm": known}
         for match in _JAVA_SET_SEED.finditer(code):

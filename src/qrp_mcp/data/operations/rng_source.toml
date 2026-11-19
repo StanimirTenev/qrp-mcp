@@ -313,7 +313,7 @@ expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "csprng",
 id = "java-securerandom-sha1prng"
 spelling = "SecureRandom.getInstance(\"SHA1PRNG\")"
 source = "https://docs.oracle.com/en/java/javase/21/docs/specs/security/standard-names.html"
-quote = "SHA1PRNG The name of the pseudo-random number generation (PRNG) algorithm supplied by the SUN provider."
+quote = "SHA1PRNG The name of the pseudo-random number generation (PRNG) algorithm supplied by the SUN provider. This algorithm uses SHA-1 as the foundation of the PRNG. It computes the SHA-1 hash over a true-random seed value concatenated with a 64-bit counter which is incremented by 1 for each operation."
 file = "S.java"
 snippet = '''
 import java.security.SecureRandom;
@@ -322,7 +322,7 @@ class S {
     SecureRandom f() throws Exception { return SecureRandom.getInstance("SHA1PRNG"); }
 }
 '''
-expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "csprng", api = "java.security.SecureRandom.getInstance", algorithm = "SHA1PRNG"}}]}
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "check", api = "java.security.SecureRandom.getInstance", algorithm = "SHA1PRNG", why = "sha1prng_seed_not_ruled_out"}}]}
 
 [[ecosystems.spellings]]
 id = "java-sha1prng-setseed"

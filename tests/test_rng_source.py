@@ -161,10 +161,10 @@ def test_the_reproduction_gives_its_rows(tmp_path):
         ("gen.go", 3, "math/rand.NewSource", "weak"),
         ("gen.go", 3, "crypto/rand.Reader", "csprng"),
         ("Gen.java", 2, "java.util.Random", "weak"),
-        ("Gen.java", 2, "java.security.SecureRandom.getInstance", "csprng"),
+        ("Gen.java", 2, "java.security.SecureRandom.getInstance", "check"),
     }
-    sha1prng = next(c for c in calls if c["path"] == "Gen.java" and c["class"] == "csprng")
-    assert sha1prng["algorithm"] == "SHA1PRNG" and "why" not in sha1prng
+    sha1prng = next(c for c in calls if c["path"] == "Gen.java" and c["class"] == "check")
+    assert sha1prng["algorithm"] == "SHA1PRNG" and sha1prng["why"] == "sha1prng_seed_not_ruled_out"
     assert next(c for c in calls if c["api"] == "math/rand.NewSource")["seed"] == "literal"
 
 
@@ -727,3 +727,19 @@ def test_a_seed_passed_to_the_secure_random_constructor_is_check(tmp_path):
         "    SecureRandom r = new SecureRandom(seedBytes);\n  }\n}\n")})
     (row,) = calls
     assert (row["class"], row["why"], row["seed"]) == ("check", "seed_supplied", "supplied")
+
+
+@pytest.mark.parametrize("call", ['SecureRandom.getInstance("SHA1PRNG")',
+                                  'SecureRandom.getInstance("SHA1PRNG", "SUN")'],
+                         ids=["one-argument", "with-provider"])
+def test_sha1prng_is_check_even_with_no_set_seed_in_its_file(tmp_path, call):
+    # A setSeed in another file (B.java of the review) or on a non-literal cannot be ruled out by
+    # reading one file, and seeding decides what SHA1PRNG returns.
+    calls = _calls(tmp_path, {
+        "A.java": ("import java.security.SecureRandom;\nclass A {\n"
+                   f"  static SecureRandom make() throws Exception {{ return {call}; }}\n}}\n"),
+        "B.java": ("import java.security.SecureRandom;\nclass B {\n  void use(byte[] seed) "
+                   "throws Exception { SecureRandom r = A.make(); r.setSeed(seed); }\n}\n")})
+    (row,) = calls
+    assert (row["path"], row["class"], row["algorithm"], row["why"]) == (
+        "A.java", "check", "SHA1PRNG", "sha1prng_seed_not_ruled_out")

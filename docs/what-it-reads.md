@@ -600,14 +600,15 @@ nor the exit code.
   `std::mt19937`/`std::mt19937_64`; .NET `new Random(...)`, `Random.Shared`; PHP `rand()`,
   `mt_rand()`, `srand()`, `mt_srand()`. `csprng`: `secrets`, `os.urandom`, `os.getrandom`,
   `random.SystemRandom`; `crypto/rand`; `new SecureRandom()`, `getInstanceStrong()`,
-  `getInstance("<standard name>")` (the name is kept if it is one of the JDK's standard names,
-  otherwise it reads `not_a_standard_name`); `crypto.getRandomValues`, Node's `crypto.randomBytes`,
-  `randomFill(Sync)`, `randomInt`, `randomUUID`; `getrandom()`, `arc4random*`, OpenSSL
-  `RAND_bytes`/`RAND_priv_bytes` and `EVP_RAND_fetch` with `CTR-DRBG`, `HASH-DRBG` or `HMAC-DRBG`;
-  `RandomNumberGenerator`, `RNGCryptoServiceProvider`; `random_int()`, `random_bytes()`. `check`,
-  with `why`: `std::random_device` (`may_be_a_prng`), SHA1PRNG in a file that calls `setSeed`
-  (`sha1prng_with_setseed`), `setSeed(<literal>)` or `new SecureRandom(<literal>)` (`fixed_seed`), `new SecureRandom(seed)`
-  with the seed in a variable (`seed_supplied`),
+  `getInstance("<standard name>")` other than SHA1PRNG (the name is kept); `crypto.getRandomValues`,
+  Node's `crypto.randomBytes`, `randomFill(Sync)`, `randomInt`, `randomUUID`; `getrandom()`,
+  `arc4random*`, OpenSSL `RAND_bytes`/`RAND_priv_bytes` and `EVP_RAND_fetch` with `CTR-DRBG`,
+  `HASH-DRBG` or `HMAC-DRBG`; `RandomNumberGenerator`, `RNGCryptoServiceProvider`; `random_int()`,
+  `random_bytes()`. `check`, with `why`: `std::random_device` (`may_be_a_prng`),
+  `getInstance("SHA1PRNG")` with or without a provider (`sha1prng_with_setseed` where its file calls
+  `setSeed`, otherwise `sha1prng_seed_not_ruled_out`: its seed decides its output, and a `setSeed`
+  in another file is not ruled out), `setSeed(<literal>)` or `new SecureRandom(<literal>)`
+  (`fixed_seed`), `new SecureRandom(seed)` with the seed in a variable (`seed_supplied`),
   `getInstance(<a variable>)` and `EVP_RAND_fetch(ctx, <a variable>, ...)`
   (`algorithm_chosen_at_run_time`), Go's `NewChaCha8`
   (`strong_type_in_a_package_not_for_security`), Node's `crypto.pseudoRandomBytes`
