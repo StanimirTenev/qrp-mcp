@@ -613,23 +613,14 @@ def _brace_functions(text: str, eco: str) -> dict[int, list[tuple[int, int | Non
     previous = ""
     for number, _line, code in _code_lines(text, eco):
         events: list[tuple[int, int | None]] = [(0, stack[-1] if stack else None)]
-        # A `;` inside parentheses (`for (i = 0; i < n; i++)`) does not end the statement, and the
-        # words since the last brace say whether a control statement opens the block
-        # (`if err := f(); err != nil {`).
+        # The words since the last brace say whether a control statement opens the block:
+        # `for (i = 0; i < n; i++) {` and `if err := f(); err != nil {` are not functions.
         separator = block = -1
-        depth = 0
         for column, char in enumerate(code):
-            if char not in "{};()":
-                continue
-            if char == "(":
-                depth += 1
-                continue
-            if char == ")":
-                depth = max(0, depth - 1)
+            if char not in "{};":
                 continue
             if char == ";":
-                if depth == 0:
-                    separator = column
+                separator = column
                 continue
             if char == "{":
                 statement = code[separator + 1:column].strip()
@@ -646,7 +637,6 @@ def _brace_functions(text: str, eco: str) -> dict[int, list[tuple[int, int | Non
                     stack.pop()
                 events.append((column + 1, stack[-1] if stack else None))
             separator = block = column
-            depth = 0
         out[number] = events
         previous = code
     return out
