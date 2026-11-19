@@ -348,6 +348,9 @@ def _evidence_lists(result: dict[str, Any]):
     yield (result.get("chosen_outside_files") or {}).get("places") or []
     # Row 472: the open finding where two layers disagree carries the terminator's owner.
     yield result.get("layer_disagreements") or []
+    # Rows 531, 539: the generator calls and the places to check quote their line too.
+    yield (result.get("randomness") or {}).get("calls") or []
+    yield (result.get("randomness") or {}).get("places") or []
 
 
 def _strip_excerpts(result: dict[str, Any]) -> dict[str, Any]:

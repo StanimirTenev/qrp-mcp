@@ -401,3 +401,62 @@ def test_out_of_scope_says_where_randomness_now_is(tmp_path):
     assert "`randomness`" in rng and "not findings" in rng
     # Row 531 b: the one place a generator is read for a size is said, not hidden.
     assert "os.urandom(n)" in rng and "symmetric key" in rng
+
+
+# --- masked and trimmed: no source text leaves in the new fields, on any of the three exits ---------
+
+CANARY = "zqcanary"
+CANARY_TREE = {
+    "k.py": ("import oqs, random\nfrom cryptography.hazmat.primitives.asymmetric import ec\n\n"
+             "def make():\n"
+             f"    seed_{CANARY} = random.getrandbits(256)  # {CANARY}\n"
+             f"    kem = oqs.KeyEncapsulation(\"ML-KEM-768\")  # {CANARY}\n"
+             "    return ec.generate_private_key(ec.SECP256R1()), kem\n"),
+    "S.java": ("import java.security.SecureRandom;\nclass S { Object f() throws Exception {"
+               f" return SecureRandom.getInstance(\"{CANARY}PRNG\"); }} }}\n"),
+}
+
+
+def _canary_tree(tmp_path: Path) -> Path:
+    tree = tmp_path / "t"
+    for name, text in CANARY_TREE.items():
+        (tree / name).parent.mkdir(parents=True, exist_ok=True)
+        (tree / name).write_text(text)
+    return tree
+
+
+@pytest.mark.parametrize("level", ["masked", "trimmed"])
+def test_no_source_text_in_the_scan_file(tmp_path, level):
+    import json
+    from qrp_mcp.server import main
+    tree = _canary_tree(tmp_path)
+    out = tmp_path / "r.json"
+    with pytest.raises(SystemExit):
+        main(["scan", str(tree), "--no-config", "--level", level, "--out", str(out)])
+    result = json.loads(out.read_text())
+    section = result["randomness"]
+    assert section["calls"] and section["places"] and section["pqc_requirements"]
+    assert CANARY not in json.dumps(section)
+    assert CANARY not in out.read_text()
+    if level == "trimmed":
+        assert not any("excerpt" in r for r in section["calls"] + section["places"])
+
+
+@pytest.mark.parametrize("level", ["masked", "trimmed"])
+def test_no_source_text_through_the_tools(tmp_path, level):
+    import json
+    from qrp_mcp.server import export_cbom, scan_repo
+    tree = _canary_tree(tmp_path)
+    assert CANARY not in json.dumps(scan_repo(str(tree), level=level))
+    assert CANARY not in json.dumps(export_cbom(str(tree), level=level))
+
+
+def test_the_full_level_still_quotes_the_line(tmp_path):
+    import json
+    from qrp_mcp.server import scan_repo
+    section = scan_repo(str(_canary_tree(tmp_path)), level="full")["randomness"]
+    assert CANARY in json.dumps(section["calls"])
+    # Even at full, a name that is not a standard one is not copied into a field.
+    java = next(c for c in section["calls"] if c["path"] == "S.java")
+    assert java["algorithm"] == "not_a_standard_name"
+    assert CANARY not in json.dumps({k: v for k, v in java.items() if k != "excerpt"})
