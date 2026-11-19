@@ -179,7 +179,8 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     counted = [f for f in response.findings
                if detected_by_name.get(f.raw_value) not in by_name_only]
     summary = summarize(counted, set_aside, protected)
-    summary.by_role = _by_role(counted, roles, detected_by_name, set_aside, protected)
+    summary.by_role = _by_role(counted, roles, detected_by_name, set_aside, protected,
+                               _vrf_keys_only(scan_result))
     fallbacks = {family: note["fallback_beside_hybrid"] for family, note in sorted(notes.items())
                  if note.get("fallback_beside_hybrid")}
     if fallbacks:
@@ -1144,9 +1145,25 @@ def _withhold_reassurance(summary: Any, block: dict[str, Any], scan_result: dict
         summary.pqc_readiness = "not_established"
 
 
+# The keys an ECVRF suite runs on (RFC 9381: edwards25519 and P-256), by the detector's name.
+_VRF_KEY_FAMILIES = frozenset({"Ed25519", "EdDSA", "EC", "ECDSA"})
+
+
+def _vrf_keys_only(scan_result: dict[str, Any]) -> set[str]:
+    """Families, by the detector's name, seen only as the import or the type of a key in files
+    that call a VRF, with no call of their own (second independent review of 0.51.0, 19.11: the
+    Ed25519 key handed to `vrf.Prove` read as a signature)."""
+    in_use = _in_use(scan_result)
+    with_vrf = {i["path"] for i in in_use.get("ECVRF", ()) if i.get("evidence_kind") == "call"}
+    if not with_vrf:
+        return set()
+    return {name for name, items in in_use.items() if name in _VRF_KEY_FAMILIES and all(
+        i["path"] in with_vrf and i.get("evidence_kind") in {"import", "reference"} for i in items)}
+
+
 def _by_role(findings: list[Any], roles: dict[str, dict[str, int]],
              detected_by_name: dict[str, str], set_aside: set[str],
-             protected: set[str]) -> dict[str, Any]:
+             protected: set[str], vrf_keys: set[str] = frozenset()) -> dict[str, Any]:
     """Readiness for key establishment and for signatures apart (ZA-OPRAVYANE row 100: nginx
     with X25519MLKEM768 and an ECDSA certificate read only `hybrid_partial`, which says
     nothing about which half is post-quantum).
@@ -1163,6 +1180,10 @@ def _by_role(findings: list[Any], roles: dict[str, dict[str, int]],
     vrf = [f for f in findings if kinds.get(f.algorithm_family) == "vrf"]
     for f in findings:
         kind = kinds.get(f.algorithm_family)
+        if kind == "signature" and detected_by_name.get(f.raw_value, f.algorithm_family) in vrf_keys:
+            # Its only rows are a key's import and type beside a VRF call: what it does is not read.
+            undetermined.add(f.algorithm_family)
+            continue
         if kind == "key_exchange":
             parts["key_establishment"].append(f)
         elif kind == "signature":

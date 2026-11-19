@@ -209,3 +209,20 @@ def test_a_blank_identifier_is_not_a_key(tmp_path):
     result = scan_directory(str(_tree(tmp_path, {"a.go": body})))
     # The import row is dropped once the file has a call of the family, as for every family.
     assert sorted(r["line"] for r in _rows(result, "ECVRF")) == [11]
+
+
+def test_an_ed25519_key_seen_only_beside_a_vrf_call_is_not_counted_as_a_signature(tmp_path):
+    # Second independent review (19.11): the reproduction still read `signature` = Ed25519 + ML-DSA.
+    # Its Ed25519 rows are the import and the type of the key handed to vrf.Prove; no Ed25519 call.
+    result = scan_directory(str(_tree(tmp_path, {"vrf.go": VRF_GO, "go.mod": GO_MOD})))
+    by_role = result["summary"]["by_role"]
+    assert by_role["signature"]["families"] == ["ML-DSA"]
+    assert "Ed25519" in by_role["role_not_determined"]
+    assert by_role["vrf"]["families"] == ["ECVRF"]
+
+
+def test_an_ed25519_call_keeps_it_a_signature(tmp_path):
+    body = VRF_GO.replace("\treturn proof, out\n", "\t_ = ed25519.Sign(sk, seed)\n\treturn proof, out\n")
+    result = scan_directory(str(_tree(tmp_path, {"vrf.go": body, "go.mod": GO_MOD})))
+    assert "Ed25519" in result["summary"]["by_role"]["signature"]["families"]
+    assert "Ed25519" not in result["summary"]["by_role"]["role_not_determined"]

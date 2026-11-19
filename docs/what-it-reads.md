@@ -209,9 +209,11 @@ go-ecvrf and keytransparency's p256 and Rust's `vrf` crate, and RFC 9381's suite
 (`data/operations/vrf.toml`). It is quantum-vulnerable and no replacement is named for it: a
 signature scheme does not replace a VRF (row 535). A call is read only in a file that imports the
 library -- `vrf` alone is also virtual routing and forwarding -- and never a call on a package
-(`ed25519.Verify(...)` beside go-ecvrf). The VRF's key, where the file names
-it by its own type (`ed25519.PrivateKey`), stays an Ed25519 row under `signature`: the scan does
-not follow the key into the call.
+(`ed25519.Verify(...)` beside go-ecvrf); a method (`Prove`, `Verify`, `Evaluate`, `ProofToHash`)
+counts only on a variable the file declares as that library's key. An Ed25519, EdDSA, EC or ECDSA
+family whose only rows are the import and the type of a key in files that call a VRF -- no call of
+its own, as the `ed25519.PrivateKey` handed to `vrf.Prove` -- is under `role_not_determined`, not
+`signature`: what the key does is not read. Its finding still lists the signature replacements.
 
 **Which module implements it, where the file says.** Validation belongs to a module, not to an
 algorithm, and `@noble/post-quantum` and Go's `crypto/mlkem` used to give identical findings
