@@ -165,7 +165,7 @@ NOT_A_VALUE = "set in the request, not read as a value"
     ({"t.py": "import rfc3161ng\nrt = rfc3161ng.RemoteTimestamper(URL, hashname=HASH)\n"},
      ("t.py", 2), NOT_A_VALUE),
     ({"T.java": "import org.bouncycastle.tsp.TimeStampRequestGenerator;\n"
-                "class T { Object r(byte[] d) { return gen.generate(hashAlg, d); } }\n"},
+                "class T { Object r(TimeStampRequestGenerator gen, byte[] d) { return gen.generate(hashAlg, d); } }\n"},
      ("T.java", 2), NOT_A_VALUE),
 ])
 def test_a_hash_written_is_never_called_the_default(tmp_path, files, at, hash_choice):
@@ -214,3 +214,36 @@ def test_a_digest_name_is_still_said(tmp_path, written, said):
     body = f"import rfc3161ng\nt = rfc3161ng.RemoteTimestamper('u', {written})\n"
     place = _places(scan_directory(str(_tree(tmp_path, {"t.py": body})))).get(("t.py", 2))
     assert place["hash_choice"] == said
+
+
+# Second independent review (19.11), the rest for row 536.
+def test_dotnet_reads_the_hash_inside_the_call_only(tmp_path):
+    cs = ("using System.Security.Cryptography;\nusing System.Security.Cryptography.Pkcs;\n"
+          "class S { void Run(byte[] h, HashAlgorithmName alg) {\n"
+          "    var req = Rfc3161TimestampRequest.CreateFromHash(h, alg, nonce: null);\n"
+          "    var other = IncrementalHash.CreateHash(HashAlgorithmName.SHA1); } }\n")
+    place = _places(scan_directory(str(_tree(tmp_path, {"S.cs": cs})))).get(("S.cs", 4))
+    assert place and place["hash_choice"] == NOT_A_VALUE
+
+
+def test_the_tsa_side_token_generator_is_not_a_request(tmp_path):
+    java = ("import org.bouncycastle.tsp.TimeStampRequestGenerator;\n"
+            "import org.bouncycastle.tsp.TimeStampTokenGenerator;\n"
+            "class Tsa { void run(TimeStampTokenGenerator tokGen, TimeStampRequest req, byte[] d) {\n"
+            "    TimeStampRequestGenerator reqGen = new TimeStampRequestGenerator();\n"
+            "    TimeStampRequest r = reqGen.generate(TSPAlgorithms.SHA256, d);\n"
+            "    TimeStampToken t = tokGen.generate(req, BigInteger.ONE, new Date()); } }\n")
+    places = _places(scan_directory(str(_tree(tmp_path, {"Tsa.java": java}))))
+    assert ("Tsa.java", 5) in places and ("Tsa.java", 6) not in places
+
+
+def test_a_parenthesis_inside_a_string_does_not_end_the_call(tmp_path):
+    body = 'import rfc3161ng\nt = rfc3161ng.RemoteTimestamper("https://tsa.example/x)", hashname="sha512")\n'
+    place = _places(scan_directory(str(_tree(tmp_path, {"t.py": body})))).get(("t.py", 2))
+    assert place and place["hash_choice"] == "sha512"
+
+
+def test_printing_an_existing_request_is_not_a_request(tmp_path):
+    sh = "#!/bin/sh\nopenssl ts -query -in req.tsq -text\nopenssl ts -query -data f.txt -sha1 -out r.tsq\n"
+    places = _places(scan_directory(str(_tree(tmp_path, {"s.sh": sh}))))
+    assert ("s.sh", 2) not in places and places[("s.sh", 3)]["hash_choice"] == "sha1"

@@ -5554,7 +5554,14 @@ _OPENSSL_DIGEST_FLAG = re.compile(r"\s-(sha\d+(?:-\d+)?|sha3-\d+|shake\d+|md[245
 _OPENSSL_VARIABLE_FLAG = re.compile(r"\s-\$\{?\w+\}?(?![\w-])")
 _RFC3161NG = re.compile(r"\bRemoteTimestamper\s*\(")
 _HASHNAME = re.compile(r"\bhashname\s*=\s*(?:[\"']([\w-]+)[\"'])?")
-_BC_TSP_GENERATE = re.compile(r"\.generate\s*\(\s*([\w.]+)\s*,")
+# The request generator's `generate(digestAlgorithm, digest)`, on a variable the file declares as a
+# TimeStampRequestGenerator or on `new TimeStampRequestGenerator()`: TimeStampTokenGenerator's
+# `generate(...)` is the authority's own, local signing (second independent review, 19.11).
+_BC_TSP_GENERATE = re.compile(r"(?:\b(\w+)|\bnew\s+TimeStampRequestGenerator\s*\(\s*\)\s*)"
+                              r"\.generate\s*\(\s*([\w.]+)\s*,")
+_BC_TSP_DECLARED = re.compile(r"\bTimeStampRequestGenerator\s+(\w+)\s*[=;,)]")
+# `openssl ts -query -in req.tsq` prints a request made before: not a new one.
+_OPENSSL_TS_PRINT = re.compile(r"\s-in\s")
 # Bouncy Castle's digest identifiers by their class (TSPAlgorithms, the OID classes): a fixed name.
 _BC_DIGEST_NAME = re.compile(r"(?:TSPAlgorithms|NISTObjectIdentifiers|OIWObjectIdentifiers|"
                              r"TeleTrusTObjectIdentifiers|CryptoProObjectIdentifiers|"
@@ -5583,11 +5590,18 @@ _HASH_NOT_READ = "not read: the call goes on past the lines read"
 def _call_arguments(window: str, start: int) -> str | None:
     """The text inside the parentheses that open at or after `start`, or None where they do not
     close in the window."""
-    depth = 0
+    depth, quote, escaped = 0, "", False
     for i in range(window.index("(", start), len(window)):
-        if window[i] == "(":
+        c = window[i]
+        if quote:
+            # A `)` inside a string is the string's (second independent review, 19.11).
+            escaped, quote = (False, quote) if escaped else (c == "\\", "" if c == quote else quote)
+            continue
+        if c in "\"'":
+            quote = c
+        elif c == "(":
             depth += 1
-        elif window[i] == ")":
+        elif c == ")":
             depth -= 1
             if depth == 0:
                 return window[window.index("(", start) + 1:i]
@@ -5597,6 +5611,7 @@ def _call_arguments(window: str, start: int) -> str | None:
 def remote_timestamps(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     text = "\n".join(lines)
     bc = "TimeStampRequestGenerator" in text
+    generators = set(_BC_TSP_DECLARED.findall(text)) if bc else set()
     rfc3161ng = "rfc3161ng" in text
     out: list[dict[str, Any]] = []
     for number, line in enumerate(lines, 1):
@@ -5606,6 +5621,9 @@ def remote_timestamps(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         window = " ".join(lines[number - 1:number + 4])
         where = chosen = None
         ts = _OPENSSL_TS_QUERY.search(line)
+        if ts and _OPENSSL_TS_PRINT.search(ts.group(1)) and not re.search(r"\s-(?:data|digest)\s",
+                                                                          ts.group(1)):
+            ts = None
         if ts:
             # A command continued with `\` goes on to the next lines (up to four).
             command, at = ts.group(1), number
@@ -5624,15 +5642,20 @@ def remote_timestamps(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
                       "default of the rfc3161ng in use" if not named else
                       named.group(1).lower() if named.group(1) and _a_digest_name(named.group(1))
                       else _HASH_NOT_A_VALUE)
-        elif bc and _BC_TSP_GENERATE.search(line):
+        elif bc and any(m.group(1) is None or m.group(1) in generators
+                        for m in _BC_TSP_GENERATE.finditer(line)):
             where = "RFC 3161 time-stamping authority (Bouncy Castle TimeStampRequestGenerator)"
-            first = _BC_TSP_GENERATE.search(line).group(1)
+            first = next(m.group(2) for m in _BC_TSP_GENERATE.finditer(line)
+                         if m.group(1) is None or m.group(1) in generators)
             chosen = (first if _BC_DIGEST_NAME.match(first)
                       and _a_digest_name(first.rsplit(".", 1)[-1]) else _HASH_NOT_A_VALUE)
         elif _DOTNET_TSP.search(line):
-            named = _HASH_ALGORITHM_NAME.search(window[_DOTNET_TSP.search(window).start():])
+            # Only inside the call's own arguments, never the next statement.
+            arguments = _call_arguments(window, _DOTNET_TSP.search(window).start())
+            named = _HASH_ALGORITHM_NAME.search(arguments) if arguments is not None else None
             where = "RFC 3161 time-stamping authority (.NET Rfc3161TimestampRequest)"
-            chosen = (named.group(0) if named and _a_digest_name(named.group(0).rsplit(".", 1)[-1])
+            chosen = (_HASH_NOT_READ if arguments is None else named.group(0)
+                      if named and _a_digest_name(named.group(0).rsplit(".", 1)[-1])
                       else _HASH_NOT_A_VALUE)
         if where:
             out.append({"path": rel_path, "line": number,
