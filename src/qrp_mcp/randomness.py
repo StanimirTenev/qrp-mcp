@@ -470,6 +470,164 @@ def _rows(result: dict[str, Any], root: Path, texts: dict[str, tuple[str, str]],
     return [r for r, _ in rows]
 
 
+# --- places to check ---------------------------------------------------------------------------------
+
+PLACES_MEANING = (
+    "a `weak` or `check` generator in the same line, function or file as an anchor: a public-key "
+    "operation this scan reports (`public_key_operation` -- a key generation, a signature or a key "
+    "exchange; the scan does not tell them apart), or its value assigned on that line to a name "
+    "whose words include key, seed, nonce or iv (`assigned_to_name`). `link_scope` is the narrowest "
+    "of same_line, same_function and same_file that holds; a function is a `def` block in Python and "
+    "the innermost brace block opened after `)` or `=>` elsewhere, a heuristic. The link is "
+    "co-location: no value is followed from the generator to the key, so a place is a place to "
+    "check, not a finding and not a verdict. A `csprng` row is never a place")
+# Our own list: the four kinds of value FIPS 203/204 and SP 800-90A name a generator for.
+_KEY_WORDS = frozenset(("key", "keys", "seed", "seeds", "nonce", "nonces", "iv", "ivs"))
+_WORD = {"keys": "key", "seeds": "seed", "nonces": "nonce", "ivs": "iv"}
+_ANCHOR_CLASSES = frozenset(("classical_vulnerable", "pqc_ready", "pqc_pre_standard"))
+_ASSIGNED = re.compile(r"([A-Za-z_$][\w$]*)\s*(?:\[[^\]]*\])?\s*(?::\s*[\w\[\]., ]+)?(?::=|=)\s*$")
+_NAME_PARTS = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+")
+_SCOPES = ("same_line", "same_function", "same_file")
+_NOT_HEADER = re.compile(r"^(?:if|for|foreach|while|switch|catch|using|lock|synchronized|with|"
+                         r"else\s+if|elseif|return)\b")
+
+
+def _name_word(code: str, column: int) -> str | None:
+    """The word of _KEY_WORDS in the name the call at `column` is assigned to on its line."""
+    match = _ASSIGNED.search(code, 0, column)
+    if not match or match.end() != column and code[match.end():column].strip():
+        return None
+    for part in _NAME_PARTS.findall(match.group(1)):
+        if part.lower() in _KEY_WORDS:
+            return _WORD.get(part.lower(), part.lower())
+    return None
+
+
+def _python_functions(text: str) -> dict[int, list[tuple[int, int | None]]]:
+    """For each line, [(0, the line of the enclosing def or None)]."""
+    out: dict[int, list[tuple[int, int | None]]] = {}
+    stack: list[tuple[int, int]] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            out[number] = [(0, stack[-1][1] if stack else None)]
+            continue
+        indent = len(line) - len(stripped)
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        if re.match(r"(?:async\s+)?def\s", stripped):
+            stack.append((indent, number))
+        out[number] = [(0, stack[-1][1] if stack else None)]
+    return out
+
+
+def _brace_functions(text: str, eco: str) -> dict[int, list[tuple[int, int | None]]]:
+    """For each line, the function open at each column where that changes: [(column, def line)].
+    A function block is one opened after `)` or `=>` that does not start with a control word."""
+    out: dict[int, list[tuple[int, int | None]]] = {}
+    stack: list[int | None] = []
+    previous = ""
+    for number, _line, code in _code_lines(text, eco):
+        current = next((s for s in reversed(stack) if s is not None), None)
+        events: list[tuple[int, int | None]] = [(0, current)]
+        for column, char in enumerate(code):
+            if char == "{":
+                header = code[:column].strip() or previous.strip()
+                statement = re.split(r"[;{}]", header)[-1].strip()
+                function = ((statement.endswith("=>") or re.search(r"\)[^()]*$", statement))
+                            and not _NOT_HEADER.match(statement))
+                stack.append(number if function else None)
+            elif char == "}" and stack:
+                stack.pop()
+            else:
+                continue
+            events.append((column + 1, next((s for s in reversed(stack) if s is not None), None)))
+        out[number] = events
+        previous = code
+    return out
+
+
+def _function_at(functions: dict[int, list[tuple[int, int | None]]], line: int,
+                 column: int | None) -> int | None:
+    events = functions.get(line)
+    if not events:
+        return None
+    if column is None:
+        return events[0][1]
+    current = None
+    for start, function in events:
+        if start > column:
+            break
+        current = function
+    return current
+
+
+def _anchor_rows(result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """The public-key call rows of each file, with their family."""
+    sizes = result.get("algorithm_key_sizes") or {}
+    by_raw = {f.get("raw_value"): f for f in result.get("findings") or []}
+    family: dict[str, str] = {}
+    for alg in result.get("detected_algorithms") or []:
+        finding = by_raw.get(f"{alg}-{sizes[alg]}" if alg in sizes else alg)
+        if finding and finding.get("classification") in _ANCHOR_CLASSES:
+            family[alg] = finding["algorithm_family"]
+    out: dict[str, list[dict[str, Any]]] = {}
+    for row in (result.get("evidence") or {}).get("source_code") or []:
+        if row.get("evidence_kind") == "call" and row.get("algorithm") in family:
+            out.setdefault(row["path"], []).append(
+                {"line": row["line"], "family": family[row["algorithm"]]})
+    return out
+
+
+def _places(calls: list[dict[str, Any]], anchors: dict[str, list[dict[str, Any]]],
+            texts: dict[str, tuple[str, str]], columns: dict[int, tuple[int, str]]
+            ) -> list[dict[str, Any]]:
+    places: list[dict[str, Any]] = []
+    functions_of: dict[str, dict[int, list[tuple[int, int | None]]]] = {}
+    for index, row in enumerate(calls):
+        if row["class"] == "csprng":
+            continue
+        column, code = columns[index]
+        found: list[tuple[int, dict[str, Any]]] = []
+        word = _name_word(code, column)
+        if word:
+            found.append((0, {"kind": "assigned_to_name", "line": row["line"], "word": word}))
+        rows = anchors.get(row["path"], [])
+        if rows:
+            if row["path"] not in functions_of:
+                text, eco = texts[row["path"]]
+                functions_of[row["path"]] = (_python_functions(text) if eco == "Py"
+                                             else _brace_functions(text, eco))
+            functions = functions_of[row["path"]]
+            here = _function_at(functions, row["line"], column)
+            for anchor in rows:
+                if anchor["line"] == row["line"]:
+                    scope = 0
+                elif here is not None and _function_at(functions, anchor["line"], None) == here:
+                    scope = 1
+                else:
+                    scope = 2
+                found.append((scope, {"kind": "public_key_operation", "line": anchor["line"],
+                                      "family": anchor["family"]}))
+        if not found:
+            continue
+        scope = _SCOPES[min(s for s, _ in found)]
+        nearest = sorted(found, key=lambda f: (f[0], f[1]["line"]))[0][1]
+        what = (f"its value assigned to a name that says {nearest['word']}"
+                if nearest["kind"] == "assigned_to_name"
+                else f"a {nearest['family']} operation on line {nearest['line']}")
+        places.append({
+            "path": row["path"], "line": row["line"], "ecosystem": row["ecosystem"],
+            "class": row["class"], "api": row["api"], **({"why": row["why"]} if "why" in row else {}),
+            "link": "co-location", "link_scope": scope,
+            "anchors": [a for _, a in sorted(found, key=lambda f: (f[0], f[1]["line"]))],
+            "statement": (f"a {row['class']} generator ({row['api']}), {scope.replace('_', ' ')} "
+                          f"as {what}: a place to check, not a verdict. Co-location only; the "
+                          f"value is not followed from the generator to the key"),
+            "excerpt": row["excerpt"], "in_test_code": row["in_test_code"]})
+    return places
+
+
 def section(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
     """The `randomness` section of a finished result. Reads it and the files it read; changes no
     row of it. A failure leaves a statement naming the exception class, never its message (which
@@ -478,8 +636,10 @@ def section(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
         texts: dict[str, tuple[str, str]] = {}
         columns: list[tuple[int, str]] = []
         calls = _rows(result, root, texts, columns)
+        places = _places(calls, _anchor_rows(result), texts, dict(enumerate(columns)))
     except Exception as error:  # noqa: BLE001 -- a context section must not end the scan
         return {"meaning": MEANING, "not_built": type(error).__name__,
                 "statement": ("the randomness section was not built for this tree; the findings, "
                               "the evidence and the exit code do not depend on it")}
-    return {"meaning": MEANING, "count": len(calls), "calls": calls}
+    return {"meaning": MEANING, "count": len(calls), "calls": calls,
+            "places_meaning": PLACES_MEANING, "places": places}

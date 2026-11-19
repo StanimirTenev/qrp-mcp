@@ -174,3 +174,95 @@ def test_the_reproduction_gives_its_rows(tmp_path):
     assert sha1prng["algorithm"] == "SHA1PRNG" and "why" not in sha1prng
     assert next(c for c in calls if c["api"] == "math/rand.NewSource")["seed"] == "literal"
 
+
+# --- places to check: co-location, never a verdict and never a flow --------------------------------
+
+def _places(tmp_path: Path, files: dict[str, str]) -> list[dict]:
+    for name, text in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    return scan_directory(tmp_path)["randomness"]["places"]
+
+
+def test_the_reproduction_gives_its_places(tmp_path):
+    places = _places(tmp_path, FAIROUZ)
+    got = {(p["path"], p["line"], p["api"], p["link_scope"]) for p in places}
+    assert got == {
+        ("keys.py", 3, "random.getrandbits", "same_line"),
+        ("keys.py", 4, "random.randint", "same_line"),
+        ("gen.go", 3, "math/rand.New", "same_line"),
+        ("gen.go", 3, "math/rand.NewSource", "same_line"),
+    }
+    seed = next(p for p in places if p["line"] == 3 and p["path"] == "keys.py")
+    assert {"kind": "assigned_to_name", "line": 3, "word": "seed"} in seed["anchors"]
+    assert {"kind": "public_key_operation", "line": 7, "family": "EC"} in seed["anchors"]
+    go = next(p for p in places if p["api"] == "math/rand.New")
+    assert {"kind": "public_key_operation", "line": 3, "family": "ECDSA"} in go["anchors"]
+    # Gen.java makes no key: its weak Random is a row, not a place.
+    assert not [p for p in places if p["path"] == "Gen.java"]
+
+
+def test_every_place_says_it_is_co_location_and_not_a_flow(tmp_path):
+    places = _places(tmp_path, FAIROUZ)
+    assert places and all(p["link"] == "co-location" for p in places)
+    for p in places:
+        assert "not followed" in p["statement"] and "flow" not in p["statement"].replace(
+            "not followed", "")
+
+
+def test_negative_control_a_csprng_beside_a_key_gives_no_place(tmp_path):
+    places = _places(tmp_path, {
+        "good.py": ("import secrets, os\nfrom cryptography.hazmat.primitives.asymmetric import ec\n"
+                    "seed = secrets.token_bytes(32)\nnonce = os.urandom(12)\n"
+                    "priv = ec.generate_private_key(ec.SECP256R1())\n"),
+        "good.go": ('package good\n\nimport (\n\t"crypto/ecdsa"\n\t"crypto/elliptic"\n\t"crypto/rand"\n)\n\n'
+                    "func K() { seed := make([]byte, 32); rand.Read(seed); "
+                    "k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader); _ = k }\n"),
+        "Good.java": ("import java.security.*;\nclass Good { void f() throws Exception {\n"
+                      "  SecureRandom seed = SecureRandom.getInstanceStrong();\n"
+                      "  KeyPairGenerator g = KeyPairGenerator.getInstance(\"RSA\");\n"
+                      "  g.initialize(3072, new SecureRandom()); } }\n")})
+    assert places == []
+
+
+def test_a_weak_generator_with_no_key_and_no_key_name_is_no_place(tmp_path):
+    assert _places(tmp_path, {"sim.py": "import random\nx = random.random()\n"}) == []
+
+
+def test_function_scope_in_python(tmp_path):
+    places = _places(tmp_path, {"k.py": (
+        "import random\nfrom cryptography.hazmat.primitives.asymmetric import rsa\n\n"
+        "def make():\n    x = random.random()\n"
+        "    return rsa.generate_private_key(public_exponent=65537, key_size=3072)\n\n"
+        "def other():\n    return random.random()\n")})
+    scopes = {p["line"]: p["link_scope"] for p in places}
+    assert scopes == {5: "same_function", 9: "same_file"}
+
+
+def test_function_scope_in_a_brace_language(tmp_path):
+    places = _places(tmp_path, {"k.go": (
+        'package k\n\nimport (\n\t"crypto/ecdsa"\n\t"crypto/elliptic"\n\tcr "crypto/rand"\n'
+        '\t"math/rand"\n)\n\n'
+        "func Make() *ecdsa.PrivateKey {\n\t_ = rand.Intn(3)\n"
+        "\tk, _ := ecdsa.GenerateKey(elliptic.P256(), cr.Reader)\n\treturn k\n}\n\n"
+        "func Jitter() int {\n\tif true {\n\t\treturn rand.Intn(9)\n\t}\n\treturn 0\n}\n")})
+    scopes = {p["line"]: p["link_scope"] for p in places}
+    assert scopes == {11: "same_function", 18: "same_file"}
+
+
+def test_a_check_generator_beside_a_key_is_a_place(tmp_path):
+    places = _places(tmp_path, {"k.cpp": (
+        "#include <random>\n#include <openssl/rsa.h>\n"
+        "void make(RSA *r, BIGNUM *e) {\n  std::random_device rd;\n"
+        "  RSA_generate_key_ex(r, 3072, e, NULL);\n}\n")})
+    assert [(p["api"], p["class"], p["link_scope"]) for p in places] == [
+        ("std::random_device", "check", "same_function")]
+
+
+def test_a_place_carries_no_source_text_outside_its_excerpt(tmp_path):
+    places = _places(tmp_path, {"k.py": (
+        "import random\nmy_secret_seed_zq = random.getrandbits(128)\n")})
+    assert len(places) == 1
+    text = repr({k: v for k, v in places[0].items() if k not in ("excerpt", "path")})
+    assert "zq" not in text and "my_secret" not in text
