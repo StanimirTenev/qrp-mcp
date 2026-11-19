@@ -153,3 +153,59 @@ def test_a_package_call_beside_go_ecvrf_is_not_a_vrf(tmp_path):
     result = scan_directory(str(_tree(tmp_path, {"v.go": body})))
     lines = {r["line"] for r in _rows(result, "ECVRF")}
     assert 9 in lines and 10 not in lines, lines
+
+
+# Second independent review (19.11): an import with a trailing comment, calls on any receiver, and
+# the keytransparency import that gave no row.
+REVIEW_A = """package a
+
+import (
+\t"crypto/ed25519" // signatures
+\t"crypto/x509"
+
+\t"github.com/ProtonMail/go-ecvrf/ecvrf"
+)
+
+func A(pub ed25519.PublicKey, m, s []byte, cert *x509.Certificate, sk *ecvrf.PrivateKey) bool {
+\t_, _ = ecvrf.GenerateKey(nil)
+\tok := ed25519.Verify(pub, m, s)
+\t_, err := cert.Verify(x509.VerifyOptions{})
+\t_, _, _ = sk.Prove(m)
+\treturn ok && err == nil
+}
+"""
+REVIEW_B = """package b
+
+import (
+\t"github.com/google/keytransparency/core/crypto/vrf/p256"
+)
+
+func B(policy Policy, k *p256.PrivateKey) {
+\tpolicy.Evaluate(nil)
+\tk.Evaluate(nil)
+}
+"""
+
+
+def test_only_calls_on_a_vrf_key_are_the_vrfs(tmp_path):
+    result = scan_directory(str(_tree(tmp_path, {"a.go": REVIEW_A, "b.go": REVIEW_B})))
+    rows = {(r["path"], r["line"]): r["evidence_kind"] for r in _rows(result, "ECVRF")}
+    assert ("a.go", 12) not in rows      # ed25519.Verify, the import with a comment
+    assert ("a.go", 13) not in rows      # cert.Verify
+    assert rows.get(("a.go", 14)) == "call" and rows.get(("a.go", 11)) == "call"
+    assert ("b.go", 8) not in rows       # policy.Evaluate
+    assert rows.get(("b.go", 9)) == "call"
+
+
+def test_the_keytransparency_import_is_a_row(tmp_path):
+    body = 'package b\n\nimport (\n\t"github.com/google/keytransparency/core/crypto/vrf/p256"\n)\n\nfunc B(k *p256.PrivateKey) {}\n'
+    result = scan_directory(str(_tree(tmp_path, {"b.go": body})))
+    assert [(r["line"], r["evidence_kind"]) for r in _rows(result, "ECVRF")] == [(4, "import")]
+
+
+def test_a_blank_identifier_is_not_a_key(tmp_path):
+    # `_, _ = ecvrf.GenerateKey(nil)` names no key: no `.Verify(` in the file is the VRF's.
+    body = REVIEW_A.replace(", sk *ecvrf.PrivateKey", "").replace("\t_, _, _ = sk.Prove(m)\n", "")
+    result = scan_directory(str(_tree(tmp_path, {"a.go": body})))
+    # The import row is dropped once the file has a call of the family, as for every family.
+    assert sorted(r["line"] for r in _rows(result, "ECVRF")) == [11]

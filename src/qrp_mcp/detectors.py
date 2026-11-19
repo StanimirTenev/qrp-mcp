@@ -4616,22 +4616,20 @@ def _sodium_signatures(findings: list[dict[str, Any]], lines: list[str],
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
-# Row 535: the calls of a VRF library, read only in a file that imports it. coname's package
-# functions under the name it is imported as (`vrf` by default); go-ecvrf's Prove and Verify on its
-# keys; keytransparency p256's Evaluate and ProofToHash, and its GenerateKey.
-_VRF_IMPORTS = (
-    (re.compile(r"(?:^|[\s(])(?:(?!import\b)(\w+)\s+)?[\"`]github\.com/yahoo/coname/vrf[\"`]", re.MULTILINE),
-     "vrf", r"\b{name}\.(?:Prove|Verify|GenerateKey|Compute)\s*\("),
-    (re.compile(r"[\"`]github\.com/ProtonMail/go-ecvrf/ecvrf[\"`]"), None,
-     r"\b(\w+)\.(?:Prove|Verify)\s*\("),
-    (re.compile(r"(?:^|[\s(])(?:(?!import\b)(\w+)\s+)?[\"`]github\.com/google/keytransparency/core/crypto/vrf/p256"
-                r"[\"`]", re.MULTILINE),
-     "p256", r"\b(\w+)\.(?:Evaluate|ProofToHash)\s*\(|\b{name}\.GenerateKey\s*\("),
+# Row 535: the calls of a VRF library, read only in a file that imports it, under the name it is
+# imported as. coname's package functions; go-ecvrf's and keytransparency p256's constructors, and
+# their methods (Prove/Verify, Evaluate/ProofToHash) only on a variable the file declares as their
+# key -- `cert.Verify(...)`, `policy.Evaluate(...)` and `ed25519.Verify(...)` are not the VRF's
+# (independent reviews of 0.51.0, 19.11). The import line is a row of its own: a long path such as
+# keytransparency's is read as a blob by the patterns and gave none.
+_VRF_LIBRARIES = (
+    ("github.com/yahoo/coname/vrf", "vrf", r"\b{pkg}\.(?:Prove|Verify|GenerateKey|Compute)\s*\(", None),
+    ("github.com/ProtonMail/go-ecvrf/ecvrf", "ecvrf",
+     r"\b{pkg}\.(?:GenerateKey|NewPrivateKey|NewPublicKey)\s*\(", r"(?:Prove|Verify)"),
+    ("github.com/google/keytransparency/core/crypto/vrf/p256", "p256", r"\b{pkg}\.GenerateKey\s*\(",
+     r"(?:Evaluate|ProofToHash)"),
 )
 _VRF_ANY = ("coname/vrf", "go-ecvrf", "crypto/vrf/p256")
-# A method is called on a key, never on a package: `ed25519.Verify(pub, msg, sig)` beside go-ecvrf
-# is Ed25519's (independent review of 0.51.0, 19.11). The names a Go file imports packages under.
-_GO_IMPORTED = re.compile(r'(?m)^\s*(?:import\s+)?(?:(\w+)\s+)?"([\w.\-/]+)"\s*$')
 
 
 def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
@@ -4639,15 +4637,31 @@ def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
     text = "\n".join(lines)
     if not any(word in text for word in _VRF_ANY):
         return findings
-    calls = []
-    for imported, default, call in _VRF_IMPORTS:
-        m = imported.search(text)
-        if m:
-            name = (m.group(1) if m.groups() and m.group(1) else default) or ""
-            calls.append(re.compile(call.format(name=re.escape(name))))
-    if not calls:
+    calls: list[re.Pattern[str]] = []
+    methods: list[str] = []
+    keys: set[str] = set()
+    imports: list[int] = []
+    for path, default, call, method in _VRF_LIBRARIES:
+        imported = re.search(r"(?m)^[ \t]*(?:import[ \t]+)?(?:(?!import\b)(\w+)[ \t]+)?[\"`]"
+                             + re.escape(path) + r"[\"`]", text)
+        if not imported:
+            continue
+        pkg = imported.group(1) or default
+        imports.append(text.count("\n", 0, imported.end()) + 1)
+        calls.append(re.compile(call.format(pkg=re.escape(pkg))))
+        if method:
+            methods.append(method)
+            keys |= set(re.findall(r"\b(\w+)\s+\*?" + re.escape(pkg) + r"\.(?:PrivateKey|PublicKey)\b",
+                                   text))
+            for names in re.findall(r"((?:\w+\s*,\s*)*\w+)\s*:?=\s*" + re.escape(pkg)
+                                    + r"\.(?:GenerateKey|NewPrivateKey|NewPublicKey)\s*\(", text):
+                keys |= {n.strip() for n in names.split(",")}
+    if not imports:
         return findings
-    packages = {alias or path.rsplit("/", 1)[-1] for alias, path in _GO_IMPORTED.findall(text)}
+    keys.discard("_")
+    if methods and keys:
+        calls.append(re.compile(r"\b(?:" + "|".join(re.escape(k) for k in sorted(keys))
+                                + r")\.(?:" + "|".join(methods) + r")\s*\("))
     rows = {f["line"]: f for f in findings if f["algorithm"] == "ECVRF"}
     added = []
     for n, line in enumerate(lines, 1):
@@ -4655,15 +4669,17 @@ def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
         if stripped.startswith(("//", "/*", "*")):
             continue
         code = line.split("//", 1)[0]
-        if not any(not c.groups or m.group(1) is None or m.group(1) not in packages
-                   for c in calls for m in c.finditer(code)):
+        kind = "import" if n in imports else "call" if any(c.search(code) for c in calls) else None
+        if not kind:
             continue
         if n in rows:
-            rows[n]["evidence_kind"] = "call"
+            if kind == "call":
+                rows[n]["evidence_kind"] = "call"
             continue
         added.append({"path": rel_path, "line": n, "algorithm": "ECVRF",
-                      "description": "ECVRF usage (a call into the VRF library this file imports)",
-                      "excerpt": line.strip()[:200], "evidence_kind": "call",
+                      "description": ("ECVRF usage (the VRF library this file imports)" if kind == "import"
+                                      else "ECVRF usage (a call into the VRF library this file imports)"),
+                      "excerpt": line.strip()[:200], "evidence_kind": kind,
                       "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
