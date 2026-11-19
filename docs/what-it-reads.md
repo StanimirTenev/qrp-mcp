@@ -538,14 +538,15 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
 - **A time-stamp from an authority** (row 536, 0.51.0). An RFC 3161 request is a place with
   `kind: remote_timestamp` and `key_location: tsa`: the authority signs the token with its own key
   and algorithm, outside the files. Read: `openssl ts -query` (not `-reply`, which signs with a
-  local key, nor `-verify`), rfc3161ng `RemoteTimestamper(...)`, Bouncy Castle
-  `TimeStampRequestGenerator` `.generate(...)`, .NET `Rfc3161TimestampRequest.CreateFromData` /
-  `CreateFromHash`. The hash of the request's messageImprint is chosen here, by the requester, and
+  local key, nor `-verify`, nor `-query -in req.tsq`, which prints a request made before),
+  rfc3161ng `RemoteTimestamper(...)`, Bouncy Castle `.generate(...)` on a variable declared as a
+  `TimeStampRequestGenerator` (not TimeStampTokenGenerator, the authority's own signing), .NET
+  `Rfc3161TimestampRequest.CreateFromData` / `CreateFromHash` (the hash read inside the call). The hash of the request's messageImprint is chosen here, by the requester, and
   the place says it as `hash_choice` -- `sha256` from `-sha256` or `hashname='sha256'`,
-  `TSPAlgorithms.SHA256`, `HashAlgorithmName.SHA384`. Only where the whole request was read and none
+  `TSPAlgorithms.SHA256`, `HashAlgorithmName.SHA384` -- a digest name from a fixed list only. Only where the whole request was read and none
   is written does it say `default of the OpenSSL in use` (openssl-ts(1): SHA-256 in 3.0, SHA-1 in
   1.1.1) or `default of the rfc3161ng in use`; no version's default is assumed. A hash written as a
-  variable is `set in the request, not read as a value`; a call that goes on past the lines read says
+  variable or any other name is `set in the request, not read as a value`; a call that goes on past the lines read says
   so. `hash_choice` never carries source text. A weak hash there (`-sha1`) is said as written; it is not
   a finding. No family is claimed.
 

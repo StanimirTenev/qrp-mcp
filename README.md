@@ -450,8 +450,8 @@ A **free inventory tool**, not a readiness assessment. It deliberately does not 
 - fetching keys from a QKD key management entity (an ETSI GS QKD 014 client) or judging where a
   postquantum preshared key comes from beyond the files read.
 
-This tool is extracted from the paid layer, the [DORA cryptography report](https://quantumreadiness.eu/dora-report/).
-Nothing here is crippled to push you there. What it does not cover is
+The paid layer is the [DORA cryptography report](https://quantumreadiness.eu/dora-report/), made
+from this scanner's masked output. Nothing here is crippled to push you there. What it does not cover is
 said, not hidden: the scan writes its coverage and limits into the CBOM and claims no
 completeness beyond them.
 

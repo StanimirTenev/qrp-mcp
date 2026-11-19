@@ -15,30 +15,39 @@ one setup.py case from the fifth review of 0.50.0, and the descriptions.
   VRF call had no row. Now ECVRF (RFC 9381) is a family of its own, classical and
   quantum-vulnerable, with its own part `summary.by_role.vrf` and `readiness_by_role.vrf`, present
   only where a VRF is found (a scan without one keeps its shape; `roles_differ` compares every part
-  present). Read: Go's coname/vrf, go-ecvrf and keytransparency p256 -- the import, and the calls
-  only in a file that imports them, since `vrf` alone is also virtual routing and forwarding, and
-  never a call on a package (`ed25519.Verify(...)` beside go-ecvrf is Ed25519's) --
-  RFC 9381's four suite names, and the Rust `vrf` crate as its README shows it. No replacement is
-  named for it: a signature scheme does not replace a VRF. CBOM primitive `other`. Not changed: the
-  key's own import and type rows (`ed25519.PrivateKey`) stay Ed25519 under `signature`; the scan does
-  not follow a key into the call. Not covered: C (the libsodium VRF fork), other VRF libraries.
+  present). Read: Go's coname/vrf, go-ecvrf and keytransparency p256 -- the import, the package
+  functions only in a file that imports them (`vrf` alone is also virtual routing and forwarding),
+  and the methods (`Prove`, `Verify`, `Evaluate`, `ProofToHash`) only on a variable the file declares
+  as that library's key, so `cert.Verify(...)`, `policy.Evaluate(...)` and `ed25519.Verify(...)` are
+  not the VRF's -- RFC 9381's four suite names, and the Rust `vrf` crate as its README shows it. No
+  replacement is named for it: a signature scheme does not replace a VRF. CBOM primitive `other`.
+  An Ed25519, EdDSA, EC or ECDSA family whose only rows are a key's import and type in files that
+  call a VRF, with no call of its own, is under `role_not_determined`, not `signature`: the
+  reproduction now reads signature = ML-DSA, vrf = ECVRF, Ed25519 not determined. Its finding still
+  lists the signature replacements. Not covered: C (the libsodium VRF fork), other VRF libraries.
 - **An RFC 3161 time-stamp request is a place (row 536).** `rfc3161ng.RemoteTimestamper(...)` and
   `openssl ts -query` gave no row and no place. Now a request is a place in `chosen_outside_files`,
   `kind: remote_timestamp`, `key_location: tsa`, as a KMS signature is: the authority signs the
   token with its own key and algorithm, outside the files, and no family is claimed. The place says
   the messageImprint hash the requester chose as `hash_choice` (`-sha256`, `hashname=`, Bouncy
-  Castle's `generate(TSPAlgorithms.X, ...)`, .NET `HashAlgorithmName.X`), or `default of the OpenSSL
+  Castle's `generate(TSPAlgorithms.X, ...)`, .NET `HashAlgorithmName.X`) -- only a digest name from a
+  fixed list (MD2/4/5, SHA-1, SHA-2, SHA-3, SHAKE, SM3, RIPEMD, GOST R 34.11, BLAKE2, Whirlpool,
+  MDC-2) -- or `default of the OpenSSL
   in use` / `default of the rfc3161ng in use` only where the whole request was read and none is
   written -- openssl-ts(1) gives SHA-256 in 3.0 and SHA-1 in 1.1.1, so no default is assumed. A hash
-  written as a variable (`-$DIGEST`, `hashname=HASH`, `generate(hashAlg, ...)`) is `set in the request,
-  not read as a value`, and a call that goes on past the lines read says so; `hash_choice` never
-  carries source text, so the masked levels show nothing of it. A command continued with `\` is read
-  on. Only the request: `-reply` signs with a local
-  key and `-verify` chooses nothing. A weak request hash is said as written, not made a finding.
+  written as a variable or as any other name (`-$DIGEST`, `hashname=HASH`, `generate(hashAlg, ...)`)
+  is `set in the request, not read as a value`, and a call that goes on past the lines read says so;
+  `hash_choice` never carries source text, so the masked levels show nothing of it. A command
+  continued with `\` is read on; the .NET hash is read inside the call's own arguments; a `)` inside
+  a string does not end them. Only the request: `-reply` and Bouncy Castle's TimeStampTokenGenerator
+  sign with a local key, `-verify` chooses nothing, and `-query -in req.tsq` prints a request made
+  before; Bouncy Castle's `generate(...)` counts on a variable declared as a
+  TimeStampRequestGenerator. A weak request hash is said as written, not made a finding.
 - **The catalogue** holds 12 (operation, ecosystem) pairs and 1,273 sourced spellings (+ `vrf` for
   Go and Rust, 10; + 2 rfc3161ng spellings in `external`/Py); every quotation found in a saved copy
-  of its page. `vrf` is a recorded gap of Go and Rust, so those ecosystems now read
-  `partially_closed`, with `external` (Go) still open.
+  of its page. `vrf` is a recorded gap of Go and Rust, and it counts toward their status in
+  `ecosystems` -- known, closed or open -- only where the scan found a VRF there: a Go tree without
+  one still reads `not_closed`.
 - **setup.py: a subscript on the next line inside brackets** (row 533, N7). `["requests",
   "paramiko"]` with `[:1]` on the line below, inside `setup(...)`, gave a paramiko row; Python joins
   lines inside brackets, and the lexer now does too. N8 (a subscript past 200 nested brackets) is
@@ -51,7 +60,7 @@ one setup.py case from the fifth review of 0.50.0, and the descriptions.
   is "qrp-mcp post-quantum readiness scanner". The README video is the one re-rendered after 0.50.0.
 - `findings_fingerprint` changes only where a VRF is found. The `meaning` of
   `chosen_outside_files` is longer by one sentence on every scan; `operation_closure` lists two more
-  pairs, and `ecosystems` reads Go and Rust as `partially_closed`.
+  pairs; `ecosystems` moves only for a tree with a VRF.
 
 Not claimed: that every VRF or time-stamp client is read -- the libraries above, as their pages
 show them; any recall or precision figure.
