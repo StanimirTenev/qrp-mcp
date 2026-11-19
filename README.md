@@ -18,10 +18,6 @@ reason.
   {"reason": "symlink_not_followed", "count": 48, "...": "..."}]}
 ```
 
-DORA: the scanner has no DORA profile. The [DORA cryptography report](https://quantumreadiness.eu/dora-report/)
-is the paid layer, made from the scanner's masked output; the first one is free for EU financial
-entities.
-
 [![The scanner's fix list as a network: gaps come in families of the same operation](https://raw.githubusercontent.com/StanimirTenev/qrp-mcp/main/docs/media/gap-network-cover.png)](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/media/gap-network.mp4)
 *34 s: the fix list drawn as a network, and why closure is by operation. The method and the closure savings theorem: Tenev (2026), Zenodo, [doi:10.5281/zenodo.24336932](https://doi.org/10.5281/zenodo.24336932).*
 
@@ -144,110 +140,6 @@ uvx qrp-mcp closure before.json after.json --out closure.json
 it is the document built to be sent. `closure` writes the `prove_closure` verdict for two saved
 scans, and names both inputs by their SHA-256, so the three files can be tied together by
 whoever receives them. Both print the SHA-256 of what they wrote.
-
-From 0.46.0 a TLS version a file pins is linked, in CycloneDX's own fields, to what the same file
-configures: the TLS groups in `protocolProperties.cryptoRefArray`, and the cipher suites in
-`protocolProperties.cipherSuites` by their IANA names, each pointing at the algorithms it names. A
-reader that skips `qrp:` properties can resolve the key exchange of `TLS 1.3`
-([details][docs-cbom]).
-
-From 0.47.0 an algorithm read only from the name of a certificate or key file a TLS setting loads
-(`ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;`) is marked `named_in_a_path: true` and is one
-confidence level lower: the file's name is a label, not the certificate.
-
-From 0.47.0 `tls_listeners` lists each nginx `server` block that listens with `ssl` or `quic`: its
-ports, server names (masked below `--level full`), the groups and the certificates set for it, with
-each one's family, so two servers in one file no longer read as one inventory. The CBOM carries it
-as `qrp:tls_listeners` ([details][docs-tls]).
-
-From 0.48.0 `--mandate` also takes the deadlines of the EU (`eu-pqc-roadmap`), the UK (`uk-ncsc`),
-Canada (`ca-cccs`), Australia (`au-ism`), the Netherlands (`nl-rqs`), Sweden (`se-ncsc`), Japan
-(`jp-gov`), Singapore's CII owners (`sg-csa-cii`), India (`in-dst`) and Germany (`de-bsi`), each
-quoted from the authority's own document, so a finding says which deadline catches it in each.
-A date for a class of system the scan cannot see -- high-risk, highest priority -- is said beside
-the clause and not counted by the gate. Every mandate block says how old its reading of the
-document is, and past 180 days (`stale`) the command line says so
-([details][docs-gate-and-suppression]).
-
-From 0.49.0 `--mandate` also takes four financial regulators whose duty dates no line of code --
-Bank of Israel (`il-boi`), FINMA (`ch-finma`), HKMA (`hk-hkma`) and MAS (`sg-mas`, a
-consultation): the sector and the duty, quoted, with no clause on any occurrence and a gate that
-never counts them. A mandate block also carries the sha256 of each document as it was read, and
-`qrp-mcp mandate-check NAME --document FILE` says whether a copy you downloaded is still the same
-document (the tool itself still fetches nothing)
-([details][docs-gate-and-suppression]).
-
-Four of the mandates also date symmetric or hash algorithms, which the scan does not read:
-`cnsa-2.0` (AES-256 and SHA-384/512, already required), `au-ism` (AES-128/192, SHA-224/256 and
-HMAC-SHA256 "will not be approved beyond 2030", for interoperability and maintainability reasons),
-`ca-cccs` and `nist-ir-8547` (the 112-bit tail by 2030). From 0.49.0 their blocks say
-`symmetric: not_established`, quoting the document, and a gate that would pass reads
-`not_established` instead -- the exit code stays that of a pass. Before, AES-128 and SHA-256 code
-passed `--mandate cnsa-2.0` in silence.
-
-From 0.49.0 `trust_stores` lists each place that loads a trust store (Python `cafile`, Go
-`AppendCertsFromPEM`, nginx `ssl_client_certificate`), the anchors read in it, and whether its
-path is outside the tree; a strongSwan proposal that can be negotiated with a classical key
-exchange alone is a row of its own (`evidence.ike_proposals`), so removing the fallback is
-closed; a KMS SDK call (boto3 KMS, Azure Key Vault) says `key_location: kms`; and every evidence
-row with a path says `in_test_code`
-([details][docs-tls]).
-
-From 0.47.0 `--mandate nist-ir-8547` also gives each clause `federal_high_value_assets`: the date
-by role that NIST IR 8547 (section 4) restates from EO 14412 and OMB M-26-15 -- post-quantum key
-establishment by 2030-12-31, signatures by 2031-12-31 -- for federal high value assets and high
-impact systems only. The scan cannot tell which systems those are, so the gate does not count it
-([details][docs-gate-and-suppression]).
-
-From 0.47.0 an RSA, EC, ECDSA, EdDSA or DSA line that calls `.sign(`, `.verify(`, `.encrypt(` or
-`.decrypt(` on a key carries `operation`, so verifying an old signature no longer reads the same
-as signing a new one; in the CBOM as `qrp:operation`. Under `--mandate nist-ir-8547` a verify-only or decrypt-only line
-says what IR 8547 calls legacy use, with no exemption: the dates and the gate are unchanged
-([details][docs-closure-and-profiles]).
-
-From 0.47.0 a call into a post-quantum KEM or signature API is a row with `operation` --
-`keygen` apart from `encapsulate`, `decapsulate`, `sign` and `verify` -- so where a device
-generates its own key is said with file and line: the NIST API of pqm4, PQClean and SUPERCOP
-(`crypto_kem_keypair/enc/dec`, `crypto_sign_keypair`, `crypto_sign_signature`/`crypto_sign`,
-`crypto_sign_verify`/`crypto_sign_open`), liboqs (`OQS_KEM_keypair/encaps/decaps`,
-`OQS_SIG_keypair/sign/verify` and the per-scheme forms) and mlkem-native's namespaced
-functions. Where the call does not name the scheme, the family is the one the same file names
-(`family_named_at`), and a family named there only in a comment stays not used; a file naming
-none or two gives no row. Declarations are not calls. Code
-shows where a key is generated, not whether that step survives a fault.
-
-From 0.47.0 RustCrypto's `ml_kem`, `ml_dsa` and `slh_dsa` crates and libcrux are named as the
-`provider`, and Go's `mlkem.GenerateKey768()` and its siblings give the parameter set
-([details][docs-what-it-reads]); so do
-liboqs's SLH-DSA names (`SLH_DSA_PURE_SHA2_128S`, `SLH_DSA_SHA2_224_PREHASH_SHAKE_128F`).
-
-From 0.47.0 an Android Keystore key (`KeyPairGenerator.getInstance(..., "AndroidKeyStore")`) takes
-its role from the `PURPOSE_*` of the file's one `KeyGenParameterSpec.Builder`, and an EC key its
-curve from `ECGenParameterSpec(...)` or `setKeySize(...)` there; where it sets neither, P-256 as the
-Keystore's default, marked as such in `curve_basis` (CBOM `qrp:curve_basis`). Where the key lives
-(StrongBox or TEE) is not read.
-
-From 0.47.0 the CBOM names the scanned folder in `qrp:coverage:corpus:target` by its own name, not
-its absolute path, so it no longer carries a path from your machine and one commit scanned in two
-places gives the same bytes; the scan result (`scan --out`, `scan_repo`) still has the absolute path.
-
-From 0.47.0 a public-key PEM (`PUBLIC KEY`, `RSA PUBLIC KEY`) that parses is read as a key, with
-its size and curve, and marked `key_material: "public key"`; it is not counted as a committed
-private key. U-Boot's FIT names `ecdsa256`/`ecdsa384`/`ecdsa521` give the key size, as `rsa2048`
-already did.
-
-From 0.47.0 the CBOM has one `related-crypto-material` component per key -- `type` `private-key` or
-`public-key`, its `size`, `algorithmRef` and `qrp:curve` -- instead of one "Embedded private key
-material" component for all the keys in the tree
-([details][docs-cbom]).
-
-From 0.47.0 an RSA line that encrypts a named value with OAEP (`pub.encrypt(archive_key,
-padding.OAEP(...))`, on one line or split over up to four) carries `wraps`: the value's name (masked below `--level full`), and, where the
-file assigns it once with `generate_key(bit_length=N)`, `os.urandom(n)`, `secrets.token_bytes(n)` or
-`get_random_bytes(n)`, `what: "symmetric key"` and its size -- a symmetric key is as safe as the key
-that wraps it. In the CBOM as `qrp:wraps`. AES itself is still not reported: symmetric cryptography
-is out of scope by design ([measurement][docs-measurement]).
-ECIES and AES key wrap under a DH-derived key are not read.
 
 ### A control on your own tree
 
@@ -415,6 +307,112 @@ different question; the measurements made of it, each with its date and version,
 [How it is measured](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/measurement.md), and no recall or precision figure is cited here as
 current.
 
+## Added in 0.46.0 to 0.49.0
+
+From 0.46.0 a TLS version a file pins is linked, in CycloneDX's own fields, to what the same file
+configures: the TLS groups in `protocolProperties.cryptoRefArray`, and the cipher suites in
+`protocolProperties.cipherSuites` by their IANA names, each pointing at the algorithms it names. A
+reader that skips `qrp:` properties can resolve the key exchange of `TLS 1.3`
+([details][docs-cbom]).
+
+From 0.47.0 an algorithm read only from the name of a certificate or key file a TLS setting loads
+(`ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;`) is marked `named_in_a_path: true` and is one
+confidence level lower: the file's name is a label, not the certificate.
+
+From 0.47.0 `tls_listeners` lists each nginx `server` block that listens with `ssl` or `quic`: its
+ports, server names (masked below `--level full`), the groups and the certificates set for it, with
+each one's family, so two servers in one file no longer read as one inventory. The CBOM carries it
+as `qrp:tls_listeners` ([details][docs-tls]).
+
+From 0.48.0 `--mandate` also takes the deadlines of the EU (`eu-pqc-roadmap`), the UK (`uk-ncsc`),
+Canada (`ca-cccs`), Australia (`au-ism`), the Netherlands (`nl-rqs`), Sweden (`se-ncsc`), Japan
+(`jp-gov`), Singapore's CII owners (`sg-csa-cii`), India (`in-dst`) and Germany (`de-bsi`), each
+quoted from the authority's own document, so a finding says which deadline catches it in each.
+A date for a class of system the scan cannot see -- high-risk, highest priority -- is said beside
+the clause and not counted by the gate. Every mandate block says how old its reading of the
+document is, and past 180 days (`stale`) the command line says so
+([details][docs-gate-and-suppression]).
+
+From 0.49.0 `--mandate` also takes four financial regulators whose duty dates no line of code --
+Bank of Israel (`il-boi`), FINMA (`ch-finma`), HKMA (`hk-hkma`) and MAS (`sg-mas`, a
+consultation): the sector and the duty, quoted, with no clause on any occurrence and a gate that
+never counts them. A mandate block also carries the sha256 of each document as it was read, and
+`qrp-mcp mandate-check NAME --document FILE` says whether a copy you downloaded is still the same
+document (the tool itself still fetches nothing)
+([details][docs-gate-and-suppression]).
+
+Four of the mandates also date symmetric or hash algorithms, which the scan does not read:
+`cnsa-2.0` (AES-256 and SHA-384/512, already required), `au-ism` (AES-128/192, SHA-224/256 and
+HMAC-SHA256 "will not be approved beyond 2030", for interoperability and maintainability reasons),
+`ca-cccs` and `nist-ir-8547` (the 112-bit tail by 2030). From 0.49.0 their blocks say
+`symmetric: not_established`, quoting the document, and a gate that would pass reads
+`not_established` instead -- the exit code stays that of a pass. Before, AES-128 and SHA-256 code
+passed `--mandate cnsa-2.0` in silence.
+
+From 0.49.0 `trust_stores` lists each place that loads a trust store (Python `cafile`, Go
+`AppendCertsFromPEM`, nginx `ssl_client_certificate`), the anchors read in it, and whether its
+path is outside the tree; a strongSwan proposal that can be negotiated with a classical key
+exchange alone is a row of its own (`evidence.ike_proposals`), so removing the fallback is
+closed; a KMS SDK call (boto3 KMS, Azure Key Vault) says `key_location: kms`; and every evidence
+row with a path says `in_test_code`
+([details][docs-tls]).
+
+From 0.47.0 `--mandate nist-ir-8547` also gives each clause `federal_high_value_assets`: the date
+by role that NIST IR 8547 (section 4) restates from EO 14412 and OMB M-26-15 -- post-quantum key
+establishment by 2030-12-31, signatures by 2031-12-31 -- for federal high value assets and high
+impact systems only. The scan cannot tell which systems those are, so the gate does not count it
+([details][docs-gate-and-suppression]).
+
+From 0.47.0 an RSA, EC, ECDSA, EdDSA or DSA line that calls `.sign(`, `.verify(`, `.encrypt(` or
+`.decrypt(` on a key carries `operation`, so verifying an old signature no longer reads the same
+as signing a new one; in the CBOM as `qrp:operation`. Under `--mandate nist-ir-8547` a verify-only or decrypt-only line
+says what IR 8547 calls legacy use, with no exemption: the dates and the gate are unchanged
+([details][docs-closure-and-profiles]).
+
+From 0.47.0 a call into a post-quantum KEM or signature API is a row with `operation` --
+`keygen` apart from `encapsulate`, `decapsulate`, `sign` and `verify` -- so where a device
+generates its own key is said with file and line: the NIST API of pqm4, PQClean and SUPERCOP
+(`crypto_kem_keypair/enc/dec`, `crypto_sign_keypair`, `crypto_sign_signature`/`crypto_sign`,
+`crypto_sign_verify`/`crypto_sign_open`), liboqs (`OQS_KEM_keypair/encaps/decaps`,
+`OQS_SIG_keypair/sign/verify` and the per-scheme forms) and mlkem-native's namespaced
+functions. Where the call does not name the scheme, the family is the one the same file names
+(`family_named_at`), and a family named there only in a comment stays not used; a file naming
+none or two gives no row. Declarations are not calls. Code
+shows where a key is generated, not whether that step survives a fault.
+
+From 0.47.0 RustCrypto's `ml_kem`, `ml_dsa` and `slh_dsa` crates and libcrux are named as the
+`provider`, and Go's `mlkem.GenerateKey768()` and its siblings give the parameter set
+([details][docs-what-it-reads]); so do
+liboqs's SLH-DSA names (`SLH_DSA_PURE_SHA2_128S`, `SLH_DSA_SHA2_224_PREHASH_SHAKE_128F`).
+
+From 0.47.0 an Android Keystore key (`KeyPairGenerator.getInstance(..., "AndroidKeyStore")`) takes
+its role from the `PURPOSE_*` of the file's one `KeyGenParameterSpec.Builder`, and an EC key its
+curve from `ECGenParameterSpec(...)` or `setKeySize(...)` there; where it sets neither, P-256 as the
+Keystore's default, marked as such in `curve_basis` (CBOM `qrp:curve_basis`). Where the key lives
+(StrongBox or TEE) is not read.
+
+From 0.47.0 the CBOM names the scanned folder in `qrp:coverage:corpus:target` by its own name, not
+its absolute path, so it no longer carries a path from your machine and one commit scanned in two
+places gives the same bytes; the scan result (`scan --out`, `scan_repo`) still has the absolute path.
+
+From 0.47.0 a public-key PEM (`PUBLIC KEY`, `RSA PUBLIC KEY`) that parses is read as a key, with
+its size and curve, and marked `key_material: "public key"`; it is not counted as a committed
+private key. U-Boot's FIT names `ecdsa256`/`ecdsa384`/`ecdsa521` give the key size, as `rsa2048`
+already did.
+
+From 0.47.0 the CBOM has one `related-crypto-material` component per key -- `type` `private-key` or
+`public-key`, its `size`, `algorithmRef` and `qrp:curve` -- instead of one "Embedded private key
+material" component for all the keys in the tree
+([details][docs-cbom]).
+
+From 0.47.0 an RSA line that encrypts a named value with OAEP (`pub.encrypt(archive_key,
+padding.OAEP(...))`, on one line or split over up to four) carries `wraps`: the value's name (masked below `--level full`), and, where the
+file assigns it once with `generate_key(bit_length=N)`, `os.urandom(n)`, `secrets.token_bytes(n)` or
+`get_random_bytes(n)`, `what: "symmetric key"` and its size -- a symmetric key is as safe as the key
+that wraps it. In the CBOM as `qrp:wraps`. AES itself is still not reported: symmetric cryptography
+is out of scope by design ([measurement][docs-measurement]).
+ECIES and AES key wrap under a DH-derived key are not read.
+
 ## Documentation
 
 - [What it looks at](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md) — the rules, file types and formats, and their limits
@@ -482,6 +480,10 @@ The paid layer is the [DORA cryptography report](https://quantumreadiness.eu/dor
 from this scanner's masked output. Nothing here is crippled to push you there. What it does not cover is
 said, not hidden: the scan writes its coverage and limits into the CBOM and claims no
 completeness beyond them.
+
+DORA: the scanner has no DORA profile. The [DORA cryptography report](https://quantumreadiness.eu/dora-report/)
+is the paid layer, made from the scanner's masked output; the first one is free for EU financial
+entities.
 
 It also does not tell you that you are about to be hacked. It tells you what you are using.
 
