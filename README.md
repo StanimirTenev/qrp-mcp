@@ -2,10 +2,25 @@
 
 <!-- mcp-name: eu.quantumreadiness/qrp-mcp -->
 
-**An adaptive post-quantum readiness scanner.** It closes operations against a catalogue of their
-documented spellings, each with a test, says in its output which (operation, ecosystem) pairs are
-closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository
-re-reads the documentation and proposes new spellings, which enter only with a source and a test.
+**Offline post-quantum readiness scanner for code; CycloneDX CBOM with what it read and did not read.**
+
+What it says about [certbot](https://github.com/certbot/certbot) at `56ee049`, trimmed from
+`qrp-mcp scan` (qrp-mcp 0.51.0): what it found, by role, and the files it did not read, with the
+reason.
+
+```json
+"verdict": "This scan read 850 of 1250 files (68.0%); the remaining 400 (3 of 20, by extension — files with no extension, .rst and .txt — being 76.14% of them) are listed with a reason each.",
+"summary": {"pqc_readiness": "hybrid_partial", "by_role": {
+  "key_establishment": {"families": ["DH", "ECDH", "ML-KEM", "X25519", "X448"], "pqc_readiness": "hybrid_partial"},
+  "signature": {"families": ["DSA", "EC", "ECDSA", "Ed25519", "Ed448", "ML-DSA", "RSA"], "pqc_readiness": "hybrid_partial"}}},
+"coverage": {"not_examined": [
+  {"reason": "type_not_claimed", "count": 352, "by_extension": {"(no extension)": 147, ".rst": 97, ".txt": 24, "...": "..."}},
+  {"reason": "symlink_not_followed", "count": 48, "...": "..."}]}
+```
+
+DORA: the scanner has no DORA profile. The [DORA cryptography report](https://quantumreadiness.eu/dora-report/)
+is the paid layer, made from the scanner's masked output; the first one is free for EU financial
+entities.
 
 [![The scanner's fix list as a network: gaps come in families of the same operation](https://raw.githubusercontent.com/StanimirTenev/qrp-mcp/main/docs/media/gap-network-cover.png)](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/media/gap-network.mp4)
 *34 s: the fix list drawn as a network, and why closure is by operation. The method and the closure savings theorem: Tenev (2026), Zenodo, [doi:10.5281/zenodo.24336932](https://doi.org/10.5281/zenodo.24336932).*
@@ -262,6 +277,11 @@ names, `go version -m`, `go tool nm`), never code, and never a key size from the
 
 ## How it adapts
 
+**An adaptive post-quantum readiness scanner.** It closes operations against a catalogue of their
+documented spellings, each with a test, says in its output which (operation, ecosystem) pairs are
+closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository
+re-reads the documentation and proposes new spellings, which enter only with a source and a test.
+
 "Adaptive" means one thing here: the operations in the scanner's catalogue are tested against the
 documentation of the libraries and formats the catalogue cites, and a maintainer tool re-reads that
 documentation for spellings the catalogue does not hold yet. The scan itself stays deterministic
@@ -430,8 +450,8 @@ A **free inventory tool**, not a readiness assessment. It deliberately does not 
 - fetching keys from a QKD key management entity (an ETSI GS QKD 014 client) or judging where a
   postquantum preshared key comes from beyond the files read.
 
-Those live in the [Quantum Readiness Platform](https://quantumreadiness.eu), the product this
-tool is extracted from. Nothing here is crippled to push you there. What it does not cover is
+Those belong to the paid layer, the [DORA cryptography report](https://quantumreadiness.eu/dora-report/),
+which this tool is extracted from. Nothing here is crippled to push you there. What it does not cover is
 said, not hidden: the scan writes its coverage and limits into the CBOM and claims no
 completeness beyond them.
 

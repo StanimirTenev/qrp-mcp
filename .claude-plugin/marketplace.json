@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "qrp",
-      "displayName": "QRP cryptographic inventory",
+      "displayName": "qrp-mcp post-quantum readiness scanner",
       "source": "./plugin",
       "description": "An adaptive post-quantum readiness scanner. It closes operations against a catalogue of their documented spellings, each with a test, says in its output which (operation, ecosystem) pairs are closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository re-reads the documentation and proposes new spellings, which enter only with a source and a test.",
       "version": "0.50.0",
@@ -22,8 +22,8 @@
       "license": "Apache-2.0",
       "category": "security",
       "keywords": [
-        "post-quantum", "pqc", "cryptography", "cbom", "crypto-inventory",
-        "security", "offline", "bitcoin", "ethereum", "secp256k1"
+        "post-quantum", "pqc", "cryptography", "cbom", "cyclonedx", "crypto-inventory",
+        "quantum-safe", "scanner", "security", "offline", "bitcoin", "ethereum", "secp256k1"
       ]
     }
   ]

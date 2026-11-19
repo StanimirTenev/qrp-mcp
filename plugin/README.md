@@ -1,4 +1,4 @@
-# QRP post-quantum readiness scanner — Claude Code plugin
+# qrp-mcp — Claude Code plugin
 
 An adaptive post-quantum readiness scanner. It closes operations against a catalogue of their
 documented spellings, each with a test, says in its output which (operation, ecosystem) pairs are
