@@ -5,7 +5,7 @@
 **Offline post-quantum scanner for code: CycloneDX CBOM, RNG calls next to keys, what it did not read.**
 
 ![qrp-mcp 0.52.0 scanning certbot at 56ee049: the verdict, the families by role, and the files it did not read](docs/media/scan-certbot.gif)
-*22 s, real terminal output of `uvx qrp-mcp@0.52.0 scan` on certbot at `56ee049`, read back with `jq`; the 5 s scan is shortened.*
+*22 s, the real output of `uvx qrp-mcp@0.52.0 scan` on certbot at `56ee049`, read back with `jq` and drawn frame by frame from that recording; the 5 s scan is shortened.*
 
 What it says about [certbot](https://github.com/certbot/certbot) at `56ee049`, trimmed from
 `qrp-mcp scan` (qrp-mcp 0.51.0): what it found, by role, and the files it did not read, with the
