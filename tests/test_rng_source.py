@@ -521,3 +521,31 @@ def test_the_cbom_stays_valid_cyclonedx_1_6(tmp_path):
     validator = jsonschema.Draft7Validator(
         schema, resolver=jsonschema.RefResolver.from_schema(schema, store=store))
     assert sorted(str(e.message) for e in validator.iter_errors(_cbom(tmp_path))) == []
+
+
+# --- hostile lines: one row per API on a line, and the shapes that were quadratic --------------------
+
+def test_a_line_of_a_thousand_calls_is_one_row_per_api(tmp_path):
+    (tmp_path / "a.c").write_text("#include <stdlib.h>\nint f(void) { return " + "rand() + " * 1000
+                                  + "srand(1); }\n")
+    section = scan_directory(tmp_path)["randomness"]
+    assert [(c["line"], c["api"]) for c in section["calls"]] == [(2, "rand"), (2, "srand")]
+    # The other 999 are the same API on the same line: covered, not "seen, not classified".
+    assert section["counts"]["calls_seen_not_classified"] == 0
+
+
+@pytest.mark.parametrize("name, line", [
+    ("q.js", '"' + '\\"' * 20000 + " Math.random()"),         # an escaped quote left open
+    ("b.c", "/*" * 20000 + " rand();"),                         # block comments left open
+    ("d.go", "{" * 20000),                                      # nesting, no closing brace
+    ("p.php", "rand(); " * 20000),                              # a declaration looked for each call
+    ("n.js", "a = " * 20000 + "Math.random();"),                # an assignment looked for each call
+], ids=["escaped-quotes", "open-comments", "nesting", "php-calls", "assignments"])
+def test_hostile_lines_finish(tmp_path, name, line):
+    import time
+    head = 'package d\nimport "math/rand"\nimport "crypto/ecdsa"\n' if name.endswith(".go") else ""
+    tail = "\nfunc F() { _ = rand.Intn(2); ecdsa.GenerateKey(nil, nil) }\n" if head else "\n"
+    (tmp_path / name).write_text(head + ("<?php\n" if name.endswith(".php") else "") + line + tail)
+    started = time.monotonic()
+    scan_directory(tmp_path)
+    assert time.monotonic() - started < 20

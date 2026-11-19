@@ -24,6 +24,7 @@ CA5394. The API names come from the documentation pages the catalogue cites.
 
 from __future__ import annotations
 
+import bisect
 import re
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -60,14 +61,51 @@ _FILE_HINTS = {
     "NET": ("Random", "RNGCryptoServiceProvider"),
     "PHP": ("rand", "random_"),
 }
-_STRING = re.compile(r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'|`[^`\n]*`')
-_BLOCK = re.compile(r"/\*.*?\*/")
+# Without a backslash in the line this is linear; with one, `"\"\"\"...` left open made every
+# quote a new start of a scan to the end, so such a line is blanked by hand (_blank_by_hand).
+_STRING = re.compile(r'"[^"\n]*"|\'[^\'\n]*\'|`[^`\n]*`')
 _LITERAL_ARG = re.compile(r"\s*(?:-?\d|0x|[\"'`]|new\s+byte\s*\[\s*\]\s*\{|\{)")
 
 
 def _blank(match: re.Match[str]) -> str:
     text = match.group(0)
     return text[0] + " " * (len(text) - 2) + text[-1]
+
+
+def _blank_by_hand(line: str) -> str:
+    out = list(line)
+    quote = None
+    index = 0
+    while index < len(line):
+        char = line[index]
+        if quote:
+            if char == "\\":
+                out[index] = " "
+                if index + 1 < len(line):
+                    out[index + 1] = " "
+                index += 2
+                continue
+            if char == quote:
+                quote = None
+            else:
+                out[index] = " "
+        elif char in "\"'`":
+            quote = char
+        index += 1
+    return "".join(out)
+
+
+def _without_block_comments(code: str) -> tuple[str, bool]:
+    """`/* ... */` blanked by `find`, never by a lazy regex (a line of `/*/*/*` was quadratic);
+    True when a comment is left open at the end of the line."""
+    start = code.find("/*")
+    while start >= 0:
+        end = code.find("*/", start + 2)
+        if end < 0:
+            return code[:start], True
+        code = code[:start] + " " * (end + 2 - start) + code[end + 2:]
+        start = code.find("/*", end + 2)
+    return code, False
 
 
 def _code_lines(text: str, eco: str):
@@ -77,7 +115,7 @@ def _code_lines(text: str, eco: str):
     slash_comment = eco != "Py"
     in_block = False
     for number, line in enumerate(text.splitlines(), 1):
-        code = _STRING.sub(_blank, line)
+        code = _blank_by_hand(line) if "\\" in line else _STRING.sub(_blank, line)
         if slash_comment:
             if in_block:
                 end = code.find("*/")
@@ -85,10 +123,7 @@ def _code_lines(text: str, eco: str):
                     continue
                 code = " " * (end + 2) + code[end + 2:]
                 in_block = False
-            code = _BLOCK.sub(lambda m: " " * len(m.group(0)), code)
-            start = code.find("/*")
-            if start >= 0:
-                code, in_block = code[:start], True
+            code, in_block = _without_block_comments(code)
             cut = code.find("//")
             if cut >= 0:
                 code = code[:cut]
@@ -130,7 +165,7 @@ _PY_MODULES = ("random", "numpy", "numpy.random", "secrets", "os")
 _PY_SEEDING = {"random.seed", "random.Random", "numpy.random"}
 _PY_CALL = re.compile(r"(?<![\w.])([A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*)\s*\(")
 _PY_IMPORT = re.compile(r"^[ \t]*import[ \t]+([^#;\n]+)", re.M)
-_PY_FROM = re.compile(r"^[ \t]*from[ \t]+([\w.]+)[ \t]+import[ \t]+(?:\(([^)]*)\)|([^#;\n]+))", re.M)
+_PY_FROM = re.compile(r"^[ \t]*from[ \t]+([\w.]+)[ \t]+import[ \t]+(?:\(([^)]{0,4000})\)|([^#;\n]+))", re.M)
 
 
 def _py_names(text: str) -> tuple[dict[str, str], dict[str, str]]:
@@ -421,7 +456,7 @@ _PHP_DECLARATION = re.compile(r"\bfunction\s*&?\s*$")
 def _php(text: str, rel: str):
     for number, line, code in _code_lines(text, "PHP"):
         for match in _PHP_CALL.finditer(code):
-            if _PHP_DECLARATION.search(code, 0, match.start()):
+            if _PHP_DECLARATION.search(code[max(0, match.start() - 40):match.start()]):
                 continue
             name = match.group(1)
             cls = "csprng" if name.startswith("random_") else "weak"
@@ -474,15 +509,16 @@ def _rows(result: dict[str, Any], root: Path, texts: dict[str, tuple[str, str]],
         if not any(hint in lowered for hint in _SEEN_HINTS + ("secrets",)):
             continue
         counts["files_looked_at"] += 1
-        seen: set[tuple[int, int]] = set()
+        # One row per API on a line: a line of a thousand `rand()` is one place, not a thousand.
+        seen: set[tuple[int, str]] = set()
         code_of = {n: c for n, _, c in _code_lines(text, eco)}
         starts: dict[int, list[int]] = {}
         if any(hint in text for hint in _FILE_HINTS[eco]):
             for number, line, column, api, cls, extra in _READERS[eco](text, rel):
-                if (number, column) in seen:
-                    continue
-                seen.add((number, column))
                 starts.setdefault(number, []).append(column)
+                if (number, api) in seen:
+                    continue
+                seen.add((number, api))
                 texts[rel] = (text, eco)
                 rows.append(({"path": rel, "line": number, "ecosystem": eco, "class": cls,
                               "api": api, **extra, "excerpt": line.strip()[:200],
@@ -491,12 +527,15 @@ def _rows(result: dict[str, Any], root: Path, texts: dict[str, tuple[str, str]],
         for number, code in code_of.items():
             if not any(hint in code.lower() for hint in _SEEN_HINTS):
                 continue
+            # A call is covered by the nearest classified match that starts at or before it,
+            # with no `(` between: `random.random(` is one call, seen once.
+            covered = sorted(set(starts.get(number, ())))
+            reach = [code.find("(", s) for s in covered]
             for match in _CALLED.finditer(code):
                 if not _seen_word(match.group(1)):
                     continue
-                # Covered by a row that starts before it on the line with no call between.
-                if any(s <= match.start() and "(" not in code[s:match.start()]
-                       for s in starts.get(number, ())):
+                at = bisect.bisect_right(covered, match.start()) - 1
+                if at >= 0 and (reach[at] < 0 or match.start() <= reach[at]):
                     continue
                 counts["calls_seen_not_classified"] += 1
     rows.sort(key=lambda r: (r[0]["path"], r[0]["line"], r[0]["api"]))
@@ -528,8 +567,9 @@ _NOT_HEADER = re.compile(r"^(?:if|for|foreach|while|switch|catch|using|lock|sync
 
 def _name_word(code: str, column: int) -> str | None:
     """The word of _KEY_WORDS in the name the call at `column` is assigned to on its line."""
-    match = _ASSIGNED.search(code, 0, column)
-    if not match or match.end() != column and code[match.end():column].strip():
+    window = code[max(0, column - 200):column]
+    match = _ASSIGNED.search(window)
+    if not match:
         return None
     for part in _NAME_PARTS.findall(match.group(1)):
         if part.lower() in _KEY_WORDS:
@@ -559,23 +599,28 @@ def _brace_functions(text: str, eco: str) -> dict[int, list[tuple[int, int | Non
     """For each line, the function open at each column where that changes: [(column, def line)].
     A function block is one opened after `)` or `=>` that does not start with a control word."""
     out: dict[int, list[tuple[int, int | None]]] = {}
+    # The function open after each brace, so the innermost one is the top: no walk down the stack.
     stack: list[int | None] = []
     previous = ""
     for number, _line, code in _code_lines(text, eco):
-        current = next((s for s in reversed(stack) if s is not None), None)
-        events: list[tuple[int, int | None]] = [(0, current)]
+        events: list[tuple[int, int | None]] = [(0, stack[-1] if stack else None)]
+        separator = -1
         for column, char in enumerate(code):
+            if char not in "{};":
+                continue
             if char == "{":
-                header = code[:column].strip() or previous.strip()
-                statement = re.split(r"[;{}]", header)[-1].strip()
-                function = ((statement.endswith("=>") or re.search(r"\)[^()]*$", statement))
+                statement = code[separator + 1:column].strip()
+                if not statement and not code[:column].strip():
+                    statement = previous[max(previous.rfind(c) for c in ";{}") + 1:].strip()
+                last = max(statement.rfind("("), statement.rfind(")"))
+                function = ((statement.endswith("=>") or last >= 0 and statement[last] == ")")
                             and not _NOT_HEADER.match(statement))
-                stack.append(number if function else None)
+                stack.append(number if function else stack[-1] if stack else None)
+                events.append((column + 1, stack[-1]))
             elif char == "}" and stack:
                 stack.pop()
-            else:
-                continue
-            events.append((column + 1, next((s for s in reversed(stack) if s is not None), None)))
+                events.append((column + 1, stack[-1] if stack else None))
+            separator = column
         out[number] = events
         previous = code
     return out
@@ -728,12 +773,16 @@ def _pqc_requirements(result: dict[str, Any], calls: list[dict[str, Any]],
     for index, row in enumerate(calls):
         by_path.setdefault(row["path"], []).append(index)
     out = []
+    functions_of: dict[str, dict[int, list[tuple[int, int | None]]]] = {}
     for row in (result.get("evidence") or {}).get("source_code") or []:
         if (row.get("algorithm") not in ("ML-KEM", "ML-DSA") or row.get("evidence_kind") != "call"
                 or row.get("path") not in by_path):
             continue
-        text, eco = texts[row["path"]]
-        functions = _python_functions(text) if eco == "Py" else _brace_functions(text, eco)
+        if row["path"] not in functions_of:
+            text, eco = texts[row["path"]]
+            functions_of[row["path"]] = (_python_functions(text) if eco == "Py"
+                                         else _brace_functions(text, eco))
+        functions = functions_of[row["path"]]
         there = _function_at(functions, row["line"], None)
         generators = []
         for index in by_path[row["path"]]:
