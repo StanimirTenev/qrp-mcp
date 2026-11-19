@@ -540,9 +540,11 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   `TimeStampRequestGenerator` `.generate(...)`, .NET `Rfc3161TimestampRequest.CreateFromData` /
   `CreateFromHash`. The hash of the request's messageImprint is chosen here, by the requester, and
   the place says it as `hash_choice` -- `sha256` from `-sha256` or `hashname='sha256'`,
-  `TSPAlgorithms.SHA256`, `HashAlgorithmName.SHA384`. Where none is written it says `default of the
-  OpenSSL in use` (openssl-ts(1): SHA-256 in 3.0, SHA-1 in 1.1.1) or `default of the rfc3161ng in
-  use`; no version's default is assumed. A weak hash there (`-sha1`) is said as written; it is not
+  `TSPAlgorithms.SHA256`, `HashAlgorithmName.SHA384`. Only where the whole request was read and none
+  is written does it say `default of the OpenSSL in use` (openssl-ts(1): SHA-256 in 3.0, SHA-1 in
+  1.1.1) or `default of the rfc3161ng in use`; no version's default is assumed. A hash written as a
+  variable is `set in the request, not read as a value`; a call that goes on past the lines read says
+  so. `hash_choice` never carries source text. A weak hash there (`-sha1`) is said as written; it is not
   a finding. No family is claimed.
 
 ### Very long lines

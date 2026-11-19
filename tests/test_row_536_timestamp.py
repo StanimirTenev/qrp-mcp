@@ -148,3 +148,41 @@ def test_the_exits_carry_it(tmp_path):
         kinds = [p.get("kind") for p in result["chosen_outside_files"]["places"]]
         assert kinds.count("remote_timestamp") == 2, kinds
         assert "remote_timestamp" in result["chosen_outside_files"]["meaning"]
+
+
+# Independent review before the release (19.11): "default" only when the whole request was read
+# and no hash is written; a hash written where the scan does not read it as a value is said so; and
+# `hash_choice` never carries source text, which the masked levels would otherwise show.
+NOT_A_VALUE = "set in the request, not read as a value"
+
+
+@pytest.mark.parametrize("files, at, hash_choice", [
+    ({"ci.sh": "openssl ts -query -data f.bin \\\n  -sha512 -cert -out q.tsq\n"}, ("ci.sh", 1), "sha512"),
+    ({"ci.sh": "openssl ts -query -data f.bin -$DIGEST -out q.tsq\n"}, ("ci.sh", 1), NOT_A_VALUE),
+    ({"ci.sh": "openssl ts -query -data f.bin -${HASH} -out q.tsq\n"}, ("ci.sh", 1), NOT_A_VALUE),
+    ({"t.py": "import rfc3161ng\nrt = rfc3161ng.RemoteTimestamper(get_url(), hashname='sha512')\n"},
+     ("t.py", 2), "sha512"),
+    ({"t.py": "import rfc3161ng\nrt = rfc3161ng.RemoteTimestamper(URL, hashname=HASH)\n"},
+     ("t.py", 2), NOT_A_VALUE),
+    ({"T.java": "import org.bouncycastle.tsp.TimeStampRequestGenerator;\n"
+                "class T { Object r(byte[] d) { return gen.generate(hashAlg, d); } }\n"},
+     ("T.java", 2), NOT_A_VALUE),
+])
+def test_a_hash_written_is_never_called_the_default(tmp_path, files, at, hash_choice):
+    place = _places(scan_directory(str(_tree(tmp_path, files)))).get(at)
+    assert place and place["kind"] == "remote_timestamp", at
+    assert place["hash_choice"] == hash_choice
+
+
+def test_a_call_that_goes_past_the_lines_read_is_not_the_default(tmp_path):
+    body = "import rfc3161ng\nrt = rfc3161ng.RemoteTimestamper(\n" + "    x,\n" * 8 + "    hashname='sha512')\n"
+    place = _places(scan_directory(str(_tree(tmp_path, {"t.py": body})))).get(("t.py", 2))
+    assert place and not place["hash_choice"].startswith("default")
+
+
+@pytest.mark.parametrize("level", ["masked", "trimmed"])
+def test_hash_choice_carries_no_source_text(tmp_path, level):
+    java = ("import org.bouncycastle.tsp.TimeStampRequestGenerator;\n"
+            "class T { Object r(byte[] d) { return gen.generate(zzneedlealg, d); } }\n")
+    out = scan_repo(path=str(_tree(tmp_path, {"T.java": java})), level=level)
+    assert "zzneedlealg" not in json.dumps(out["chosen_outside_files"])
