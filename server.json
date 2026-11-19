@@ -8,7 +8,7 @@
     "source": "github"
   },
   "version": "0.51.0",
-  "websiteUrl": "https://quantumreadiness.eu",
+  "websiteUrl": "https://quantumreadiness.eu/qrp-mcp/",
   "packages": [
     {
       "registryType": "pypi",

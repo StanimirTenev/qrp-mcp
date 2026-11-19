@@ -34,7 +34,7 @@ dependencies = ["mcp>=2.0.0", "pydantic>=2.0", 'tomli; python_version < "3.11"',
                 'qrp-mcp-core==0.2.0; platform_python_implementation == "CPython" and sys_platform == "win32" and (platform_machine == "AMD64" or platform_machine == "ARM64")']
 
 [project.urls]
-Homepage = "https://quantumreadiness.eu"
+Homepage = "https://quantumreadiness.eu/qrp-mcp/"
 Repository = "https://github.com/StanimirTenev/qrp-mcp"
 "Free DORA report" = "https://quantumreadiness.eu/dora-report/"
 
