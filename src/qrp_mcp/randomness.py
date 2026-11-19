@@ -360,6 +360,10 @@ def _java(text: str, rel: str):
                 yield (number, line, match.start(), api, "check",
                        {"algorithm": known, "why": "sha1prng_with_setseed" if sets_seed
                         else "sha1prng_seed_not_ruled_out"})
+            elif known == "not_a_standard_name":
+                # A third party's generator, whose quality the JDK's documentation does not settle.
+                yield (number, line, match.start(), api, "check",
+                       {"algorithm": known, "why": "not_a_standard_name"})
             else:
                 yield number, line, match.start(), api, "csprng", {"algorithm": known}
         for match in _JAVA_SET_SEED.finditer(code):

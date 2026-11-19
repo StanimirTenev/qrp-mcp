@@ -609,6 +609,8 @@ nor the exit code.
   `setSeed`, otherwise `sha1prng_seed_not_ruled_out`: its seed decides its output, and a `setSeed`
   in another file is not ruled out), `setSeed(<literal>)` or `new SecureRandom(<literal>)`
   (`fixed_seed`), `new SecureRandom(seed)` with the seed in a variable (`seed_supplied`),
+  `getInstance("<a name outside the JDK's standard names>")` (`algorithm` and `why`:
+  `not_a_standard_name`, a third party's generator the JDK's documentation does not settle),
   `getInstance(<a variable>)` and `EVP_RAND_fetch(ctx, <a variable>, ...)`
   (`algorithm_chosen_at_run_time`), Go's `NewChaCha8`
   (`strong_type_in_a_package_not_for_security`), Node's `crypto.pseudoRandomBytes`

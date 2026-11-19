@@ -743,3 +743,13 @@ def test_sha1prng_is_check_even_with_no_set_seed_in_its_file(tmp_path, call):
     (row,) = calls
     assert (row["path"], row["class"], row["algorithm"], row["why"]) == (
         "A.java", "check", "SHA1PRNG", "sha1prng_seed_not_ruled_out")
+
+
+def test_a_name_outside_the_standard_names_is_check(tmp_path):
+    # A third party's generator: the JDK's documentation does not settle its quality.
+    calls = _calls(tmp_path, {"G.java": (
+        "import java.security.SecureRandom;\nclass G {\n  SecureRandom f() throws Exception {"
+        " return SecureRandom.getInstance(\"VendorPRNG\"); }\n}\n")})
+    (row,) = calls
+    assert (row["class"], row["algorithm"], row["why"]) == (
+        "check", "not_a_standard_name", "not_a_standard_name")
