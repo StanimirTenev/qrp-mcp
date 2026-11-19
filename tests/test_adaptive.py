@@ -71,12 +71,14 @@ def test_status_is_read_against_the_catalogue(tmp_path):
     assert py["closed_operations"] == ["external"]
     assert "keysize" in py["open_operations"]
     assert "here we may miss" in py["may_miss"]
-    # vrf/Go is in the catalogue since row 535; external of Go is not.
+    # A tree without a VRF: vrf/Go is in the catalogue (row 535), but counts only where the scan
+    # found a VRF (independent review of 0.51.0, 19.11: Vault read `partially_closed`).
     go = _eco(result, "Go")
-    assert go["status"] == "partially_closed" and go["closed_operations"] == ["vrf"]
-    assert go["open_operations"] == ["external"]
-    # vrf is a recorded gap of Go and Rust (row 535), so it is known, not only closed.
-    assert "vrf" in go["known_operations"] and "vrf" in _eco(result, "Rust")["known_operations"]
+    assert go["status"] == "not_closed" and go["closed_operations"] == []
+    assert go["open_operations"] == ["external"] and "vrf" not in go["known_operations"]
+    assert go["may_miss"].startswith("here we may miss")
+    rust = _eco(result, "Rust")
+    assert rust["status"] == "not_closed" and "vrf" not in rust["known_operations"]
     js = _eco(result, "JS")
     assert js["status"] == "not_closed" and js["closed_operations"] == []
     assert js["may_miss"].startswith("here we may miss")
@@ -369,3 +371,21 @@ def test_a_dangling_symlink_is_still_in_the_tree(tmp_path):
     result = scan_directory(tmp_path)
     lead = next(l for l in _leads(result) if l["target"] == "live/cert.pem")
     assert lead["status"] == "in_the_tree_not_read"
+
+
+def test_vrf_counts_where_the_scan_found_a_vrf(tmp_path):
+    tree = {**ECO_TREE, "cmd/elect.go": 'package main\nimport vrf "github.com/yahoo/coname/vrf"\n'
+                                        "func e(s []byte, k *[64]byte) { vrf.Prove(s, k) }\n"}
+    result = scan_directory(_write(tmp_path, tree))
+    assert "vrf" in result["summary"]["by_role"]
+    go = _eco(result, "Go")
+    assert go["status"] == "partially_closed" and go["closed_operations"] == ["vrf"]
+    assert go["open_operations"] == ["external"] and "vrf" in go["known_operations"]
+    # The tree has no Rust VRF; Rust's status does not move with Go's.
+    assert "vrf" not in _eco(result, "Rust")["closed_operations"]
+
+
+def test_the_meaning_states_the_rule():
+    from qrp_mcp.adaptive import ECOSYSTEMS_MEANING
+    assert "only where the scan found" in ECOSYSTEMS_MEANING
+    assert "18.11.2026)" not in ECOSYSTEMS_MEANING

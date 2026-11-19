@@ -70,6 +70,11 @@ _CODE_SUFFIXES = {
     "CI": (".sh", ".bash", ".zsh", ".ksh", ".bat", ".cmd"),
 }
 _SUFFIX_TO_CODE = {s: eco for eco, suffixes in _CODE_SUFFIXES.items() for s in suffixes}
+# An operation most trees never perform counts toward an ecosystem's status -- known, closed or
+# open -- only where the scan found it there: a row of its family in a file of that ecosystem. A
+# VRF catalogue made every Go and Rust tree read `partially_closed` (independent review of 0.51.0,
+# 19.11: Vault, Go rank 1 -> 40, with `external` still open and untested).
+_FOUND_ONLY = {"vrf": "ECVRF"}
 # A manifest's (or a dependency row's) package ecosystem, as the catalogue names ecosystems.
 _PACKAGE_ECOSYSTEM = {"pypi": "Py", "npm": "JS", "go": "Go", "cargo": "Rust", "maven": "Java",
                       "nuget": "NET", "rubygems": "PHP", "composer": "PHP"}
@@ -114,11 +119,13 @@ ECOSYSTEMS_MEANING = (
     "manifest, crypto_dependency, config_name, config_content, key_file) and how many files each "
     "matched; and whether this version's closure catalogue (operation_closure) holds its "
     "operations. The operations of an ecosystem are those in which a gap has been recorded "
-    "(known_operations, from the labelled ZA-OPRAVYANE rows of 18.11.2026): `closed` -- the "
+    "(known_operations, from the labelled ZA-OPRAVYANE rows of 18.11.2026 and the later rows "
+    "that name an operation, as `vrf` of Go and Rust, row 535): `closed` -- the "
     "catalogue holds every one; `partially_closed` -- some; `not_closed` -- none, or the "
     "ecosystem has no catalogue entry at all. A closed operation is one whose documented "
     "spellings are tested one by one; it is not a claim that nothing can be missed, and an "
-    "operation with no recorded gap is not counted. Context only: it does not affect the "
+    "operation with no recorded gap is not counted. An operation most trees never perform (`vrf`) "
+    "counts -- known, closed or open -- only where the scan found it in that ecosystem. Context only: it does not affect the "
     "findings, their fingerprint, a gate or the exit code")
 
 
@@ -182,11 +189,20 @@ def _ecosystems(result: dict[str, Any], root: Path) -> dict[str, Any]:
     for doc in operations.catalogue():
         for entry in doc["ecosystems"]:
             catalogue.setdefault(entry["ecosystem"], set()).add(doc["operation"])
+    found: dict[str, set[str]] = {}
+    for rows in (result.get("evidence") or {}).values():
+        for row in rows if isinstance(rows, list) else ():
+            if (isinstance(row, dict) and row.get("evidence_kind") not in {"comment", "ban"}
+                    and row.get("algorithm") in _FOUND_ONLY.values()):
+                eco = _SUFFIX_TO_CODE.get(PurePosixPath(str(row.get("path", ""))).suffix.lower())
+                if eco:
+                    found.setdefault(eco, set()).add(row["algorithm"])
     present = []
     for eco in sorted(files):
         every = set().union(*files[eco].values())
-        known = set(KNOWN_OPERATIONS.get(eco, ()))
-        closed = sorted(catalogue.get(eco, set()))
+        absent = {op for op, family in _FOUND_ONLY.items() if family not in found.get(eco, set())}
+        known = set(KNOWN_OPERATIONS.get(eco, ())) - absent
+        closed = sorted(catalogue.get(eco, set()) - absent)
         still_open = sorted(known - set(closed))
         entry: dict[str, Any] = {
             "ecosystem": eco,
