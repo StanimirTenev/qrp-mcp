@@ -4,6 +4,52 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.51.0 (2026-11-19)
+
+Two roles the scan did not name, reported on LinkedIn on 19.11 and reproduced on 0.50.0 from PyPI,
+one setup.py case from the fifth review of 0.50.0, and the descriptions.
+
+- **A VRF is its own role, not a signature (row 535).** A Go file electing its leader with
+  `vrf.Prove(seed, sk)` over an Ed25519 key and signing blocks with ML-DSA-65 gave rows only for the
+  imports and types and summed up as `by_role.signature` = Ed25519 + ML-DSA, `hybrid_partial`; the
+  VRF call had no row. Now ECVRF (RFC 9381) is a family of its own, classical and
+  quantum-vulnerable, with its own part `summary.by_role.vrf` and `readiness_by_role.vrf`, present
+  only where a VRF is found (a scan without one keeps its shape; `roles_differ` compares every part
+  present). Read: Go's coname/vrf, go-ecvrf and keytransparency p256 -- the import, and the calls
+  only in a file that imports them, since `vrf` alone is also virtual routing and forwarding --
+  RFC 9381's four suite names, and the Rust `vrf` crate as its README shows it. No replacement is
+  named for it: a signature scheme does not replace a VRF. CBOM primitive `other`. Not changed: the
+  key's own import and type rows (`ed25519.PrivateKey`) stay Ed25519 under `signature`; the scan does
+  not follow a key into the call. Not covered: C (the libsodium VRF fork), other VRF libraries.
+- **An RFC 3161 time-stamp request is a place (row 536).** `rfc3161ng.RemoteTimestamper(...)` and
+  `openssl ts -query` gave no row and no place. Now a request is a place in `chosen_outside_files`,
+  `kind: remote_timestamp`, `key_location: tsa`, as a KMS signature is: the authority signs the
+  token with its own key and algorithm, outside the files, and no family is claimed. The place says
+  the messageImprint hash the requester chose as `hash_choice` (`-sha256`, `hashname=`, Bouncy
+  Castle's `generate(TSPAlgorithms.X, ...)`, .NET `HashAlgorithmName.X`), or `default of the OpenSSL
+  in use` / `default of the rfc3161ng in use` where none is written -- openssl-ts(1) gives SHA-256 in
+  3.0 and SHA-1 in 1.1.1, so no default is assumed. Only the request: `-reply` signs with a local
+  key and `-verify` chooses nothing. A weak request hash is said as written, not made a finding.
+- **The catalogue** holds 12 (operation, ecosystem) pairs and 1,273 sourced spellings (+ `vrf` for
+  Go and Rust, 10; + 2 rfc3161ng spellings in `external`/Py); every quotation found in a saved copy
+  of its page. `vrf` is a recorded gap of Go and Rust, so those ecosystems now read
+  `partially_closed`, with `external` (Go) still open.
+- **setup.py: a subscript on the next line inside brackets** (row 533, N7). `["requests",
+  "paramiko"]` with `[:1]` on the line below, inside `setup(...)`, gave a paramiko row; Python joins
+  lines inside brackets, and the lexer now does too. N8 (a subscript past 200 nested brackets) is
+  left as it was.
+- **The descriptions.** The PyPI summary and the registry description are one plain sentence; the
+  README opens with it and a trimmed excerpt of a real scan, and says in one line that the scanner
+  has no DORA profile and where the DORA report is. Keywords add cbom, cyclonedx, quantum-safe and
+  scanner and drop three web3 words; a "Free DORA report" project link; the plugin's display name
+  is "qrp-mcp post-quantum readiness scanner". The README video is the one re-rendered after 0.50.0.
+- `findings_fingerprint` changes only where a VRF is found. The `meaning` of
+  `chosen_outside_files` is longer by one sentence on every scan; `operation_closure` lists two more
+  pairs, and `ecosystems` reads Go and Rust as `partially_closed`.
+
+Not claimed: that every VRF or time-stamp client is read -- the libraries above, as their pages
+show them; any recall or precision figure.
+
 ## 0.50.0 (2026-11-18)
 
 **An adaptive post-quantum readiness scanner.** It closes operations against a catalogue of their

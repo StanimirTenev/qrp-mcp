@@ -11,7 +11,7 @@ authors:
 license: Apache-2.0
 repository-code: "https://github.com/StanimirTenev/qrp-mcp"
 url: "https://quantumreadiness.eu"
-version: 0.50.0
+version: 0.51.0
 preferred-citation:
   type: report
   title: >-
