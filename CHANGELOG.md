@@ -16,7 +16,8 @@ one setup.py case from the fifth review of 0.50.0, and the descriptions.
   quantum-vulnerable, with its own part `summary.by_role.vrf` and `readiness_by_role.vrf`, present
   only where a VRF is found (a scan without one keeps its shape; `roles_differ` compares every part
   present). Read: Go's coname/vrf, go-ecvrf and keytransparency p256 -- the import, and the calls
-  only in a file that imports them, since `vrf` alone is also virtual routing and forwarding --
+  only in a file that imports them, since `vrf` alone is also virtual routing and forwarding, and
+  never a call on a package (`ed25519.Verify(...)` beside go-ecvrf is Ed25519's) --
   RFC 9381's four suite names, and the Rust `vrf` crate as its README shows it. No replacement is
   named for it: a signature scheme does not replace a VRF. CBOM primitive `other`. Not changed: the
   key's own import and type rows (`ed25519.PrivateKey`) stay Ed25519 under `signature`; the scan does
@@ -27,8 +28,12 @@ one setup.py case from the fifth review of 0.50.0, and the descriptions.
   token with its own key and algorithm, outside the files, and no family is claimed. The place says
   the messageImprint hash the requester chose as `hash_choice` (`-sha256`, `hashname=`, Bouncy
   Castle's `generate(TSPAlgorithms.X, ...)`, .NET `HashAlgorithmName.X`), or `default of the OpenSSL
-  in use` / `default of the rfc3161ng in use` where none is written -- openssl-ts(1) gives SHA-256 in
-  3.0 and SHA-1 in 1.1.1, so no default is assumed. Only the request: `-reply` signs with a local
+  in use` / `default of the rfc3161ng in use` only where the whole request was read and none is
+  written -- openssl-ts(1) gives SHA-256 in 3.0 and SHA-1 in 1.1.1, so no default is assumed. A hash
+  written as a variable (`-$DIGEST`, `hashname=HASH`, `generate(hashAlg, ...)`) is `set in the request,
+  not read as a value`, and a call that goes on past the lines read says so; `hash_choice` never
+  carries source text, so the masked levels show nothing of it. A command continued with `\` is read
+  on. Only the request: `-reply` signs with a local
   key and `-verify` chooses nothing. A weak request hash is said as written, not made a finding.
 - **The catalogue** holds 12 (operation, ecosystem) pairs and 1,273 sourced spellings (+ `vrf` for
   Go and Rust, 10; + 2 rfc3161ng spellings in `external`/Py); every quotation found in a saved copy
@@ -41,7 +46,8 @@ one setup.py case from the fifth review of 0.50.0, and the descriptions.
 - **The descriptions.** The PyPI summary and the registry description are one plain sentence; the
   README opens with it and a trimmed excerpt of a real scan, and says in one line that the scanner
   has no DORA profile and where the DORA report is. Keywords add cbom, cyclonedx, quantum-safe and
-  scanner and drop three web3 words; a "Free DORA report" project link; the plugin's display name
+  scanner and drop three web3 words; a "Free DORA report" project link; Homepage and the registry's
+  `websiteUrl` point to https://quantumreadiness.eu/qrp-mcp/; the plugin's display name
   is "qrp-mcp post-quantum readiness scanner". The README video is the one re-rendered after 0.50.0.
 - `findings_fingerprint` changes only where a VRF is found. The `meaning` of
   `chosen_outside_files` is longer by one sentence on every scan; `operation_closure` lists two more
