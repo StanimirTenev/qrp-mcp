@@ -778,3 +778,31 @@ def test_dense_co_location_is_not_quadratic(tmp_path, monkeypatch):
     result = scan_directory(tmp_path)
     assert len(result["randomness"]["places"]) == 20000
     assert took["section"] < 6, took
+
+
+# --- getrandom with GRND_NONBLOCK (LinkedIn, 19.11 evening: proba-vecher/rng/src/keygen.c) ----------
+
+KEYGEN_C = ("#include <sys/random.h>\n#include <openssl/evp.h>\n"
+            "int make_key(unsigned char *seed) {\n"
+            "    if (getrandom(seed, 32, GRND_NONBLOCK) < 0) { /* EAGAIN before the pool is ready */\n"
+            "        return -1;\n    }\n"
+            "    EVP_PKEY *k = EVP_PKEY_Q_keygen(NULL, NULL, \"EC\", \"P-256\");\n"
+            "    return k != NULL;\n}\n")
+
+
+def test_getrandom_nonblocking_is_check_and_a_place_beside_a_key(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "keygen.c").write_text(KEYGEN_C)
+    section = scan_directory(tmp_path)["randomness"]
+    (row,) = section["calls"]
+    assert (row["api"], row["class"], row["why"], row["nonblocking"]) == (
+        "getrandom", "check", "may_return_before_the_pool_is_initialised", True)
+    (place,) = section["places"]
+    assert (place["path"], place["line"], place["link_scope"]) == ("src/keygen.c", 4, "same_function")
+    assert {"kind": "public_key_operation", "line": 7, "family": "EC"} in place["anchors"]
+
+
+def test_getrandom_without_the_flag_stays_csprng(tmp_path):
+    calls = _calls(tmp_path, {"k.c": KEYGEN_C.replace("GRND_NONBLOCK", "0")})
+    assert [(c["api"], c["class"]) for c in calls] == [("getrandom", "csprng")]
+    assert "why" not in calls[0]

@@ -609,6 +609,8 @@ nor the exit code.
   `setSeed`, otherwise `sha1prng_seed_not_ruled_out`: its seed decides its output, and a `setSeed`
   in another file is not ruled out), `setSeed(<literal>)` or `new SecureRandom(<literal>)`
   (`fixed_seed`), `new SecureRandom(seed)` with the seed in a variable (`seed_supplied`),
+  `getrandom(..., GRND_NONBLOCK)` (`may_return_before_the_pool_is_initialised`: with the flag it
+  returns -1 with EAGAIN instead of blocking until the pool is initialised; without it, `csprng`),
   `getInstance("<a name outside the JDK's standard names>")` (`algorithm` and `why`:
   `not_a_standard_name`, a third party's generator the JDK's documentation does not settle),
   `getInstance(<a variable>)` and `EVP_RAND_fetch(ctx, <a variable>, ...)`
@@ -617,7 +619,7 @@ nor the exit code.
   (`deprecated_alias`). A seed written as a literal is `seed: "literal"`. Names resolve through the
   file's own imports (Python aliases and from-imports, Go import aliases); a comment line is skipped
   and string contents are blanked before matching. Every field except `path` and `excerpt` holds a
-  value from a closed list. The 47 spellings, each with its page, the words quoted from it and a
+  value from a closed list. The 48 spellings, each with its page, the words quoted from it and a
   test, are `data/operations/rng_source.toml`.
 - **Places to check** (`randomness.places`): a `weak` or `check` row with an anchor in its file. An
   anchor is a public-key call row the scan reports (`public_key_operation`), which may be a key

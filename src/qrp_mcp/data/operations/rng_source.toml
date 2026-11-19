@@ -448,7 +448,7 @@ expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "check", 
 
 [[ecosystems]]
 ecosystem = "C"
-scope = "C rand(), srand(), rand_r(); C++ std::mt19937 and std::mt19937_64 (check: std::random_device); getrandom(); arc4random, arc4random_buf, arc4random_uniform; OpenSSL RAND_bytes, RAND_priv_bytes and their _ex forms, EVP_RAND_fetch with CTR-DRBG, HASH-DRBG or HMAC-DRBG. Not covered: random()/drand48() (no page read states their class), RAND_pseudo_bytes (its page says only that it is deprecated), other engines of <random>, libsodium randombytes, mbedTLS ctr_drbg, BoringSSL."
+scope = "C rand(), srand(), rand_r(); C++ std::mt19937 and std::mt19937_64 (check: std::random_device); getrandom() (check with GRND_NONBLOCK); arc4random, arc4random_buf, arc4random_uniform; OpenSSL RAND_bytes, RAND_priv_bytes and their _ex forms, EVP_RAND_fetch with CTR-DRBG, HASH-DRBG or HMAC-DRBG. Not covered: random()/drand48() (no page read states their class), RAND_pseudo_bytes (its page says only that it is deprecated), other engines of <random>, libsodium randombytes, mbedTLS ctr_drbg, BoringSSL."
 
 [[ecosystems.spellings]]
 id = "c-rand"
@@ -520,6 +520,19 @@ snippet = '''
 int fill(unsigned char *buf) { return getrandom(buf, 32, 0) == 32; }
 '''
 expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "getrandom"}}]}
+
+[[ecosystems.spellings]]
+id = "c-getrandom-nonblock"
+spelling = "getrandom(buf, n, GRND_NONBLOCK)"
+source = "https://man7.org/linux/man-pages/man2/getrandom.2.html"
+quote = "If the GRND_NONBLOCK flag is set, then getrandom() does not block in these cases, but instead immediately returns -1 with errno set to EAGAIN."
+file = "rnd.c"
+snippet = '''
+#include <sys/random.h>
+
+int fill(unsigned char *buf) { return getrandom(buf, 32, GRND_NONBLOCK) == 32; }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "check", api = "getrandom", why = "may_return_before_the_pool_is_initialised", nonblocking = true}}]}
 
 [[ecosystems.spellings]]
 id = "c-arc4random-buf"

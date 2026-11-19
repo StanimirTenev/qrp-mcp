@@ -9,7 +9,8 @@ data/operations/rng_source.toml, cites the page and quotes it for every spelling
 - `csprng`: a named cryptographic generator (`secrets`, `os.urandom`, `crypto/rand`, `SecureRandom`,
   `getRandomValues`, `getrandom`, `arc4random`, `RAND_bytes`, `RandomNumberGenerator`, `random_int`);
 - `check`: a call its documentation does not settle by itself (`std::random_device`, SHA1PRNG,
-  a seed passed into a CSPRNG API, Go's ChaCha8, a generator named in a variable).
+  a seed passed into a CSPRNG API, `getrandom` with GRND_NONBLOCK, Go's ChaCha8, a generator named
+  in a variable).
 
 The section is built on the finished result, after `findings_fingerprint`, and outside `evidence`:
 a row is no finding, carries no classification of the code and moves neither the findings, their
@@ -424,7 +425,12 @@ def _c(text: str, rel: str):
                 if api == "srand" and _literal_after(code, match.end()):
                     said["seed"] = "literal"
                 if api == "getrandom" and "GRND_NONBLOCK" in code:
+                    # getrandom(2): with the flag it "does not block in these cases, but instead
+                    # immediately returns -1 with errno set to EAGAIN" -- before the pool is ready.
                     said["nonblocking"] = True
+                    said["why"] = "may_return_before_the_pool_is_initialised"
+                    yield number, line, match.start(), api, "check", said
+                    continue
                 yield number, line, match.start(), api, cls, said
         for match in _C_OPENSSL.finditer(code):
             yield number, line, match.start(), match.group(1) + (match.group(2) or ""), "csprng", {}
