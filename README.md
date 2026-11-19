@@ -149,7 +149,7 @@ From 0.46.0 a TLS version a file pins is linked, in CycloneDX's own fields, to w
 configures: the TLS groups in `protocolProperties.cryptoRefArray`, and the cipher suites in
 `protocolProperties.cipherSuites` by their IANA names, each pointing at the algorithms it names. A
 reader that skips `qrp:` properties can resolve the key exchange of `TLS 1.3`
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/cbom.md)).
+([details][docs-cbom]).
 
 From 0.47.0 an algorithm read only from the name of a certificate or key file a TLS setting loads
 (`ssl_certificate /etc/nginx/certs/mldsa65_srv.crt;`) is marked `named_in_a_path: true` and is one
@@ -158,7 +158,7 @@ confidence level lower: the file's name is a label, not the certificate.
 From 0.47.0 `tls_listeners` lists each nginx `server` block that listens with `ssl` or `quic`: its
 ports, server names (masked below `--level full`), the groups and the certificates set for it, with
 each one's family, so two servers in one file no longer read as one inventory. The CBOM carries it
-as `qrp:tls_listeners` ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/tls.md)).
+as `qrp:tls_listeners` ([details][docs-tls]).
 
 From 0.48.0 `--mandate` also takes the deadlines of the EU (`eu-pqc-roadmap`), the UK (`uk-ncsc`),
 Canada (`ca-cccs`), Australia (`au-ism`), the Netherlands (`nl-rqs`), Sweden (`se-ncsc`), Japan
@@ -167,7 +167,7 @@ quoted from the authority's own document, so a finding says which deadline catch
 A date for a class of system the scan cannot see -- high-risk, highest priority -- is said beside
 the clause and not counted by the gate. Every mandate block says how old its reading of the
 document is, and past 180 days (`stale`) the command line says so
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
+([details][docs-gate-and-suppression]).
 
 From 0.49.0 `--mandate` also takes four financial regulators whose duty dates no line of code --
 Bank of Israel (`il-boi`), FINMA (`ch-finma`), HKMA (`hk-hkma`) and MAS (`sg-mas`, a
@@ -175,7 +175,7 @@ consultation): the sector and the duty, quoted, with no clause on any occurrence
 never counts them. A mandate block also carries the sha256 of each document as it was read, and
 `qrp-mcp mandate-check NAME --document FILE` says whether a copy you downloaded is still the same
 document (the tool itself still fetches nothing)
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
+([details][docs-gate-and-suppression]).
 
 Four of the mandates also date symmetric or hash algorithms, which the scan does not read:
 `cnsa-2.0` (AES-256 and SHA-384/512, already required), `au-ism` (AES-128/192, SHA-224/256 and
@@ -191,19 +191,19 @@ path is outside the tree; a strongSwan proposal that can be negotiated with a cl
 exchange alone is a row of its own (`evidence.ike_proposals`), so removing the fallback is
 closed; a KMS SDK call (boto3 KMS, Azure Key Vault) says `key_location: kms`; and every evidence
 row with a path says `in_test_code`
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/tls.md)).
+([details][docs-tls]).
 
 From 0.47.0 `--mandate nist-ir-8547` also gives each clause `federal_high_value_assets`: the date
 by role that NIST IR 8547 (section 4) restates from EO 14412 and OMB M-26-15 -- post-quantum key
 establishment by 2030-12-31, signatures by 2031-12-31 -- for federal high value assets and high
 impact systems only. The scan cannot tell which systems those are, so the gate does not count it
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md)).
+([details][docs-gate-and-suppression]).
 
 From 0.47.0 an RSA, EC, ECDSA, EdDSA or DSA line that calls `.sign(`, `.verify(`, `.encrypt(` or
 `.decrypt(` on a key carries `operation`, so verifying an old signature no longer reads the same
 as signing a new one; in the CBOM as `qrp:operation`. Under `--mandate nist-ir-8547` a verify-only or decrypt-only line
 says what IR 8547 calls legacy use, with no exemption: the dates and the gate are unchanged
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/closure-and-profiles.md)).
+([details][docs-closure-and-profiles]).
 
 From 0.47.0 a call into a post-quantum KEM or signature API is a row with `operation` --
 `keygen` apart from `encapsulate`, `decapsulate`, `sign` and `verify` -- so where a device
@@ -218,7 +218,7 @@ shows where a key is generated, not whether that step survives a fault.
 
 From 0.47.0 RustCrypto's `ml_kem`, `ml_dsa` and `slh_dsa` crates and libcrux are named as the
 `provider`, and Go's `mlkem.GenerateKey768()` and its siblings give the parameter set
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md)); so do
+([details][docs-what-it-reads]); so do
 liboqs's SLH-DSA names (`SLH_DSA_PURE_SHA2_128S`, `SLH_DSA_SHA2_224_PREHASH_SHAKE_128F`).
 
 From 0.47.0 an Android Keystore key (`KeyPairGenerator.getInstance(..., "AndroidKeyStore")`) takes
@@ -239,14 +239,14 @@ already did.
 From 0.47.0 the CBOM has one `related-crypto-material` component per key -- `type` `private-key` or
 `public-key`, its `size`, `algorithmRef` and `qrp:curve` -- instead of one "Embedded private key
 material" component for all the keys in the tree
-([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/cbom.md)).
+([details][docs-cbom]).
 
 From 0.47.0 an RSA line that encrypts a named value with OAEP (`pub.encrypt(archive_key,
 padding.OAEP(...))`, on one line or split over up to four) carries `wraps`: the value's name (masked below `--level full`), and, where the
 file assigns it once with `generate_key(bit_length=N)`, `os.urandom(n)`, `secrets.token_bytes(n)` or
 `get_random_bytes(n)`, `what: "symmetric key"` and its size -- a symmetric key is as safe as the key
 that wraps it. In the CBOM as `qrp:wraps`. AES itself is still not reported: symmetric cryptography
-is out of scope by design ([measurement](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/measurement.md)).
+is out of scope by design ([measurement][docs-measurement]).
 ECIES and AES key wrap under a DH-derived key are not read.
 
 ### A control on your own tree
@@ -388,7 +388,7 @@ rules, file types and their limits is in [What it looks at](https://github.com/S
 A name is not a use. A post-quantum name that only names something the file defines
 (`self.mlkem_key = ec.generate_private_key(...)`, `def kyber_exchange`) is an identifier row and
 does not make a file post-quantum ready; a file that also calls the library keeps every row as it
-was ([details](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md)).
+was ([details][docs-what-it-reads]).
 A name that only spells like a family is not one: `MLDSA1R` (an SH7722 register) is not ML-DSA,
 tinycrypt's `ecc_dsa` is ECDSA, not DSA, and `#define MBEDTLS_REMOVE_3DES_CIPHERSUITES` is a
 removal, not a use. A call inside `with pytest.raises(...)` or `with self.assertRaises(...)` whose
@@ -488,3 +488,10 @@ It also does not tell you that you are about to be hacked. It tells you what you
 ## License
 
 Apache-2.0.
+
+[docs-cbom]: https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/cbom.md
+[docs-closure-and-profiles]: https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/closure-and-profiles.md
+[docs-gate-and-suppression]: https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/gate-and-suppression.md
+[docs-measurement]: https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/measurement.md
+[docs-tls]: https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/tls.md
+[docs-what-it-reads]: https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/what-it-reads.md
