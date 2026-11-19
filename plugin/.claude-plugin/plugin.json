@@ -2,7 +2,7 @@
   "name": "qrp",
   "description": "An adaptive post-quantum readiness scanner. It closes operations against a catalogue of their documented spellings, each with a test, says in its output which (operation, ecosystem) pairs are closed, and carries its coverage and limits inside the CBOM. A maintainer tool in the repository re-reads the documentation and proposes new spellings, which enter only with a source and a test.",
   "icon": "./icon.png",
-  "version": "0.51.0",
+  "version": "0.52.0",
   "author": {
     "name": "Stanimir Tenev",
     "url": "https://quantumreadiness.eu"

@@ -2,7 +2,7 @@
 
 <!-- mcp-name: eu.quantumreadiness/qrp-mcp -->
 
-**Offline post-quantum readiness scanner for code; CycloneDX CBOM with what it read and did not read.**
+**Offline post-quantum scanner for code: CycloneDX CBOM, RNG calls next to keys, what it did not read.**
 
 What it says about [certbot](https://github.com/certbot/certbot) at `56ee049`, trimmed from
 `qrp-mcp scan` (qrp-mcp 0.51.0): what it found, by role, and the files it did not read, with the
@@ -292,12 +292,12 @@ test.
   package carries a catalogue of the documented spellings (`src/qrp_mcp/data/operations/*.toml`),
   each with the page it comes from and the words quoted from it. Every spelling is a test: it is
   written to a file, scanned, and expected on its line (`tests/test_operation_closure.py`). In
-  0.51.0 the catalogue holds 12 pairs and 1,273 sourced spellings: IKE/IPsec, the public-key names
+  0.52.0 the catalogue holds 19 pairs and 1,321 sourced spellings: IKE/IPsec, the public-key names
   of seven C libraries, key files and key sizes in PKI, key sizes in .NET, TLS endpoints and TLS
   groups in nginx-style configuration, SSH algorithms, liboqs and hash-based signatures in C,
-  Python dependencies, environment reads and RFC 3161 time-stamp requests, and ECVRF (RFC 9381)
-  in Go and Rust. The next release adds `rng_source` for seven ecosystems (19 pairs, 1,319
-  spellings): the random number generators the code calls, below.
+  Python dependencies, environment reads and RFC 3161 time-stamp requests, ECVRF (RFC 9381)
+  in Go and Rust, and `rng_source` in seven ecosystems (48 spellings): the random number
+  generators the code calls, below.
 - **`randomness`: the generators the code calls, as context.** Each generator API called on a line
   is a row in one of three classes, from the generator's own documentation: `weak` (a non-cryptographic
   PRNG: Python `random` and `numpy.random`, Go `math/rand` and `math/rand/v2`,
@@ -462,7 +462,7 @@ A **free inventory tool**, not a readiness assessment. It deliberately does not 
   random number generation as a finding (SecureRandom, DRBG, `os.urandom`, `secrets`, `math/rand`, a
   remote entropy service) — out of scope by design: it reports the public-key cryptography a quantum
   computer would break. A file holding nothing else is read and gives no finding; the output says so
-  in `coverage.claims.out_of_scope_by_design`. From the next release the generators the code calls
+  in `coverage.claims.out_of_scope_by_design`. From 0.52.0 the generators the code calls
   are listed in `randomness` as context (above, "How it adapts"); the entropy behind them and the
   quality of a seed are not read. MD5, SHA-1, DES, 3DES and RC4 are still named where
   found. Four `--mandate` documents date AES or SHA sizes (`cnsa-2.0`, `au-ism`, `ca-cccs`,

@@ -4,7 +4,7 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
-## 0.52.0 (not released; branch `v0.52-rng`)
+## 0.52.0 (2026-11-19)
 
 Random number generators, asked for on 19.11 ("give the random number generator more attention")
 after a LinkedIn post asked who audits the randomness behind PQC keys. The reproduction
@@ -61,6 +61,9 @@ after a LinkedIn post asked who audits the randomness behind PQC keys. The repro
   from it).
 - **Not covered**: Rust, Ruby, Swift, methods on a generator variable, entropy estimation and
   statistical tests. Not changed: SHA1PRNG keeps its SHA-1 row in `evidence`.
+- **The descriptions.** The PyPI summary, the registry description and the README's first line are
+  "Offline post-quantum scanner for code: CycloneDX CBOM, RNG calls next to keys, what it did not read": it names the generator calls and the places to look, not an audit of the
+  randomness. Keywords add rng, randomness and csprng.
 - **Against us** (said, not left out):
   - A place is co-location, not data flow. The controls hold known false places: certbot's renewal
     jitter (`random.uniform`), Vault's jitter and sink, and a Firebase index in a name that says key.

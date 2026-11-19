@@ -586,7 +586,7 @@ s2n-tls, rustls) every piece of evidence is identical before and after.
   `gpg -r X` without `-e`. The readiness summary is over families and does not read these rows.
 - **Cipher suites by name** (rows 465, 475): see [The CBOM it emits](cbom.md).
 
-### Random number generators (`rng_source`, next release; rows 531, 539)
+### Random number generators (`rng_source`, 0.52.0; rows 531, 539)
 
 Context, not findings: the section `randomness` is built after the findings fingerprint and outside
 `evidence`, so it moves neither the findings, their fingerprint, a baseline, `prove_closure`, a gate

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qrp-mcp"
-version = "0.51.0"
-description = "Offline post-quantum readiness scanner for code; CycloneDX CBOM with what it read and did not read"
+version = "0.52.0"
+description = "Offline post-quantum scanner for code: CycloneDX CBOM, RNG calls next to keys, what it did not read"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -13,7 +13,8 @@ license-files = ["LICENSE"]
 authors = [{ name = "Stanimir Tenev" }]
 keywords = [
     "mcp", "post-quantum", "pqc", "cryptography", "security", "crypto-inventory", "cbom",
-    "cyclonedx", "quantum-safe", "scanner", "quantum", "ethereum", "bitcoin", "secp256k1",
+    "cyclonedx", "quantum-safe", "scanner", "quantum", "ethereum", "bitcoin", "secp256k1", "rng",
+    "randomness", "csprng",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
