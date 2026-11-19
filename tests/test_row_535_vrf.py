@@ -142,3 +142,14 @@ def test_the_three_exits_carry_it(tmp_path):
     props = component["cryptoProperties"]["algorithmProperties"]
     assert props["primitive"] == "other"
     assert props.get("nistQuantumSecurityLevel") == 0
+
+
+def test_a_package_call_beside_go_ecvrf_is_not_a_vrf(tmp_path):
+    # Independent review before the release (19.11): in a file importing go-ecvrf, any `.Verify(`
+    # was read as the VRF's -- `ed25519.Verify(pub, msg, sig)` too.
+    body = ('package v\n\nimport (\n\t"crypto/ed25519"\n\t"github.com/ProtonMail/go-ecvrf/ecvrf"\n)\n\n'
+            "func F(sk *ecvrf.PrivateKey, pub ed25519.PublicKey, msg, sig []byte) bool {\n"
+            "\tsk.Prove(msg)\n\treturn ed25519.Verify(pub, msg, sig)\n}\n")
+    result = scan_directory(str(_tree(tmp_path, {"v.go": body})))
+    lines = {r["line"] for r in _rows(result, "ECVRF")}
+    assert 9 in lines and 10 not in lines, lines

@@ -208,7 +208,8 @@ present only where one is found: ECVRF (RFC 9381), its own family, through the G
 go-ecvrf and keytransparency's p256 and Rust's `vrf` crate, and RFC 9381's suite names
 (`data/operations/vrf.toml`). It is quantum-vulnerable and no replacement is named for it: a
 signature scheme does not replace a VRF (row 535). A call is read only in a file that imports the
-library -- `vrf` alone is also virtual routing and forwarding. The VRF's key, where the file names
+library -- `vrf` alone is also virtual routing and forwarding -- and never a call on a package
+(`ed25519.Verify(...)` beside go-ecvrf). The VRF's key, where the file names
 it by its own type (`ed25519.PrivateKey`), stays an Ed25519 row under `signature`: the scan does
 not follow the key into the call.
 

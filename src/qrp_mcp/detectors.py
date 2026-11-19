@@ -4623,12 +4623,15 @@ _VRF_IMPORTS = (
     (re.compile(r"(?:^|[\s(])(?:(?!import\b)(\w+)\s+)?[\"`]github\.com/yahoo/coname/vrf[\"`]", re.MULTILINE),
      "vrf", r"\b{name}\.(?:Prove|Verify|GenerateKey|Compute)\s*\("),
     (re.compile(r"[\"`]github\.com/ProtonMail/go-ecvrf/ecvrf[\"`]"), None,
-     r"\.(?:Prove|Verify)\s*\("),
+     r"\b(\w+)\.(?:Prove|Verify)\s*\("),
     (re.compile(r"(?:^|[\s(])(?:(?!import\b)(\w+)\s+)?[\"`]github\.com/google/keytransparency/core/crypto/vrf/p256"
                 r"[\"`]", re.MULTILINE),
-     "p256", r"\.(?:Evaluate|ProofToHash)\s*\(|\b{name}\.GenerateKey\s*\("),
+     "p256", r"\b(\w+)\.(?:Evaluate|ProofToHash)\s*\(|\b{name}\.GenerateKey\s*\("),
 )
 _VRF_ANY = ("coname/vrf", "go-ecvrf", "crypto/vrf/p256")
+# A method is called on a key, never on a package: `ed25519.Verify(pub, msg, sig)` beside go-ecvrf
+# is Ed25519's (independent review of 0.51.0, 19.11). The names a Go file imports packages under.
+_GO_IMPORTED = re.compile(r'(?m)^\s*(?:import\s+)?(?:(\w+)\s+)?"([\w.\-/]+)"\s*$')
 
 
 def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
@@ -4644,6 +4647,7 @@ def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
             calls.append(re.compile(call.format(name=re.escape(name))))
     if not calls:
         return findings
+    packages = {alias or path.rsplit("/", 1)[-1] for alias, path in _GO_IMPORTED.findall(text)}
     rows = {f["line"]: f for f in findings if f["algorithm"] == "ECVRF"}
     added = []
     for n, line in enumerate(lines, 1):
@@ -4651,7 +4655,8 @@ def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
         if stripped.startswith(("//", "/*", "*")):
             continue
         code = line.split("//", 1)[0]
-        if not any(c.search(code) for c in calls):
+        if not any(not c.groups or m.group(1) is None or m.group(1) not in packages
+                   for c in calls for m in c.finditer(code)):
             continue
         if n in rows:
             rows[n]["evidence_kind"] = "call"

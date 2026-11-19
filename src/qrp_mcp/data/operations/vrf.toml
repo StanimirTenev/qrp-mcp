@@ -9,7 +9,7 @@ catalogue_version = "1"
 
 [[ecosystems]]
 ecosystem = "Go"
-scope = "github.com/yahoo/coname/vrf (GenerateKey, Prove, Verify, Compute), github.com/ProtonMail/go-ecvrf/ecvrf (GenerateKey, NewPrivateKey, NewPublicKey, and Prove/Verify on its keys), github.com/google/keytransparency/core/crypto/vrf/p256 (GenerateKey, Evaluate, ProofToHash), and the four RFC 9381 suite names as strings. Not covered: other Go VRF packages, a call through a variable the package is not imported under."
+scope = "github.com/yahoo/coname/vrf (GenerateKey, Prove, Verify, Compute), github.com/ProtonMail/go-ecvrf/ecvrf (GenerateKey, NewPrivateKey, NewPublicKey, and Prove/Verify on its keys), github.com/google/keytransparency/core/crypto/vrf/p256 (GenerateKey, Evaluate, ProofToHash), and the four RFC 9381 suite names as strings. A method call on a package (`ed25519.Verify(...)`) is not the VRF's. Not covered: other Go VRF packages, a call through a variable the package is not imported under."
 
 [[ecosystems.spellings]]
 id = "coname-prove"
