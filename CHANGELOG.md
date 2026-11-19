@@ -21,10 +21,12 @@ one setup.py case from the fifth review of 0.50.0, and the descriptions.
   as that library's key, so `cert.Verify(...)`, `policy.Evaluate(...)` and `ed25519.Verify(...)` are
   not the VRF's -- RFC 9381's four suite names, and the Rust `vrf` crate as its README shows it. No
   replacement is named for it: a signature scheme does not replace a VRF. CBOM primitive `other`.
-  An Ed25519, EdDSA, EC or ECDSA family whose only rows are a key's import and type in files that
-  call a VRF, with no call of its own, is under `role_not_determined`, not `signature`: the
-  reproduction now reads signature = ML-DSA, vrf = ECVRF, Ed25519 not determined. Its finding still
-  lists the signature replacements. Not covered: C (the libsodium VRF fork), other VRF libraries.
+  Not changed: an Ed25519 key beside a VRF call (`ed25519.PrivateKey` handed to `vrf.Prove`) stays
+  under `signature` -- the scan does not follow a key into a call, and a key that also signs through
+  a method (`sk.Sign(...)`, no Ed25519 call row) cannot be told apart, so the reproduction reads
+  signature = Ed25519 + ML-DSA, `hybrid_partial`, beside vrf = ECVRF, `classical_only`: it errs
+  toward counting the key, not toward `pqc_ready`. Not covered: C (the libsodium VRF fork), other
+  VRF libraries.
 - **An RFC 3161 time-stamp request is a place (row 536).** `rfc3161ng.RemoteTimestamper(...)` and
   `openssl ts -query` gave no row and no place. Now a request is a place in `chosen_outside_files`,
   `kind: remote_timestamp`, `key_location: tsa`, as a KMS signature is: the authority signs the

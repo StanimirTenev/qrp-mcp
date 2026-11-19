@@ -208,12 +208,13 @@ present only where one is found: ECVRF (RFC 9381), its own family, through the G
 go-ecvrf and keytransparency's p256 and Rust's `vrf` crate, and RFC 9381's suite names
 (`data/operations/vrf.toml`). It is quantum-vulnerable and no replacement is named for it: a
 signature scheme does not replace a VRF (row 535). A call is read only in a file that imports the
-library -- `vrf` alone is also virtual routing and forwarding -- and never a call on a package
-(`ed25519.Verify(...)` beside go-ecvrf); a method (`Prove`, `Verify`, `Evaluate`, `ProofToHash`)
-counts only on a variable the file declares as that library's key. An Ed25519, EdDSA, EC or ECDSA
-family whose only rows are the import and the type of a key in files that call a VRF -- no call of
-its own, as the `ed25519.PrivateKey` handed to `vrf.Prove` -- is under `role_not_determined`, not
-`signature`: what the key does is not read. Its finding still lists the signature replacements.
+library -- `vrf` alone is also virtual routing and forwarding -- and a method (`Prove`, `Verify`,
+`Evaluate`, `ProofToHash`) only on a variable the file declares as that library's key, so
+`ed25519.Verify(...)`, `cert.Verify(...)` and `policy.Evaluate(...)` are not the VRF's. An Ed25519
+key beside a VRF call (`ed25519.PrivateKey` handed to `vrf.Prove`) stays an Ed25519 row under
+`signature`: the scan does not follow a key into a call, and a key that also signs through a method
+(`sk.Sign(...)`, which gives no Ed25519 call row) cannot be told from one that does not, so the part
+errs toward counting it rather than reading `pqc_ready` (second re-review of 0.51.0, 19.11).
 
 **Which module implements it, where the file says.** Validation belongs to a module, not to an
 algorithm, and `@noble/post-quantum` and Go's `crypto/mlkem` used to give identical findings
