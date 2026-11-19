@@ -40,7 +40,8 @@ one setup.py case from the fifth review of 0.50.0, and the descriptions.
   written as a variable or as any other name (`-$DIGEST`, `hashname=HASH`, `generate(hashAlg, ...)`)
   is `set in the request, not read as a value`, and a call that goes on past the lines read says so;
   `hash_choice` never carries source text, so the masked levels show nothing of it. A command
-  continued with `\` is read on; the .NET hash is read inside the call's own arguments; a `)` inside
+  continued with `\` is read on; the .NET hash is read inside the call's own arguments; a generator
+  assigned without its type (`var g = new ...`, Kotlin `val g = ...()`) counts; a `)` inside
   a string does not end them. Only the request: `-reply` and Bouncy Castle's TimeStampTokenGenerator
   sign with a local key, `-verify` chooses nothing, and `-query -in req.tsq` prints a request made
   before; Bouncy Castle's `generate(...)` counts on a variable declared as a
@@ -48,8 +49,8 @@ one setup.py case from the fifth review of 0.50.0, and the descriptions.
 - **The catalogue** holds 12 (operation, ecosystem) pairs and 1,273 sourced spellings (+ `vrf` for
   Go and Rust, 10; + 2 rfc3161ng spellings in `external`/Py); every quotation found in a saved copy
   of its page. `vrf` is a recorded gap of Go and Rust, and it counts toward their status in
-  `ecosystems` -- known, closed or open -- only where the scan found a VRF there: a Go tree without
-  one still reads `not_closed`.
+  `ecosystems` -- known, closed or open -- only where the scan found a VRF there, outside test code:
+  a Go tree without one still reads `not_closed`.
 - **setup.py: a subscript on the next line inside brackets** (row 533, N7). `["requests",
   "paramiko"]` with `[:1]` on the line below, inside `setup(...)`, gave a paramiko row; Python joins
   lines inside brackets, and the lexer now does too. N8 (a subscript past 200 nested brackets) is

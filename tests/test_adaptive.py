@@ -389,3 +389,12 @@ def test_the_meaning_states_the_rule():
     from qrp_mcp.adaptive import ECOSYSTEMS_MEANING
     assert "only where the scan found" in ECOSYSTEMS_MEANING
     assert "18.11.2026)" not in ECOSYSTEMS_MEANING
+
+
+def test_a_vrf_only_in_test_code_does_not_move_the_status(tmp_path):
+    # Re-review of 0.51.0 (19.11): a VRF only in a _test.go file made Go `partially_closed`.
+    tree = {**ECO_TREE, "cmd/elect_test.go": 'package main\nimport vrf "github.com/yahoo/coname/vrf"\n'
+                                             "func e(s []byte, k *[64]byte) { vrf.Prove(s, k) }\n"}
+    result = scan_directory(_write(tmp_path, tree))
+    go = _eco(result, "Go")
+    assert go["status"] == "not_closed" and "vrf" not in go["known_operations"]

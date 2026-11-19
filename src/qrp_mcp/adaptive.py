@@ -125,7 +125,8 @@ ECOSYSTEMS_MEANING = (
     "ecosystem has no catalogue entry at all. A closed operation is one whose documented "
     "spellings are tested one by one; it is not a claim that nothing can be missed, and an "
     "operation with no recorded gap is not counted. An operation most trees never perform (`vrf`) "
-    "counts -- known, closed or open -- only where the scan found it in that ecosystem. Context only: it does not affect the "
+    "counts -- known, closed or open -- only where the scan found it in that ecosystem, outside test "
+    "code. Context only: it does not affect the "
     "findings, their fingerprint, a gate or the exit code")
 
 
@@ -193,6 +194,7 @@ def _ecosystems(result: dict[str, Any], root: Path) -> dict[str, Any]:
     for rows in (result.get("evidence") or {}).values():
         for row in rows if isinstance(rows, list) else ():
             if (isinstance(row, dict) and row.get("evidence_kind") not in {"comment", "ban"}
+                    and not row.get("in_test_code")
                     and row.get("algorithm") in _FOUND_ONLY.values()):
                 eco = _SUFFIX_TO_CODE.get(PurePosixPath(str(row.get("path", ""))).suffix.lower())
                 if eco:
