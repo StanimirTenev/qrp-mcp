@@ -298,8 +298,8 @@ test.
   Python dependencies, environment reads and RFC 3161 time-stamp requests, and ECVRF (RFC 9381)
   in Go and Rust. The next release adds `rng_source` for seven ecosystems (19 pairs, 1,319
   spellings): the random number generators the code calls, below.
-- **`randomness`: the generators the code calls, as context.** Each call of a generator is a row
-  in one of three classes, from the generator's own documentation: `weak` (a non-cryptographic
+- **`randomness`: the generators the code calls, as context.** Each generator API called on a line
+  is a row in one of three classes, from the generator's own documentation: `weak` (a non-cryptographic
   PRNG: Python `random` and `numpy.random`, Go `math/rand` and `math/rand/v2`,
   `java.util.Random`, `ThreadLocalRandom`, `Math.random`, C `rand`/`srand`, `std::mt19937`,
   `System.Random`, PHP `rand`/`mt_rand`), `csprng` (a named cryptographic generator: `secrets`,
@@ -320,9 +320,9 @@ test.
   `drbg` component where the DRBG family is named on the line, nowhere else (OpenSSL's
   `EVP_RAND_fetch(..., "CTR-DRBG", ...)`). Pattern rules for weak generators are already free and
   widespread (Bandit B311, gosec G404, FindSecBugs, CA5394, Semgrep), and CodeQL and Sonar S2245
-  link a weak generator to sensitive use; this section adds the class from the documentation, the
-  FIPS requirement beside ML-KEM and ML-DSA, and what is not read, in the same output as the
-  inventory.
+  link a weak generator to sensitive use. This section carries the class from each generator's
+  documentation, the FIPS requirement beside ML-KEM and ML-DSA, and what is not read, in the same
+  output as the inventory.
 - **`operation_closure`** in the result lists those pairs, with `spellings_count` and the
   catalogue version. It says what this version was tested against, not what your code contains.
   It does not enter the findings, their fingerprint, a gate or the exit code.

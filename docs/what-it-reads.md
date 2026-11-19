@@ -592,8 +592,8 @@ Context, not findings: the section `randomness` is built after the findings fing
 `evidence`, so it moves neither the findings, their fingerprint, a baseline, `prove_closure`, a gate
 nor the exit code.
 
-- **Rows** (`randomness.calls`): each call of a generator, with its `ecosystem`, `class` and the
-  catalogue's name for it (`api`). `weak`: Python `random` (its functions and `random.Random`) and
+- **Rows** (`randomness.calls`): one row per generator API on a line (a line repeating `rand()`
+  is one row), with its `ecosystem`, `class` and the catalogue's name for it (`api`). `weak`: Python `random` (its functions and `random.Random`) and
   `numpy.random`; Go `math/rand` and `math/rand/v2`; Java `new java.util.Random(...)` (with
   `java.util.Random` or `java.util.*` imported, or the qualified name), `ThreadLocalRandom.current()`,
   `Math.random()`; JavaScript `Math.random()`; C `rand()`, `srand()`, `rand_r()`, C++
@@ -621,14 +621,18 @@ nor the exit code.
   assigned on its line to a name whose words include key, seed, nonce or iv (`assigned_to_name`).
   `link_scope` is `same_line`, `same_function` (a Python `def` by indentation; the innermost brace
   block opened after `)` or `=>`, a heuristic) or `same_file`. `link` is always `co-location`: the
-  value is not followed. A `csprng` row is never a place.
+  value is not followed. `anchors` names up to three, nearest first, and `anchors_count` how many
+  the file holds. A `csprng` row is never a place.
 - **FIPS 203/204** (`randomness.pqc_requirements`): an ML-KEM or ML-DSA call row with a generator of
   any class in the same function or on the same line. The entry carries FIPS 203 §3.3 (p. 16, PDF
   p. 25) or FIPS 204 §3.6.1 (p. 12, PDF p. 22), quoted, with the minimum security strength per
   parameter set: 128/192/256 bits for ML-KEM-512/768/1024. For ML-DSA it gives the seed ξ (shall:
   192 bits for ML-DSA-65, 256 for ML-DSA-87; ML-DSA-44 shall 128, should 192) and the hedged `rnd`
-  (should). An ML-DSA row is not told apart as key generation or signing, so both are given. The
-  requirement is named, not checked.
+  (should). A row is not told apart as key generation, signing, decapsulation, verification or a
+  parameter name, so an entry can sit where no randomness is drawn (in the corpus, smallstep's
+  mapping of ML-DSA parameter sets to COSE identifiers); for ML-DSA both requirements are given.
+  `generators` names up to three, nearest first, with `generators_count`. The requirement is named,
+  not checked.
 - **Not read** (`randomness.not_read`, `randomness.counts`): entropy at boot, VM and container
   entropy, an HSM's or PKCS#11 token's generator, a generator injected at run time, a seed from
   configuration or the environment, statistical quality. The counts are `calls_seen`,

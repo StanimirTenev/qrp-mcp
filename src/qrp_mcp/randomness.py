@@ -32,8 +32,8 @@ from typing import Any
 from . import detectors
 
 MEANING = (
-    "the random number generators the code calls, each row in one class from the generator's own "
-    "documentation: `weak` -- a non-cryptographic PRNG; `csprng` -- a named cryptographic "
+    "the random number generators the code calls, one row per generator API on a line, each in one "
+    "class from the generator's own documentation: `weak` -- a non-cryptographic PRNG; `csprng` -- a named cryptographic "
     "generator; `check` -- a call its documentation does not settle by itself (`why` says which). "
     "The spellings read, with the page each comes from, are the rng_source catalogue "
     "(operation_closure). Context only: a row is no finding and no verdict on the code, and it does "
@@ -96,16 +96,23 @@ def _blank_by_hand(line: str) -> str:
 
 
 def _without_block_comments(code: str) -> tuple[str, bool]:
-    """`/* ... */` blanked by `find`, never by a lazy regex (a line of `/*/*/*` was quadratic);
-    True when a comment is left open at the end of the line."""
+    """`/* ... */` blanked by `find`, never by a lazy regex (a line of `/*` left open was quadratic),
+    and joined once (a line of closed comments rebuilt per comment was too); True when a comment is
+    left open at the end of the line."""
+    pieces: list[str] = []
+    at = 0
     start = code.find("/*")
     while start >= 0:
         end = code.find("*/", start + 2)
         if end < 0:
-            return code[:start], True
-        code = code[:start] + " " * (end + 2 - start) + code[end + 2:]
-        start = code.find("/*", end + 2)
-    return code, False
+            pieces.append(code[at:start])
+            return "".join(pieces), True
+        pieces.append(code[at:start])
+        pieces.append(" " * (end + 2 - start))
+        at = end + 2
+        start = code.find("/*", at)
+    pieces.append(code[at:])
+    return "".join(pieces), False
 
 
 def _code_lines(text: str, eco: str):
@@ -252,7 +259,7 @@ _GO_EXPORTS = {
     "crypto/rand": frozenset(("Read", "Reader", "Int", "Prime", "Text")),
 }
 _GO_SEEDING = {"Seed", "NewSource", "NewPCG"}
-_GO_IMPORT = re.compile(r'(?:^|[\s(;])(?:([A-Za-z_]\w*|\.)\s+)?"(math/rand(?:/v2)?|crypto/rand)"')
+_GO_IMPORT = re.compile(r'(?:^|[\s(;])(?:([A-Za-z_]\w*|\.)[ \t]+)?"(math/rand(?:/v2)?|crypto/rand)"')
 
 
 def _go(text: str, rel: str):
@@ -483,7 +490,7 @@ _SEEN_WORDS = frozenset(("rand", "random", "randomness", "rng", "prng", "csprng"
                          "getrandbits", "randbelow", "randn", "srand", "entropy"))
 _SEEN_INSIDE = ("mt19937", "urandom", "getrandom", "arc4random")
 _SEEN_HINTS = ("rand", "rng", "drbg", "mt19937", "entropy")
-_CALLED = re.compile(r"([A-Za-z_]\w*)\s*\(")
+_CALLED = re.compile(r"(?<!\w)([A-Za-z_]\w*)\s*\(")
 
 
 def _seen_word(name: str) -> bool:
@@ -525,7 +532,8 @@ def _rows(result: dict[str, Any], root: Path, texts: dict[str, tuple[str, str]],
                               "in_test_code": detectors.in_test_code(rel)},
                              (column, code_of.get(number, ""))))
         for number, code in code_of.items():
-            if not any(hint in code.lower() for hint in _SEEN_HINTS):
+            lowered_line = code.lower()
+            if not any(hint in lowered_line for hint in _SEEN_HINTS):
                 continue
             # A call is covered by the nearest classified match that starts at or before it,
             # with no `(` between: `random.random(` is one call, seen once.
@@ -553,7 +561,8 @@ PLACES_MEANING = (
     "of same_line, same_function and same_file that holds; a function is a `def` block in Python and "
     "the innermost brace block opened after `)` or `=>` elsewhere, a heuristic. The link is "
     "co-location: no value is followed from the generator to the key, so a place is a place to "
-    "check, not a finding and not a verdict. A `csprng` row is never a place")
+    "check, not a finding and not a verdict. `anchors` names up to three, nearest first, and "
+    "`anchors_count` how many the file holds. A `csprng` row is never a place")
 # Our own list of four words, in singular and plural.
 _KEY_WORDS = frozenset(("key", "keys", "seed", "seeds", "nonce", "nonces", "iv", "ivs"))
 _WORD = {"keys": "key", "seeds": "seed", "nonces": "nonce", "ivs": "iv"}
@@ -604,23 +613,40 @@ def _brace_functions(text: str, eco: str) -> dict[int, list[tuple[int, int | Non
     previous = ""
     for number, _line, code in _code_lines(text, eco):
         events: list[tuple[int, int | None]] = [(0, stack[-1] if stack else None)]
-        separator = -1
+        # A `;` inside parentheses (`for (i = 0; i < n; i++)`) does not end the statement, and the
+        # words since the last brace say whether a control statement opens the block
+        # (`if err := f(); err != nil {`).
+        separator = block = -1
+        depth = 0
         for column, char in enumerate(code):
-            if char not in "{};":
+            if char not in "{};()":
+                continue
+            if char == "(":
+                depth += 1
+                continue
+            if char == ")":
+                depth = max(0, depth - 1)
+                continue
+            if char == ";":
+                if depth == 0:
+                    separator = column
                 continue
             if char == "{":
                 statement = code[separator + 1:column].strip()
-                if not statement and not code[:column].strip():
-                    statement = previous[max(previous.rfind(c) for c in ";{}") + 1:].strip()
+                opened = code[block + 1:column].strip()
+                if not code[:column].strip():
+                    statement = opened = previous[max(previous.rfind(c) for c in ";{}") + 1:].strip()
                 last = max(statement.rfind("("), statement.rfind(")"))
                 function = ((statement.endswith("=>") or last >= 0 and statement[last] == ")")
-                            and not _NOT_HEADER.match(statement))
+                            and not _NOT_HEADER.match(statement) and not _NOT_HEADER.match(opened))
                 stack.append(number if function else stack[-1] if stack else None)
                 events.append((column + 1, stack[-1]))
-            elif char == "}" and stack:
-                stack.pop()
+            else:
+                if stack:
+                    stack.pop()
                 events.append((column + 1, stack[-1] if stack else None))
-            separator = column
+            separator = block = column
+            depth = 0
         out[number] = events
         previous = code
     return out
@@ -658,48 +684,86 @@ def _anchor_rows(result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
+# A place names its nearest anchors, a requirement its nearest generators, and each says how many
+# there are: 20,000 lines alternating a weak call and a key in one file were 10,000 x 10,000.
+_CAP = 3
+
+
+def _nearest(items: list[tuple[int, Any]], line: int, cap: int = _CAP) -> list[tuple[int, Any]]:
+    """Up to `cap` of `items` (sorted by line) closest to `line`, nearest first."""
+    lines = [item[0] for item in items]
+    hi = bisect.bisect_left(lines, line)
+    lo = hi - 1
+    out = []
+    while len(out) < cap and (lo >= 0 or hi < len(items)):
+        if hi >= len(items) or (lo >= 0 and line - items[lo][0] <= items[hi][0] - line):
+            out.append(items[lo])
+            lo -= 1
+        else:
+            out.append(items[hi])
+            hi += 1
+    return out
+
+
+def _functions(texts: dict[str, tuple[str, str]], cache: dict[str, Any], path: str
+               ) -> dict[int, list[tuple[int, int | None]]]:
+    if path not in cache:
+        text, eco = texts[path]
+        cache[path] = _python_functions(text) if eco == "Py" else _brace_functions(text, eco)
+    return cache[path]
+
+
 def _places(calls: list[dict[str, Any]], anchors: dict[str, list[dict[str, Any]]],
             texts: dict[str, tuple[str, str]], columns: dict[int, tuple[int, str]]
             ) -> list[dict[str, Any]]:
     places: list[dict[str, Any]] = []
-    functions_of: dict[str, dict[int, list[tuple[int, int | None]]]] = {}
+    cache: dict[str, Any] = {}
+    grouped: dict[str, tuple[list, dict, dict]] = {}
     for index, row in enumerate(calls):
         if row["class"] == "csprng":
             continue
         column, code = columns[index]
-        found: list[tuple[int, dict[str, Any]]] = []
         word = _name_word(code, column)
-        if word:
-            found.append((0, {"kind": "assigned_to_name", "line": row["line"], "word": word}))
-        rows = anchors.get(row["path"], [])
+        path = row["path"]
+        rows = anchors.get(path, [])
+        here = None
         if rows:
-            if row["path"] not in functions_of:
-                text, eco = texts[row["path"]]
-                functions_of[row["path"]] = (_python_functions(text) if eco == "Py"
-                                             else _brace_functions(text, eco))
-            functions = functions_of[row["path"]]
+            functions = _functions(texts, cache, path)
+            if path not in grouped:
+                every = sorted(((a["line"], a) for a in rows), key=lambda item: item[0])
+                by_line: dict[int, list] = {}
+                by_function: dict[int, list] = {}
+                for line, anchor in every:
+                    by_line.setdefault(line, []).append((line, anchor))
+                    function = _function_at(functions, line, None)
+                    if function is not None:
+                        by_function.setdefault(function, []).append((line, anchor))
+                grouped[path] = (every, by_line, by_function)
             here = _function_at(functions, row["line"], column)
-            for anchor in rows:
-                if anchor["line"] == row["line"]:
-                    scope = 0
-                elif here is not None and _function_at(functions, anchor["line"], None) == here:
-                    scope = 1
-                else:
-                    scope = 2
-                found.append((scope, {"kind": "public_key_operation", "line": anchor["line"],
-                                      "family": anchor["family"]}))
-        if not found:
+        every, by_line, by_function = grouped.get(path, ([], {}, {}))
+        same_line = by_line.get(row["line"], [])
+        in_function = by_function.get(here, []) if here is not None else []
+        if word or same_line:
+            scope = "same_line"
+        elif in_function:
+            scope = "same_function"
+        elif every:
+            scope = "same_file"
+        else:
             continue
-        scope = _SCOPES[min(s for s, _ in found)]
-        nearest = sorted(found, key=lambda f: (f[0], f[1]["line"]))[0][1]
-        what = (f"its value assigned to a name that says {nearest['word']}"
-                if nearest["kind"] == "assigned_to_name"
-                else f"a {nearest['family']} operation on line {nearest['line']}")
+        chosen = _nearest(same_line or in_function or every, row["line"])
+        found = ([{"kind": "assigned_to_name", "line": row["line"], "word": word}] if word else [])
+        found += [{"kind": "public_key_operation", "line": a["line"], "family": a["family"]}
+                  for _, a in chosen]
+        closest = found[0]
+        what = (f"its value assigned to a name that says {closest['word']}"
+                if closest["kind"] == "assigned_to_name"
+                else f"a {closest['family']} operation on line {closest['line']}")
         places.append({
-            "path": row["path"], "line": row["line"], "ecosystem": row["ecosystem"],
+            "path": path, "line": row["line"], "ecosystem": row["ecosystem"],
             "class": row["class"], "api": row["api"], **({"why": row["why"]} if "why" in row else {}),
             "link": "co-location", "link_scope": scope,
-            "anchors": [a for _, a in sorted(found, key=lambda f: (f[0], f[1]["line"]))],
+            "anchors": found, "anchors_count": len(every) + (1 if word else 0),
             "statement": (f"a {row['class']} generator ({row['api']}), {scope.replace('_', ' ')} "
                           f"as {what}: a place to check, not a verdict. Co-location only; the "
                           f"value is not followed from the generator to the key"),
@@ -715,8 +779,10 @@ PQC_MEANING = (
     "requirement FIPS 203 or FIPS 204 sets on that randomness, quoted with its section and page "
     "(printed page, then the PDF's). The requirement is named, not checked: the scan does not "
     "establish that a generator is an approved RBG or what its security strength is, and a `csprng` "
-    "row is not shown to meet it. An ML-DSA row is not told apart as key generation or signing, so "
-    "both requirements are given")
+    "row is not shown to meet it. The row is not told apart as key generation, encapsulation, "
+    "signing, decapsulation, verification or a parameter name, so an entry can sit where no "
+    "randomness is drawn; for ML-DSA both requirements are given. `generators` names up to three, "
+    "nearest first, and `generators_count` how many are in that function")
 # Quoted from the PDFs (nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.203.pdf and .204.pdf), each found
 # word for word in a saved text of the page (izdanie-0.52.0/izvori, tools/proveri_izvori.py).
 _FIPS_203 = {
@@ -773,29 +839,37 @@ def _pqc_requirements(result: dict[str, Any], calls: list[dict[str, Any]],
     for index, row in enumerate(calls):
         by_path.setdefault(row["path"], []).append(index)
     out = []
-    functions_of: dict[str, dict[int, list[tuple[int, int | None]]]] = {}
+    cache: dict[str, Any] = {}
+    grouped: dict[str, tuple[dict, dict, dict]] = {}
     for row in (result.get("evidence") or {}).get("source_code") or []:
         if (row.get("algorithm") not in ("ML-KEM", "ML-DSA") or row.get("evidence_kind") != "call"
                 or row.get("path") not in by_path):
             continue
-        if row["path"] not in functions_of:
-            text, eco = texts[row["path"]]
-            functions_of[row["path"]] = (_python_functions(text) if eco == "Py"
-                                         else _brace_functions(text, eco))
-        functions = functions_of[row["path"]]
+        path = row["path"]
+        functions = _functions(texts, cache, path)
+        if path not in grouped:
+            by_line: dict[int, list] = {}
+            by_function: dict[int, list] = {}
+            function_of: dict[int, int | None] = {}
+            for index in by_path[path]:
+                line = calls[index]["line"]
+                function = _function_at(functions, line, columns[index][0])
+                function_of[index] = function
+                by_line.setdefault(line, []).append((line, index))
+                if function is not None:
+                    by_function.setdefault(function, []).append((line, index))
+            grouped[path] = (by_line, by_function, function_of)
+        by_line, by_function, function_of = grouped[path]
         there = _function_at(functions, row["line"], None)
-        generators = []
-        for index in by_path[row["path"]]:
-            call = calls[index]
-            if call["line"] == row["line"]:
-                scope = "same_line"
-            elif there is not None and _function_at(functions, call["line"],
-                                                    columns[index][0]) == there:
-                scope = "same_function"
-            else:
-                continue
-            generators.append({"line": call["line"], "class": call["class"], "api": call["api"],
-                               "link_scope": scope})
+        same_line = [(line, i) for line, i in by_line.get(row["line"], [])
+                     if there is None or function_of[i] != there]
+        in_function = by_function.get(there, []) if there is not None else []
+        chosen = same_line[:_CAP] + _nearest(in_function, row["line"], _CAP)
+        generators = [{"line": calls[i]["line"], "class": calls[i]["class"], "api": calls[i]["api"],
+                       "link_scope": "same_line" if calls[i]["line"] == row["line"]
+                       else "same_function"}
+                      for _, i in sorted(chosen, key=lambda c: (c[0], c[1]))]
+        count = len(same_line) + len(in_function)
         if not generators:
             continue
         pset = row.get("parameter_set")
@@ -803,7 +877,7 @@ def _pqc_requirements(result: dict[str, Any], calls: list[dict[str, Any]],
                                 else {"44", "65", "87"}) else None
         out.append({
             "path": row["path"], "line": row["line"], "family": row["algorithm"],
-            "parameter_set": pset, "generators": generators,
+            "parameter_set": pset, "generators": generators, "generators_count": count,
             "requirements": _requirements(row["algorithm"], pset),
             "statement": (f"{row['algorithm']} with a generator in the same function: the "
                           f"requirement is named, not checked -- the scan does not establish that "

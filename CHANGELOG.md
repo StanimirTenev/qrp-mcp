@@ -11,8 +11,9 @@ after a LinkedIn post asked who audits the randomness behind PQC keys. The repro
 (`random.getrandbits` and `random.randint` beside an EC key, `math/rand` with a fixed seed beside
 `ecdsa.GenerateKey`, `java.util.Random` and SHA1PRNG) gave 0 rows on 0.51.0.
 
-- **A new operation, `rng_source` (rows 531, 539).** A new section, `randomness`, lists each call of a
-  generator in one of three classes from its own documentation: `weak` (a non-cryptographic PRNG),
+- **A new operation, `rng_source` (rows 531, 539).** A new section, `randomness`, lists the
+  generators the code calls, one row per API on a line, in one of three classes from their own
+  documentation: `weak` (a non-cryptographic PRNG),
   `csprng` (a named cryptographic generator) and `check` (a call its documentation does not settle
   by itself, with `why`). It covers Python, Go, Java/Kotlin, JS/TS, C/C++, .NET and PHP: 46
   spellings in `data/operations/rng_source.toml`, each with its page, the words quoted from it and

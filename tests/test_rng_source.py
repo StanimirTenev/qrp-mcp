@@ -549,3 +549,53 @@ def test_hostile_lines_finish(tmp_path, name, line):
     started = time.monotonic()
     scan_directory(tmp_path)
     assert time.monotonic() - started < 20
+
+
+# --- the second look before the review (19.11): loops, Go import comments, cross products -----------
+
+def test_a_for_loop_or_a_go_if_init_is_not_a_function(tmp_path):
+    places = _places(tmp_path, {
+        "K.java": ("import java.util.Random;\nimport java.security.KeyPairGenerator;\n"
+                   "class K {\n  void make() throws Exception {\n    Random r = new Random();\n"
+                   "    for (int i = 0; i < 3; i++) {\n"
+                   "      KeyPairGenerator g = KeyPairGenerator.getInstance(\"RSA\");\n    }\n  }\n}\n"),
+        "k.go": ('package k\n\nimport (\n\t"crypto/ecdsa"\n\t"crypto/elliptic"\n\tcr "crypto/rand"\n'
+                 '\t"math/rand"\n)\n\nfunc Make() {\n\t_ = rand.Intn(3)\n'
+                 "\tif k, err := ecdsa.GenerateKey(elliptic.P256(), cr.Reader); err == nil {\n"
+                 "\t\t_ = k\n\t}\n}\n")})
+    assert {(p["path"], p["link_scope"]) for p in places} == {("K.java", "same_function"),
+                                                               ("k.go", "same_function")}
+
+
+def test_a_comment_above_a_go_import_is_not_its_alias(tmp_path):
+    calls = _calls(tmp_path, {"j.go": ('package j\n\nimport (\n\t// seeded jitter\n\t"math/rand"\n)\n\n'
+                                       "func J() int { return rand.Intn(9) }\n")})
+    assert [(c["api"], c["class"]) for c in calls] == [("math/rand.Intn", "weak")]
+
+
+def test_anchors_and_generators_are_capped_with_their_count(tmp_path):
+    lines = ["import oqs, random", "from cryptography.hazmat.primitives.asymmetric import ec", "",
+             "def f():"]
+    for _ in range(300):
+        lines += ["    x = random.random()", "    k = ec.generate_private_key(ec.SECP256R1())",
+                  "    m = oqs.KeyEncapsulation(\"ML-KEM-768\")"]
+    (tmp_path / "a.py").write_text("\n".join(lines) + "\n")
+    section = scan_directory(tmp_path)["randomness"]
+    place = section["places"][0]
+    # Each line of `k = ec...` and `m = oqs...` is a public-key call row: 600 anchors.
+    assert len(place["anchors"]) <= 3 and place["anchors_count"] == 600
+    req = section["pqc_requirements"][0]
+    assert len(req["generators"]) <= 3 and req["generators_count"] == 300
+
+
+@pytest.mark.parametrize("name, line", [
+    ("c.c", "/* x */ " * 30000 + " rand();"),                   # closed comments, one after another
+    ("w.py", "import random\nx = " + "rand" * 60000 + " + random.random()"),  # a word run, no `(`
+], ids=["closed-comments", "word-run"])
+def test_more_hostile_lines_finish(tmp_path, name, line):
+    import time
+    (tmp_path / name).write_text(line + "\n")
+    started = time.monotonic()
+    calls = scan_directory(tmp_path)["randomness"]["calls"]
+    assert time.monotonic() - started < 20
+    assert calls
