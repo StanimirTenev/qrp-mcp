@@ -5531,6 +5531,64 @@ def remote_signing(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     return out
 
 
+# Row 536 (19.11.2026): an RFC 3161 time-stamp request. The token is signed by the time-stamping
+# authority with its own key, so the signature algorithm is chosen there -- a place, as a KMS
+# signature is; no family is claimed. The hash of the request's messageImprint is the requester's
+# choice and is said as `hash_choice`; where none is written, the library's default, which differs
+# by version (openssl-ts(1): "The default is SHA-256." in 3.0, "The default is SHA-1." in 1.1.1).
+# Only the request: `openssl ts -reply` signs with a local key (`-inkey`) and `-verify` chooses
+# nothing. rfc3161ng RemoteTimestamper (`hashname=`), Bouncy Castle TimeStampRequestGenerator
+# `generate(digestAlgorithm, digest)`, .NET Rfc3161TimestampRequest.CreateFromData/CreateFromHash
+# (`HashAlgorithmName`); pages read 19.11.2026.
+TIMESTAMP_BYTES = re.compile(rb"openssl\s+ts\b|rfc3161ng|TimeStampRequestGenerator|"
+                             rb"Rfc3161TimestampRequest")
+_OPENSSL_TS_QUERY = re.compile(r"\bopenssl\s+ts\s+-query\b([^|;&\n]*)")
+_OPENSSL_DIGEST_FLAG = re.compile(r"\s-(sha\d+(?:-\d+)?|sha3-\d+|shake\d+|md[245]|sm3|ripemd160|"
+                                  r"blake2[bs]\d+|whirlpool|mdc2)(?![\w-])", re.IGNORECASE)
+_RFC3161NG = re.compile(r"\bRemoteTimestamper\s*\(")
+_HASHNAME = re.compile(r"\bhashname\s*=\s*[\"']([\w-]+)[\"']")
+_BC_TSP_GENERATE = re.compile(r"\.generate\s*\(\s*([\w.]+)\s*,")
+_DOTNET_TSP = re.compile(r"\bRfc3161TimestampRequest\.CreateFrom(?:Data|Hash)\s*\(")
+_HASH_ALGORITHM_NAME = re.compile(r"\bHashAlgorithmName\.\w+")
+
+
+def remote_timestamps(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    text = "\n".join(lines)
+    bc = "TimeStampRequestGenerator" in text
+    rfc3161ng = "rfc3161ng" in text
+    out: list[dict[str, Any]] = []
+    for number, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
+            continue
+        window = " ".join(lines[number - 1:number + 4])
+        where = chosen = None
+        ts = _OPENSSL_TS_QUERY.search(line)
+        if ts:
+            flag = _OPENSSL_DIGEST_FLAG.search(ts.group(1))
+            where = "RFC 3161 time-stamping authority (openssl ts -query)"
+            chosen = flag.group(1).lower() if flag else "default of the OpenSSL in use"
+        elif rfc3161ng and _RFC3161NG.search(line):
+            call = window[window.index("RemoteTimestamper"):]
+            named = _HASHNAME.search(call.split(")", 1)[0] if ")" in call else call)
+            where = "RFC 3161 time-stamping authority (rfc3161ng RemoteTimestamper)"
+            chosen = named.group(1).lower() if named else "default of the rfc3161ng in use"
+        elif bc and _BC_TSP_GENERATE.search(line):
+            where = "RFC 3161 time-stamping authority (Bouncy Castle TimeStampRequestGenerator)"
+            chosen = _BC_TSP_GENERATE.search(line).group(1)
+        elif _DOTNET_TSP.search(line):
+            named = _HASH_ALGORITHM_NAME.search(window[_DOTNET_TSP.search(window).start():])
+            where = "RFC 3161 time-stamping authority (.NET Rfc3161TimestampRequest)"
+            chosen = named.group(0) if named else "as the call's hashAlgorithm argument says"
+        if where:
+            out.append({"path": rel_path, "line": number,
+                        "setting": "time-stamp signature algorithm", "read_from": where,
+                        "kind": "remote_timestamp", "key_location": "tsa",
+                        "hash_choice": chosen, "excerpt": stripped[:200],
+                        "in_test_code": in_test_code(rel_path)})
+    return out
+
+
 # Who owns a place, as the repository's CODEOWNERS says (ZA-OPRAVYANE row 94, Dhiraj S.,
 # 23.10.2026: "one CBOM, many owners ... the device teams own their rows"). GitHub reads the
 # first of .github/CODEOWNERS, CODEOWNERS, docs/CODEOWNERS; the last matching line wins; the
@@ -6154,6 +6212,10 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     if any(b in raw for b in _REMOTE_SIGN_BYTES):
         taken = {(p["path"], p["line"]) for p in runtime_choices_found}
         runtime_choices_found.extend(p for p in remote_signing(rel_path, lines)
+                                     if (p["path"], p["line"]) not in taken)
+    if TIMESTAMP_BYTES.search(raw):
+        taken = {(p["path"], p["line"]) for p in runtime_choices_found}
+        runtime_choices_found.extend(p for p in remote_timestamps(rel_path, lines)
                                      if (p["path"], p["line"]) not in taken)
     if b"qrp:ignore" in raw:
         found, lines = suppression.read_markers(rel_path, lines)

@@ -272,10 +272,11 @@ test.
   package carries a catalogue of the documented spellings (`src/qrp_mcp/data/operations/*.toml`),
   each with the page it comes from and the words quoted from it. Every spelling is a test: it is
   written to a file, scanned, and expected on its line (`tests/test_operation_closure.py`). In
-  0.51.0 the catalogue holds 12 pairs and 1,271 sourced spellings: IKE/IPsec, the public-key names
+  0.51.0 the catalogue holds 12 pairs and 1,273 sourced spellings: IKE/IPsec, the public-key names
   of seven C libraries, key files and key sizes in PKI, key sizes in .NET, TLS endpoints and TLS
   groups in nginx-style configuration, SSH algorithms, liboqs and hash-based signatures in C,
-  Python dependencies and environment reads, and ECVRF (RFC 9381) in Go and Rust.
+  Python dependencies, environment reads and RFC 3161 time-stamp requests, and ECVRF (RFC 9381)
+  in Go and Rust.
 - **`operation_closure`** in the result lists those pairs, with `spellings_count` and the
   catalogue version. It says what this version was tested against, not what your code contains.
   It does not enter the findings, their fingerprint, a gate or the exit code.
@@ -423,6 +424,9 @@ A **free inventory tool**, not a readiness assessment. It deliberately does not 
   package a `RUN` line installs is a dependency row with its version,
 - the algorithm of a signature made by a KMS, Vault or an agent: such a call is a place in
   `chosen_outside_files` (`kind: remote_signing`), not a family,
+- the algorithm a time-stamping authority signs an RFC 3161 token with: the request (`openssl ts
+  -query`, rfc3161ng, Bouncy Castle, .NET) is a place (`kind: remote_timestamp`) that says the
+  hash the request chose (`hash_choice`),
 - fetching keys from a QKD key management entity (an ETSI GS QKD 014 client) or judging where a
   postquantum preshared key comes from beyond the files read.
 

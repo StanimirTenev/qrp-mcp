@@ -439,7 +439,11 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
                     "its family is a finding, and the place says `default` and "
                     "`overridable: true`, since the environment can replace it. A place with "
                     "`kind: remote_signing` is a signature made by a KMS, Vault or an agent: "
-                    "the key and its algorithm are there, not in the files (`key_location`)"),
+                    "the key and its algorithm are there, not in the files (`key_location`). "
+                    "A place with `kind: remote_timestamp` is an RFC 3161 time-stamp request: "
+                    "the authority signs the token with its own key and algorithm "
+                    "(`key_location: tsa`); `hash_choice` is the messageImprint hash the request "
+                    "asks for, or the default of the library in use where none is written"),
         "count": len(places), "places": places}
     _library_default_key_exchange(result)
     _authentication_not_read(result, repo_path)

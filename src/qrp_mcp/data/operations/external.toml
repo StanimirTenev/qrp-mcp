@@ -9,7 +9,7 @@ catalogue_version = "1"
 
 [[ecosystems]]
 ecosystem = "Py"
-scope = "os.environ[...] / .get, os.getenv, os.getenvb, os.environb; pyproject [project] dependencies and optional-dependencies, [dependency-groups]; requirements files (pins, ranges, markers, --hash); setup.cfg install_requires/extras_require; setup.py install_requires/extras_require. Not covered: Pipfile, Poetry, uv/pdm lockfiles, conda, provider/version selection inside libraries (pyOpenSSL defaults, row 164)."
+scope = "os.environ[...] / .get, os.getenv, os.getenvb, os.environb; pyproject [project] dependencies and optional-dependencies, [dependency-groups]; requirements files (pins, ranges, markers, --hash); setup.cfg install_requires/extras_require; setup.py install_requires/extras_require. rfc3161ng RemoteTimestamper (row 536). Not covered: Pipfile, Poetry, uv/pdm lockfiles, conda, provider/version selection inside libraries (pyOpenSSL defaults, row 164)."
 
 [[ecosystems.spellings]]
 id = "os-environ-get-default"
@@ -238,6 +238,32 @@ setup(
 )
 '''
 expect = {rows = [{at = "evidence.dependencies", match = {path = "setup.py", line = 4, package = "paramiko", version = "3.4.0"}}]}
+
+# Row 536 (19.11.2026): an RFC 3161 time-stamp request -- the token is signed by the authority, with an
+# algorithm chosen there; the requester chooses the messageImprint hash (`hash_choice`).
+[[ecosystems.spellings]]
+id = "rfc3161ng-remote-timestamper"
+spelling = "rfc3161ng.RemoteTimestamper(url, hashname=...)"
+source = "https://raw.githubusercontent.com/trbs/rfc3161ng/master/README.rst"
+quote = "timestamper = rfc3161ng.RemoteTimestamper('https://interop.redwax.eu/test/timestamp', hashname='sha256')"
+file = "stamp.py"
+snippet = '''
+import rfc3161ng
+timestamper = rfc3161ng.RemoteTimestamper('https://interop.redwax.eu/test/timestamp', hashname='sha256')
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "stamp.py", line = 2, kind = "remote_timestamp", key_location = "tsa", hash_choice = "sha256"}}]}
+
+[[ecosystems.spellings]]
+id = "rfc3161ng-remote-timestamper-default-hash"
+spelling = "rfc3161ng.RemoteTimestamper(url, certificate=...)"
+source = "https://raw.githubusercontent.com/trbs/rfc3161ng/master/README.rst"
+quote = "rt = rfc3161ng.RemoteTimestamper('http://time.certum.pl', certificate=certificate)"
+file = "stamp.py"
+snippet = '''
+import rfc3161ng
+rt = rfc3161ng.RemoteTimestamper('http://time.certum.pl', certificate=certificate)
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "stamp.py", line = 2, kind = "remote_timestamp", hash_choice = "default of the rfc3161ng in use"}}]}
 
 [[ecosystems.refresh]]
 source = "https://docs.python.org/3/library/os.html"
