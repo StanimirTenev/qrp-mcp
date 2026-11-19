@@ -964,13 +964,13 @@ def _readiness_by_role(result: dict[str, Any]) -> None:
     two parts' values, so a reader of the headline alone sees when they differ."""
     summary = result["summary"]
     parts = {part: summary["by_role"][part]["pqc_readiness"]
-             for part in ("key_establishment", "signature")}
+             for part in ("key_establishment", "signature", "vrf") if part in summary["by_role"]}
     rebuilt: dict[str, Any] = {}
     for key, value in summary.items():
         rebuilt[key] = value
         if key == "pqc_readiness":
             rebuilt["readiness_by_role"] = {
-                **parts, "roles_differ": parts["key_establishment"] != parts["signature"]}
+                **parts, "roles_differ": len(set(parts.values())) > 1}
     summary.clear()
     summary.update(rebuilt)
 
@@ -1155,6 +1155,8 @@ def _by_role(findings: list[Any], roles: dict[str, dict[str, int]],
     kinds = {a["family"]: a["kind"] for a in known_algorithms()}
     parts: dict[str, list[Any]] = {"key_establishment": [], "signature": []}
     undetermined: set[str] = set()
+    # Row 535: a VRF is its own part, present only where one is found.
+    vrf = [f for f in findings if kinds.get(f.algorithm_family) == "vrf"]
     for f in findings:
         kind = kinds.get(f.algorithm_family)
         if kind == "key_exchange":
@@ -1176,6 +1178,9 @@ def _by_role(findings: list[Any], roles: dict[str, dict[str, int]],
             "pqc_readiness": (summarize(chosen, set_aside, protected).pqc_readiness
                               if chosen else "none_found"),
         }
+    if vrf:
+        out["vrf"] = {"families": sorted({f.algorithm_family for f in vrf}),
+                      "pqc_readiness": summarize(vrf, set_aside, protected).pqc_readiness}
     out["role_not_determined"] = sorted(undetermined)
     return out
 

@@ -272,10 +272,10 @@ test.
   package carries a catalogue of the documented spellings (`src/qrp_mcp/data/operations/*.toml`),
   each with the page it comes from and the words quoted from it. Every spelling is a test: it is
   written to a file, scanned, and expected on its line (`tests/test_operation_closure.py`). In
-  0.50.0 the catalogue holds 10 pairs and 1,261 sourced spellings: IKE/IPsec, the public-key names
+  0.51.0 the catalogue holds 12 pairs and 1,271 sourced spellings: IKE/IPsec, the public-key names
   of seven C libraries, key files and key sizes in PKI, key sizes in .NET, TLS endpoints and TLS
-  groups in nginx-style configuration, SSH algorithms, liboqs and hash-based signatures in C, and
-  Python dependencies and environment reads.
+  groups in nginx-style configuration, SSH algorithms, liboqs and hash-based signatures in C,
+  Python dependencies and environment reads, and ECVRF (RFC 9381) in Go and Rust.
 - **`operation_closure`** in the result lists those pairs, with `spellings_count` and the
   catalogue version. It says what this version was tested against, not what your code contains.
   It does not enter the findings, their fingerprint, a gate or the exit code.

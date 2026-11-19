@@ -57,6 +57,14 @@ for fam in ("X25519", "X448", "ECDH", "DH", "X3DH"):
     _BY_FAMILY[fam] = {"options": [_KEM], "note": _HYBRID}
 for fam in ("ECDSA", "EdDSA", "Ed25519", "Ed448", "DSA", "GOST R 34.10", "XEdDSA"):
     _BY_FAMILY[fam] = {"options": [_SIG, _SIG_FIRMWARE], "note": _HYBRID}
+# Row 535: a VRF is not a signature; a signature scheme replaces neither its output nor its proof.
+_BY_FAMILY["ECVRF"] = {
+    "options": [],
+    "note": ("No replacement is named: the standards this tool cites define post-quantum "
+             "key establishment and signatures, not a verifiable random function, and a "
+             "signature scheme does not give a VRF's unique, verifiable output. This is a "
+             "protocol choice. (Design judgement, not a statement of the standards.)"),
+    "standards": []}
 # SM2 and ElGamal sign and encrypt alike (row 139).
 for fam in ("RSA", "EC", "SM2", "ElGamal"):
     _BY_FAMILY[fam] = {

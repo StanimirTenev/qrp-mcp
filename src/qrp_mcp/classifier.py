@@ -173,6 +173,11 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     # longer token.
     ("XEDDSA", "XEdDSA", "classical_vulnerable", "signature"),
     ("X3DH", "X3DH", "classical_vulnerable", "key_exchange"),
+    # Row 535: a verifiable random function over an elliptic curve (ECVRF, RFC 9381) -- leader
+    # election, sortition. Its pseudorandomness rests on the decisional Diffie-Hellman problem in
+    # the curve's group (RFC 9381, 7.2, 7.3), which Shor's algorithm breaks. Its own role, `vrf`:
+    # not a signature, so a signature scheme does not replace it.
+    ("ECVRF", "ECVRF", "classical_vulnerable", "vrf"),
     ("ELGAMAL", "ElGamal", "classical_vulnerable", "public_key"),
     ("DIFFIEHELLMAN", "DH", "classical_vulnerable", "key_exchange"),
     ("DHE", "DH", "classical_vulnerable", "key_exchange"),

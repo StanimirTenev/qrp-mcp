@@ -203,7 +203,14 @@ SIKE read `no_quantum_vulnerable_detected` (raised by Larisa Ghazaryan). `pqc_pr
 and `broken_pqc_count` sit beside `pqc_ready_count`, and `list_algorithms` answers with the same
 classification a scan gives. From 0.35.0 `summary.by_role` gives the same value for key
 establishment and for signatures apart, with the families in each (`none_found` for a part with
-none).
+none). From 0.51.0 a verifiable random function is a third part, `by_role.vrf`,
+present only where one is found: ECVRF (RFC 9381), its own family, through the Go libraries coname,
+go-ecvrf and keytransparency's p256 and Rust's `vrf` crate, and RFC 9381's suite names
+(`data/operations/vrf.toml`). It is quantum-vulnerable and no replacement is named for it: a
+signature scheme does not replace a VRF (row 535). A call is read only in a file that imports the
+library -- `vrf` alone is also virtual routing and forwarding. The VRF's key, where the file names
+it by its own type (`ed25519.PrivateKey`), stays an Ed25519 row under `signature`: the scan does
+not follow the key into the call.
 
 **Which module implements it, where the file says.** Validation belongs to a module, not to an
 algorithm, and `@noble/post-quantum` and Go's `crypto/mlkem` used to give identical findings

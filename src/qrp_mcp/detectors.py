@@ -916,6 +916,17 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("XEdDSA", "XEdDSA usage (PKCS#11 CKM_XEDDSA)", re.compile(r"\bCKM_XEDDSA\b")),
     ("X3DH", "X3DH usage (PKCS#11 CKM_X3DH_INITIALIZE / CKM_X3DH_RESPOND)",
      re.compile(r"\bCKM_X3DH_(?:INITIALIZE|RESPOND)\b")),
+    # Row 535: ECVRF (RFC 9381), its own family and role (classifier.py). The libraries' import
+    # paths and names (data/operations/vrf.toml, pages read 19.11.2026) and RFC 9381's four suite
+    # names. Never `vrf` alone -- virtual routing and forwarding; the calls of a package imported
+    # under that name are read in `_vrf_calls`.
+    ("ECVRF", "ECVRF usage (RFC 9381 verifiable random function)", re.compile(
+        r"[\"`]github\.com/(?:yahoo/coname/vrf|ProtonMail/go-ecvrf/ecvrf|"
+        r"google/keytransparency/core/crypto/vrf/p256)[\"`]|"
+        r"\becvrf\.(?:GenerateKey|NewPrivateKey|NewPublicKey|PrivateKey|PublicKey)\b|"
+        r"\bECVRF-(?:P256-SHA256-(?:TAI|SSWU)|EDWARDS25519-SHA512-(?:TAI|ELL2))\b|"
+        r"\bvrf::openssl\b|\bECVRF::from_suite\b|"
+        r"\bCipherSuite::(?:P256|K163|SECP256K1)_SHA256_TAI\b")),
     ("SM2", "SM2 usage", re.compile(
         r"\bSM2(?:Engine|Signer|KeyPairGenerator|KeyExchange|ParameterSpec|WITH|with)|"
         r"(?:WITH|With|with)SM2\b|\bcurveSM2\b|\bEVP_PKEY_SM2\b|\bsm2p256v1\b")),
@@ -4531,6 +4542,7 @@ def scan_source_file(path: Path, rel_path: str,
     _name_not_a_use_rules(findings, lines, denial_lines)
     findings = _sodium_signatures(findings, lines, rel_path)
     findings = _pq_operations(findings, lines, rel_path)
+    findings = _vrf_calls(findings, lines, rel_path)
     _android_keystore_spec(findings, lines)
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
@@ -4601,6 +4613,53 @@ def _sodium_signatures(findings: list[dict[str, Any]], lines: list[str],
              for n, line in enumerate(lines, 1)
              if n not in have and _SODIUM_SIGN_CALL.search(line.split("//", 1)[0])
              and not line.lstrip().startswith(("/*", "*"))]
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 535: the calls of a VRF library, read only in a file that imports it. coname's package
+# functions under the name it is imported as (`vrf` by default); go-ecvrf's Prove and Verify on its
+# keys; keytransparency p256's Evaluate and ProofToHash, and its GenerateKey.
+_VRF_IMPORTS = (
+    (re.compile(r"(?:^|[\s(])(?:(?!import\b)(\w+)\s+)?[\"`]github\.com/yahoo/coname/vrf[\"`]", re.MULTILINE),
+     "vrf", r"\b{name}\.(?:Prove|Verify|GenerateKey|Compute)\s*\("),
+    (re.compile(r"[\"`]github\.com/ProtonMail/go-ecvrf/ecvrf[\"`]"), None,
+     r"\.(?:Prove|Verify)\s*\("),
+    (re.compile(r"(?:^|[\s(])(?:(?!import\b)(\w+)\s+)?[\"`]github\.com/google/keytransparency/core/crypto/vrf/p256"
+                r"[\"`]", re.MULTILINE),
+     "p256", r"\.(?:Evaluate|ProofToHash)\s*\(|\b{name}\.GenerateKey\s*\("),
+)
+_VRF_ANY = ("coname/vrf", "go-ecvrf", "crypto/vrf/p256")
+
+
+def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
+               rel_path: str) -> list[dict[str, Any]]:
+    text = "\n".join(lines)
+    if not any(word in text for word in _VRF_ANY):
+        return findings
+    calls = []
+    for imported, default, call in _VRF_IMPORTS:
+        m = imported.search(text)
+        if m:
+            name = (m.group(1) if m.groups() and m.group(1) else default) or ""
+            calls.append(re.compile(call.format(name=re.escape(name))))
+    if not calls:
+        return findings
+    rows = {f["line"]: f for f in findings if f["algorithm"] == "ECVRF"}
+    added = []
+    for n, line in enumerate(lines, 1):
+        stripped = line.lstrip()
+        if stripped.startswith(("//", "/*", "*")):
+            continue
+        code = line.split("//", 1)[0]
+        if not any(c.search(code) for c in calls):
+            continue
+        if n in rows:
+            rows[n]["evidence_kind"] = "call"
+            continue
+        added.append({"path": rel_path, "line": n, "algorithm": "ECVRF",
+                      "description": "ECVRF usage (a call into the VRF library this file imports)",
+                      "excerpt": line.strip()[:200], "evidence_kind": "call",
+                      "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 

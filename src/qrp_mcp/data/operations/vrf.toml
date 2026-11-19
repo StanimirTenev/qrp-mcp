@@ -1,0 +1,179 @@
+# Operation `vrf`: a verifiable random function over an elliptic curve (ECVRF, RFC 9381) -- leader
+# election, sortition, key transparency indexes. Its own role, not a signature (ZA-OPRAVYANE row 535,
+# 19.11.2026). Pages fetched 19.11.2026. `expect`: an ECVRF row on the line, and the `vrf` part of
+# summary.by_role. A call is read only in a file that imports the library; `vrf` alone is also virtual
+# routing and forwarding.
+
+operation = "vrf"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Go"
+scope = "github.com/yahoo/coname/vrf (GenerateKey, Prove, Verify, Compute), github.com/ProtonMail/go-ecvrf/ecvrf (GenerateKey, NewPrivateKey, NewPublicKey, and Prove/Verify on its keys), github.com/google/keytransparency/core/crypto/vrf/p256 (GenerateKey, Evaluate, ProofToHash), and the four RFC 9381 suite names as strings. Not covered: other Go VRF packages, a call through a variable the package is not imported under."
+
+[[ecosystems.spellings]]
+id = "coname-prove"
+spelling = "vrf.Prove(m, sk)"
+source = "https://raw.githubusercontent.com/yahoo/coname/master/vrf/vrf.go"
+quote = "// Prove returns the vrf value and a proof such that Verify(pk, m, vrf, proof)"
+file = "elect.go"
+snippet = '''
+package elect
+
+import vrf "github.com/yahoo/coname/vrf"
+
+func Elect(seed []byte, sk *[vrf.SecretKeySize]byte) ([]byte, []byte) {
+	return vrf.Prove(seed, sk)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "ECVRF", evidence_kind = "call"}}], value = [{at = "summary.by_role.vrf.pqc_readiness", is = "classical_only"}]}
+
+[[ecosystems.spellings]]
+id = "coname-verify"
+spelling = "vrf.Verify(pk, m, vrf, proof)"
+source = "https://raw.githubusercontent.com/yahoo/coname/master/vrf/vrf.go"
+quote = "// Verify returns true iff vrf=Compute(m, sk) for the sk that corresponds to pk."
+file = "check.go"
+snippet = '''
+package check
+
+import "github.com/yahoo/coname/vrf"
+
+func Check(pk, m, out, proof []byte) bool {
+	return vrf.Verify(pk, m, out, proof)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "ECVRF", evidence_kind = "call"}}]}
+
+[[ecosystems.spellings]]
+id = "go-ecvrf-generate"
+spelling = "ecvrf.GenerateKey(rand.Reader)"
+source = "https://raw.githubusercontent.com/ProtonMail/go-ecvrf/master/README.md"
+quote = "Go-ECVRF is a library that implements ECVRF-EDWARDS25519-SHA512-TAI,"
+file = "key.go"
+snippet = '''
+package key
+
+import (
+	"crypto/rand"
+
+	"github.com/ProtonMail/go-ecvrf/ecvrf"
+)
+
+func New() (*ecvrf.PrivateKey, error) {
+	return ecvrf.GenerateKey(rand.Reader)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 10, algorithm = "ECVRF", evidence_kind = "call"}}]}
+
+[[ecosystems.spellings]]
+id = "go-ecvrf-prove"
+spelling = "sk.Prove(message)"
+source = "https://raw.githubusercontent.com/ProtonMail/go-ecvrf/master/ecvrf/ecvrf.go"
+quote = "// Prove returns a proof such that Verify(pk, message, vrf, proof) == true"
+file = "draw.go"
+snippet = '''
+package draw
+
+import "github.com/ProtonMail/go-ecvrf/ecvrf"
+
+func Draw(sk *ecvrf.PrivateKey, round []byte) ([]byte, []byte, error) {
+	return sk.Prove(round)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "ECVRF", evidence_kind = "call"}}]}
+
+[[ecosystems.spellings]]
+id = "keytransparency-p256-evaluate"
+spelling = "k.Evaluate(m)"
+source = "https://raw.githubusercontent.com/google/keytransparency/master/core/crypto/vrf/p256/p256.go"
+quote = "// Evaluate returns the verifiable unpredictable function evaluated at m"
+file = "index.go"
+snippet = '''
+package index
+
+import "github.com/google/keytransparency/core/crypto/vrf/p256"
+
+func Index(user []byte) ([32]byte, []byte) {
+	k, _ := p256.GenerateKey()
+	return k.Evaluate(user)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "ECVRF", evidence_kind = "call"}}]}
+
+[[ecosystems.spellings]]
+id = "keytransparency-p256-proof-to-hash"
+spelling = "pk.ProofToHash(m, proof)"
+source = "https://raw.githubusercontent.com/google/keytransparency/master/core/crypto/vrf/p256/p256.go"
+quote = "// ProofToHash asserts that proof is correct for m and outputs index."
+file = "verify.go"
+snippet = '''
+package verify
+
+import "github.com/google/keytransparency/core/crypto/vrf/p256"
+
+func Check(pk *p256.PublicKey, m, proof []byte) ([32]byte, error) {
+	return pk.ProofToHash(m, proof)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "ECVRF", evidence_kind = "call"}}]}
+
+[[ecosystems.spellings]]
+id = "rfc9381-suite-edwards25519-tai"
+spelling = "\"ECVRF-EDWARDS25519-SHA512-TAI\""
+source = "https://www.rfc-editor.org/rfc/rfc9381.txt"
+quote = "This document defines ECVRF-EDWARDS25519-SHA512-TAI as follows:"
+file = "suite.go"
+snippet = '''
+package suite
+
+const Suite = "ECVRF-EDWARDS25519-SHA512-TAI"
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECVRF"}}]}
+
+[[ecosystems.spellings]]
+id = "rfc9381-suite-p256-tai"
+spelling = "\"ECVRF-P256-SHA256-TAI\""
+source = "https://www.rfc-editor.org/rfc/rfc9381.txt"
+quote = "This document defines ECVRF-P256-SHA256-TAI as follows:"
+file = "suite.go"
+snippet = '''
+package suite
+
+const Suite = "ECVRF-P256-SHA256-TAI"
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECVRF"}}]}
+
+[[ecosystems]]
+ecosystem = "Rust"
+scope = "the vrf crate (witnet/vrf-rs) as its README shows it: `use vrf::openssl::{CipherSuite, ECVRF}`, ECVRF::from_suite with its three CipherSuite names. Not covered: the crate's source (not read), other Rust VRF crates (schnorrkel's sr25519 VRF and the rest)."
+
+[[ecosystems.spellings]]
+id = "vrf-rs-from-suite"
+spelling = "ECVRF::from_suite(CipherSuite::SECP256K1_SHA256_TAI)"
+source = "https://raw.githubusercontent.com/witnet/vrf-rs/master/README.md"
+quote = "let mut vrf = ECVRF::from_suite(CipherSuite::SECP256K1_SHA256_TAI).unwrap();"
+file = "src/lib.rs"
+snippet = '''
+use vrf::openssl::{CipherSuite, ECVRF};
+
+pub fn make() -> ECVRF {
+    ECVRF::from_suite(CipherSuite::SECP256K1_SHA256_TAI).unwrap()
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECVRF"}}], value = [{at = "summary.by_role.vrf.pqc_readiness", is = "classical_only"}]}
+
+[[ecosystems.spellings]]
+id = "vrf-rs-p256"
+spelling = "CipherSuite::P256_SHA256_TAI"
+source = "https://raw.githubusercontent.com/witnet/vrf-rs/master/README.md"
+quote = "P256_SHA256_TAI"
+file = "src/lib.rs"
+snippet = '''
+use vrf::openssl::{CipherSuite, ECVRF};
+
+pub fn make() -> ECVRF {
+    ECVRF::from_suite(CipherSuite::P256_SHA256_TAI).unwrap()
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECVRF"}}]}

@@ -47,6 +47,7 @@ ECO_TREE = {
     "deploy/nginx.conf": "events {}\n",
     "cmd/main.go": 'package main\nimport "crypto/rsa"\nfunc main() { _ = rsa.GenerateKey }\n',
     "tests/fixture.rs": "fn main() {}\n",
+    "web/app.js": "const x = 1;\n",
 }
 
 
@@ -70,9 +71,13 @@ def test_status_is_read_against_the_catalogue(tmp_path):
     assert py["closed_operations"] == ["external"]
     assert "keysize" in py["open_operations"]
     assert "here we may miss" in py["may_miss"]
+    # vrf/Go is in the catalogue since row 535; external of Go is not.
     go = _eco(result, "Go")
-    assert go["status"] == "not_closed" and go["closed_operations"] == []
-    assert go["may_miss"].startswith("here we may miss")
+    assert go["status"] == "partially_closed" and go["closed_operations"] == ["vrf"]
+    assert go["open_operations"] == ["external"]
+    js = _eco(result, "JS")
+    assert js["status"] == "not_closed" and js["closed_operations"] == []
+    assert js["may_miss"].startswith("here we may miss")
 
 
 def test_closed_when_every_operation_with_a_known_gap_is_in_the_catalogue(tmp_path, monkeypatch):
