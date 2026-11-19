@@ -39,9 +39,10 @@ after a LinkedIn post asked who audits the randomness behind PQC keys. The repro
 - **CBOM**: `qrp:randomness:*` properties. A `drbg` component appears where the DRBG family is named
   on the line, and nowhere else (OpenSSL `EVP_RAND_fetch` with `CTR-DRBG`, `HASH-DRBG`, `HMAC-DRBG`). A weak
   generator is never a component.
-- **Ecosystem status**: `rng_source` is a recorded gap of the seven ecosystems. It counts where the
-  tree has a row of it outside test code, and not elsewhere (the per-tree rule of 0.51.0), so a Go tree with
-  `crypto/rand` or `math/rand` reads `partially_closed` where it read `not_closed`.
+- **Ecosystem status unchanged**: `rng_source` is in `operation_closure`, but it never counts toward
+  an ecosystem's status or `where_to_look`. Almost every tree calls a generator, so counting it could only
+  raise a status: in Vault, Go would have read `partially_closed` and fallen from rank 1 to 39 with
+  `external` still open and untested.
 - **Credited, not copied**: Bandit B311, gosec G404, FindSecBugs, CA5394, Semgrep, CodeQL's
   insecure-randomness queries and Sonar S2245 (its co-location idea is described, nothing is taken
   from it).

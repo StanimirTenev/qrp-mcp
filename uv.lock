@@ -653,7 +653,7 @@ wheels = [
 
 [[package]]
 name = "qrp-mcp"
-version = "0.38.0"
+version = "0.51.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

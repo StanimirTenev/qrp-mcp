@@ -638,9 +638,9 @@ nor the exit code.
   configuration or the environment, statistical quality. The counts are `calls_seen`,
   `calls_classified`, `calls_seen_not_classified` (a called name with a randomness word that no
   spelling classifies), `by_class` and `chosen_at_run_time`.
-- **Ecosystem status**: `rng_source` counts toward Py, Go, Java, JS, C, NET and PHP where
-  `randomness.calls` has a row of that ecosystem outside test code, of any class, and not elsewhere. A `crypto/rand`
-  row counts, so a Go tree that uses it moves from `not_closed` to `partially_closed`.
+- **Ecosystem status**: `rng_source` is in `operation_closure` but never counts toward an ecosystem's
+  status or `where_to_look`. Almost every tree calls a generator, so counting it could only raise a status
+  while other operations of the same ecosystem stay open and untested.
 - **CBOM**: `qrp:randomness:calls`, `:places`, `:pqc_requirements`, `:not_read` and the counts, without
   excerpts. A `drbg` component appears for `EVP_RAND_fetch` with a named DRBG, and for nothing else (`CTR_DRBG`,
   `Hash_DRBG`, `HMAC_DRBG`). A weak generator is never a component.

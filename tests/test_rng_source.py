@@ -109,31 +109,24 @@ def test_a_tree_without_a_generator_keeps_its_status(tmp_path):
     assert go["status"] == "not_closed" and "rng_source" not in go["known_operations"]
 
 
-def test_a_generator_row_counts_where_the_tree_has_one(tmp_path):
+def test_a_generator_row_never_moves_the_status(tmp_path):
+    # Counting the catalogued `rng_source` could only raise a status: Vault's Go went rank 1 -> 39
+    # with `external` open and untested (review of 0.52.0, 19.11.2026). Rows live in `randomness`.
     files = {**_GO_NO_RNG, "cmd/jitter.go": 'package main\nimport "math/rand"\n'
                                             "func j() int { return rand.Intn(9) }\n"}
     for name, text in files.items():
         (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / name).write_text(text)
-    go = _eco(scan_directory(tmp_path), "Go")
-    assert go["status"] == "partially_closed"
-    assert go["closed_operations"] == ["rng_source"] and go["open_operations"] == ["external"]
+    result = scan_directory(tmp_path)
+    assert result["randomness"]["calls"]
+    go = _eco(result, "Go")
+    assert go["status"] == "not_closed" and go["open_operations"] == ["external"]
+    assert "rng_source" not in go["known_operations"] + go["closed_operations"]
 
 
-def test_a_generator_only_in_test_code_does_not_move_the_status(tmp_path):
-    files = {**_GO_NO_RNG, "cmd/jitter_test.go": 'package main\nimport "math/rand"\n'
-                                                 "func j() int { return rand.Intn(9) }\n"}
-    for name, text in files.items():
-        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
-        (tmp_path / name).write_text(text)
-    go = _eco(scan_directory(tmp_path), "Go")
-    assert go["status"] == "not_closed" and "rng_source" not in go["known_operations"]
-
-
-def test_rng_source_is_a_recorded_gap_of_the_seven_ecosystems():
+def test_rng_source_is_in_no_ecosystem_status():
     from qrp_mcp.adaptive import KNOWN_OPERATIONS
-    assert {e for e, ops in KNOWN_OPERATIONS.items() if "rng_source" in ops} == {
-        "Py", "Go", "Java", "JS", "C", "NET", "PHP"}
+    assert not {e for e, ops in KNOWN_OPERATIONS.items() if "rng_source" in ops}
 
 
 # --- the reproduction from LinkedIn (19.11.2026, fairouz/proba/repo), byte for byte ------------------
