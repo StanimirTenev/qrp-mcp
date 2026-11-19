@@ -460,3 +460,64 @@ def test_the_full_level_still_quotes_the_line(tmp_path):
     java = next(c for c in section["calls"] if c["path"] == "S.java")
     assert java["algorithm"] == "not_a_standard_name"
     assert CANARY not in json.dumps({k: v for k, v in java.items() if k != "excerpt"})
+
+
+# --- the CBOM: our own properties, and `drbg` only where the family is read -------------------------
+
+CBOM_TREE = {
+    "keys.py": FAIROUZ["keys.py"],
+    "drbg.c": ('#include <openssl/evp.h>\n#include <openssl/rand.h>\n'
+               'EVP_RAND *get(void) { return EVP_RAND_fetch(NULL, "CTR-DRBG", NULL); }\n'
+               "int fill(unsigned char *b) { return RAND_bytes(b, 32); }\n"),
+    "S.java": ("import java.security.SecureRandom;\nclass S { Object f() throws Exception {"
+               " return SecureRandom.getInstance(\"DRBG\"); } }\n"),
+}
+
+
+def _cbom(tmp_path: Path) -> dict:
+    from qrp_mcp import cyclonedx
+    for name, text in CBOM_TREE.items():
+        (tmp_path / name).write_text(text)
+    return cyclonedx.build(scan_directory(tmp_path))
+
+
+def test_the_cbom_carries_rows_places_and_counts_as_properties(tmp_path):
+    import json
+    props = {p["name"]: p["value"] for p in _cbom(tmp_path)["properties"]}
+    calls = json.loads(props["qrp:randomness:calls"])
+    assert {"location": "keys.py", "line": 3, "class": "weak", "api": "random.getrandbits"} in calls
+    assert not any("excerpt" in c for c in calls)
+    places = json.loads(props["qrp:randomness:places"])
+    assert {(p["location"], p["line"], p["link"], p["link_scope"]) for p in places} == {
+        ("keys.py", 3, "co-location", "same_line"), ("keys.py", 4, "co-location", "same_line")}
+    assert props["qrp:randomness:calls_classified"] == str(len(calls))
+    assert "qrp:randomness:calls_seen" in props
+
+
+def test_a_drbg_component_only_where_its_family_is_read(tmp_path):
+    bom = _cbom(tmp_path)
+    drbg = [c for c in bom["components"]
+            if c.get("cryptoProperties", {}).get("algorithmProperties", {}).get("primitive") == "drbg"]
+    assert [c["name"] for c in drbg] == ["CTR_DRBG"]
+    (component,) = drbg
+    assert component["evidence"]["occurrences"] == [{"location": "drbg.c", "line": 3}]
+    # A weak generator is never a component; neither is a csprng whose mechanism is not named.
+    names = {c["name"] for c in bom["components"]}
+    assert not names & {"random.getrandbits", "os.urandom", "DRBG", "RAND_bytes"}
+    assert component["bom-ref"] in bom["compositions"][0]["assemblies"]
+
+
+def test_the_cbom_stays_valid_cyclonedx_1_6(tmp_path):
+    import json
+    jsonschema = pytest.importorskip("jsonschema")
+    schema_dir = Path(__file__).parent / "schema"
+    schema = json.loads((schema_dir / "bom-1.6.schema.json").read_text())
+    store = {
+        "http://cyclonedx.org/schema/spdx.SNAPSHOT.schema.json":
+            json.loads((schema_dir / "spdx.schema.json").read_text()),
+        "http://cyclonedx.org/schema/jsf-0.82.SNAPSHOT.schema.json":
+            json.loads((schema_dir / "jsf-0.82.schema.json").read_text()),
+    }
+    validator = jsonschema.Draft7Validator(
+        schema, resolver=jsonschema.RefResolver.from_schema(schema, store=store))
+    assert sorted(str(e.message) for e in validator.iter_errors(_cbom(tmp_path))) == []

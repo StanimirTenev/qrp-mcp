@@ -1594,6 +1594,24 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
     # Rows 465, 475: the links of each TLS pin, now that every component they may name exists,
     # in the schema's own fields: the groups as `cryptoRefArray`, the suites as `cipherSuites`
     # with the families each one names. A ref the document does not hold is left out.
+    # Rows 531, 539: a named CSPRNG is a `drbg` component only where its DRBG family is read on the
+    # line (OpenSSL's EVP_RAND_fetch with CTR-DRBG, HASH-DRBG or HMAC-DRBG, the registry's names).
+    # Every other generator row -- a weak one above all -- stays in the qrp:randomness properties.
+    drbg: dict[str, list[dict[str, Any]]] = {}
+    for row in (scan_result.get("randomness") or {}).get("calls") or []:
+        if row.get("class") == "csprng" and row.get("drbg_family"):
+            drbg.setdefault(row["drbg_family"], []).append(
+                {"location": row["path"], "line": row["line"]})
+    for family, occurrences in sorted(drbg.items()):
+        components.append({
+            "type": "cryptographic-asset",
+            "bom-ref": _ref("crypto", family),
+            "name": family,
+            "cryptoProperties": {"assetType": "algorithm",
+                                 "algorithmProperties": {"primitive": "drbg"}},
+            "properties": [{"name": f"{NS}basis", "value": "randomness"}],
+            "evidence": {"occurrences": occurrences},
+        })
     held_refs = {c["bom-ref"] for c in components}
     for component, link in linked_protocols:
         pp = component["cryptoProperties"]["protocolProperties"]
@@ -1785,6 +1803,34 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                   "description": c["description"],
                   **({"recipient_key": c["recipient_key"]} if c.get("recipient_key") else {})}
                  for c in encrypting], ensure_ascii=False)})
+    # Rows 531, 539: the generator rows, the places to check and the FIPS 203/204 requirements, in
+    # our own properties and without excerpts; context, as in the scan result.
+    section = scan_result.get("randomness") or {}
+    if "calls" in section:
+        said = ("class", "api", "algorithm", "why", "seed", "drbg_family", "nonblocking")
+        document["properties"].extend([
+            {"name": f"{NS}randomness:calls", "value": json.dumps(
+                [{"location": r["path"], "line": r["line"], **{k: r[k] for k in said if k in r},
+                  **({"in_test_code": True} if r.get("in_test_code") else {})}
+                 for r in section["calls"]], ensure_ascii=False)},
+            {"name": f"{NS}randomness:places", "value": json.dumps(
+                [{"location": p["path"], "line": p["line"], "class": p["class"], "api": p["api"],
+                  "link": p["link"], "link_scope": p["link_scope"], "anchors": p["anchors"]}
+                 for p in section.get("places") or []], ensure_ascii=False)},
+            {"name": f"{NS}randomness:pqc_requirements", "value": json.dumps(
+                [{"location": q["path"], "line": q["line"], "family": q["family"],
+                  "parameter_set": q["parameter_set"], "generators": q["generators"],
+                  "requirements": [{k: x[k] for k in ("document", "section", "page", "applies_to",
+                                                      "level", "min_strength_bits") if k in x}
+                                   for x in q["requirements"]]}
+                 for q in section.get("pqc_requirements") or []], ensure_ascii=False)},
+            {"name": f"{NS}randomness:not_read",
+             "value": json.dumps((section.get("not_read") or {}).get("what", []),
+                                 ensure_ascii=False)},
+            *({"name": f"{NS}randomness:{k}", "value": str(section["counts"][k])}
+              for k in ("calls_seen", "calls_classified", "calls_seen_not_classified",
+                        "chosen_at_run_time") if k in (section.get("counts") or {})),
+        ])
     # The bound of the recoverable-key check, where it ran, found or not (row 154).
     check = scan_result.get("weak_key_check")
     if check:
