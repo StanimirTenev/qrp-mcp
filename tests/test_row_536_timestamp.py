@@ -180,9 +180,37 @@ def test_a_call_that_goes_past_the_lines_read_is_not_the_default(tmp_path):
     assert place and not place["hash_choice"].startswith("default")
 
 
+# Second independent review (19.11): a name in a known slot that is not a digest name --
+# `hashname="zzneedlehash"`, `HashAlgorithmName.zzneedlealg`, `TSPAlgorithms.zzneedlebc` -- still
+# carried its text. Only a digest name from a fixed list is said.
+LEAKS = {
+    "variable": ("T.java", "import org.bouncycastle.tsp.TimeStampRequestGenerator;\n"
+                 "class T { Object r(TimeStampRequestGenerator gen, byte[] d) {\n"
+                 "  return gen.generate(zzneedlealg, d); } }\n"),
+    "hashname": ("t.py", 'import rfc3161ng\nt = rfc3161ng.RemoteTimestamper("u", hashname="zzneedlehash")\n'),
+    "dotnet": ("L.cs", "using System.Security.Cryptography.Pkcs;\nclass L { void R(byte[] d) {\n"
+               "  var q = Rfc3161TimestampRequest.CreateFromData(d, HashAlgorithmName.zzneedlealg); } }\n"),
+    "bc-class": ("U.java", "import org.bouncycastle.tsp.TimeStampRequestGenerator;\n"
+                 "class U { void r(TimeStampRequestGenerator g, byte[] d) {\n"
+                 "  g.generate(TSPAlgorithms.zzneedlebc, d); } }\n"),
+}
+
+
 @pytest.mark.parametrize("level", ["masked", "trimmed"])
-def test_hash_choice_carries_no_source_text(tmp_path, level):
-    java = ("import org.bouncycastle.tsp.TimeStampRequestGenerator;\n"
-            "class T { Object r(byte[] d) { return gen.generate(zzneedlealg, d); } }\n")
-    out = scan_repo(path=str(_tree(tmp_path, {"T.java": java})), level=level)
-    assert "zzneedlealg" not in json.dumps(out["chosen_outside_files"])
+@pytest.mark.parametrize("form", sorted(LEAKS))
+def test_hash_choice_carries_no_source_text(tmp_path, level, form):
+    name, body = LEAKS[form]
+    out = scan_repo(path=str(_tree(tmp_path, {name: body})), level=level)
+    places = [p for p in out["chosen_outside_files"]["places"] if p.get("kind") == "remote_timestamp"]
+    assert places, form
+    assert places[0]["hash_choice"] == NOT_A_VALUE
+    assert "zzneedle" not in json.dumps(out["chosen_outside_files"])
+
+
+@pytest.mark.parametrize("written, said", [
+    ('hashname="sha512"', "sha512"), ("hashname='SHA-256'", "sha-256"), ('hashname="sha3_256"', "sha3_256"),
+])
+def test_a_digest_name_is_still_said(tmp_path, written, said):
+    body = f"import rfc3161ng\nt = rfc3161ng.RemoteTimestamper('u', {written})\n"
+    place = _places(scan_directory(str(_tree(tmp_path, {"t.py": body})))).get(("t.py", 2))
+    assert place["hash_choice"] == said

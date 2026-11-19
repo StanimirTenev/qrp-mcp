@@ -5564,6 +5564,19 @@ _HASH_ALGORITHM_NAME = re.compile(r"\bHashAlgorithmName\.\w+")
 # Never source text in `hash_choice` (the masked levels mask the excerpt, not this field): a known
 # name, the library's default where the whole request was read and none is written, or this.
 _HASH_NOT_A_VALUE = "set in the request, not read as a value"
+# The digest names said as written, compared without case, `-`, `_` or a leading `id`
+# (`SHA-256`, `sha3_256`, `id_sha256`, `GOST3411_2012_256`); any other name in the same slot is
+# source text and is not said (second independent review of 0.51.0, 19.11: `zzneedlehash`).
+_DIGEST_NAMES = frozenset({
+    "md2", "md4", "md5", "sha1", "sha224", "sha256", "sha384", "sha512", "sha512224", "sha512256",
+    "sha3224", "sha3256", "sha3384", "sha3512", "shake128", "shake256", "sm3", "ripemd128",
+    "ripemd160", "ripemd256", "gost3411", "gost34112012256", "gost34112012512", "blake2b512",
+    "blake2s256", "whirlpool", "mdc2"})
+
+
+def _a_digest_name(name: str) -> bool:
+    key = re.sub(r"[-_]", "", name.lower())
+    return (key[2:] if key.startswith("id") else key) in _DIGEST_NAMES
 _HASH_NOT_READ = "not read: the call goes on past the lines read"
 
 
@@ -5609,15 +5622,18 @@ def remote_timestamps(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
             where = "RFC 3161 time-stamping authority (rfc3161ng RemoteTimestamper)"
             chosen = (_HASH_NOT_READ if arguments is None else
                       "default of the rfc3161ng in use" if not named else
-                      named.group(1).lower() if named.group(1) else _HASH_NOT_A_VALUE)
+                      named.group(1).lower() if named.group(1) and _a_digest_name(named.group(1))
+                      else _HASH_NOT_A_VALUE)
         elif bc and _BC_TSP_GENERATE.search(line):
             where = "RFC 3161 time-stamping authority (Bouncy Castle TimeStampRequestGenerator)"
             first = _BC_TSP_GENERATE.search(line).group(1)
-            chosen = first if _BC_DIGEST_NAME.match(first) else _HASH_NOT_A_VALUE
+            chosen = (first if _BC_DIGEST_NAME.match(first)
+                      and _a_digest_name(first.rsplit(".", 1)[-1]) else _HASH_NOT_A_VALUE)
         elif _DOTNET_TSP.search(line):
             named = _HASH_ALGORITHM_NAME.search(window[_DOTNET_TSP.search(window).start():])
             where = "RFC 3161 time-stamping authority (.NET Rfc3161TimestampRequest)"
-            chosen = named.group(0) if named else _HASH_NOT_A_VALUE
+            chosen = (named.group(0) if named and _a_digest_name(named.group(0).rsplit(".", 1)[-1])
+                      else _HASH_NOT_A_VALUE)
         if where:
             out.append({"path": rel_path, "line": number,
                         "setting": "time-stamp signature algorithm", "read_from": where,
