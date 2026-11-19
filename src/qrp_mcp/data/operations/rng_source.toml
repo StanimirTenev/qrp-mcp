@@ -1,0 +1,681 @@
+# Operation `rng_source`: the random number generator a line calls, in one of three classes -- `weak`, a
+# non-cryptographic PRNG by its own documentation; `csprng`, a named cryptographic generator; `check`, a
+# call the documentation does not settle by itself (ZA-OPRAVYANE rows 531, 539; design in
+# rng-prouchvane/02-dizajn.md, 19.11.2026). Pages fetched 19.11.2026. `expect`: a row in `randomness.calls`
+# on the line, with its class and the catalogue's name for the API. A row is context: it gives no finding,
+# no classification and no verdict, and it moves neither the findings nor their fingerprint.
+
+operation = "rng_source"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Py"
+scope = "the random module (its functions and random.Random; random.SystemRandom is csprng), numpy.random, secrets, os.urandom and os.getrandom, each resolved through the file's own imports (import as, from ... import). Not covered: random.Random subclasses, a generator object passed in, docstrings, third-party packages (pycryptodome Random, PyNaCl)."
+
+[[ecosystems.spellings]]
+id = "random-getrandbits"
+spelling = "random.getrandbits(256)"
+source = "https://docs.python.org/3/library/random.html"
+quote = "The pseudo-random generators of this module should not be used for security purposes. For security or cryptographic uses, see the secrets module."
+file = "keys.py"
+snippet = '''
+import random
+
+seed = random.getrandbits(256)
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "random.getrandbits"}}]}
+
+[[ecosystems.spellings]]
+id = "random-randint-from-import"
+spelling = "from random import randint; randint(0, n)"
+source = "https://docs.python.org/3/library/random.html"
+quote = "The pseudo-random generators of this module should not be used for security purposes."
+file = "nonce.py"
+snippet = '''
+from random import randint as ri
+
+nonce = ri(0, 2**64)
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "random.randint"}}]}
+
+[[ecosystems.spellings]]
+id = "random-random-instance"
+spelling = "random.Random(42)"
+source = "https://docs.python.org/3/library/random.html"
+quote = "The pseudo-random generators of this module should not be used for security purposes."
+file = "gen.py"
+snippet = '''
+import random as r
+
+rng = r.Random(42)
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "random.Random"}}]}
+
+[[ecosystems.spellings]]
+id = "random-systemrandom"
+spelling = "random.SystemRandom()"
+source = "https://docs.python.org/3/library/random.html"
+quote = "Class that uses the os.urandom() function for generating random numbers from sources provided by the operating system."
+file = "gen.py"
+snippet = '''
+import random
+
+rng = random.SystemRandom()
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "random.SystemRandom"}}]}
+
+[[ecosystems.spellings]]
+id = "numpy-random"
+spelling = "np.random.default_rng(0)"
+source = "https://numpy.org/doc/stable/reference/random/index.html"
+quote = "They are not suitable for security or cryptographic purposes."
+file = "sim.py"
+snippet = '''
+import numpy as np
+
+rng = np.random.default_rng(0)
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "numpy.random"}}]}
+
+[[ecosystems.spellings]]
+id = "secrets-token-bytes"
+spelling = "secrets.token_bytes(32)"
+source = "https://docs.python.org/3/library/secrets.html"
+quote = "The secrets module is used for generating cryptographically strong random numbers suitable for managing data such as passwords, account authentication, security tokens, and related secrets."
+file = "tok.py"
+snippet = '''
+import secrets
+
+good = secrets.token_bytes(32)
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "secrets.token_bytes"}}]}
+
+[[ecosystems.spellings]]
+id = "os-urandom"
+spelling = "os.urandom(32)"
+source = "https://docs.python.org/3/library/os.html"
+quote = "Return a bytestring of size random bytes suitable for cryptographic use."
+file = "tok.py"
+snippet = '''
+import os
+
+key = os.urandom(32)
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "os.urandom"}}]}
+
+[[ecosystems.spellings]]
+id = "os-getrandom"
+spelling = "os.getrandom(32)"
+source = "https://docs.python.org/3/library/os.html"
+quote = "These bytes can be used to seed user-space random number generators or for cryptographic purposes."
+file = "tok.py"
+snippet = '''
+from os import getrandom
+
+key = getrandom(32)
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "os.getrandom"}}]}
+
+[[ecosystems]]
+ecosystem = "Go"
+scope = "math/rand and math/rand/v2 (their exported functions and types, any import alias), crypto/rand (Read, Reader, Int, Prime, Text). NewChaCha8 of math/rand/v2 is check. Not covered: a *rand.Rand method through a variable (r.Int63()), golang.org/x/exp/rand, third-party generators."
+
+[[ecosystems.spellings]]
+id = "math-rand-new-source"
+spelling = "rand.New(rand.NewSource(42))"
+source = "https://pkg.go.dev/math/rand"
+quote = "Package rand implements pseudo-random number generators suitable for tasks such as simulation, but it should not be used for security-sensitive work."
+file = "gen.go"
+snippet = '''
+package gen
+
+import "math/rand"
+
+func R() int64 {
+	r := rand.New(rand.NewSource(42))
+	return r.Int63()
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 6, class = "weak", api = "math/rand.New"}}, {at = "randomness.calls", match = {line = 6, class = "weak", api = "math/rand.NewSource", seed = "literal"}}]}
+
+[[ecosystems.spellings]]
+id = "math-rand-alias-intn"
+spelling = "mrand.Intn(n)"
+source = "https://pkg.go.dev/math/rand"
+quote = "it should not be used for security-sensitive work."
+file = "jitter.go"
+snippet = '''
+package jitter
+
+import mrand "math/rand"
+
+func J(n int) int { return mrand.Intn(n) }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 5, class = "weak", api = "math/rand.Intn"}}]}
+
+[[ecosystems.spellings]]
+id = "math-rand-v2-intn"
+spelling = "rand.IntN(n) (math/rand/v2)"
+source = "https://pkg.go.dev/math/rand/v2"
+quote = "Package rand implements pseudo-random number generators suitable for tasks such as simulation, but it should not be used for security-sensitive work."
+file = "pick.go"
+snippet = '''
+package pick
+
+import "math/rand/v2"
+
+func P(n int) int { return rand.IntN(n) }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 5, class = "weak", api = "math/rand/v2.IntN"}}]}
+
+[[ecosystems.spellings]]
+id = "math-rand-v2-chacha8"
+spelling = "rand.NewChaCha8(seed) (math/rand/v2)"
+source = "https://pkg.go.dev/math/rand/v2"
+quote = "A ChaCha8 is a ChaCha8-based cryptographically strong random number generator."
+file = "cc.go"
+snippet = '''
+package cc
+
+import "math/rand/v2"
+
+func C(seed [32]byte) *rand.ChaCha8 { return rand.NewChaCha8(seed) }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 5, class = "check", api = "math/rand/v2.NewChaCha8"}}]}
+
+[[ecosystems.spellings]]
+id = "crypto-rand-reader"
+spelling = "crand.Reader"
+source = "https://pkg.go.dev/crypto/rand"
+quote = "Package rand implements a cryptographically secure random number generator."
+file = "key.go"
+snippet = '''
+package key
+
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	crand "crypto/rand"
+)
+
+func K() (*ecdsa.PrivateKey, error) { return ecdsa.GenerateKey(elliptic.P256(), crand.Reader) }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 9, class = "csprng", api = "crypto/rand.Reader"}}]}
+
+[[ecosystems.spellings]]
+id = "crypto-rand-read"
+spelling = "rand.Read(b)"
+source = "https://pkg.go.dev/crypto/rand"
+quote = "Package rand implements a cryptographically secure random number generator."
+file = "nonce.go"
+snippet = '''
+package nonce
+
+import "crypto/rand"
+
+func N() []byte { b := make([]byte, 12); rand.Read(b); return b }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 5, class = "csprng", api = "crypto/rand.Read"}}]}
+
+[[ecosystems]]
+ecosystem = "Java"
+scope = "java.util.Random (new, with java.util.Random or java.util.* imported or the qualified name), ThreadLocalRandom.current(), Math.random(), java.security.SecureRandom (new, getInstanceStrong, getInstance with a standard name, setSeed). In .java and .kt files. Not covered: commons-lang RandomUtils/RandomStringUtils, SplittableRandom, java.util.random.RandomGenerator.of(...), Scala's scala.util.Random, kotlin.random."
+
+[[ecosystems.spellings]]
+id = "java-util-random"
+spelling = "new Random()"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Random.html"
+quote = "Instances of java.util.Random are not cryptographically secure."
+file = "Gen.java"
+snippet = '''
+import java.util.Random;
+
+class Gen {
+    long f() { Random r = new Random(); return r.nextLong(); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "weak", api = "java.util.Random"}}]}
+
+[[ecosystems.spellings]]
+id = "java-thread-local-random"
+spelling = "ThreadLocalRandom.current()"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadLocalRandom.html"
+quote = "Instances of ThreadLocalRandom are not cryptographically secure."
+file = "Pick.java"
+snippet = '''
+import java.util.concurrent.ThreadLocalRandom;
+
+class Pick {
+    int f() { return ThreadLocalRandom.current().nextInt(10); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "weak", api = "java.util.concurrent.ThreadLocalRandom"}}]}
+
+[[ecosystems.spellings]]
+id = "java-math-random"
+spelling = "Math.random()"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Math.html"
+quote = "When this method is first called, it creates a single new pseudorandom-number generator, exactly as if by the expression new java.util.Random()"
+file = "M.java"
+snippet = '''
+class M {
+    double f() { return Math.random(); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 2, class = "weak", api = "java.lang.Math.random"}}]}
+
+[[ecosystems.spellings]]
+id = "java-securerandom-new"
+spelling = "new SecureRandom()"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandom.html"
+quote = "This class provides a cryptographically strong random number generator (RNG)."
+file = "S.java"
+snippet = '''
+import java.security.SecureRandom;
+
+class S {
+    SecureRandom f() { return new SecureRandom(); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "csprng", api = "java.security.SecureRandom"}}]}
+
+[[ecosystems.spellings]]
+id = "java-securerandom-strong"
+spelling = "SecureRandom.getInstanceStrong()"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandom.html"
+quote = "Returns a SecureRandom object that was selected by using the algorithms/providers specified in the securerandom.strongAlgorithms Security property."
+file = "S.java"
+snippet = '''
+import java.security.SecureRandom;
+
+class S {
+    SecureRandom f() throws Exception { return SecureRandom.getInstanceStrong(); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "csprng", api = "java.security.SecureRandom.getInstanceStrong"}}]}
+
+[[ecosystems.spellings]]
+id = "java-securerandom-drbg"
+spelling = "SecureRandom.getInstance(\"DRBG\")"
+source = "https://docs.oracle.com/en/java/javase/21/docs/specs/security/standard-names.html"
+quote = "DRBG An algorithm using DRBG mechanisms as defined in NIST SP 800-90Ar1."
+file = "S.java"
+snippet = '''
+import java.security.SecureRandom;
+
+class S {
+    SecureRandom f() throws Exception { return SecureRandom.getInstance("DRBG"); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "csprng", api = "java.security.SecureRandom.getInstance", algorithm = "DRBG"}}]}
+
+[[ecosystems.spellings]]
+id = "java-securerandom-sha1prng"
+spelling = "SecureRandom.getInstance(\"SHA1PRNG\")"
+source = "https://docs.oracle.com/en/java/javase/21/docs/specs/security/standard-names.html"
+quote = "SHA1PRNG The name of the pseudo-random number generation (PRNG) algorithm supplied by the SUN provider."
+file = "S.java"
+snippet = '''
+import java.security.SecureRandom;
+
+class S {
+    SecureRandom f() throws Exception { return SecureRandom.getInstance("SHA1PRNG"); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "csprng", api = "java.security.SecureRandom.getInstance", algorithm = "SHA1PRNG"}}]}
+
+[[ecosystems.spellings]]
+id = "java-sha1prng-setseed"
+spelling = "SecureRandom.getInstance(\"SHA1PRNG\") and setSeed(...)"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandom.html"
+quote = "This self-seeding will not occur if setSeed was previously called."
+file = "S.java"
+snippet = '''
+import java.security.SecureRandom;
+
+class S {
+    byte[] f(byte[] seed) throws Exception {
+        SecureRandom s = SecureRandom.getInstance("SHA1PRNG");
+        s.setSeed(seed);
+        byte[] out = new byte[32];
+        s.nextBytes(out);
+        return out;
+    }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 5, class = "check", api = "java.security.SecureRandom.getInstance", algorithm = "SHA1PRNG", why = "sha1prng_with_setseed"}}]}
+
+[[ecosystems.spellings]]
+id = "java-setseed-literal"
+spelling = "secureRandom.setSeed(42L)"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandom.html"
+quote = "Therefore, any seed material passed to a SecureRandom object must be unpredictable"
+file = "S.java"
+snippet = '''
+import java.security.SecureRandom;
+
+class S {
+    SecureRandom f() { SecureRandom s = new SecureRandom(); s.setSeed(42L); return s; }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "check", api = "java.security.SecureRandom.setSeed", why = "fixed_seed", seed = "literal"}}]}
+
+[[ecosystems.spellings]]
+id = "java-getinstance-variable"
+spelling = "SecureRandom.getInstance(name)"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandom.html"
+quote = "Returns a SecureRandom object that implements the specified Random Number Generator (RNG) algorithm."
+file = "S.java"
+snippet = '''
+import java.security.SecureRandom;
+
+class S {
+    SecureRandom f(String name) throws Exception { return SecureRandom.getInstance(name); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "check", api = "java.security.SecureRandom.getInstance", why = "algorithm_chosen_at_run_time"}}]}
+
+[[ecosystems]]
+ecosystem = "JS"
+scope = "Math.random(), crypto.getRandomValues on any receiver, Node's crypto.randomBytes, randomFill, randomFillSync, randomInt, randomUUID on `crypto.`; crypto.pseudoRandomBytes is check. In .js/.mjs/.cjs/.ts/.tsx/.jsx/.mts/.cts. Not covered: a destructured import used bare (const { randomBytes } = require('crypto')), npm generators (seedrandom, chance, random-js)."
+
+[[ecosystems.spellings]]
+id = "js-math-random"
+spelling = "Math.random()"
+source = "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random"
+quote = "Math.random() does not provide cryptographically secure random numbers. Do not use them for anything related to security."
+file = "id.js"
+snippet = '''
+export function id() {
+  return Math.random().toString(36).slice(2);
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 2, class = "weak", api = "Math.random"}}]}
+
+[[ecosystems.spellings]]
+id = "js-get-random-values"
+spelling = "crypto.getRandomValues(buf)"
+source = "https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues"
+quote = "The pseudo-random number generator algorithm (PRNG) may vary across user agents, but is suitable for cryptographic purposes."
+file = "iv.ts"
+snippet = '''
+export function iv(): Uint8Array {
+  return window.crypto.getRandomValues(new Uint8Array(12));
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 2, class = "csprng", api = "crypto.getRandomValues"}}]}
+
+[[ecosystems.spellings]]
+id = "node-random-bytes"
+spelling = "crypto.randomBytes(32)"
+source = "https://nodejs.org/api/crypto.html"
+quote = "Generates cryptographically strong pseudorandom data."
+file = "key.js"
+snippet = '''
+const crypto = require('crypto');
+
+const key = crypto.randomBytes(32);
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "crypto.randomBytes"}}]}
+
+[[ecosystems.spellings]]
+id = "node-pseudo-random-bytes"
+spelling = "crypto.pseudoRandomBytes(16)"
+source = "https://nodejs.org/api/deprecations.html"
+quote = "In recent versions of Node.js, there is no difference between crypto.randomBytes() and crypto.pseudoRandomBytes()."
+file = "old.js"
+snippet = '''
+const crypto = require('crypto');
+
+const salt = crypto.pseudoRandomBytes(16);
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "check", api = "crypto.pseudoRandomBytes", why = "deprecated_alias"}}]}
+
+[[ecosystems]]
+ecosystem = "C"
+scope = "C rand(), srand(), rand_r(); C++ std::mt19937 and std::mt19937_64 (check: std::random_device); getrandom(); arc4random, arc4random_buf, arc4random_uniform; OpenSSL RAND_bytes, RAND_priv_bytes and their _ex forms, EVP_RAND_fetch with CTR-DRBG, HASH-DRBG or HMAC-DRBG. Not covered: random()/drand48() (no page read states their class), RAND_pseudo_bytes (its page says only that it is deprecated), other engines of <random>, libsodium randombytes, mbedTLS ctr_drbg, BoringSSL."
+
+[[ecosystems.spellings]]
+id = "c-rand"
+spelling = "rand()"
+source = "https://en.cppreference.com/w/c/numeric/random/rand"
+quote = "There are no guarantees as to the quality of the random sequence produced."
+file = "gen.c"
+snippet = '''
+#include <stdlib.h>
+
+int nonce(void) { return rand(); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "rand"}}]}
+
+[[ecosystems.spellings]]
+id = "c-srand"
+spelling = "srand(42)"
+source = "https://man7.org/linux/man-pages/man3/rand.3.html"
+quote = "rand, rand_r, srand - pseudo-random number generator"
+file = "gen.c"
+snippet = '''
+#include <stdlib.h>
+
+void init(void) { srand(42); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "srand", seed = "literal"}}]}
+
+[[ecosystems.spellings]]
+id = "cpp-mt19937"
+spelling = "std::mt19937 gen(rd())"
+source = "https://en.cppreference.com/w/cpp/numeric/random/mersenne_twister_engine"
+quote = "It produces high quality, but not cryptographically secure, unsigned integer random numbers"
+file = "gen.cpp"
+snippet = '''
+#include <random>
+
+unsigned pick() {
+    std::mt19937 gen(1234);
+    return gen();
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "weak", api = "std::mt19937"}}]}
+
+[[ecosystems.spellings]]
+id = "cpp-random-device"
+spelling = "std::random_device rd"
+source = "https://en.cppreference.com/w/cpp/numeric/random/random_device"
+quote = "std::random_device may be implemented in terms of an implementation-defined pseudo-random number engine if a non-deterministic source (e.g. a hardware device) is not available to the implementation."
+file = "seed.cpp"
+snippet = '''
+#include <random>
+
+unsigned seed() {
+    std::random_device rd;
+    return rd();
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "check", api = "std::random_device", why = "may_be_a_prng"}}]}
+
+[[ecosystems.spellings]]
+id = "c-getrandom"
+spelling = "getrandom(buf, n, 0)"
+source = "https://man7.org/linux/man-pages/man2/getrandom.2.html"
+quote = "These bytes can be used to seed user-space random number generators or for cryptographic purposes."
+file = "rnd.c"
+snippet = '''
+#include <sys/random.h>
+
+int fill(unsigned char *buf) { return getrandom(buf, 32, 0) == 32; }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "getrandom"}}]}
+
+[[ecosystems.spellings]]
+id = "c-arc4random-buf"
+spelling = "arc4random_buf(buf, n)"
+source = "https://man7.org/linux/man-pages/man3/arc4random.3.html"
+quote = "arc4random, arc4random_uniform, arc4random_buf - cryptographically-secure pseudorandom number generator"
+file = "rnd.c"
+snippet = '''
+#include <stdlib.h>
+
+void fill(unsigned char *buf) { arc4random_buf(buf, 32); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "arc4random_buf"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-rand-bytes"
+spelling = "RAND_bytes(buf, n)"
+source = "https://raw.githubusercontent.com/openssl/openssl/master/doc/man3/RAND_bytes.pod"
+quote = "RAND_bytes() generates B<num> random bytes using a cryptographically secure pseudo random generator (CSPRNG) and stores them in B<buf>."
+file = "rnd.c"
+snippet = '''
+#include <openssl/rand.h>
+
+int fill(unsigned char *buf) { return RAND_bytes(buf, 32); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "RAND_bytes"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-rand-ctr-drbg"
+spelling = "EVP_RAND_fetch(NULL, \"CTR-DRBG\", NULL)"
+source = "https://raw.githubusercontent.com/openssl/openssl/master/doc/man7/EVP_RAND-CTR-DRBG.pod"
+quote = "\"CTR-DRBG\" is the name for this implementation; it can be used with the EVP_RAND_fetch() function."
+file = "drbg.c"
+snippet = '''
+#include <openssl/evp.h>
+
+EVP_RAND *get(void) { return EVP_RAND_fetch(NULL, "CTR-DRBG", NULL); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "EVP_RAND_fetch", drbg_family = "CTR_DRBG"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-rand-hash-drbg"
+spelling = "EVP_RAND_fetch(NULL, \"HASH-DRBG\", NULL)"
+source = "https://raw.githubusercontent.com/openssl/openssl/master/doc/man7/EVP_RAND-HASH-DRBG.pod"
+quote = "\"HASH-DRBG\" is the name for this implementation; it can be used with the EVP_RAND_fetch() function."
+file = "drbg.c"
+snippet = '''
+#include <openssl/evp.h>
+
+EVP_RAND *get(void) { return EVP_RAND_fetch(NULL, "HASH-DRBG", NULL); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "EVP_RAND_fetch", drbg_family = "Hash_DRBG"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-evp-rand-hmac-drbg"
+spelling = "EVP_RAND_fetch(NULL, \"HMAC-DRBG\", NULL)"
+source = "https://raw.githubusercontent.com/openssl/openssl/master/doc/man7/EVP_RAND-HMAC-DRBG.pod"
+quote = "\"HMAC-DRBG\" is the name for this implementation; it can be used with the EVP_RAND_fetch() function."
+file = "drbg.c"
+snippet = '''
+#include <openssl/evp.h>
+
+EVP_RAND *get(void) { return EVP_RAND_fetch(NULL, "HMAC-DRBG", NULL); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "EVP_RAND_fetch", drbg_family = "HMAC_DRBG"}}]}
+
+[[ecosystems]]
+ecosystem = "NET"
+scope = "System.Random (new, with or without System., in C# and VB; Random.Shared), System.Security.Cryptography.RandomNumberGenerator (Create and the static GetBytes, Fill, GetInt32, GetHexString, GetString, GetItems, Shuffle), RNGCryptoServiceProvider. Not covered: F# Random() without new, a Random subclass, Unity's UnityEngine.Random."
+
+[[ecosystems.spellings]]
+id = "dotnet-new-random"
+spelling = "new Random()"
+source = "https://learn.microsoft.com/en-us/dotnet/fundamentals/runtime-libraries/system-random"
+quote = "The Random class represents a pseudo-random number generator"
+file = "Gen.cs"
+snippet = '''
+using System;
+
+class Gen { int F() { var r = new Random(); return r.Next(); } }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "System.Random"}}]}
+
+[[ecosystems.spellings]]
+id = "dotnet-random-shared"
+spelling = "Random.Shared.Next()"
+source = "https://learn.microsoft.com/en-us/dotnet/fundamentals/runtime-libraries/system-random"
+quote = "Provides a thread-safe Random instance that may be used concurrently from any thread."
+file = "Gen.cs"
+snippet = '''
+using System;
+
+class Gen { int F() => Random.Shared.Next(); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "System.Random.Shared"}}]}
+
+[[ecosystems.spellings]]
+id = "dotnet-rng-getbytes"
+spelling = "RandomNumberGenerator.GetBytes(32)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.randomnumbergenerator"
+quote = "Cryptographic random number generators create cryptographically strong random values."
+file = "Key.cs"
+snippet = '''
+using System.Security.Cryptography;
+
+class Key { byte[] F() => RandomNumberGenerator.GetBytes(32); }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "System.Security.Cryptography.RandomNumberGenerator"}}]}
+
+[[ecosystems.spellings]]
+id = "dotnet-rngcsp"
+spelling = "new RNGCryptoServiceProvider()"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.randomnumbergenerator"
+quote = "This is preferred over calling the constructor of the derived class RNGCryptoServiceProvider, which is not available on all platforms."
+file = "Key.cs"
+snippet = '''
+using System.Security.Cryptography;
+
+class Key { void F(byte[] b) { using var r = new RNGCryptoServiceProvider(); r.GetBytes(b); } }
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "csprng", api = "System.Security.Cryptography.RNGCryptoServiceProvider"}}]}
+
+[[ecosystems]]
+ecosystem = "PHP"
+scope = "rand(), mt_rand(), srand(), mt_srand() as functions (not methods, not a declaration), random_int(), random_bytes(). In .php files. Not covered: Random\\Randomizer and its engines, lcg_value(), uniqid(), openssl_random_pseudo_bytes(), Ruby (its files share this ecosystem's label in `ecosystems`)."
+
+[[ecosystems.spellings]]
+id = "php-rand"
+spelling = "rand()"
+source = "https://www.php.net/manual/en/function.rand.php"
+quote = "This function does not generate cryptographically secure values, and must not be used for cryptographic purposes, or purposes that require returned values to be unguessable."
+file = "tok.php"
+snippet = '''
+<?php
+$token = rand(100000, 999999);
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 2, class = "weak", api = "rand"}}]}
+
+[[ecosystems.spellings]]
+id = "php-mt-rand"
+spelling = "mt_rand()"
+source = "https://www.php.net/manual/en/function.mt-rand.php"
+quote = "This function does not generate cryptographically secure values, and must not be used for cryptographic purposes, or purposes that require returned values to be unguessable."
+file = "tok.php"
+snippet = '''
+<?php
+mt_srand(42);
+$nonce = mt_rand();
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 3, class = "weak", api = "mt_rand"}}, {at = "randomness.calls", match = {line = 2, class = "weak", api = "mt_srand", seed = "literal"}}]}
+
+[[ecosystems.spellings]]
+id = "php-random-int"
+spelling = "random_int(0, 99)"
+source = "https://www.php.net/manual/en/function.random-int.php"
+quote = "random_int — Get a cryptographically secure, uniformly selected integer"
+file = "tok.php"
+snippet = '''
+<?php
+$n = random_int(0, 99);
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 2, class = "csprng", api = "random_int"}}]}
+
+[[ecosystems.spellings]]
+id = "php-random-bytes"
+spelling = "random_bytes(32)"
+source = "https://www.php.net/manual/en/function.random-bytes.php"
+quote = "random_bytes — Get cryptographically secure random bytes"
+file = "tok.php"
+snippet = '''
+<?php
+$key = random_bytes(32);
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 2, class = "csprng", api = "random_bytes"}}]}

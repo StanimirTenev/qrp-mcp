@@ -34,22 +34,22 @@ from . import assets, confidence, detectors, operations
 # known so far, not about every way the ecosystem can name an algorithm. `vrf` of Go and Rust:
 # row 535 (19.11.2026).
 KNOWN_OPERATIONS: dict[str, tuple[str, ...]] = {
-    "C": ("apiname", "ciphers", "external", "keyfile", "keysize", "pqc", "protover", "sign",
-          "tlsgroups", "usectx"),
+    "C": ("apiname", "ciphers", "external", "keyfile", "keysize", "pqc", "protover",
+          "rng_source", "sign", "tlsgroups", "usectx"),
     "CI": ("encrypt", "external", "sign", "usectx"),
     "DNSSEC": ("apiname", "keyfile"),
-    "Go": ("external", "vrf"),
+    "Go": ("external", "rng_source", "vrf"),
     "IPsec": ("ike", "keysize", "symhash"),
     "IaC": ("ciphers", "encrypt", "external", "keyfile", "keysize", "pqc", "sign"),
-    "JS": ("apiname", "encrypt", "keysize", "protover", "usectx"),
+    "JS": ("apiname", "encrypt", "keysize", "protover", "rng_source", "usectx"),
     "Java": ("apiname", "ciphers", "encrypt", "external", "keyfile", "keysize", "pqc", "protover",
-             "symhash"),
-    "NET": ("apiname", "ciphers", "external", "keyfile", "keysize", "protover", "sign", "symhash",
-            "tlsgroups", "usectx"),
-    "PHP": ("apiname", "encrypt", "keysize", "protover"),
+             "rng_source", "symhash"),
+    "NET": ("apiname", "ciphers", "external", "keyfile", "keysize", "protover", "rng_source",
+            "sign", "symhash", "tlsgroups", "usectx"),
+    "PHP": ("apiname", "encrypt", "keysize", "protover", "rng_source"),
     "PKI": ("keyfile", "keysize", "pqc"),
-    "Py": ("apiname", "encrypt", "external", "keysize", "pqc", "protover", "sign", "symhash",
-           "usectx"),
+    "Py": ("apiname", "encrypt", "external", "keysize", "pqc", "protover", "rng_source", "sign",
+           "symhash", "usectx"),
     "Rust": ("apiname", "keysize", "protover", "vrf"),
     "SSH": ("keyfile", "keysize", "pqc", "ssh"),
     "embed": ("apiname", "keysize", "pqc", "sign", "usectx"),
@@ -75,6 +75,9 @@ _SUFFIX_TO_CODE = {s: eco for eco, suffixes in _CODE_SUFFIXES.items() for s in s
 # VRF catalogue made every Go and Rust tree read `partially_closed` (independent review of 0.51.0,
 # 19.11: Vault, Go rank 1 -> 40, with `external` still open and untested).
 _FOUND_ONLY = {"vrf": "ECVRF"}
+# The same rule for `rng_source` (rows 531, 539): it counts only where `randomness.calls` has a row of
+# that ecosystem outside test code, of any class -- a `crypto/rand` row counts as a `math/rand` one.
+_FOUND_IN_RANDOMNESS = "rng_source"
 # A manifest's (or a dependency row's) package ecosystem, as the catalogue names ecosystems.
 _PACKAGE_ECOSYSTEM = {"pypi": "Py", "npm": "JS", "go": "Go", "cargo": "Rust", "maven": "Java",
                       "nuget": "NET", "rubygems": "PHP", "composer": "PHP"}
@@ -120,13 +123,15 @@ ECOSYSTEMS_MEANING = (
     "matched; and whether this version's closure catalogue (operation_closure) holds its "
     "operations. The operations of an ecosystem are those in which a gap has been recorded "
     "(known_operations, from the labelled ZA-OPRAVYANE rows of 18.11.2026 and the later rows "
-    "that name an operation, as `vrf` of Go and Rust, row 535): `closed` -- the "
+    "that name an operation, as `vrf` of Go and Rust, row 535, and `rng_source` of Py, Go, Java, "
+    "JS, C, NET and PHP, row 539): `closed` -- the "
     "catalogue holds every one; `partially_closed` -- some; `not_closed` -- none, or the "
     "ecosystem has no catalogue entry at all. A closed operation is one whose documented "
     "spellings are tested one by one; it is not a claim that nothing can be missed, and an "
     "operation with no recorded gap is not counted. An operation most trees never perform (`vrf`) "
     "counts -- known, closed or open -- only where the scan found it in that ecosystem, outside test "
-    "code. Context only: it does not affect the "
+    "code; so does `rng_source`, where `randomness.calls` has a row of that ecosystem outside test "
+    "code, of any class. Context only: it does not affect the "
     "findings, their fingerprint, a gate or the exit code")
 
 
@@ -199,10 +204,15 @@ def _ecosystems(result: dict[str, Any], root: Path) -> dict[str, Any]:
                 eco = _SUFFIX_TO_CODE.get(PurePosixPath(str(row.get("path", ""))).suffix.lower())
                 if eco:
                     found.setdefault(eco, set()).add(row["algorithm"])
+    with_generator = {row.get("ecosystem") for row in
+                      ((result.get("randomness") or {}).get("calls") or [])
+                      if isinstance(row, dict) and not row.get("in_test_code")}
     present = []
     for eco in sorted(files):
         every = set().union(*files[eco].values())
         absent = {op for op, family in _FOUND_ONLY.items() if family not in found.get(eco, set())}
+        if eco not in with_generator:
+            absent.add(_FOUND_IN_RANDOMNESS)
         known = set(KNOWN_OPERATIONS.get(eco, ())) - absent
         closed = sorted(catalogue.get(eco, set()) - absent)
         still_open = sorted(known - set(closed))
