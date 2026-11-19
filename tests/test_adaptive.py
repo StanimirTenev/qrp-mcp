@@ -75,6 +75,8 @@ def test_status_is_read_against_the_catalogue(tmp_path):
     go = _eco(result, "Go")
     assert go["status"] == "partially_closed" and go["closed_operations"] == ["vrf"]
     assert go["open_operations"] == ["external"]
+    # vrf is a recorded gap of Go and Rust (row 535), so it is known, not only closed.
+    assert "vrf" in go["known_operations"] and "vrf" in _eco(result, "Rust")["known_operations"]
     js = _eco(result, "JS")
     assert js["status"] == "not_closed" and js["closed_operations"] == []
     assert js["may_miss"].startswith("here we may miss")

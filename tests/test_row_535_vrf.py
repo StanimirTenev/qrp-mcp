@@ -95,6 +95,11 @@ def test_no_signature_scheme_is_offered_for_the_vrf(tmp_path):
     text = json.dumps(finding.get("replacement") or finding.get("remediation") or {})
     for scheme in ("ML-DSA", "SLH-DSA", "ML-KEM", "FIPS 204", "FIPS 205"):
         assert scheme not in text, (scheme, text)
+    # Said, not left blank: no option, and why (mutation round of 0.51.0: without the entry the
+    # finding had no replacement at all, and the line above still passed).
+    replacement = finding["replacement"]
+    assert replacement["options"] == []
+    assert "verifiable random function" in replacement["note"]
 
 
 def test_a_scan_without_a_vrf_keeps_its_shape(tmp_path):
