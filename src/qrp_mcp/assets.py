@@ -633,8 +633,11 @@ def _setup_py_requests(lines: list[str]) -> list[tuple[str, int, str | None]]:
             found += _setup_rows(value[0]["kept"])
             value = None
         if kind == "l":
-            previous = before = ""
-            tail = 0
+            # Inside brackets Python joins the lines: what was just read stays, so a subscript
+            # on the next line is one (row 533, N7: `["requests", "paramiko"]` / `[:1]`).
+            if depth == 0:
+                previous = before = ""
+                tail = 0
             continue
         if value is None:
             if kind == "o" and word in "([{":
