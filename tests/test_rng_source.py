@@ -717,3 +717,13 @@ def test_a_line_of_open_braces_finishes(tmp_path):
     started = time.monotonic()
     places = scan_directory(tmp_path)["randomness"]["places"]
     assert time.monotonic() - started < 20 and places
+
+
+# --- the review of 19.11, findings 2-4: the pessimistic side for SecureRandom ----------------------
+
+def test_a_seed_passed_to_the_secure_random_constructor_is_check(tmp_path):
+    calls = _calls(tmp_path, {"C.java": (
+        "import java.security.SecureRandom;\nclass C {\n  void use(byte[] seedBytes) {\n"
+        "    SecureRandom r = new SecureRandom(seedBytes);\n  }\n}\n")})
+    (row,) = calls
+    assert (row["class"], row["why"], row["seed"]) == ("check", "seed_supplied", "supplied")

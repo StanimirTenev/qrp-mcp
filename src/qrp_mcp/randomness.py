@@ -342,8 +342,10 @@ def _java(text: str, rel: str):
                 yield (number, line, match.start(), "java.security.SecureRandom", "check",
                        {"why": "fixed_seed", "seed": "literal"})
             else:
-                yield (number, line, match.start(), "java.security.SecureRandom", "csprng",
-                       {"seed": "supplied"})
+                # "The SecureRandom instance is seeded with the specified seed bytes": the caller's
+                # seed, not the provider's self-seeding, decides it.
+                yield (number, line, match.start(), "java.security.SecureRandom", "check",
+                       {"why": "seed_supplied", "seed": "supplied"})
         for match in _JAVA_GET_INSTANCE.finditer(code):
             api = "java.security.SecureRandom.getInstance"
             name = _first_string(line, code, match.end())

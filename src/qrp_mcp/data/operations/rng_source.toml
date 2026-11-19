@@ -361,6 +361,21 @@ class S {
 expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "check", api = "java.security.SecureRandom.setSeed", why = "fixed_seed", seed = "literal"}}]}
 
 [[ecosystems.spellings]]
+id = "java-securerandom-seed-supplied"
+spelling = "new SecureRandom(seedBytes)"
+source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandom.html"
+quote = "The SecureRandom instance is seeded with the specified seed bytes."
+file = "S.java"
+snippet = '''
+import java.security.SecureRandom;
+
+class S {
+    SecureRandom f(byte[] seedBytes) { return new SecureRandom(seedBytes); }
+}
+'''
+expect = {rows = [{at = "randomness.calls", match = {line = 4, class = "check", api = "java.security.SecureRandom", why = "seed_supplied", seed = "supplied"}}]}
+
+[[ecosystems.spellings]]
 id = "java-getinstance-variable"
 spelling = "SecureRandom.getInstance(name)"
 source = "https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandom.html"

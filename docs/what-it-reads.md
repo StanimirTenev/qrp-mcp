@@ -606,14 +606,15 @@ nor the exit code.
   `RAND_bytes`/`RAND_priv_bytes` and `EVP_RAND_fetch` with `CTR-DRBG`, `HASH-DRBG` or `HMAC-DRBG`;
   `RandomNumberGenerator`, `RNGCryptoServiceProvider`; `random_int()`, `random_bytes()`. `check`,
   with `why`: `std::random_device` (`may_be_a_prng`), SHA1PRNG in a file that calls `setSeed`
-  (`sha1prng_with_setseed`), `setSeed(<literal>)` or `new SecureRandom(<literal>)` (`fixed_seed`),
+  (`sha1prng_with_setseed`), `setSeed(<literal>)` or `new SecureRandom(<literal>)` (`fixed_seed`), `new SecureRandom(seed)`
+  with the seed in a variable (`seed_supplied`),
   `getInstance(<a variable>)` and `EVP_RAND_fetch(ctx, <a variable>, ...)`
   (`algorithm_chosen_at_run_time`), Go's `NewChaCha8`
   (`strong_type_in_a_package_not_for_security`), Node's `crypto.pseudoRandomBytes`
   (`deprecated_alias`). A seed written as a literal is `seed: "literal"`. Names resolve through the
   file's own imports (Python aliases and from-imports, Go import aliases); a comment line is skipped
   and string contents are blanked before matching. Every field except `path` and `excerpt` holds a
-  value from a closed list. The 46 spellings, each with its page, the words quoted from it and a
+  value from a closed list. The 47 spellings, each with its page, the words quoted from it and a
   test, are `data/operations/rng_source.toml`.
 - **Places to check** (`randomness.places`): a `weak` or `check` row with an anchor in its file. An
   anchor is a public-key call row the scan reports (`public_key_operation`), which may be a key
