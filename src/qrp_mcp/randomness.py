@@ -767,15 +767,19 @@ def _places(calls: list[dict[str, Any]], anchors: dict[str, list[dict[str, Any]]
 # --- FIPS 203 and FIPS 204 ---------------------------------------------------------------------------
 
 PQC_MEANING = (
-    "an ML-KEM or ML-DSA call row with a generator row of any class in the same function or on the "
-    "same line -- what `visible` means here; no library's RNG argument is parsed -- and the "
-    "requirement FIPS 203 or FIPS 204 sets on that randomness, quoted with its section and page "
-    "(printed page, then the PDF's). The requirement is named, not checked: the scan does not "
-    "establish that a generator is an approved RBG or what its security strength is, and a `csprng` "
-    "row is not shown to meet it. The row is not told apart as key generation, encapsulation, "
-    "signing, decapsulation, verification or a parameter name, so an entry can sit where no "
-    "randomness is drawn; for ML-DSA both requirements are given. `generators` names up to three, "
-    "nearest first, and `generators_count` how many are in that function")
+    "an ML-KEM or ML-DSA call row whose call draws randomness, with a generator row of any class in "
+    "the same function or on the same line -- what `visible` means here; no library's RNG argument "
+    "is parsed -- and the requirement FIPS 203 or FIPS 204 sets on that randomness, quoted with its "
+    "section and page (printed page, then the PDF's). The requirement is named, not checked: the "
+    "scan does not establish that a generator is an approved RBG or what its security strength is, "
+    "and a `csprng` row is not shown to meet it. `operations` is read from the names called on the "
+    "row's line or on the name that line assigns (keygen, encapsulate, sign), a heuristic on names; "
+    "a row whose operation is not read that way, or reads as decapsulation, verification or a "
+    "parameter name, names none. A seeded call (`_seeded`, `_derand`) is read as the operation it "
+    "names, so an entry can still sit where the seed is not fresh. ML-KEM key generation and "
+    "encapsulation get FIPS 203; ML-DSA key generation gets the seed \U0001d709, signing the hedged rnd. "
+    "One entry per function, family and parameter set, on its first row; `generators` names up to "
+    "three, nearest first, and `generators_count` how many are in that function")
 # Quoted from the PDFs (nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.203.pdf and .204.pdf), each found
 # word for word in a saved text of the page (izdanie-0.52.0/izvori, tools/proveri_izvori.py).
 _FIPS_203 = {
@@ -809,19 +813,60 @@ _FIPS_204_RND = {
 _ML_KEM_BITS = {"512": 128, "768": 192, "1024": 256}
 
 
-def _requirements(family: str, pset: str | None) -> list[dict[str, Any]]:
+def _requirements(family: str, pset: str | None, operations: set[str]) -> list[dict[str, Any]]:
     def only(bits: dict[str, int]) -> dict[str, int]:
         return {k: v for k, v in bits.items() if pset is None or k == pset}
 
     if family == "ML-KEM":
         return [{**_FIPS_203, "level": "shall", "min_strength_bits": only(_ML_KEM_BITS)}]
     out = []
-    if only({"65": 192, "87": 256}):
-        out.append({**_FIPS_204_XI, "level": "shall", "min_strength_bits": only({"65": 192, "87": 256})})
-    if only({"44": 128}):
-        out.append({**_FIPS_204_XI_44, "level": "shall", "min_strength_bits": {"44": 128}})
-        out.append({**_FIPS_204_XI_44, "level": "should", "min_strength_bits": {"44": 192}})
-    out.append({**_FIPS_204_RND, "level": "should"})
+    if "keygen" in operations:
+        if only({"65": 192, "87": 256}):
+            out.append({**_FIPS_204_XI, "level": "shall",
+                        "min_strength_bits": only({"65": 192, "87": 256})})
+        if only({"44": 128}):
+            out.append({**_FIPS_204_XI_44, "level": "shall", "min_strength_bits": {"44": 128}})
+            out.append({**_FIPS_204_XI_44, "level": "should", "min_strength_bits": {"44": 192}})
+    if "sign" in operations:
+        out.append({**_FIPS_204_RND, "level": "should"})
+    return out
+
+
+# The operation a call names, by the words of the called name (`generate_keypair`,
+# `crypto_sign_mldsa44_seeded`, `Encapsulate`). A word for decapsulation or verification wins:
+# `crypto_sign_verify` and `crypto_sign_open` draw nothing. A type or handle (`oqs.Signature`,
+# `oqs.KeyEncapsulation`, `EncapsulationKey`, `KeyPairGenerator.getInstance`) names no operation.
+_PQC_CALLED = re.compile(r"(?<![\w$])([A-Za-z_$][\w$]*)\s*\(")
+_PQC_NO_DRAW = frozenset(("verify", "open", "dec", "decap", "decaps", "decapsulate", "decapsulator"))
+_PQC_ENCAPS = frozenset(("enc", "encap", "encaps", "encapsulate", "encapsulator"))
+_PQC_KEYGEN = ("keygen", "keypair", "generatekey", "genkey")
+_PQC_HANDLE = re.compile(r"^\s*(?:(?:val|var|let|const|final|auto)\s+)?(?:[\w<>\[\].?]+\s+)?"
+                         r"([A-Za-z_$][\w$]*)\s*(?:,\s*[\w$]+\s*)*(?::=|=)(?!=)")
+
+
+def _pqc_operation(name: str) -> str | None:
+    parts = [p.lower() for piece in name.split("_") for p in _NAME_PARTS.findall(piece)]
+    if _PQC_NO_DRAW.intersection(parts):
+        return None
+    joined = "".join(parts)
+    if any(word in joined for word in _PQC_KEYGEN):
+        return "keygen"
+    if _PQC_ENCAPS.intersection(parts):
+        return "encapsulate"
+    if "sign" in parts:
+        return "sign"
+    return None
+
+
+def _pqc_methods(code_of: dict[int, str], lines: list[int]) -> dict[str, set[str]]:
+    """For each name in `lines`, the operations of the methods called on it (`kem.encap_secret(`)."""
+    out: dict[str, set[str]] = {}
+    for line in lines:
+        for match in re.finditer(r"(?<![\w.$])([A-Za-z_$][\w$]*)\s*(?:\.|->)\s*([A-Za-z_$][\w$]*)\s*\(",
+                                 code_of.get(line, "")):
+            operation = _pqc_operation(match.group(2))
+            if operation:
+                out.setdefault(match.group(1), set()).add(operation)
     return out
 
 
@@ -831,9 +876,9 @@ def _pqc_requirements(result: dict[str, Any], calls: list[dict[str, Any]],
     by_path: dict[str, list[int]] = {}
     for index, row in enumerate(calls):
         by_path.setdefault(row["path"], []).append(index)
-    out = []
     cache: dict[str, Any] = {}
-    grouped: dict[str, tuple[dict, dict, dict]] = {}
+    grouped: dict[str, tuple[dict, dict, dict, dict, dict]] = {}
+    groups: dict[tuple, dict[str, Any]] = {}
     for row in (result.get("evidence") or {}).get("source_code") or []:
         if (row.get("algorithm") not in ("ML-KEM", "ML-DSA") or row.get("evidence_kind") != "call"
                 or row.get("path") not in by_path):
@@ -851,31 +896,61 @@ def _pqc_requirements(result: dict[str, Any], calls: list[dict[str, Any]],
                 by_line.setdefault(line, []).append((line, index))
                 if function is not None:
                     by_function.setdefault(function, []).append((line, index))
-            grouped[path] = (by_line, by_function, function_of)
-        by_line, by_function, function_of = grouped[path]
+            text, eco = texts[path]
+            code_of = {n: c for n, _, c in _code_lines(text, eco)}
+            members: dict[int, list[int]] = {}
+            for line, events in functions.items():
+                for function in {f for _, f in events if f is not None}:
+                    members.setdefault(function, []).append(line)
+            grouped[path] = (by_line, by_function, function_of, code_of, members)
+        by_line, by_function, function_of, code_of, members = grouped[path]
         there = _function_at(functions, row["line"], None)
-        same_line = [(line, i) for line, i in by_line.get(row["line"], [])
-                     if there is None or function_of[i] != there]
-        in_function = by_function.get(there, []) if there is not None else []
-        chosen = same_line[:_CAP] + _nearest(in_function, row["line"], _CAP)
-        generators = [{"line": calls[i]["line"], "class": calls[i]["class"], "api": calls[i]["api"],
-                       "link_scope": "same_line" if calls[i]["line"] == row["line"]
-                       else "same_function"}
-                      for _, i in sorted(chosen, key=lambda c: (c[0], c[1]))]
-        count = len(same_line) + len(in_function)
-        if not generators:
+        code = code_of.get(row["line"], "")
+        operations = {o for o in map(_pqc_operation, (m.group(1) for m in _PQC_CALLED.finditer(code)))
+                      if o}
+        handle = _PQC_HANDLE.match(code)
+        if handle:
+            key = ("methods", path, there)
+            if key not in cache:
+                cache[key] = _pqc_methods(code_of, members.get(there, []) if there is not None
+                                          else [row["line"]])
+            operations |= cache[key].get(handle.group(1), set())
+        if not operations:
             continue
         pset = row.get("parameter_set")
         pset = pset if pset in ({"512", "768", "1024"} if row["algorithm"] == "ML-KEM"
                                 else {"44", "65", "87"}) else None
+        group = groups.setdefault((path, there if there is not None else ("line", row["line"]),
+                                   row["algorithm"], pset),
+                                  {"row": row, "pset": pset, "operations": set(), "lines": set()})
+        group["operations"] |= operations
+        group["lines"].add(row["line"])
+    out = []
+    for (path, there, family, pset), group in groups.items():
+        by_line, by_function, function_of, _, _ = grouped[path]
+        row = group["row"]
+        same_line = [(line, i) for n in sorted(group["lines"]) for line, i in by_line.get(n, [])
+                     if not isinstance(there, int) or function_of[i] != there]
+        in_function = by_function.get(there, []) if isinstance(there, int) else []
+        chosen = same_line[:_CAP] + _nearest(in_function, row["line"], _CAP)
+        generators = [{"line": calls[i]["line"], "class": calls[i]["class"], "api": calls[i]["api"],
+                       "link_scope": "same_line" if calls[i]["line"] in group["lines"]
+                       else "same_function"}
+                      for _, i in sorted(chosen, key=lambda c: (c[0], c[1]))]
+        count = len(same_line) + len(in_function)
+        requirements = _requirements(family, pset, group["operations"])
+        if not generators or not requirements:
+            continue
         out.append({
-            "path": row["path"], "line": row["line"], "family": row["algorithm"],
-            "parameter_set": pset, "generators": generators, "generators_count": count,
-            "requirements": _requirements(row["algorithm"], pset),
-            "statement": (f"{row['algorithm']} with a generator in the same function: the "
+            "path": path, "line": row["line"], "family": family,
+            "parameter_set": pset, "operations": sorted(group["operations"]),
+            "generators": generators, "generators_count": count,
+            "requirements": requirements,
+            "statement": (f"{family} with a generator in the same function: the "
                           f"requirement is named, not checked -- the scan does not establish that "
                           f"the generator is an approved RBG or what its security strength is"),
-            "in_test_code": detectors.in_test_code(row["path"])})
+            "in_test_code": detectors.in_test_code(path)})
+    out.sort(key=lambda q: (q["path"], q["line"], q["family"]))
     return out
 
 

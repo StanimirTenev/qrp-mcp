@@ -623,16 +623,23 @@ nor the exit code.
   block opened after `)` or `=>`, a heuristic) or `same_file`. `link` is always `co-location`: the
   value is not followed. `anchors` names up to three, nearest first, and `anchors_count` how many
   the file holds. A `csprng` row is never a place.
-- **FIPS 203/204** (`randomness.pqc_requirements`): an ML-KEM or ML-DSA call row with a generator of
-  any class in the same function or on the same line. The entry carries FIPS 203 §3.3 (p. 16, PDF
-  p. 25) or FIPS 204 §3.6.1 (p. 12, PDF p. 22), quoted, with the minimum security strength per
-  parameter set: 128/192/256 bits for ML-KEM-512/768/1024. For ML-DSA it gives the seed ξ (shall:
-  192 bits for ML-DSA-65, 256 for ML-DSA-87; ML-DSA-44 shall 128, should 192) and the hedged `rnd`
-  (should). A row is not told apart as key generation, signing, decapsulation, verification or a
-  parameter name, so an entry can sit where no randomness is drawn (in the corpus, smallstep's
-  mapping of ML-DSA parameter sets to COSE identifiers); for ML-DSA both requirements are given.
-  `generators` names up to three, nearest first, with `generators_count`. The requirement is named,
-  not checked.
+- **FIPS 203/204** (`randomness.pqc_requirements`): an ML-KEM or ML-DSA call row whose call draws
+  randomness, with a generator of any class in the same function or on the same line. The
+  operation (`operations`: `keygen`, `encapsulate`, `sign`) is read from the names called on the
+  row's line, or on the name that line assigns (`kem = oqs.KeyEncapsulation(...)`, then
+  `kem.generate_keypair()`), a heuristic on names. A row whose operation is not read that way, or
+  reads as decapsulation, verification or a parameter name, names no requirement: verify-only and
+  decapsulation-only code, and a table that only names the algorithm (in the corpus, smallstep's
+  mapping of ML-DSA parameter sets to COSE identifiers), give no entry. ML-KEM key generation and
+  encapsulation carry FIPS 203 §3.3 (p. 16, PDF p. 25), quoted, with the minimum security strength
+  per parameter set: 128/192/256 bits for ML-KEM-512/768/1024. ML-DSA key generation carries the
+  seed ξ of FIPS 204 §3.6.1 (p. 12, PDF p. 22; shall: 192 bits for ML-DSA-65, 256 for ML-DSA-87;
+  ML-DSA-44 shall 128, should 192), and signing the hedged `rnd` (should). There is one entry per
+  function, family and parameter set, on its first row. A seeded call (`_seeded`, `_derand`) is
+  read as the operation it names, so an entry can still sit where the seed is not fresh (OpenSSH's
+  composite ML-DSA-44/Ed25519 signing expands its key with `keypair_seeded` from the stored seed, and
+  gets the seed ξ beside `rnd`). `generators` names up to three, nearest first, with
+  `generators_count`. The requirement is named, not checked.
 - **Not read** (`randomness.not_read`, `randomness.counts`): entropy at boot, VM and container
   entropy, an HSM's or PKCS#11 token's generator, a generator injected at run time, a seed from
   configuration or the environment, statistical quality. The counts are `calls_seen`,
@@ -641,8 +648,8 @@ nor the exit code.
 - **Ecosystem status**: `rng_source` is in `operation_closure` but never counts toward an ecosystem's
   status or `where_to_look`. Almost every tree calls a generator, so counting it could only raise a status
   while other operations of the same ecosystem stay open and untested.
-- **CBOM**: `qrp:randomness:calls`, `:places`, `:pqc_requirements`, `:not_read` and the counts, without
-  excerpts. A `drbg` component appears for `EVP_RAND_fetch` with a named DRBG, and for nothing else (`CTR_DRBG`,
+- **CBOM**: `qrp:randomness:calls`, `:places`, `:pqc_requirements` (with `operations`, and its meaning
+  in `:pqc_requirements_meaning`), `:not_read` and the counts, without excerpts. A `drbg` component appears for `EVP_RAND_fetch` with a named DRBG, and for nothing else (`CTR_DRBG`,
   `Hash_DRBG`, `HMAC_DRBG`). A weak generator is never a component.
 - **Not covered**: Rust's `rand` crate, Ruby, Swift, Kotlin's `kotlin.random`, Python docstrings, a
   method on a generator variable (`r.Int63()`, `rng.nextInt()`), commons-lang `RandomUtils`,

@@ -1819,11 +1819,14 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
                  for p in section.get("places") or []], ensure_ascii=False)},
             {"name": f"{NS}randomness:pqc_requirements", "value": json.dumps(
                 [{"location": q["path"], "line": q["line"], "family": q["family"],
-                  "parameter_set": q["parameter_set"], "generators": q["generators"],
+                  "parameter_set": q["parameter_set"], "operations": q.get("operations", []),
+                  "generators": q["generators"],
                   "requirements": [{k: x[k] for k in ("document", "section", "page", "applies_to",
                                                       "level", "min_strength_bits") if k in x}
                                    for x in q["requirements"]]}
                  for q in section.get("pqc_requirements") or []], ensure_ascii=False)},
+            {"name": f"{NS}randomness:pqc_requirements_meaning",
+             "value": section.get("pqc_requirements_meaning", "")},
             {"name": f"{NS}randomness:not_read",
              "value": json.dumps((section.get("not_read") or {}).get("what", []),
                                  ensure_ascii=False)},
