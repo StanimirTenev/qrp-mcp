@@ -599,3 +599,12 @@ def test_more_hostile_lines_finish(tmp_path, name, line):
     calls = scan_directory(tmp_path)["randomness"]["calls"]
     assert time.monotonic() - started < 20
     assert calls
+
+
+def test_the_meanings_state_the_limits(tmp_path):
+    (tmp_path / "a.py").write_text("import random\nx = random.random()\n")
+    section = scan_directory(tmp_path)["randomness"]
+    assert "named, not checked" in section["pqc_requirements_meaning"]
+    assert "decapsulation, verification or a parameter name" in section["pqc_requirements_meaning"]
+    assert "co-location" in section["places_meaning"] and "not a verdict" in section["places_meaning"]
+    assert "one row per generator API on a line" in section["meaning"]
