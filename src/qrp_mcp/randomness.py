@@ -691,9 +691,13 @@ def _anchor_rows(result: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 _CAP = 3
 
 
-def _nearest(items: list[tuple[int, Any]], line: int, cap: int = _CAP) -> list[tuple[int, Any]]:
-    """Up to `cap` of `items` (sorted by line) closest to `line`, nearest first."""
-    lines = [item[0] for item in items]
+def _nearest(items: list[tuple[int, Any]], line: int, cap: int = _CAP,
+             lines: list[int] | None = None) -> list[tuple[int, Any]]:
+    """Up to `cap` of `items` (sorted by line) closest to `line`, nearest first. `lines` is the
+    line of each item, built once per group by the caller: built here on every call, 20,000 calls
+    beside 20,000 anchors were quadratic (review of 19.11, finding 5)."""
+    if lines is None:
+        lines = [item[0] for item in items]
     hi = bisect.bisect_left(lines, line)
     lo = hi - 1
     out = []
@@ -740,9 +744,11 @@ def _places(calls: list[dict[str, Any]], anchors: dict[str, list[dict[str, Any]]
                     function = _function_at(functions, line, None)
                     if function is not None:
                         by_function.setdefault(function, []).append((line, anchor))
-                grouped[path] = (every, by_line, by_function)
+                keys = {id(group): [item[0] for item in group]
+                        for group in [every, *by_line.values(), *by_function.values()]}
+                grouped[path] = (every, by_line, by_function, keys)
             here = _function_at(functions, row["line"], column)
-        every, by_line, by_function = grouped.get(path, ([], {}, {}))
+        every, by_line, by_function, keys = grouped.get(path, ([], {}, {}, {}))
         same_line = by_line.get(row["line"], [])
         in_function = by_function.get(here, []) if here is not None else []
         if word or same_line:
@@ -753,7 +759,8 @@ def _places(calls: list[dict[str, Any]], anchors: dict[str, list[dict[str, Any]]
             scope = "same_file"
         else:
             continue
-        chosen = _nearest(same_line or in_function or every, row["line"])
+        near = same_line or in_function or every
+        chosen = _nearest(near, row["line"], lines=keys.get(id(near)))
         found = ([{"kind": "assigned_to_name", "line": row["line"], "word": word}] if word else [])
         found += [{"kind": "public_key_operation", "line": a["line"], "family": a["family"]}
                   for _, a in chosen]

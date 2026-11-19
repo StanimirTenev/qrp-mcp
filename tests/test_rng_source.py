@@ -753,3 +753,28 @@ def test_a_name_outside_the_standard_names_is_check(tmp_path):
     (row,) = calls
     assert (row["class"], row["algorithm"], row["why"]) == (
         "check", "not_a_standard_name", "not_a_standard_name")
+
+
+def test_dense_co_location_is_not_quadratic(tmp_path, monkeypatch):
+    # Review of 19.11, finding 5: `_nearest` rebuilt the line list of a group on every call, so
+    # 20,000 weak calls beside 20,000 key rows in one function took 155 s at 40,000 lines.
+    import time
+    from qrp_mcp import randomness
+    lines = ["import random", "import oqs", "", "def f():"]
+    for _ in range(20000):
+        lines += ["    x = random.random()", "    s = oqs.Signature(\"ML-DSA-65\")"]
+    lines.append("    s.generate_keypair()")
+    (tmp_path / "a.py").write_text("\n".join(lines) + "\n")
+    took: dict[str, float] = {}
+    section = randomness.section
+
+    def timed(result, root):
+        started = time.monotonic()
+        out = section(result, root)
+        took["section"] = time.monotonic() - started
+        return out
+
+    monkeypatch.setattr(randomness, "section", timed)
+    result = scan_directory(tmp_path)
+    assert len(result["randomness"]["places"]) == 20000
+    assert took["section"] < 6, took
