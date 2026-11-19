@@ -616,6 +616,7 @@ def _brace_functions(text: str, eco: str) -> dict[int, list[tuple[int, int | Non
         # The words since the last brace say whether a control statement opens the block:
         # `for (i = 0; i < n; i++) {` and `if err := f(); err != nil {` are not functions.
         separator = block = -1
+        first = len(code) - len(code.lstrip())
         for column, char in enumerate(code):
             if char not in "{};":
                 continue
@@ -625,7 +626,9 @@ def _brace_functions(text: str, eco: str) -> dict[int, list[tuple[int, int | Non
             if char == "{":
                 statement = code[separator + 1:column].strip()
                 opened = code[block + 1:column].strip()
-                if not code[:column].strip():
+                # The brace opens the line (Allman style): the header is the line before. Asked by
+                # position, not by slicing the line before every brace (1 MB of `{` was quadratic).
+                if column == first:
                     statement = opened = previous[max(previous.rfind(c) for c in ";{}") + 1:].strip()
                 last = max(statement.rfind("("), statement.rfind(")"))
                 function = ((statement.endswith("=>") or last >= 0 and statement[last] == ")")

@@ -608,3 +608,12 @@ def test_the_meanings_state_the_limits(tmp_path):
     assert "decapsulation, verification or a parameter name" in section["pqc_requirements_meaning"]
     assert "co-location" in section["places_meaning"] and "not a verdict" in section["places_meaning"]
     assert "one row per generator API on a line" in section["meaning"]
+
+
+def test_a_line_of_open_braces_finishes(tmp_path):
+    import time
+    (tmp_path / "d.go").write_text('package d\nimport "math/rand"\nimport "crypto/ecdsa"\n' + "{" * 1000000
+                                   + "\nfunc F() { _ = rand.Intn(2); ecdsa.GenerateKey(nil, nil) }\n")
+    started = time.monotonic()
+    places = scan_directory(tmp_path)["randomness"]["places"]
+    assert time.monotonic() - started < 20 and places
