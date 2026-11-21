@@ -4,6 +4,36 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.52.1 (2026-11-21)
+
+Security fix. A scanned repository could run its own code in the processes that read it.
+Reported privately on 20.11 by the GitLab Threat Research Group against 0.52.0, reproduced
+here before the fix.
+
+- **What was wrong.** From 0.37.0, a tree of 200 files or more is read by a pool of processes.
+  Where the pool starts them with `spawn` (macOS, Windows, and Linux whenever the process runs
+  more than one thread, which the MCP server always does), each reader starts as `python -c ...`,
+  and Python puts the working directory first on `sys.path`. When the server's working directory
+  was the scanned repository, a committed `multiprocessing/__init__.py`, or any module of the
+  same name as one the reader imports, was imported in its place and ran with the user's rights.
+  `scan_repo` is marked read-only, so a host asked for no approval. The scan still returned its
+  normal result.
+- **The fix.** Readers are started with `PYTHONSAFEPATH=1`, so the working directory is not on
+  their `sys.path` (Python 3.11 and later). Python 3.10 has no such switch: there, a tree that
+  would need spawned readers is read in one pass. `fork` readers import nothing and are
+  unchanged. The variable is set only while the pool starts and is put back afterwards.
+- **How it is pinned.** `tests/test_pool_import_path.py` starts the server over stdio the way a
+  host does, with a tree of 260 files and a planted `multiprocessing/` as its working directory,
+  calls `scan_repo(path=".")`, and fails if the planted code ran. It also fails if no reader
+  process started, so it cannot pass by the pool being skipped. It fails on 0.52.0 and passes on
+  0.52.1.
+- **What is not claimed.** Reproduced on Linux with Python 3.12; macOS and Windows were not
+  tested here. The findings do not change: certbot (1,251 files) and OpenSSH (874) read by spawned
+  readers give the same result as one pass. Running the server as `python -m qrp_mcp` from inside
+  an untrusted tree still puts that tree on the server's own path; start it from its console
+  script (`uvx qrp-mcp`, as the plugin does) or from a neutral directory.
+- **Affected:** 0.37.0 to 0.52.0. A security policy is now in `SECURITY.md`.
+
 ## 0.52.0 (2026-11-19)
 
 Random number generators, asked for on 19.11 ("give the random number generator more attention")

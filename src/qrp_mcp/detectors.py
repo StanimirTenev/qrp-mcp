@@ -6931,14 +6931,31 @@ def _read_files(r: dict[str, Any], paths: list[Path], repo_path: Path,
         # where it is safe to.
         method = ("fork" if sys.platform == "linux" and threading.active_count() == 1
                   else "spawn")
-        try:
-            with ProcessPoolExecutor(jobs, mp_context=multiprocessing.get_context(method)) as pool:
-                started = {i: pool.submit(_read_batch, batches[i], repo_path, resolved_exclude,
-                                          config_excludes, core)
-                           for i in sorted(range(len(batches)), key=lambda i: -weights[i])}
-                parts = [started[i].result() for i in range(len(batches))]
-        except (OSError, BrokenProcessPool):
-            parts = None
+        # A spawned reader starts as `python -c ...`, which puts the working directory
+        # first on sys.path: when that is the scanned tree, its own `multiprocessing/`
+        # (or any module) is imported in the reader and runs. PYTHONSAFEPATH keeps the
+        # working directory off sys.path; Python 3.10 has no such switch, so there a
+        # tree that would need spawned readers is read in one pass instead.
+        safe = method == "fork" or sys.version_info >= (3, 11)
+        before = os.environ.get("PYTHONSAFEPATH")
+        parts = None
+        if safe:
+            try:
+                if method == "spawn":
+                    os.environ["PYTHONSAFEPATH"] = "1"
+                with ProcessPoolExecutor(jobs, mp_context=multiprocessing.get_context(method)) as pool:
+                    started = {i: pool.submit(_read_batch, batches[i], repo_path, resolved_exclude,
+                                              config_excludes, core)
+                               for i in sorted(range(len(batches)), key=lambda i: -weights[i])}
+                    parts = [started[i].result() for i in range(len(batches))]
+            except (OSError, BrokenProcessPool):
+                parts = None
+            finally:
+                if method == "spawn":
+                    if before is None:
+                        os.environ.pop("PYTHONSAFEPATH", None)
+                    else:
+                        os.environ["PYTHONSAFEPATH"] = before
         if parts is not None:
             for part in parts:
                 _join_reading(r, part)

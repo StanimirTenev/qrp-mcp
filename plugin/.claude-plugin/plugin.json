@@ -2,7 +2,7 @@
   "name": "qrp",
   "description": "Offline post-quantum scanner for code: CycloneDX CBOM, RNG calls next to keys, what it did not read",
   "icon": "./icon.png",
-  "version": "0.52.0",
+  "version": "0.52.1",
   "author": {
     "name": "Stanimir Tenev",
     "url": "https://quantumreadiness.eu"

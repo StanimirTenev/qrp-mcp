@@ -436,6 +436,8 @@ ECIES and AES key wrap under a DH-derived key are not read.
 - [How it is measured](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/measurement.md) — the measurements, the corpora, what an outside
   review found, what is still missing
 - [CHANGELOG](https://github.com/StanimirTenev/qrp-mcp/blob/main/CHANGELOG.md) — what changed in each version, newest first
+- [Security policy](https://github.com/StanimirTenev/qrp-mcp/blob/main/SECURITY.md) — how to report a vulnerability privately.
+  0.52.1 fixes a scanned tree running its own code in the readers (0.37.0 to 0.52.0); update to it
 
 ## What it is not
 
