@@ -4,6 +4,26 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.52.2 (2026-11-23)
+
+Findability only. No detection, coverage or output change.
+
+- **What was wrong.** Agents and directories that search for "find quantum-vulnerable
+  cryptography" did not reach qrp-mcp: the server set no `instructions`, so a model had no
+  sentence saying when to use its tools; the PyPI summary and the registry description did not
+  contain the words people search with; the plugin's `homepage` pointed at the site root, a page
+  about the Q-Day forecast, not the scanner. Found by blind probes of AI search on 19–20.11, in
+  which an agent with no knowledge of the project searched 24 such queries.
+- **The fix.** The server now sends `instructions` in its initialize result. The PyPI summary and
+  `server.json` description now lead with "Find quantum-vulnerable cryptography (RSA, ECDSA, DH) in
+  code" (100 characters, the registry schema's limit). Keywords `dora` and
+  `cryptographic-inventory` were added. The plugin and marketplace `homepage` point to
+  https://quantumreadiness.eu/qrp-mcp/.
+- **How it is pinned.** `tests/test_server_instructions.py` runs a real initialize handshake and
+  checks the instructions; it fails on 0.52.1.
+- **What is not claimed.** That this makes any agent recommend the tool. Whether it does is
+  measured by the next blind probe, not by this release.
+
 ## 0.52.1 (2026-11-21)
 
 Security fix. A scanned repository could run its own code in the processes that read it.

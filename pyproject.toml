@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "qrp-mcp"
-version = "0.52.1"
+version = "0.52.2"
 description = "Find quantum-vulnerable cryptography (RSA, ECDSA, DH) in code: offline cryptographic inventory, CBOM"
 readme = "README.md"
 requires-python = ">=3.10"
