@@ -25,6 +25,15 @@ def Field(*args: Any, **kwargs: Any) -> Any:  # noqa: N802 -- stands in for pyda
     return field(*args, **kwargs)
 
 
+# Sent in the initialize result (ZA-OPRAVYANE row 543): the words people ask with.
+_INSTRUCTIONS = (
+    "Use these tools to find quantum-vulnerable cryptography (RSA, ECDSA, DH and other "
+    "classical public-key algorithms) in a local codebase, to build a cryptographic "
+    "inventory, or to export it as a CycloneDX CBOM. Offline and read-only: nothing is "
+    "sent anywhere and no file is changed."
+)
+
+
 class _Server:
     """The MCP server, built the first time something asks it for anything.
 
@@ -47,7 +56,7 @@ class _Server:
         if self._real is None:
             from mcp.server.mcpserver import MCPServer
             from mcp.types import ToolAnnotations
-            real = MCPServer("qrp-mcp", version=__version__)
+            real = MCPServer("qrp-mcp", version=__version__, instructions=_INSTRUCTIONS)
             for fn, annotations in self._tools:
                 real.tool(annotations=ToolAnnotations(**annotations))(fn)
             self._real = real

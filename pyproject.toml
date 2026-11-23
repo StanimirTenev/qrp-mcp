@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "qrp-mcp"
 version = "0.52.1"
-description = "Offline post-quantum scanner for code: CycloneDX CBOM, RNG calls next to keys, what it did not read"
+description = "Find quantum-vulnerable cryptography (RSA, ECDSA, DH) in code: offline cryptographic inventory, CBOM"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -14,7 +14,7 @@ authors = [{ name = "Stanimir Tenev" }]
 keywords = [
     "mcp", "post-quantum", "pqc", "cryptography", "security", "crypto-inventory", "cbom",
     "cyclonedx", "quantum-safe", "scanner", "quantum", "ethereum", "bitcoin", "secp256k1", "rng",
-    "randomness", "csprng",
+    "randomness", "csprng", "dora", "cryptographic-inventory",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
