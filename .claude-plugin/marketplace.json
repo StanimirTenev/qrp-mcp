@@ -12,7 +12,7 @@
       "displayName": "qrp-mcp post-quantum readiness scanner",
       "source": "./plugin",
       "description": "Offline post-quantum scanner for code: CycloneDX CBOM, RNG calls next to keys, what it did not read",
-      "version": "0.52.1",
+      "version": "0.52.2",
       "author": {
         "name": "Stanimir Tenev",
         "url": "https://quantumreadiness.eu"
