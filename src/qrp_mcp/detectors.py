@@ -4824,6 +4824,11 @@ def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> 
             continue
         if uses and "key_use_in_block" not in f:
             f["key_use_in_block"] = " ".join(sorted(uses))
+        # keysize/Java closure (zatv-a): an RSA key's modulus, "for RSA keys this sets the
+        # modulus size" (KeyGenParameterSpec.Builder.setKeySize).
+        if (f["algorithm"] == "RSA" and len(sizes) == 1 and f.get("key_size") in (None, "undetermined")
+                and next(iter(sizes)) in registry._SIZES):
+            f["key_size"] = next(iter(sizes))
         if f["algorithm"] != "EC" or f.get("curve"):
             continue
         if len(curves) == 1:
