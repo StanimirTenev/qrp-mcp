@@ -4577,6 +4577,7 @@ def scan_source_file(path: Path, rel_path: str,
     _size_through_a_name(findings, lines)
     _jca_initialised_later(findings, lines)
     findings = _psa_key_bits(findings, lines, rel_path)
+    findings = _ossl_param_size(findings, lines, rel_path)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5086,6 +5087,48 @@ def _psa_key_bits(findings: list[dict[str, Any]], lines: list[str], rel_path: st
         if family == "EC" and ecc_family == "PSA_ECC_FAMILY_SECP_R1" and size in (256, 384, 521):
             item["curve"] = f"P-{size}"
         added.append(item)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# keysize/C (closure zatv-a, row 394): OpenSSL 3's key generation parameters, as the man7 pages'
+# examples write them -- `OSSL_PARAM_construct_uint("bits", &bits)` (EVP_PKEY-RSA(7), "bits"
+# (OSSL_PKEY_PARAM_RSA_BITS)) and `("pbits", &pbits)` (EVP_PKEY-DSA(7), EVP_PKEY-DH(7),
+# OSSL_PKEY_PARAM_FFC_PBITS), the number in a local the file assigns once. The family is the
+# macro's, or for the strings the one family the file's EVP_PKEY_CTX_new_from_name names.
+_OSSL_SIZE_PARAM = re.compile(
+    r"\bOSSL_PARAM_construct_u?int(?:32|64)?\s*\(\s*(\"bits\"|OSSL_PKEY_PARAM_RSA_BITS|\"pbits\"|"
+    r"OSSL_PKEY_PARAM_FFC_PBITS)\s*,\s*&\s*([A-Za-z_]\w*)\s*\)")
+_EVP_CTX_FAMILY = re.compile(r"\bEVP_PKEY_CTX_new_from_name\s*\([^,]*,\s*\"(RSA|RSA-PSS|DSA|DH|DHX|EC)\"")
+
+
+def _ossl_param_size(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not any("OSSL_PARAM_construct_u" in line for line in lines):
+        return findings
+    named = {{"RSA-PSS": "RSA", "DHX": "DH"}.get(m.group(1), m.group(1))
+             for line in lines for m in _EVP_CTX_FAMILY.finditer(line)}
+    constants = size_constants(lines)
+    added = []
+    for n, line in enumerate(lines, 1):
+        for m in _OSSL_SIZE_PARAM.finditer(line):
+            key, size = m.group(1), constants.get(m.group(2))
+            if key == "OSSL_PKEY_PARAM_RSA_BITS":
+                family = "RSA"
+            elif key == '"bits"':
+                family = "RSA" if named == {"RSA"} else None
+            else:
+                ffc = named & {"DSA", "DH"}
+                family = ffc.pop() if len(ffc) == 1 and len(named) == 1 else None
+            if family is None or size not in registry._SIZES:
+                continue
+            row = next((f for f in findings if f["line"] == n and f.get("algorithm") == family), None)
+            if row is not None:
+                if row.get("key_size") in (None, "undetermined"):
+                    row["key_size"] = size
+                continue
+            added.append({"path": rel_path, "line": n, "algorithm": family,
+                          "description": f"{family} key size given as the OpenSSL key generation parameter {key}",
+                          "excerpt": line.strip()[:200], "evidence_kind": "call", "key_size": size,
+                          "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
