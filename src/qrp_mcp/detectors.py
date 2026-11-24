@@ -4638,6 +4638,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _ossl_param_size(findings, lines, rel_path)
     _wolfcrypt_ecc_bytes(findings, lines)
     findings = _dotnet_signing_receivers(findings, lines, rel_path)
+    findings = _dotnet_aes_ecb(findings, lines, rel_path)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5223,6 +5224,34 @@ def _dotnet_signing_receivers(findings: list[dict[str, Any]], lines: list[str], 
             if family == "RSA":
                 item["role"] = "signature"
             added.append(item)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 381 (symhash/NET closure, zatv-a): ECB mode on an AES object whatever its name -- the rule
+# above reads only a receiver with "aes" in it. A name whose type is written where it is made
+# (`Aes cipher`, `var alg = new AesManaged()`, `Aes.Create()`) and then `.Mode =
+# [System.Security.Cryptography.]CipherMode.ECB` or `.EncryptEcb(` / `.DecryptEcb(` (Learn,
+# CipherMode.ECB, SymmetricAlgorithm.EncryptEcb).
+_DOTNET_AES_TYPES = r"Aes|AesManaged|AesCng|AesCryptoServiceProvider|Rijndael|RijndaelManaged"
+_DOTNET_AES_NAMED = re.compile(
+    rf"\b(?:{_DOTNET_AES_TYPES})\??\s+([A-Za-z_]\w*)\s*(?=[,)=;]|$)|"
+    rf"\b(?:var|Dim)\s+([A-Za-z_]\w*)\s*(?:As\s+New\s+|=\s*(?:new\s+)?)(?:System\.Security\.Cryptography\.)?"
+    rf"(?:{_DOTNET_AES_TYPES})\s*(?:\.Create\s*)?\(")
+_DOTNET_ECB_USE = re.compile(
+    r"\b([A-Za-z_]\w*)\.(?:Mode\s*=\s*(?:System\.Security\.Cryptography\.)?CipherMode\.ECB\b|(?:En|De)cryptEcb\s*\()")
+
+
+def _dotnet_aes_ecb(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith((".cs", ".vb")) or not any("Ecb" in l or "ECB" in l for l in lines):
+        return findings
+    names = {m.group(1) or m.group(2) for line in lines for m in _DOTNET_AES_NAMED.finditer(line)}
+    added = []
+    for n, line in enumerate(lines, 1):
+        if any(m.group(1) in names for m in _DOTNET_ECB_USE.finditer(line)) and not any(
+                f["line"] == n and f.get("algorithm") == "AES-ECB" for f in findings):
+            added.append({"path": rel_path, "line": n, "algorithm": "AES-ECB",
+                          "description": "AES in ECB mode (.NET CipherMode.ECB or EncryptEcb) on an AES object",
+                          "excerpt": line.strip()[:200], "evidence_kind": "call", "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
