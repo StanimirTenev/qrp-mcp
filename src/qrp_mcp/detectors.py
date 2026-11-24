@@ -4550,6 +4550,7 @@ def scan_source_file(path: Path, rel_path: str,
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
     _powershell_statement_size(findings, lines, rel_path)
+    findings = _python_key_generation(findings, lines, rel_path)  # keysize/Py
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -4910,6 +4911,182 @@ def _dotnet_key_size_property(findings: list[dict[str, Any]], lines: list[str]) 
                     and f.get("evidence_kind") not in ("comment", "ban")
                     and assigned.search(lines[f["line"] - 1])):
                 f["key_size"] = int(m.group(2))
+
+
+# keysize/Py (24.11.2026): the size or curve a Python library is asked for when it makes a key, read
+# from the call's own arguments -- keyword or positional, the call over several lines, the value a
+# literal or a name the file assigns one literal (every assignment of it the same). A name the file
+# does not fix (a parameter) leaves the size undetermined. The pages read: cryptography.io (rsa
+# generate_private_key(public_exponent, key_size), dsa generate_private_key(key_size) and
+# generate_parameters(key_size), dh generate_parameters(generator, key_size), ec
+# generate_private_key(curve) and derive_private_key(private_value, curve)); PyCryptodome
+# RSA.generate(bits), DSA.generate(bits), ECC.generate(curve=); paramiko RSAKey.generate(bits),
+# ECDSAKey.generate(curve=, bits=); pyOpenSSL PKey.generate_key(type, bits); M2Crypto
+# RSA.gen_key(bits, e), DSA.gen_params(bits), DH.gen_params(plen, g), EC.gen_params(curve nid).
+# A line with no row of the family gets one (`dsa.generate_parameters`, a bare imported
+# generate_private_key, M2Crypto's calls were silent).
+_PY_KEYGEN_CALLS = (
+    # (call, family, size keyword, size position, curve keyword, curve position, what, needs)
+    (r"\brsa\.generate_private_key", "RSA", "key_size", 1, None, None, "pyca rsa.generate_private_key", None),
+    (r"\bdsa\.generate_(?:private_key|parameters)", "DSA", "key_size", 0, None, None,
+     "pyca dsa.generate_private_key/generate_parameters", None),
+    (r"\bdh\.generate_parameters", "DH", "key_size", 1, None, None, "pyca dh.generate_parameters", None),
+    (r"\bec\.generate_private_key", "EC", None, None, "curve", 0, "pyca ec.generate_private_key", None),
+    (r"\bec\.derive_private_key", "EC", None, None, "curve", 1, "pyca ec.derive_private_key", None),
+    (r"(?<![\w.])RSA\.generate", "RSA", "bits", 0, None, None, "PyCryptodome RSA.generate",
+     r"(?:Crypto|Cryptodome)\.PublicKey\s+import\b[^\n]*\bRSA\b"),
+    (r"(?<![\w.])DSA\.generate", "DSA", "bits", 0, None, None, "PyCryptodome DSA.generate",
+     r"(?:Crypto|Cryptodome)\.PublicKey\s+import\b[^\n]*\bDSA\b"),
+    (r"(?<![\w.])ECC\.generate", "EC", None, None, "curve", None, "PyCryptodome ECC.generate",
+     r"(?:Crypto|Cryptodome)\.PublicKey\s+import\b[^\n]*\bECC\b"),
+    (r"\bRSAKey\.generate", "RSA", "bits", 0, None, None, "paramiko RSAKey.generate", r"\bparamiko\b"),
+    (r"\bECDSAKey\.generate", "ECDSA", "bits", None, "curve", None, "paramiko ECDSAKey.generate",
+     r"\bparamiko\b"),
+    (r"\.generate_key(?=\s*\((?:[^)]*?)\bTYPE_RSA\b)", "RSA", "bits", 1, None, None,
+     "pyOpenSSL PKey.generate_key", r"\bOpenSSL\b"),
+    (r"\.generate_key(?=\s*\((?:[^)]*?)\bTYPE_DSA\b)", "DSA", "bits", 1, None, None,
+     "pyOpenSSL PKey.generate_key", r"\bOpenSSL\b"),
+    (r"\bRSA\.gen_key", "RSA", "bits", 0, None, None, "M2Crypto RSA.gen_key", r"\bM2Crypto\b"),
+    (r"\bDSA\.gen_params", "DSA", "bits", 0, None, None, "M2Crypto DSA.gen_params", r"\bM2Crypto\b"),
+    (r"\bDH\.gen_params", "DH", "plen", 0, None, None, "M2Crypto DH.gen_params", r"\bM2Crypto\b"),
+    (r"\bEC\.gen_params", "EC", None, None, "curve", 0, "M2Crypto EC.gen_params", r"\bM2Crypto\b"),
+)
+# pyca's curve classes (cryptography.io, Elliptic Curves), PyCryptodome's ECC table names of the
+# NIST curves, OpenSSL's NIDs as M2Crypto names them: (curve, size).
+_PY_CURVES = {
+    "SECP192R1": ("P-192", 192), "SECP224R1": ("P-224", 224), "SECP256R1": ("P-256", 256),
+    "SECP384R1": ("P-384", 384), "SECP521R1": ("P-521", 521), "SECP256K1": ("secp256k1", 256),
+    "BrainpoolP256R1": ("brainpoolP256r1", 256), "BrainpoolP320R1": ("brainpoolP320r1", 320),
+    "BrainpoolP384R1": ("brainpoolP384r1", 384), "BrainpoolP512R1": ("brainpoolP512r1", 512),
+    "NID_X9_62_prime192v1": ("P-192", 192), "NID_secp224r1": ("P-224", 224),
+    "NID_X9_62_prime256v1": ("P-256", 256), "NID_secp384r1": ("P-384", 384),
+    "NID_secp521r1": ("P-521", 521), "NID_secp256k1": ("secp256k1", 256),
+}
+_PYCRYPTODOME_CURVES = {name.lower(): curve for curve, names in (
+    (("P-192", 192), ("NIST P-192", "p192", "P-192", "prime192v1", "secp192r1")),
+    (("P-224", 224), ("NIST P-224", "p224", "P-224", "prime224v1", "secp224r1")),
+    (("P-256", 256), ("NIST P-256", "p256", "P-256", "prime256v1", "secp256r1")),
+    (("P-384", 384), ("NIST P-384", "p384", "P-384", "prime384v1", "secp384r1")),
+    (("P-521", 521), ("NIST P-521", "p521", "P-521", "prime521v1", "secp521r1")),
+) for name in names}
+_PY_PYCA_BARE = re.compile(
+    r"^\s*from\s+cryptography\.hazmat\.primitives\.asymmetric\.(rsa|dsa|dh|ec)\s+import\s+([^#\n]+)")
+_PY_LITERAL_ASSIGN = re.compile(r"^\s*([A-Za-z_]\w*)\s*(?::\s*\w+\s*)?=\s*(.+?)\s*(?:#.*)?$")
+
+
+def _py_call_arguments(lines: list[str], index: int, start: int) -> list[str] | None:
+    """The top-level arguments of the call whose `(` is at or after `start` on lines[index],
+    read over up to six lines; None when it does not close."""
+    text = lines[index][start:]
+    for extra in lines[index + 1:index + 7]:
+        if text.count("(") <= text.count(")") and "(" in text:
+            break
+        text += " " + extra.strip()
+    open_at = text.find("(")
+    if open_at < 0:
+        return None
+    depth, args, current = 0, [], ""
+    for ch in text[open_at + 1:]:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            if depth == 0:
+                args.append(current.strip())
+                return [a for a in args if a]
+            depth -= 1
+        if ch == "," and depth == 0:
+            args.append(current.strip())
+            current = ""
+            continue
+        current += ch
+    return None
+
+
+def _py_argument(args: list[str], keyword: str | None, position: int | None) -> str | None:
+    if keyword:
+        for a in args:
+            m = re.match(rf"{keyword}\s*=(?!=)\s*(.+)$", a)
+            if m:
+                return m.group(1).strip()
+    positional = [a for a in args if not re.match(r"[A-Za-z_]\w*\s*=(?!=)", a)]
+    if position is not None and position < len(positional):
+        return positional[position]
+    return None
+
+
+def _python_key_generation(findings: list[dict[str, Any]], lines: list[str],
+                           rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.endswith(".py"):
+        return findings
+    text = "\n".join(lines)
+    if not re.search(r"generate|gen_key|gen_params|derive_private_key", text):
+        return findings
+    # Names the file assigns, each with the one value every assignment gives it.
+    assigned: dict[str, str | None] = {}
+    for line in lines:
+        m = _PY_LITERAL_ASSIGN.match(line)
+        if m:
+            value = m.group(2)
+            assigned[m.group(1)] = value if assigned.get(m.group(1), value) == value else None
+
+    def resolve(value: str | None) -> str | None:
+        if value and re.fullmatch(r"[A-Za-z_]\w*", value) and value in assigned:
+            return assigned[value]
+        return value
+
+    calls = [(re.compile(c), *rest) for c, *rest in _PY_KEYGEN_CALLS
+             if rest[-1] is None or re.search(rest[-1], text)]
+    # `from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key`: the bare
+    # name is that module's.
+    for line in lines:
+        m = _PY_PYCA_BARE.match(line)
+        if m:
+            names = {n.strip().split(" as ")[-1].strip("() ") for n in m.group(2).split(",")}
+            for c, family, *rest in [x for x in _PY_KEYGEN_CALLS if x[0].startswith(rf"\b{m.group(1)}\.")]:
+                bare = c.split(".", 1)[1]
+                if any(re.fullmatch(bare, n) for n in names):
+                    calls.append((re.compile(r"(?<![\w.])" + bare), family, *rest))
+    added: list[dict[str, Any]] = []
+    for index, line in enumerate(lines):
+        code = line.split("#", 1)[0]
+        for call, family, size_kw, size_pos, curve_kw, curve_pos, what, _ in calls:
+            m = call.search(code)
+            if not m:
+                continue
+            args = _py_call_arguments(lines, index, m.end())
+            if args is None:
+                continue
+            size = curve = None
+            if size_kw:
+                value = resolve(_py_argument(args, size_kw, size_pos))
+                if value and value.isdigit() and (int(value) in registry._SIZES
+                                                  or family in ("EC", "ECDSA")):
+                    size = int(value)
+            if curve_kw:
+                value = resolve(_py_argument(args, curve_kw, curve_pos))
+                if value:
+                    named = re.search(r"\b(SECP\d+[RK]1|BrainpoolP\d+R1|NID_\w+)\b", value)
+                    curve = (_PY_CURVES.get(named.group(1)) if named else
+                             _PYCRYPTODOME_CURVES.get(value.strip("\"'").lower()))
+            if size is None and curve is None and any(
+                    f["line"] == index + 1 and f["algorithm"] == family for f in findings):
+                break
+            row = next((f for f in findings if f["line"] == index + 1
+                        and f.get("evidence_kind") not in ("comment", "ban")
+                        and (f["algorithm"] == family or (family in ("EC", "ECDSA")
+                                                          and f["algorithm"] in ("EC", "ECDSA")))),
+                       None)
+            if row is None:
+                row = {"path": rel_path, "line": index + 1, "algorithm": family,
+                       "description": f"{family} key made by {what}", "excerpt": line.strip()[:200],
+                       "evidence_kind": "call", "in_test_code": in_test_code(rel_path)}
+                added.append(row)
+            if curve and not row.get("curve"):
+                row["curve"], row["key_size"] = curve
+            elif size and row.get("key_size") in (None, "undetermined"):
+                row["key_size"] = size
+            break
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 # Row 495: an RSA key that wraps a symmetric key -- `pub.encrypt(archive_key, padding.OAEP(...))`
