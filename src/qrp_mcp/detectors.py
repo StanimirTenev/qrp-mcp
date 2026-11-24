@@ -1304,6 +1304,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
            r"\bNew-SelfSignedCertificate\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
            r"\bsigntool(?:\.exe)?\"?\s+sign\b[^\n]*\s/[ft]d\s+\"?" + name + r"\b|"
            r"\bSet-AuthenticodeSignature\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
+           r"\bmage(?:\.exe)?\b[^\n]*\s-(?:a|Algorithm)\s+" + name + r"RSA\b|"
            r"\bcertutil(?:\.exe)?\s+-hashfile\s+\S+\s+" + name + r"\b|"
            r"\bmakecert(?:\.exe)?\b[^\n]*\s-a\s+" + name + r"\b", re.IGNORECASE))
       for family, name in (("SHA1", "sha-?1"), ("MD5", "md5"))],
@@ -1983,6 +1984,9 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     # sign/NET closure (zatv-a): PowerShell's Set-AuthenticodeSignature, "-HashAlgorithm ...
     # For earlier versions, the default is SHA1" (Learn).
     ("set_authenticodesignature", re.compile(r"\bSet-AuthenticodeSignature\b", re.IGNORECASE)),
+    # sign/NET closure (zatv-a): mage(1)'s -Sign of a ClickOnce manifest ("-a, -Algorithm sha1RSA ...
+    # Value must be "sha256RSA" or "sha1RSA"", Learn, Mage.exe).
+    ("mage_sign", re.compile(r"\bmage(?:\.exe)?\"?\s+(?:[^|;&\n]*\s)?-Sign\b", re.IGNORECASE)),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
@@ -5528,6 +5532,7 @@ _SIGNTOOL_DIGEST = re.compile(r"\s/fd\s+\"?([A-Za-z0-9-]+)")
 _SIGNING_DIGEST = {
     "signtool_sign": _SIGNTOOL_DIGEST,
     "set_authenticodesignature": re.compile(r"\s-HashAlgorithm\s+[\"']?([A-Za-z0-9-]+)", re.IGNORECASE),
+    "mage_sign": re.compile(r"\s-(?:a|Algorithm)\s+(sha1|sha256)RSA\b", re.IGNORECASE),
 }
 
 
