@@ -2008,8 +2008,10 @@ def _recipient_file(command_type: str, segment: str) -> str | None:
 # `-k KEY`.
 _SIGNING_KEY_ARG = re.compile(
     # Row 482: a quoted value whole, so a `pkcs11:` URI is not cut at its `;`.
+    # Row 510: a value never starts with `-`; `-sign -inkey KEY` took `-inkey` as -sign's value
+    # and the match swallowed the -inkey that names the key.
     r"(?:\s-sign|\s-inkey|\s--key(?:-dir|-file)?|\s/f|\s-k|\s-G)(?:\s+|=)"
-    r"(\"[^\"\n]*\"|'[^'\n]*'|[^\s;|&)]+)|"
+    r"(\"[^\"\n]*\"|'[^'\n]*'|(?!-)[^\s;|&)]+)|"
     r"(?:\bkmodsign|(?:^|[\s/])sign-file)\s+(?:-\w+\s+)*\w+\s+([^\s;|&)]+)")
 # Row 500: the FIT algorithm a firmware signer is given on its line, `binman sign -a
 # sha256,rsa4096`, `mkimage -o sha256,rsa2048`.
