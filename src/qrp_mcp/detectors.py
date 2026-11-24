@@ -486,7 +486,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
         r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']dh[\"']|"      # Node, row 69
         # include/openssl/dh.h and the RFC 7919 group NIDs (crypto/objects/objects.txt).
-        r"\bDH_compute_key(?:_padded)?\b|\bNID_ffdhe\d+\b|[<\"]openssl/dh\.h[>\"]|"
+        # And the RFC 3526 ones DH_new_by_nid(3) lists, NID_modp_1536 ... NID_modp_8192
+        # (keysize/C closure, zatv-a).
+        r"\bDH_compute_key(?:_padded)?\b|\bNID_ffdhe\d+\b|\bNID_modp_\d{4}\b|[<\"]openssl/dh\.h[>\"]|"
         # Ruby, the Rust openssl crate, and BouncyCastle -- the vocabulary a rival
         # reads and this scanner did not. Fix #9 of the September comparison.
         r"\bdh\.compute_key\b|\bDh::generate_params\b|\bDh::from_params\b|"
@@ -2446,6 +2448,14 @@ _KEY_SIZE_GENERIC = re.compile(
 
 
 _MODP_GROUP = re.compile(r"(?<![A-Za-z])modp(\d{3,5})(?![0-9])", re.IGNORECASE)
+# keysize/C closure (zatv-a): a named Diffie-Hellman group is its prime's size -- OpenSSL's
+# DH_get_1024_160/2048_224/2048_256 (RFC 5114), NID_ffdhe2048 and the "ffdheNNNN" group names
+# (RFC 7919), NID_modp_1536 (RFC 3526), Mbed TLS MBEDTLS_DHM_RFC3526_MODP_2048_P_BIN and
+# MBEDTLS_DHM_RFC7919_FFDHE2048_P_BIN. Several on one line: the smallest, as for modp above.
+_DH_NAMED_GROUP = re.compile(
+    r"\bDH_get_(1024|2048)_(?:160|224|256)\b|(?<![A-Za-z0-9])ffdhe(2048|3072|4096|6144|8192)(?![0-9])|"
+    r"(?<![A-Za-z0-9])modp_(1536|2048|3072|4096|6144|8192)\b|_MODP_(1536|2048|3072|4096|6144|8192)_",
+    re.IGNORECASE)
 
 
 def key_size_on_line(line: str, family: str = "RSA") -> int | None:
@@ -2459,6 +2469,10 @@ def key_size_on_line(line: str, family: str = "RSA") -> int | None:
         offered = [int(n) for n in _MODP_GROUP.findall(line) if int(n) in registry._SIZES]
         if offered:
             return min(offered)
+    if family == "DH":
+        named = [int(next(g for g in m.groups() if g)) for m in _DH_NAMED_GROUP.finditer(line)]
+        if named:
+            return min(named)
     if family == "RSA" and "CryptGenKey" in line:
         hexed = _CRYPTGENKEY_HEX.search(line)
         if hexed and int(hexed.group(1), 16) in registry._SIZES:
