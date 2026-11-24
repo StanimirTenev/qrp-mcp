@@ -27,7 +27,8 @@ closed, two closed pairs now vary their free parts, and a file read in no ecosys
 - **Ten pairs closed, chosen before the work** (ZATVARYANE.md, stage 4): keysize in Java, C and
   Python; apiname in Java and .NET; sign in .NET and CI; symhash in .NET; pqc in PKI; external in
   Go. All ten closed; none had to ship open. The catalogue now holds 29 pairs and 1,848 sourced
-  spellings, each with its quotation checked against a saved copy of its page. Under the strict
+  spellings; the quotations of the spellings added for these ten were checked against saved
+  copies of their pages. Under the strict
   rule two ecosystems are now `closed`: PKI and Go.
 - **Also fixed:** row 548, hybrid KEM names from a Go registry string (`mlkem768-x25519`) now give
   both halves, and the CBOM shows the hybrid depending on each.
@@ -36,8 +37,8 @@ closed, two closed pairs now vary their free parts, and a file read in no ecosys
   `minisign_sign`, `ssh_keygen_sign`, `sigstore_action`; signing steps `set_authenticodesignature`,
   `mage_sign`, `nuget_sign`, `sn_sign`, `strong_name_sign` with `strong_name_mode`; `.vbproj` read
   for signing steps.
-- **How it is pinned.** Every new spelling and variant fails on 0.52.2 and passes here; each fix
-  was reverted alone and its cases turned red. Positive control on pinned public repositories
+- **How it is pinned.** Not every new case was a gap: many already passed on 0.52.2. Those that
+  failed before the fixes pass here, and each fix was reverted alone and its cases turned red. Positive control on pinned public repositories
   (santuario, jjwt, wolfssl-examples, Mbed TLS, OpenSSL demos, hpqc, smallstep, paramiko, cosign,
   certbot, cfssl, nuclei, sigstore-python, Vault and others): every new or changed row was read
   against its source line. On the 185-repository corpus, as disagreement with a model and not
