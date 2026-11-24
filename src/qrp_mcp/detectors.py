@@ -1924,9 +1924,13 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(
         r"\bgpg2?\b[^|;&\n]*?\s(?:--detach-sign|--sign|--clear-?sign|-[aequvz]*[sb][aequvzsb]*)"
         r"(?=\s|$)")),
-    ("openssl_sign", re.compile(r"\bopenssl\s+(dgst|smime|cms)\b.*-sign\b")),
+    # sign/CI (24.11.2026): and a digest command, openssl-dgst(1) "openssl sha256 -sign
+    # privatekey.pem -out signature.sign file.txt".
+    ("openssl_sign", re.compile(r"\bopenssl\s+(dgst|smime|cms|sha(?:1|224|256|384|512)|sha3-\d{3}|"
+                                r"sha512-2(?:24|56)|md5|sm3|ripemd160|blake2[bs]\d+)\b.*-sign\b")),
     ("cosign_sign", re.compile(r"\bcosign\s+sign\b")),
-    ("signtool_sign", re.compile(r"\bsigntool\s+sign\b", re.IGNORECASE)),
+    # sign/CI: `signtool.exe sign` as Windows runners call it.
+    ("signtool_sign", re.compile(r"\bsigntool(?:\.exe)?\s+sign\b", re.IGNORECASE)),
     ("jarsigner", re.compile(r"\bjarsigner\b")),
     # Row 367: the command, followed by an option -- not `/f codesign.pfx`.
     ("codesign", re.compile(r"(?:^|[\s;&|(/\"'])codesign\s+-")),
@@ -1951,6 +1955,15 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("tpm2_sign", re.compile(r"\btpm2_sign\b")),
     ("pkcs11_tool_sign", re.compile(r"\bpkcs11-tool\b[^|;&\n]*\s(?:--sign|-s)(?=\s|$)")),
     ("openssl_sign", re.compile(r"\bopenssl\s+pkeyutl\b[^|;&\n]*\s-sign\b")),
+    # sign/CI (24.11.2026), from each tool's page: notation sign (notation_sign.md), minisign
+    # `-S` alone or clustered (`-Sm`; `-V` verifies), ssh-keygen(1) `-Y sign` (not `-Y verify`),
+    # and the GitHub actions that sign with Sigstore: sigstore/gh-action-sigstore-python and
+    # actions/attest (actions/attest-build-provenance wraps it), on their `uses:` line.
+    ("notation_sign", re.compile(r"\bnotation\s+sign\b")),
+    ("minisign_sign", re.compile(r"\bminisign\b[^|;&\n]*?\s-[A-Za-z]*S[A-Za-z]*(?=\s|$)")),
+    ("ssh_keygen_sign", re.compile(r"\bssh-keygen\b[^|;&\n]*\s-Y\s+sign\b")),
+    ("sigstore_action", re.compile(
+        r"\buses:\s*[\"']?(?:sigstore/gh-action-sigstore-python|actions/attest(?:-build-provenance)?)@")),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
