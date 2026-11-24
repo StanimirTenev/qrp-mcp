@@ -1303,6 +1303,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
        re.compile(
            r"\bNew-SelfSignedCertificate\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
            r"\bsigntool(?:\.exe)?\"?\s+sign\b[^\n]*\s/[ft]d\s+\"?" + name + r"\b|"
+           r"\bSet-AuthenticodeSignature\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
            r"\bcertutil(?:\.exe)?\s+-hashfile\s+\S+\s+" + name + r"\b|"
            r"\bmakecert(?:\.exe)?\b[^\n]*\s-a\s+" + name + r"\b", re.IGNORECASE))
       for family, name in (("SHA1", "sha-?1"), ("MD5", "md5"))],
@@ -1979,6 +1980,9 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("tpm2_sign", re.compile(r"\btpm2_sign\b")),
     ("pkcs11_tool_sign", re.compile(r"\bpkcs11-tool\b[^|;&\n]*\s(?:--sign|-s)(?=\s|$)")),
     ("openssl_sign", re.compile(r"\bopenssl\s+pkeyutl\b[^|;&\n]*\s-sign\b")),
+    # sign/NET closure (zatv-a): PowerShell's Set-AuthenticodeSignature, "-HashAlgorithm ...
+    # For earlier versions, the default is SHA1" (Learn).
+    ("set_authenticodesignature", re.compile(r"\bSet-AuthenticodeSignature\b", re.IGNORECASE)),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
@@ -5520,6 +5524,11 @@ def _link_recipient_key(step: dict[str, Any], key_files: dict[str, list[str]]) -
 
 
 _SIGNTOOL_DIGEST = re.compile(r"\s/fd\s+\"?([A-Za-z0-9-]+)")
+# sign/NET closure (zatv-a): the digest each Windows signing tool is told to use.
+_SIGNING_DIGEST = {
+    "signtool_sign": _SIGNTOOL_DIGEST,
+    "set_authenticodesignature": re.compile(r"\s-HashAlgorithm\s+[\"']?([A-Za-z0-9-]+)", re.IGNORECASE),
+}
 
 
 def scan_ci_file(path: Path, rel_path: str,
@@ -5535,8 +5544,8 @@ def scan_ci_file(path: Path, rel_path: str,
                     "command_type": command_type,
                     "excerpt": line.strip()[:200],
                 })
-                # Row 382: signtool's file digest, `/fd SHA1`.
-                digest = (_SIGNTOOL_DIGEST.search(line) if command_type == "signtool_sign"
+                # Row 382: signtool's file digest, `/fd SHA1`; and the other Windows tools'.
+                digest = (_SIGNING_DIGEST[command_type].search(line) if command_type in _SIGNING_DIGEST
                           else None)
                 if digest:
                     findings[-1]["digest_algorithm"] = digest.group(1).upper()
