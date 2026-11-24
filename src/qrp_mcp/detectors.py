@@ -5060,8 +5060,14 @@ def _python_key_generation(findings: list[dict[str, Any]], lines: list[str],
                 if any(re.fullmatch(bare, n) for n in names):
                     calls.append((re.compile(r"(?<![\w.])" + bare), family, *rest))
     added: list[dict[str, Any]] = []
+    in_string = False
     for index, line in enumerate(lines):
         code = line.split("#", 1)[0]
+        # A docstring or other triple-quoted text is prose: no row is made there (the other rules
+        # read it as a mention, test_retest_0_11_0).
+        quoted = in_string or '"""' in line or "'''" in line
+        if (line.count('"""') + line.count("'''")) % 2:
+            in_string = not in_string
         for call, family, size_kw, size_pos, curve_kw, curve_pos, what, _ in calls:
             m = call.search(code)
             if not m:
@@ -5084,11 +5090,13 @@ def _python_key_generation(findings: list[dict[str, Any]], lines: list[str],
             if size is None and curve is None and any(
                     f["line"] == index + 1 and f["algorithm"] == family for f in findings):
                 break
-            row = next((f for f in findings if f["line"] == index + 1
-                        and f.get("evidence_kind") not in ("comment", "ban")
-                        and (f["algorithm"] == family or (family in ("EC", "ECDSA")
-                                                          and f["algorithm"] in ("EC", "ECDSA")))),
-                       None)
+            same = [f for f in findings if f["line"] == index + 1
+                    and (f["algorithm"] == family or (family in ("EC", "ECDSA")
+                                                      and f["algorithm"] in ("EC", "ECDSA")))]
+            row = next((f for f in same if f.get("evidence_kind") not in ("comment", "ban")), None)
+            if row is None and (same or quoted):
+                # A row the other rules read as a mention or a rejection (row 497) stays one.
+                break
             if row is None:
                 row = {"path": rel_path, "line": index + 1, "algorithm": family,
                        "description": f"{family} key made by {what}", "excerpt": line.strip()[:200],
