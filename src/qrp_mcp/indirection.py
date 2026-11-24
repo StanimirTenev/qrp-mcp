@@ -42,6 +42,7 @@ _JS_DESTRUCTURE = re.compile(
 _JS_PAIR = re.compile(r"(\w+)\s*(?::|\bas\b)\s*(\w+)")
 _CONCAT = re.compile(r"([\"'])([^\"'\\]*)\1\s*\+\s*([\"'])([^\"'\\]*)\3")
 _JAVA_CONST_USE = re.compile(r"(?<![\w.])([A-Z]\w*)\.([A-Z][A-Z0-9_]*)\b")
+_JAVA_GETINSTANCE_NAME = re.compile(r"\bgetInstance\s*\(\s*([A-Za-z_]\w*)\s*[,)]")
 _JS_REL_REQUIRE = re.compile(
     r"(?:const|let|var)\s+(?:\{([^}]*)\}|(\w+))\s*=\s*require\(\s*['\"](\.{1,2}/[^'\"]+)['\"]\s*\)"
     r"|import\s*\{([^}]*)\}\s*from\s*['\"](\.{1,2}/[^'\"]+)['\"]")
@@ -162,6 +163,18 @@ def _constants(path: Path, lines: list[str], ext: str, root: Path
                 if value:
                     out.append((re.compile(rf"(?<![\w.]){cls}\.{name}\b"), f'"{value}"',
                                 f"the constant {cls}.{name} in {cls}.java"))
+        # apiname/Java closure (zatv-a): the name given to a JCA getInstance through a String
+        # constant of the same file, `static final String ALGORITHM = "RSA";` then
+        # `Cipher.getInstance(ALGORITHM)`. Only in the call's argument, and only a constant
+        # the file assigns once; any value, since what getInstance takes is a name.
+        for name in sorted({m.group(1) for text in lines if "getInstance" in text
+                            for m in _JAVA_GETINSTANCE_NAME.finditer(text)}):
+            assignment = re.compile(rf"\b(?:final\s+)?String\s+{re.escape(name)}\s*=\s*\"([^\"\\]+)\"\s*;")
+            values = {m.group(1) for text in lines if name in text for m in assignment.finditer(text)}
+            value = values.pop() if len(values) == 1 else None
+            if value:
+                out.append((re.compile(rf"(\bgetInstance\s*\(\s*){name}\b"), rf'\g<1>"{value}"',
+                            f"the constant {name} of this file"))
     elif ext in (".js", ".mjs", ".cjs", ".ts", ".jsx", ".tsx"):
         for text in lines:
             for m in _JS_REL_REQUIRE.finditer(text):
