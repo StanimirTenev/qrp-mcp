@@ -2134,6 +2134,9 @@ _JCA_NAME_FAMILY.update({
     "OAEP": "RSA", "PSS": "RSA", "RSAPSS": "RSA", "RSA-KTS-KEM-KWS": "RSA", "DDSA": "DSA",
     "DHKEM": "ECDH",
 })
+# apiname/Java closure (zatv-a): Bouncy Castle's "DHU", Diffie-Hellman Unified (docs/specifications.md,
+# Key Agreement).
+_JCA_NAME_FAMILY.update({"DHU": "DH"})
 
 
 # COSE algorithm identifiers (IANA "COSE Algorithms", algorithms.csv, read 23.10.2026), as
