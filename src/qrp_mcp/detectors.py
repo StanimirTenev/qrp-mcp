@@ -4578,6 +4578,7 @@ def scan_source_file(path: Path, rel_path: str,
     _jca_initialised_later(findings, lines)
     findings = _psa_key_bits(findings, lines, rel_path)
     findings = _ossl_param_size(findings, lines, rel_path)
+    _wolfcrypt_ecc_bytes(findings, lines)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5088,6 +5089,31 @@ def _psa_key_bits(findings: list[dict[str, Any]], lines: list[str], rel_path: st
             item["curve"] = f"P-{size}"
         added.append(item)
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# keysize/C (closure zatv-a, row 400): wolfCrypt's wc_ecc_make_key(rng, keysize, key) and
+# wc_ecc_make_key_ex(rng, keysize, key, curve_id) take the size in bytes ("keysize size of key to
+# be created in bytes", wolfSSL manual, ECC): 32 is a 256-bit key. A literal, or a local the file
+# assigns once.
+_WC_ECC_MAKE_KEY = re.compile(r"\bwc_ecc_make_key(?:_ex)?\s*\(\s*[^,]*,\s*([A-Za-z_]\w*|\d+)\s*,")
+_ECC_BYTES = {20: 160, 24: 192, 28: 224, 32: 256, 48: 384, 66: 521}
+
+
+def _wolfcrypt_ecc_bytes(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    for f in findings:
+        if (f.get("algorithm") != "EC" or f.get("key_size") not in (None, "undetermined")
+                or f.get("evidence_kind") in ("comment", "ban") or not 0 < f["line"] <= len(lines)):
+            continue
+        m = _WC_ECC_MAKE_KEY.search(lines[f["line"] - 1])
+        if not m:
+            continue
+        value = m.group(1)
+        if not value.isdigit():
+            once = [a.group(1) for line in lines
+                    for a in re.finditer(rf"(?<![\w.]){re.escape(value)}\s*=(?!=)\s*(\w+)", line)]
+            value = once[0] if len(once) == 1 else ""
+        if value.isdigit() and int(value) in _ECC_BYTES:
+            f["key_size"] = _ECC_BYTES[int(value)]
 
 
 # keysize/C (closure zatv-a, row 394): OpenSSL 3's key generation parameters, as the man7 pages'
