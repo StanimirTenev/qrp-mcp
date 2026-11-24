@@ -4641,6 +4641,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _dotnet_aes_ecb(findings, lines, rel_path)
     findings = _rfc2898_default_sha1(findings, lines, rel_path)
     findings = _powershell_continued_hash(findings, lines, rel_path)
+    findings = _certreq_request_hash(findings, lines, rel_path)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5311,6 +5312,35 @@ def _powershell_continued_hash(findings: list[dict[str, Any]], lines: list[str],
                 added.append({"path": rel_path, "line": j + 1, "algorithm": family,
                               "description": f"{family} named as the digest of a Windows signing or hashing tool",
                               "excerpt": lines[j].strip()[:200], "evidence_kind": "reference",
+                              "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 379 (its note: "certreq .inf HashAlgorithm ... not"; symhash/NET closure, zatv-a): a certreq
+# request file's [NewRequest] HashAlgorithm, the "Hash Algorithm to be used for this request"
+# (Learn, certreq: sha256, sha384, sha512, sha1, md5, md4, md2). Only inside [NewRequest] of an
+# .inf file.
+_INF_SECTION = re.compile(r"^\s*\[([^\]]+)\]\s*$")
+_INF_HASH = re.compile(r"^\s*HashAlgorithm\s*=\s*\"?(sha-?1|md5|md4|md2)\"?\s*(?:;.*)?$", re.IGNORECASE)
+_INF_HASH_FAMILY = {"sha1": "SHA1", "sha-1": "SHA1", "md5": "MD5", "md4": "MD4", "md2": "MD2"}
+
+
+def _certreq_request_hash(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith(".inf"):
+        return findings
+    added, section = [], None
+    for n, line in enumerate(lines, 1):
+        s = _INF_SECTION.match(line)
+        if s:
+            section = s.group(1).strip().lower()
+            continue
+        m = _INF_HASH.match(line) if section == "newrequest" else None
+        if m:
+            family = _INF_HASH_FAMILY[m.group(1).lower()]
+            if not any(f["line"] == n and f.get("algorithm") == family for f in findings):
+                added.append({"path": rel_path, "line": n, "algorithm": family,
+                              "description": f"{family} as the hash of a certreq request ([NewRequest] HashAlgorithm)",
+                              "excerpt": line.strip()[:200], "evidence_kind": "declaration",
                               "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
