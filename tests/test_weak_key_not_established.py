@@ -19,14 +19,26 @@ def _finding(result, family):
 
 
 def test_unread_size_is_not_called_not_weak(tmp_path):
+    # The size on the next line is read since the keysize/Java closure (zatv-a, 24.11.2026);
+    # a size the file does not give -- a method's parameter -- is still unread.
+    from qrp_mcp.scan import scan_directory
+    (tmp_path / "K.java").write_text(
+        "import java.security.KeyPairGenerator;\nclass K { void k(int bits) throws Exception {\n"
+        '  KeyPairGenerator dsa = KeyPairGenerator.getInstance("DSA");\n'
+        "  dsa.initialize(bits);\n} }\n")
+    f = _finding(scan_directory(tmp_path), "DSA")
+    assert f["weak_key"] is None
+    assert "not established" in f["reason"]
+
+
+def test_size_on_the_next_line_is_read_and_weak(tmp_path):
+    # Row 391's own file: `initialize(1024)` on the line after getInstance is a 1024-bit DSA key.
     from qrp_mcp.scan import scan_directory
     (tmp_path / "K.java").write_text(
         "import java.security.KeyPairGenerator;\nclass K { void k() throws Exception {\n"
         '  KeyPairGenerator dsa = KeyPairGenerator.getInstance("DSA");\n'
         "  dsa.initialize(1024);\n} }\n")
-    f = _finding(scan_directory(tmp_path), "DSA")
-    assert f["weak_key"] is None
-    assert "not established" in f["reason"]
+    assert _finding(scan_directory(tmp_path), "DSA")["weak_key"] is True
 
 
 def test_read_size_still_decides(tmp_path):
