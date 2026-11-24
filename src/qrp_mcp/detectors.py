@@ -6183,17 +6183,56 @@ _SETTING_PATTERNS = tuple(
 LINE_GATE = line_gate()
 
 
+# Row 548 (24.11.2026): a hybrid KEM by the name a scheme registry gives it -- katzenpost/hpqc's
+# combiner, kem/schemes/schemes.go at 30f6aab: `"MLKEM768-X25519"`, `"HQC-256-X448"`,
+# `"FrodoKEM-640-SHAKE-X448"`, and `"X25519-MLKEM768"` the other way round. A post-quantum KEM and
+# X25519 or X448 joined by a hyphen, the whole of a string literal; the halves from the name.
+_REGISTRY_PQ_HALF = (
+    (re.compile(r"ML-?KEM(?:Hedged)?(512|768|1024)", re.I), "ML-KEM", lambda m: m.group(1)),
+    (re.compile(r"Kyber(512|768|1024)", re.I), "Kyber", lambda m: m.group(1)),
+    (re.compile(r"HQC-?(128|192|256)", re.I), "HQC", lambda m: m.group(1)),
+    (re.compile(r"FrodoKEM-?(640|976|1344)-?(SHAKE|AES)", re.I), "FrodoKEM",
+     lambda m: f"{m.group(1)}-{m.group(2).upper()}"),
+    (re.compile(r"(sntrup\d{3,7})", re.I), "NTRU", lambda m: m.group(1).lower()),
+    (re.compile(r"mceliece(\d{6,7}f?)", re.I), "Classic McEliece", lambda m: m.group(1).lower()),
+    (re.compile(r"CTIDH(511|512|1024|2048)", re.I), "CSIDH/CTIDH", lambda m: m.group(1)),
+)
+_REGISTRY_HYBRID = re.compile(r"[\"'`]((?:[A-Za-z][\w-]*?-X(?:25519|448))|(?:X(?:25519|448)-[A-Za-z][\w-]*?))[\"'`]")
+
+
+def registry_hybrid(name: str) -> list[tuple[str, str | None]] | None:
+    """The two halves of a registry hybrid name (row 548), in the name's order, or None."""
+    for classical in ("X25519", "X448"):
+        if name.startswith(classical + "-"):
+            pq, order = name[len(classical) + 1:], "classical_first"
+        elif name.endswith("-" + classical):
+            pq, order = name[:-len(classical) - 1], "pq_first"
+        else:
+            continue
+        for pattern, family, param in _REGISTRY_PQ_HALF:
+            m = pattern.fullmatch(pq)
+            if m:
+                halves = [(family, param(m)), (classical, None)]
+                return halves if order == "pq_first" else halves[::-1]
+    return None
+
+
 def scan_hybrid_names(line: str) -> list[str]:
     """The hybrids this line names, by their registered spelling."""
     lowered = line.lower()
     if ("kem" not in lowered and "sntrup" not in lowered and "wing" not in lowered
-            and "mldsa" not in lowered and "5.5.7.6." not in lowered):
+            and "mldsa" not in lowered and "5.5.7.6." not in lowered
+            and "x25519" not in lowered and "x448" not in lowered):
         return []
     out: list[str] = []
     for match in _HYBRID_NAME.finditer(line):
         name = HYBRIDS[match.group(1).lower()][0]
         if name not in out:
             out.append(name)
+    # Row 548: a registry's hybrid names, as written.
+    for match in _REGISTRY_HYBRID.finditer(line):
+        if match.group(1) not in out and registry_hybrid(match.group(1)):
+            out.append(match.group(1))
     return out
 
 
@@ -7506,7 +7545,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     _tag_named_in_a_path(source_findings + iac_findings)
     _join_fips(source_findings + iac_findings, fips_findings)
     hybrids = [{"path": p, "line": n, "name": name,
-                "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}
+                "halves": [list(h) for h in (HYBRIDS[name.lower()][1] if name.lower() in HYBRIDS
+                                             else registry_hybrid(name))]}  # row 548
                for p, n, name in hybrid_names]
     _link_kms_keys(hybrids, kms_refs)
     return {
