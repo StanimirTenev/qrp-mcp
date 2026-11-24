@@ -4984,7 +4984,10 @@ _PYCRYPTODOME_CURVES = {name.lower(): curve for curve, names in (
 ) for name in names}
 _PY_PYCA_BARE = re.compile(
     r"^\s*from\s+cryptography\.hazmat\.primitives\.asymmetric\.(rsa|dsa|dh|ec)\s+import\s+([^#\n]+)")
-_PY_LITERAL_ASSIGN = re.compile(r"^\s*([A-Za-z_]\w*)\s*(?::\s*\w+\s*)?=\s*(.+?)\s*(?:#.*)?$")
+# A module-level assignment only (column 0): a local of another function, or a keyword line of an
+# unrelated call (`    bits=1024`), is not the name a call reads (review, 24.11.2026).
+_PY_LITERAL_ASSIGN = re.compile(r"^([A-Za-z_]\w*)\s*(?::\s*\w+\s*)?=\s*(.+?)\s*(?:#.*)?$")
+_PY_DEF_PARAMS = re.compile(r"^\s*(?:async\s+)?def\s+\w+\s*\(([^)]*)")
 
 
 def _py_call_arguments(lines: list[str], index: int, start: int) -> list[str] | None:
@@ -5041,6 +5044,16 @@ def _python_key_generation(findings: list[dict[str, Any]], lines: list[str],
         if m:
             value = m.group(2)
             assigned[m.group(1)] = value if assigned.get(m.group(1), value) == value else None
+
+    # A name a function takes as a parameter is that call's argument, not the module's constant
+    # of the same name (`KEY_SIZE = 2048` ... `def make(KEY_SIZE)`): never resolved.
+    for line in lines:
+        m = _PY_DEF_PARAMS.match(line)
+        if m:
+            for param in m.group(1).split(","):
+                name = param.split("=", 1)[0].split(":", 1)[0].strip().lstrip("*")
+                if name in assigned:
+                    assigned[name] = None
 
     def resolve(value: str | None) -> str | None:
         if value and re.fullmatch(r"[A-Za-z_]\w*", value) and value in assigned:
