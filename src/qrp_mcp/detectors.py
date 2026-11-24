@@ -1276,6 +1276,15 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     *[(family, CNG_MACRO_RULE % family, re.compile(
         r"\bBCryptOpenAlgorithmProvider\s*\([^,]*,\s*BCRYPT_" + family + r"(?:_SIGN)?_ALGORITHM\b"))
       for family in ("RSA", "DSA", "DH")],
+    # apiname/NET closure (zatv-a): every CNG identifier macro of bcrypt.h a tracked family has
+    # (Learn, "CNG Algorithm Identifiers"), wherever it is written -- held in a local before the
+    # call, or the hash and cipher providers the rule above leaves out (BCRYPT_MD5_ALGORITHM).
+    # A rule of its own, after that one: a provider opened by macro keeps its description.
+    *[(family, f"{family} named by its CNG algorithm identifier macro (bcrypt.h)",
+       re.compile(r"\bBCRYPT_(?:" + ids + r")_ALGORITHM\b")) for family, ids in (
+        ("RSA", "RSA|RSA_SIGN"), ("DSA", "DSA"), ("DH", "DH"), ("ECDSA", "ECDSA|ECDSA_P256|ECDSA_P384|ECDSA_P521"),
+        ("ECDH", "ECDH|ECDH_P256|ECDH_P384|ECDH_P521"), ("MD5", "MD5"), ("MD4", "MD4"), ("MD2", "MD2"),
+        ("SHA1", "SHA1"), ("3DES", "3DES|3DES_112"), ("DES", "DES|DESX"), ("RC4", "RC4"), ("RC2", "RC2"))],
     # Rows 379, 382, 383 (W1): the digest a Windows certificate, signing or hashing tool is
     # told to use -- New-SelfSignedCertificate -HashAlgorithm, signtool /fd and /td,
     # certutil -hashfile FILE ALG, makecert -a.
