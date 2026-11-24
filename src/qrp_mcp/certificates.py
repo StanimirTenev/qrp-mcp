@@ -469,6 +469,11 @@ def pqc_set(oid: str | None) -> tuple[str, str] | None:
     if not _PQC_SET_BY_OID:
         from .cyclonedx import _PQC_OID  # local: avoids an import cycle
         _PQC_SET_BY_OID.update({dotted: key for key, dotted in _PQC_OID.items()})
+        # pqc/PKI (24.11.2026): HashSLH-DSA, RFC 9909 section 3 -- sigAlgs 35-46 are the same
+        # twelve parameter sets as pure SLH-DSA's 20-31, in the same order, with a pre-hash; its
+        # public key identifiers are these too ("The public key identifiers for HashSLH-DSA").
+        _PQC_SET_BY_OID.update({f"2.16.840.1.101.3.4.3.{int(dotted.rsplit('.', 1)[1]) + 15}": key
+                                for key, dotted in _PQC_OID.items() if key[0] == "SLH-DSA"})
     return _PQC_SET_BY_OID.get(oid or "")
 
 # `cryptography`'s curve names, in the spelling CURVE_OIDS uses.
