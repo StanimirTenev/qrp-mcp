@@ -4548,6 +4548,7 @@ def scan_source_file(path: Path, rel_path: str,
     _cng_key_pair_size(findings, lines)
     _powershell_statement_size(findings, lines, rel_path)
     _size_through_a_name(findings, lines)
+    _jca_initialised_later(findings, lines)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -4925,7 +4926,8 @@ _SIZE_CONSTANT = re.compile(
 
 def size_constants(lines: list[str]) -> dict[str, int]:
     """The names this file gives one key size: assigned exactly once, to a number a key can
-    have, never assigned again or declared otherwise (a method's `int bits` parameter)."""
+    have (a modulus, or the field of an EC curve), never assigned again or declared otherwise
+    (a method's `int bits` parameter)."""
     found: dict[str, list[int]] = {}
     for line in lines:
         m = _SIZE_CONSTANT.search(line) if ("=" in line or "define" in line) else None
@@ -4935,7 +4937,7 @@ def size_constants(lines: list[str]) -> dict[str, int]:
     text = "\n".join(lines)
     out = {}
     for name, values in found.items():
-        if len(values) != 1 or values[0] not in registry._SIZES:
+        if len(values) != 1 or values[0] not in registry._SIZES | _EC_FIELD_SIZES:
             continue
         assigned = len(re.findall(rf"(?<![\w.]){re.escape(name)}\s*=(?!=)", text))
         declared = len(re.findall(rf"\b(?:int|Int|long|Long|size_t|unsigned|short|uint32_t|word32)\s+{re.escape(name)}\b"
@@ -4965,6 +4967,52 @@ def _size_through_a_name(findings: list[dict[str, Any]], lines: list[str]) -> No
             constants = size_constants(lines)
         size = key_size_on_line(resolve_size_names(lines[f["line"] - 1], constants), f["algorithm"])
         if size:
+            f["key_size"] = size
+
+
+# keysize/Java (closure zatv-a; rows 180, 395): the size a JCA generator is initialised with on a
+# later line -- the KeyPairGenerator javadoc's own example, `keyGen = getInstance("DSA", "SUN");`
+# then `keyGen.initialize(1024, random);` -- and AlgorithmParameterGenerator's `init(int size)`.
+# The size goes to the row of the getInstance that assigned the name (or the line above it, a
+# call split over two), when that name is initialised once before it is assigned again. EC's
+# `initialize(256)` is the field size of the curve the provider picks: the size, not the curve.
+_JCA_GENERATOR = re.compile(
+    r"\b([A-Za-z_]\w*)\s*(?::\s*[\w.]+\s*)?=\s*(?:new\s+)?(?:java\.security\.)?"
+    r"(KeyPairGenerator|AlgorithmParameterGenerator)\.getInstance\s*\(")
+_EC_FIELD_SIZES = {160, 163, 192, 193, 224, 233, 239, 256, 283, 384, 409, 521, 571}
+
+
+def _jca_initialised_later(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    constants = None
+    for f in findings:
+        if (f.get("algorithm") not in ("RSA", "DSA", "DH", "EC") or f.get("key_size") not in (None, "undetermined")
+                or f.get("evidence_kind") in ("comment", "ban") or not 0 < f["line"] <= len(lines)):
+            continue
+        at = f["line"] - 1
+        m = _JCA_GENERATOR.search(lines[at]) or (at > 0 and not lines[at - 1].rstrip().endswith(";")
+                                                  and _JCA_GENERATOR.search(lines[at - 1]))
+        if not m:
+            continue
+        name, engine = m.group(1), m.group(2)
+        verb = "initialize" if engine == "KeyPairGenerator" else "init"
+        call = re.compile(rf"(?<![\w.]){re.escape(name)}\.{verb}\s*\(\s*(\w+)\s*[,)]")
+        again = re.compile(rf"(?<![\w.]){re.escape(name)}\s*=(?!=)")
+        start = at if _JCA_GENERATOR.search(lines[at]) else at - 1
+        calls = []
+        for i in range(start, min(start + 40, len(lines))):
+            text = lines[i][m.end():] if i == start else lines[i]
+            if i > start and again.search(text):
+                break
+            calls += [c.group(1) for c in call.finditer(text)]
+        if len(calls) != 1:
+            continue
+        if constants is None:
+            constants = size_constants(lines)
+        value = calls[0] if calls[0].isdigit() else str(constants.get(calls[0], ""))
+        if not value.isdigit():
+            continue
+        size = int(value)
+        if size in (_EC_FIELD_SIZES if f["algorithm"] == "EC" else registry._SIZES):
             f["key_size"] = size
 
 
