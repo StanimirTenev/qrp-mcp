@@ -2311,7 +2311,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-diffiehellman"
@@ -2380,7 +2380,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-dsa"
@@ -2449,7 +2449,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-dsa"
@@ -2518,7 +2518,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-rsa"
@@ -2587,7 +2587,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-rsa"
@@ -2656,7 +2656,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-rsassa-pss"
@@ -2725,7 +2725,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-rsassa-pss"
@@ -2794,7 +2794,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-ec"
@@ -2863,7 +2863,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "EC"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EC"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-ec"
@@ -2932,7 +2932,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "EC"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EC"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-eddsa"
@@ -2954,7 +2954,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -2971,7 +2971,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "Names.kt"
@@ -2982,7 +2982,7 @@ fun make(): Any? {
     return e
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 3, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 3, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -3001,7 +3001,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-eddsa"
@@ -3023,7 +3023,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -3040,7 +3040,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "Names.kt"
@@ -3051,7 +3051,7 @@ fun make(): Any? {
     return e
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 3, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 3, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -3070,7 +3070,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-ed25519"
@@ -3139,7 +3139,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-ed25519"
@@ -3208,7 +3208,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-ed448"
@@ -3277,7 +3277,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed448"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed448"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-ed448"
@@ -3346,7 +3346,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed448"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed448"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-xdh"
@@ -3415,7 +3415,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-xdh"
@@ -3484,7 +3484,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-x25519"
@@ -3553,7 +3553,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-x25519"
@@ -3622,7 +3622,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-x448"
@@ -3691,7 +3691,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X448"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X448"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-x448"
@@ -3760,7 +3760,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X448"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X448"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-dh"
@@ -3829,7 +3829,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyfactory-dh"
@@ -3898,7 +3898,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-dh"
@@ -3967,7 +3967,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-diffiehellman"
@@ -4036,7 +4036,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-ecdh"
@@ -4105,7 +4105,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-ecmqv"
@@ -4174,7 +4174,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-xdh"
@@ -4243,7 +4243,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-x25519"
@@ -4312,7 +4312,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-x448"
@@ -4381,7 +4381,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "X448"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X448"}}]}
 
 [[ecosystems.spellings]]
 id = "algorithmparametergenerator-diffiehellman"
@@ -4450,7 +4450,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "algorithmparametergenerator-dsa"
@@ -4519,7 +4519,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-nonewithrsa"
@@ -4588,7 +4588,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-md2withrsa"
@@ -4657,7 +4657,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "MD2"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD2"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-md5withrsa"
@@ -4726,7 +4726,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "MD5"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha1withrsa"
@@ -4795,7 +4795,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha224withrsa"
@@ -4864,7 +4864,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withrsa"
@@ -4933,7 +4933,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha384withrsa"
@@ -5002,7 +5002,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha512withrsa"
@@ -5071,7 +5071,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha512-224withrsa"
@@ -5140,7 +5140,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha512-256withrsa"
@@ -5209,7 +5209,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha3-256withrsa"
@@ -5278,7 +5278,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-rsassa-pss"
@@ -5347,7 +5347,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-nonewithdsa"
@@ -5416,7 +5416,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha1withdsa"
@@ -5485,7 +5485,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha224withdsa"
@@ -5554,7 +5554,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withdsa"
@@ -5623,7 +5623,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha3-256withdsa"
@@ -5692,7 +5692,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-nonewithecdsa"
@@ -5761,7 +5761,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha1withecdsa"
@@ -5830,7 +5830,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha224withecdsa"
@@ -5899,7 +5899,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withecdsa"
@@ -5968,7 +5968,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha384withecdsa"
@@ -6037,7 +6037,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha512withecdsa"
@@ -6106,7 +6106,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha3-256withecdsa"
@@ -6175,7 +6175,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-nonewithdsainp1363format"
@@ -6244,7 +6244,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withdsainp1363format"
@@ -6313,7 +6313,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-nonewithecdsainp1363format"
@@ -6382,7 +6382,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withecdsainp1363format"
@@ -6451,7 +6451,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-eddsa"
@@ -6473,7 +6473,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -6490,7 +6490,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "Names.kt"
@@ -6501,7 +6501,7 @@ fun make(): Any? {
     return e
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 3, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 3, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -6520,7 +6520,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-ed25519"
@@ -6589,7 +6589,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed25519"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-ed448"
@@ -6658,7 +6658,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "Ed448"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed448"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-ecdsa-ambiguous"
@@ -6727,7 +6727,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-md5withrsaandmgf1"
@@ -6796,7 +6796,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "MD5"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-rawdsa"
@@ -6865,7 +6865,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rsa"
@@ -6934,7 +6934,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rsa-ecb-pkcs1padding"
@@ -7003,7 +7003,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rsa-ecb-oaepwithsha-1andmgf1padding"
@@ -7072,7 +7072,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rsa-ecb-oaepwithsha-256andmgf1padding"
@@ -7141,7 +7141,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-ecies"
@@ -7210,7 +7210,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-des"
@@ -7279,7 +7279,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-des-cbc-pkcs5padding"
@@ -7348,7 +7348,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-desede"
@@ -7417,7 +7417,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "3DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-desede-ecb-nopadding"
@@ -7486,7 +7486,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "3DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-desedewrap"
@@ -7555,7 +7555,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "3DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-arcfour"
@@ -7624,7 +7624,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RC4"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC4"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rc2"
@@ -7693,7 +7693,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RC2"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC2"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rc4"
@@ -7762,7 +7762,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RC4"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC4"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-pbewithmd5anddes"
@@ -7831,7 +7831,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "MD5"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-aes-ecb-pkcs5padding"
@@ -7900,7 +7900,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "AES-ECB"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "AES-ECB"}}]}
 
 [[ecosystems.spellings]]
 id = "messagedigest-md2"
@@ -7969,7 +7969,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "MD2"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD2"}}]}
 
 [[ecosystems.spellings]]
 id = "messagedigest-md5"
@@ -8038,7 +8038,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "MD5"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "messagedigest-sha-1"
@@ -8107,7 +8107,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "mac-hmacmd5"
@@ -8176,7 +8176,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "MD5"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "keygenerator-hmacmd5"
@@ -8245,7 +8245,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "MD5"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "mac-hmacsha1"
@@ -8314,7 +8314,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "keygenerator-hmacsha1"
@@ -8383,7 +8383,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "keygenerator-des"
@@ -8452,7 +8452,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
 
 [[ecosystems.spellings]]
 id = "secretkeyfactory-des"
@@ -8521,7 +8521,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
 
 [[ecosystems.spellings]]
 id = "keygenerator-desede"
@@ -8590,7 +8590,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "3DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
 
 [[ecosystems.spellings]]
 id = "secretkeyfactory-desede"
@@ -8659,7 +8659,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "3DES"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
 
 [[ecosystems.spellings]]
 id = "keygenerator-arcfour"
@@ -8728,7 +8728,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RC4"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC4"}}]}
 
 [[ecosystems.spellings]]
 id = "secretkeyfactory-arcfour"
@@ -8797,7 +8797,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RC4"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC4"}}]}
 
 [[ecosystems.spellings]]
 id = "keygenerator-rc2"
@@ -8866,7 +8866,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RC2"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC2"}}]}
 
 [[ecosystems.spellings]]
 id = "messagedigest-sha-alias"
@@ -8957,7 +8957,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha1withdetecdsa"
@@ -9026,7 +9026,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withecnr"
@@ -9095,7 +9095,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "EC"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EC"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withplain-ecdsa"
@@ -9164,7 +9164,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withrsaandmgf1"
@@ -9233,7 +9233,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha1withrsa-iso9796-2"
@@ -9302,7 +9302,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "SHA1"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withrsa-x931"
@@ -9371,7 +9371,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withddsa"
@@ -9440,7 +9440,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-ripemd160withecdsa"
@@ -9509,7 +9509,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-cipher-rsa-none-oaepwithsha256andmgf1padding"
@@ -9578,7 +9578,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-cipher-rsa-none-pkcs1padding"
@@ -9647,7 +9647,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "RSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-cipher-elgamal"
@@ -9716,7 +9716,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ElGamal"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ElGamal"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-eccdh"
@@ -9785,7 +9785,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-dhu"
@@ -9854,7 +9854,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-eccdhwithsha256kdf"
@@ -9923,7 +9923,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-ecmqvwithsha1ckdf"
@@ -9992,7 +9992,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-ecdhwithsha256hkdf"
@@ -10061,7 +10061,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-dhwithsha256kdf"
@@ -10130,7 +10130,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 8, algorithm = "DH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-sha256withrsaencryption"
@@ -12810,7 +12810,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -12825,7 +12825,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "Names.kt"
@@ -12837,7 +12837,7 @@ fun make(): Any? {
     return k
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 4, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 4, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "jca-type-edecprivatekey"
@@ -12857,7 +12857,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -12872,7 +12872,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "Names.kt"
@@ -12884,7 +12884,7 @@ fun make(): Any? {
     return k
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 4, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 4, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "jca-type-xecpublickey"
@@ -13609,7 +13609,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 snippet = '''
@@ -13624,7 +13624,7 @@ class Keys {
     }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 7, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "Names.kt"
@@ -13636,7 +13636,7 @@ fun make(): Any? {
     return k
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 4, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 4, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "jca-type-dhparameterspec"
