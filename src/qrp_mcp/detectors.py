@@ -4607,6 +4607,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _psa_key_bits(findings, lines, rel_path)
     findings = _ossl_param_size(findings, lines, rel_path)
     _wolfcrypt_ecc_bytes(findings, lines)
+    findings = _dotnet_signing_receivers(findings, lines, rel_path)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5130,6 +5131,69 @@ def _psa_key_bits(findings: list[dict[str, Any]], lines: list[str], rel_path: st
 # assigns once.
 _WC_ECC_MAKE_KEY = re.compile(r"\bwc_ecc_make_key(?:_ex)?\s*\(\s*[^,]*,\s*([A-Za-z_]\w*|\d+)\s*,")
 _ECC_BYTES = {20: 160, 24: 192, 28: 224, 32: 256, 48: 384, 66: 521}
+
+
+# sign/NET (closure zatv-a): a .NET sign or verify call on a key whose type is written where the
+# name is made -- a parameter or local `ECDsa key`, `var signer = ECDsa.Create()`, `new DSACng()`,
+# `cert.GetECDsaPrivateKey()`, a signature formatter `new RSAPKCS1SignatureFormatter(rsa)` -- and
+# not on the call's line (Learn: RSA/ECDsa/DSA SignData, SignHash, VerifyData, VerifyHash,
+# CreateSignature, VerifySignature; the formatters' CreateSignature/VerifySignature). The call
+# line becomes a signature row of that family. A name given two families stays unread; so does a
+# key passed to CertificateRequest, which signs the request with it.
+_DOTNET_KEY_TYPE = {"RSA": "RSA", "RSACng": "RSA", "RSACryptoServiceProvider": "RSA", "RSAOpenSsl": "RSA",
+                    "ECDsa": "ECDSA", "ECDsaCng": "ECDSA", "ECDsaOpenSsl": "ECDSA",
+                    "DSA": "DSA", "DSACng": "DSA", "DSACryptoServiceProvider": "DSA", "DSAOpenSsl": "DSA",
+                    "RSAPKCS1SignatureFormatter": "RSA", "RSAPKCS1SignatureDeformatter": "RSA",
+                    "DSASignatureFormatter": "DSA", "DSASignatureDeformatter": "DSA"}
+_DOTNET_KEY_TYPES = "|".join(sorted(_DOTNET_KEY_TYPE, key=len, reverse=True))
+_DOTNET_KEY_NAMED = re.compile(
+    rf"\b({_DOTNET_KEY_TYPES})\??\s+([A-Za-z_]\w*)\s*(?=[,)=;]|$)|"                       # typed
+    rf"\b(?:var|Dim)\s+([A-Za-z_]\w*)\s*(?:As\s+New\s+|=\s*(?:new\s+)?)(?:System\.Security\.Cryptography\.)?"
+    rf"({_DOTNET_KEY_TYPES})\s*(?:\.Create\s*)?\(|"                                            # made
+    r"\b([A-Za-z_]\w*)\s*=\s*\w+\??\.Get(RSA|ECDsa|DSA)PrivateKey\s*\(")                      # a certificate's
+_DOTNET_SIGN_CALL = re.compile(
+    r"\b([A-Za-z_]\w*)!?\.(SignData|SignHash|VerifyData|VerifyHash|TrySignData|TrySignHash|CreateSignature|"
+    r"VerifySignature)\s*\(")
+_CERTIFICATE_REQUEST_KEY = re.compile(r"\b(?:new\s+CertificateRequest|CertificateRequest\s+\w+\s*=\s*new)\s*\([^,]*,\s*([A-Za-z_]\w*)\s*,")
+
+
+def _dotnet_signing_receivers(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith((".cs", ".vb")) or not any(
+            "Sign" in line or "Verify" in line or "CertificateRequest" in line for line in lines):
+        return findings
+    named: dict[str, set[tuple[str, int]]] = {}
+    for n, line in enumerate(lines, 1):
+        for m in _DOTNET_KEY_NAMED.finditer(line):
+            if m.group(1):
+                name, family = m.group(2), _DOTNET_KEY_TYPE[m.group(1)]
+            elif m.group(3):
+                name, family = m.group(3), _DOTNET_KEY_TYPE[m.group(4)]
+            else:
+                name, family = m.group(5), {"RSA": "RSA", "ECDsa": "ECDSA", "DSA": "DSA"}[m.group(6)]
+            named.setdefault(name, set()).add((family, n))
+    added = []
+    for n, line in enumerate(lines, 1):
+        calls = [(m.group(1), m.group(2)) for m in _DOTNET_SIGN_CALL.finditer(line)]
+        calls += [(m.group(1), "CertificateRequest") for m in _CERTIFICATE_REQUEST_KEY.finditer(line)]
+        for name, verb in calls:
+            families = {f for f, _ in named.get(name, ())}
+            if len(families) != 1:
+                continue
+            family = families.pop()
+            at = min(k for f, k in named[name])
+            row = next((f for f in findings + added if f["line"] == n and f.get("algorithm") == family), None)
+            if row is not None:
+                if family == "RSA" and row.get("role") in (None, "undetermined"):
+                    row["role"] = "signature"
+                continue
+            item = {"path": rel_path, "line": n, "algorithm": family,
+                    "description": f"{family} {'request signed with' if verb == 'CertificateRequest' else verb + ' on'} "
+                                   f"the key {name}, of the type written at line {at}",
+                    "excerpt": line.strip()[:200], "evidence_kind": "call", "in_test_code": in_test_code(rel_path)}
+            if family == "RSA":
+                item["role"] = "signature"
+            added.append(item)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 def _wolfcrypt_ecc_bytes(findings: list[dict[str, Any]], lines: list[str]) -> None:
