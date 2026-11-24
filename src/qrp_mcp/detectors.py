@@ -4639,6 +4639,7 @@ def scan_source_file(path: Path, rel_path: str,
     _wolfcrypt_ecc_bytes(findings, lines)
     findings = _dotnet_signing_receivers(findings, lines, rel_path)
     findings = _dotnet_aes_ecb(findings, lines, rel_path)
+    findings = _rfc2898_default_sha1(findings, lines, rel_path)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5251,6 +5252,36 @@ def _dotnet_aes_ecb(findings: list[dict[str, Any]], lines: list[str], rel_path: 
                 f["line"] == n and f.get("algorithm") == "AES-ECB" for f in findings):
             added.append({"path": rel_path, "line": n, "algorithm": "AES-ECB",
                           "description": "AES in ECB mode (.NET CipherMode.ECB or EncryptEcb) on an AES object",
+                          "excerpt": line.strip()[:200], "evidence_kind": "call", "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 380 (symhash/NET closure, zatv-a): Rfc2898DeriveBytes without a HashAlgorithmName is
+# PBKDF2 with SHA-1 -- also where the rule above, which wants the statement's `);` on the line,
+# does not see it: `using (var k = new Rfc2898DeriveBytes(password, salt))` and a constructor
+# whose arguments run over several lines. The arguments are read to the closing parenthesis.
+_RFC2898_NEW = re.compile(r"\bnew\s+Rfc2898DeriveBytes\s*\(")
+
+
+def _rfc2898_default_sha1(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith((".cs", ".vb")) or not any("Rfc2898DeriveBytes" in l for l in lines):
+        return findings
+    added = []
+    for n, line in enumerate(lines, 1):
+        for m in _RFC2898_NEW.finditer(line):
+            depth, args = 1, ""
+            text = "\n".join([line[m.end():]] + lines[n:n + 7])
+            for ch in text:
+                depth += ch == "("
+                depth -= ch == ")"
+                if depth == 0:
+                    break
+                args += ch
+            if depth != 0 or "HashAlgorithmName" in args or any(
+                    f["line"] == n and f.get("algorithm") == "SHA1" for f in findings + added):
+                continue
+            added.append({"path": rel_path, "line": n, "algorithm": "SHA1",
+                          "description": "SHA-1 as the default hash of Rfc2898DeriveBytes (no HashAlgorithmName given)",
                           "excerpt": line.strip()[:200], "evidence_kind": "call", "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
