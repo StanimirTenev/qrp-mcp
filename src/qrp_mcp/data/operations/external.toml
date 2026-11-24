@@ -343,3 +343,539 @@ pattern = '\b(os\.(?:environb?|getenvb?)\b)'
 file = "settings.py"
 snippet = "import os\nalg = {candidate}(\"SIGN_ALG\")\nalg = {candidate}[\"SIGN_ALG\"]\n"
 expect = {any = [{rows = [{at = "chosen_outside_files.places", match = {path = "settings.py", line = 2}}]}, {rows = [{at = "chosen_outside_files.places", match = {path = "settings.py", line = 3}}]}]}
+
+# Operation `external`, ecosystem Go (24.11.2026): the algorithm or implementation chosen outside the
+# line -- read from the environment at run time (package os), required from a module (go.mod, go.sum,
+# vendor/modules.txt; a replace swaps the module's code), or a GODEBUG / GOFIPS140 setting that switches
+# the standard library's cryptography (go.mod and go.work godebug lines, //go:debug, the environment of
+# the program or the build). `expect`: an environment read is a place in chosen_outside_files; a module
+# is a dependency row with its version; a crypto GODEBUG or GOFIPS140 setting is a place with the
+# setting's name and value. Row 546 (Go part): `os.Getenv("KEM_SCHEME")`.
+[[ecosystems]]
+ecosystem = "Go"
+scope = "os.Getenv, os.LookupEnv, os.ExpandEnv (the name as a string, a raw string or a constant of the file), os.Environ() compared to a setting's name; go.mod require (one line and block, // indirect), replace of a required module, exclude (not a requirement); go.sum; vendor/modules.txt; godebug in go.mod and go.work (one line and block) and //go:debug, for the settings whose names concern cryptography (tls*, x509*, rsa*, crypto*, fips140*, mlkem, kyber, dsa); GODEBUG and GOFIPS140 assigned in a shell line or a Dockerfile ENV. Not covered: the go line's default GODEBUG (every go.mod has one), GOEXPERIMENT and build tags (boringcrypto is on no page read), syscall.Getenv, os.Setenv(\"GODEBUG\"), environment set by a Kubernetes manifest (name/value on two lines)."
+
+[[ecosystems.spellings]]
+id = "os-getenv"
+spelling = "os.Getenv(NAME)"
+source = "https://pkg.go.dev/os"
+quote = "Getenv retrieves the value of the environment variable named by the key."
+file = "kem.go"
+snippet = '''
+package kem
+
+import "os"
+
+func Scheme() string {
+    name := os.Getenv("KEM_SCHEME")
+    return name
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 6, setting = "KEM_SCHEME"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package kem
+
+import "os"
+
+func Scheme() string {
+    alg := os.Getenv("SIGN_ALG")
+    return alg
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 6, setting = "SIGN_ALG"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package kem
+
+import "os"
+
+func Scheme() string {
+    s := os.Getenv(`KEM_SCHEME`)
+    return s
+}
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package kem
+
+import "os"
+
+const envScheme = "KEM_SCHEME"
+
+func Scheme() string {
+    return os.Getenv(envScheme)
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 8}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package kem
+
+import "os"
+
+func Ciphers() string {
+    return os.Getenv("TLS_CIPHER_SUITES")
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 6}}]}
+
+[[ecosystems.spellings]]
+id = "os-lookupenv"
+spelling = "v, ok := os.LookupEnv(NAME)"
+source = "https://pkg.go.dev/os"
+quote = "LookupEnv retrieves the value of the environment variable named by the key. If the variable is present in the environment the val"
+file = "kem.go"
+snippet = '''
+package kem
+
+import "os"
+
+func Scheme() string {
+    name, ok := os.LookupEnv("KEM_SCHEME")
+    if !ok {
+        return "MLKEM768-X25519"
+    }
+    return name
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 6}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package kem
+
+import "os"
+
+func Curves() string {
+    if v, found := os.LookupEnv("TLS_CURVES"); found {
+        return v
+    }
+    return ""
+}
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package kem
+
+import "os"
+
+const sigEnv = "SIGNATURE_SCHEME"
+
+func Scheme() string {
+    s, _ := os.LookupEnv(sigEnv)
+    return s
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 8}}]}
+
+[[ecosystems.spellings]]
+id = "os-expandenv"
+spelling = "os.ExpandEnv(\"$NAME\")"
+source = "https://pkg.go.dev/os"
+quote = "ExpandEnv replaces ${var} or $var in the string according to the values of the current environment variables."
+file = "kem.go"
+snippet = '''
+package kem
+
+import "os"
+
+func Scheme() string {
+    return os.ExpandEnv("${KEM_SCHEME}")
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 6}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package kem
+
+import "os"
+
+func Scheme() string {
+    return os.ExpandEnv("$SIGN_ALG")
+}
+'''
+
+[[ecosystems.spellings]]
+id = "os-environ-compare"
+spelling = "for _, kv := range os.Environ() { ... \"NAME=\" ... }"
+source = "https://pkg.go.dev/os"
+quote = "Environ returns a copy of strings representing the environment, in the form \"key=value\"."
+file = "kem.go"
+snippet = '''
+package kem
+
+import (
+    "os"
+    "strings"
+)
+
+func Scheme() string {
+    for _, kv := range os.Environ() {
+        if strings.HasPrefix(kv, "KEM_SCHEME=") {
+            return strings.TrimPrefix(kv, "KEM_SCHEME=")
+        }
+    }
+    return ""
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package kem
+
+import (
+    "os"
+    "strings"
+)
+
+func Scheme() string {
+    for _, kv := range os.Environ() {
+        k, v, _ := strings.Cut(kv, "=")
+        if k == "SIGN_ALG" {
+            return v
+        }
+    }
+    return ""
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "kem.go", line = 11}}]}
+
+[[ecosystems.spellings]]
+id = "gomod-require-line"
+spelling = "require MODULE VERSION"
+source = "https://go.dev/ref/mod"
+quote = "A require directive declares a minimum required version of a given module dependency."
+file = "go.mod"
+snippet = '''
+module example.com/app
+
+go 1.24
+
+require github.com/cloudflare/circl v1.6.1
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", line = 5, package = "github.com/cloudflare/circl", version = "v1.6.1"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+module example.com/app
+
+go 1.24
+
+require golang.org/x/crypto v0.40.0
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", line = 5, package = "golang.org/x/crypto", version = "v0.40.0"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+module example.com/app
+
+go 1.24
+
+require github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", line = 5, package = "github.com/golang-jwt/jwt/v5", version = "v5.2.2"}}]}
+
+[[ecosystems.spellings]]
+id = "gomod-require-block"
+spelling = "require ( MODULE VERSION // indirect )"
+source = "https://go.dev/ref/mod"
+quote = "require golang.org/x/net v1.2.3 require ( golang.org/x/crypto v1.4.5 // indirect golang.org/x/text v1.6.7 )"
+file = "go.mod"
+snippet = '''
+module example.com/app
+
+go 1.24
+
+require (
+    golang.org/x/text v0.20.0
+    golang.org/x/crypto v0.40.0 // indirect
+)
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", line = 7, package = "golang.org/x/crypto", version = "v0.40.0"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+module example.com/app
+
+go 1.24
+
+require (
+	github.com/go-jose/go-jose/v4 v4.1.0
+	github.com/tink-crypto/tink-go/v2 v2.4.0
+)
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", line = 7, package = "github.com/tink-crypto/tink-go/v2", version = "v2.4.0"}}]}
+
+[[ecosystems.spellings]]
+id = "gomod-replace"
+spelling = "replace MODULE => PATH or MODULE VERSION"
+source = "https://go.dev/ref/mod"
+quote = "replace golang.org/x/net v1.2.3 => example.com/fork/net v1.4.5"
+file = "go.mod"
+snippet = '''
+module example.com/app
+
+go 1.24
+
+require golang.org/x/crypto v0.40.0
+
+replace golang.org/x/crypto => ../crypto
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", line = 5, package = "golang.org/x/crypto", version = "v0.40.0", replaced_by = "../crypto"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+module example.com/app
+
+go 1.24
+
+require golang.org/x/crypto v0.40.0
+
+replace golang.org/x/crypto v0.40.0 => example.com/fork/crypto v0.41.0
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", line = 5, package = "golang.org/x/crypto", replaced_by = "example.com/fork/crypto v0.41.0"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+module example.com/app
+
+go 1.24
+
+require (
+    github.com/cloudflare/circl v1.6.1
+)
+
+replace (
+    github.com/cloudflare/circl v1.6.1 => ./third_party/circl
+)
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", line = 6, package = "github.com/cloudflare/circl", version = "v1.6.1", replaced_by = "./third_party/circl"}}, {at = "evidence.dependencies", match = {path = "go.mod", line = 10}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "gomod-exclude"
+spelling = "exclude ( MODULE VERSION ) -- not a requirement"
+source = "https://go.dev/ref/mod"
+quote = "exclude golang.org/x/net v1.2.3 exclude ( golang.org/x/crypto v1.4.5 golang.org/x/text v1.6.7 )"
+file = "go.mod"
+snippet = '''
+module example.com/app
+
+go 1.24
+
+exclude (
+    golang.org/x/crypto v0.1.0
+)
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", package = "golang.org/x/crypto"}, absent = true}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+module example.com/app
+
+go 1.24
+
+exclude github.com/cloudflare/circl v1.0.0
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.mod", package = "github.com/cloudflare/circl"}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "gosum-line"
+spelling = "go.sum MODULE VERSION h1:HASH"
+source = "https://go.dev/ref/mod"
+quote = "Each line in go.sum has three fields separated by spaces: a module path, a version (possibly ending with /go.mod ), and"
+file = "go.sum"
+snippet = '''
+golang.org/x/crypto v0.40.0 h1:r4x+VvoG5Fm+eJcxMaY8CQM7Lb0l1lsmjGBQ6s8BfKM=
+golang.org/x/crypto v0.40.0/go.mod h1:Qr1vMJLKqGkREjyU6wBeZZBVIJ2OkvXNBr7Bb3R8Cjs=
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "go.sum", line = 1, package = "golang.org/x/crypto", version = "v0.40.0"}}, {at = "evidence.dependencies", match = {path = "go.sum", line = 2}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "vendor-modules-txt"
+spelling = "vendor/modules.txt # MODULE VERSION"
+source = "https://go.dev/ref/mod"
+quote = "If the file vendor/modules.txt is present and consistent with go.mod , there is no need to explicitly use the -mod=vendor flag."
+file = "vendor/modules.txt"
+snippet = '''
+# github.com/cloudflare/circl v1.6.1
+## explicit; go 1.22
+github.com/cloudflare/circl/kem
+'''
+expect = {rows = [{at = "evidence.dependencies", match = {path = "vendor/modules.txt", line = 1, package = "github.com/cloudflare/circl", version = "v1.6.1"}}]}
+
+[[ecosystems.spellings]]
+id = "gomod-godebug-line"
+spelling = "godebug NAME=VALUE (go.mod)"
+source = "https://go.dev/ref/mod"
+quote = "A godebug directive declares a single GODEBUG setting to apply when this module is the main module."
+file = "go.mod"
+snippet = '''
+module example.com/app
+
+go 1.24
+
+godebug tlsmlkem=0
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "go.mod", line = 5, setting = "tlsmlkem", value = "0", kind = "go_setting"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+module example.com/app
+
+go 1.23
+
+godebug rsa1024min=0
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "go.mod", line = 5, setting = "rsa1024min", value = "0", kind = "go_setting"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+module example.com/app
+
+go 1.24
+
+godebug default=go1.21
+godebug x509sha1=1
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "go.mod", line = 6, setting = "x509sha1", value = "1"}}, {at = "chosen_outside_files.places", match = {path = "go.mod", line = 5}, absent = true}]}
+
+[[ecosystems.spellings.variants]]
+file = "go.work"
+snippet = '''
+go 1.24
+
+use ./app
+
+godebug fips140=on
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "go.work", line = 5, setting = "fips140", value = "on"}}]}
+
+[[ecosystems.spellings]]
+id = "gomod-godebug-block"
+spelling = "godebug ( NAME=VALUE ... ) (go.mod, go.work)"
+source = "https://go.dev/ref/mod"
+quote = "Example: godebug default=go1.21 godebug ( panicnil=1 asynctimerchan=0 )"
+file = "go.mod"
+snippet = '''
+module example.com/app
+
+go 1.24
+
+godebug (
+    panicnil=1
+    tlsmlkem=0
+)
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "go.mod", line = 7, setting = "tlsmlkem", value = "0"}}, {at = "chosen_outside_files.places", match = {path = "go.mod", line = 6}, absent = true}]}
+
+[[ecosystems.spellings.variants]]
+file = "go.work"
+snippet = '''
+go 1.24
+
+use ./app
+
+godebug (
+	tlssha1=1
+	x509rsacrt=0
+)
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "go.work", line = 6, setting = "tlssha1", value = "1"}}, {at = "chosen_outside_files.places", match = {path = "go.work", line = 7, setting = "x509rsacrt", value = "0"}}]}
+
+[[ecosystems.spellings]]
+id = "go-debug-directive"
+spelling = "//go:debug NAME=VALUE"
+source = "https://go.dev/doc/godebug"
+quote = "//go:debug default=go1.21 //go:debug panicnil=1 //go:debug asynctimerchan=0"
+file = "main.go"
+snippet = '''
+//go:debug tlsmlkem=0
+package main
+
+func main() {}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "main.go", line = 1, setting = "tlsmlkem", value = "0", kind = "go_setting"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+// Command server.
+//go:debug panicnil=1
+//go:debug tlsrsakex=1
+package main
+
+func main() {}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "main.go", line = 3, setting = "tlsrsakex", value = "1"}}, {at = "chosen_outside_files.places", match = {path = "main.go", line = 2}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "godebug-environment"
+spelling = "GODEBUG=NAME=VALUE,... (the program's environment)"
+source = "https://go.dev/doc/godebug"
+quote = "if a Go program is running in an environment that contains GODEBUG=http2client=0,http2server=0 then that Go program will disable the use of HTTP/2"
+file = "run.sh"
+snippet = '''
+#!/bin/sh
+GODEBUG=http2client=0,tlsmlkem=0 ./server
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "run.sh", line = 2, setting = "tlsmlkem", value = "0", kind = "go_setting"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+#!/bin/sh
+export GODEBUG="fips140=only"
+exec ./server
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "run.sh", line = 2, setting = "fips140", value = "only"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Dockerfile"
+snippet = '''
+FROM gcr.io/distroless/static
+ENV GODEBUG=x509sha1=1
+COPY server /server
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "Dockerfile", line = 2, setting = "x509sha1", value = "1"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+#!/bin/sh
+GODEBUG=http2client=0 ./server
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "run.sh", line = 2}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "gofips140-build"
+spelling = "GOFIPS140=VALUE go build"
+source = "https://go.dev/doc/security/fips140"
+quote = "The GOFIPS140 environment variable can be used with go build , go install , and go test to select the version of the Go Cryptographic Module to be linked into the executable program"
+file = "build.sh"
+snippet = '''
+#!/bin/sh
+GOFIPS140=v1.0.0 go build -o server ./cmd/server
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "build.sh", line = 2, setting = "GOFIPS140", value = "v1.0.0", kind = "go_setting"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+#!/bin/sh
+export GOFIPS140=latest
+go build ./...
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "build.sh", line = 2, setting = "GOFIPS140", value = "latest"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Dockerfile"
+snippet = '''
+FROM golang:1.25 AS build
+ENV GOFIPS140=certified
+RUN go build -o /server ./cmd/server
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "Dockerfile", line = 2, setting = "GOFIPS140", value = "certified"}}]}
