@@ -443,7 +443,12 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
                     "A place with `kind: remote_timestamp` is an RFC 3161 time-stamp request: "
                     "the authority signs the token with its own key and algorithm "
                     "(`key_location: tsa`); `hash_choice` is the messageImprint hash the request "
-                    "asks for, or the default of the library in use where none is written"),
+                    "asks for, or the default of the library in use where none is written. "
+                    "A place with `kind: go_setting` is a GODEBUG setting that switches the Go "
+                    "standard library's cryptography (`tlsmlkem=0`, `fips140=only`) or a "
+                    "GOFIPS140 build setting, written in go.mod, go.work, a //go:debug line or "
+                    "an environment (`setting`, `value`); the GODEBUG the program runs with can "
+                    "still replace it"),
         "count": len(places), "places": places}
     _library_default_key_exchange(result)
     _authentication_not_read(result, repo_path)

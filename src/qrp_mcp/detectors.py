@@ -162,6 +162,9 @@ CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
                     # selects a bootloader's signature type, and a Caddyfile is a TLS
                     # server's whole configuration (ZA-OPRAVYANE rows 79 and 52).
                     "Dockerfile", "Containerfile", "Kconfig", "Caddyfile",
+                    # A Go workspace: its godebug lines set the programs' GODEBUG
+                    # (go.dev/doc/godebug; external/Go, 24.11.2026).
+                    "go.work",
                     # Postfix's main.cf and master.cf: its TLS protocols, ciphers and curves
                     # (postconf(5); ZA-OPRAVYANE row 336).
                     "main.cf", "master.cf",
@@ -5586,6 +5589,75 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     return out
 
 
+# external/Go (24.11.2026): a GODEBUG setting switches what the standard library's cryptography
+# does -- `tlsmlkem=0` drops X25519MLKEM768 from the default groups, `rsa1024min=0` allows RSA keys
+# under 1024 bits, `fips140=only` refuses what is not FIPS 140-3 (go.dev/doc/godebug,
+# go.dev/doc/security/fips140) -- and GOFIPS140 picks the Go Cryptographic Module a build links. Each
+# is a place: the choice is made there, not on the line that calls crypto/tls. Written as a `godebug`
+# line or block of go.mod or go.work, a `//go:debug` directive, or `GODEBUG=` / `GOFIPS140=` in a
+# script's or a Dockerfile's environment. Only the settings whose names concern cryptography
+# (buildgap._GODEBUG_CRYPTO): `http2client=0` is not one. A value read from elsewhere (`$X`) is not
+# a setting written here.
+GO_SETTING_BYTES = re.compile(rb"godebug|go:debug|GODEBUG|GOFIPS140")
+_GO_DEBUG_DIRECTIVE = re.compile(r"^//go:debug\s+([\w.-]+)=(\S+)\s*$")
+_GO_MOD_GODEBUG = re.compile(r"^\s*godebug\s+([\w.-]+)=(\S+)\s*(?://.*)?$")
+_GO_MOD_GODEBUG_LINE = re.compile(r"^\s*([\w.-]+)=(\S+)\s*(?://.*)?$")
+_GO_ENV_SETTING = re.compile(r"\b(GODEBUG|GOFIPS140)\s*[=:]\s*[\"']?([^\s\"'$]+)")
+
+
+def _go_crypto_setting(name: str) -> bool:
+    from .buildgap import _GODEBUG_CRYPTO  # local: the one list of crypto GODEBUG prefixes
+    return name.startswith(_GODEBUG_CRYPTO)
+
+
+def go_settings(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    name = rel_path.rsplit("/", 1)[-1]
+    module_file = name in ("go.mod", "go.work")
+    block = False
+
+    def add(number: int, setting: str, value: str, read_from: str) -> None:
+        out.append({"path": rel_path, "line": number, "setting": setting, "value": value,
+                    "read_from": read_from, "kind": "go_setting",
+                    "excerpt": lines[number - 1].strip()[:200],
+                    "in_test_code": in_test_code(rel_path)})
+
+    for number, text in enumerate(lines, 1):
+        stripped = text.strip()
+        if module_file:
+            if block:
+                if stripped == ")":
+                    block = False
+                    continue
+                match = _GO_MOD_GODEBUG_LINE.match(text)
+                if match and _go_crypto_setting(match.group(1)):
+                    add(number, match.group(1), match.group(2), f"godebug ({name})")
+                continue
+            if re.match(r"godebug\s*\($", stripped):
+                block = True
+                continue
+            match = _GO_MOD_GODEBUG.match(text)
+            if match and _go_crypto_setting(match.group(1)):
+                add(number, match.group(1), match.group(2), f"godebug ({name})")
+            continue
+        if rel_path.endswith(".go"):
+            match = _GO_DEBUG_DIRECTIVE.match(stripped)
+            if match and _go_crypto_setting(match.group(1)):
+                add(number, match.group(1), match.group(2), "//go:debug")
+            continue
+        if stripped.startswith(("#", "//")):
+            continue
+        for match in _GO_ENV_SETTING.finditer(text):
+            if match.group(1) == "GOFIPS140":
+                add(number, "GOFIPS140", match.group(2), "GOFIPS140")
+                continue
+            for pair in match.group(2).split(","):
+                key, eq, value = pair.partition("=")
+                if eq and value and _go_crypto_setting(key):
+                    add(number, key, value, "GODEBUG")
+    return out
+
+
 # Row 528 (audit #17), decided 17.11: a signature made by a remote service or an agent, whose key
 # and algorithm are not in the files, is a place in chosen_outside_files, as an environment read
 # is. boto3 KMS `sign(...)` with no algorithm written on the line (AWS KMS API Sign:
@@ -6386,6 +6458,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         taken = {(p["path"], p["line"]) for p in runtime_choices_found}
         runtime_choices_found.extend(p for p in remote_signing(rel_path, lines)
                                      if (p["path"], p["line"]) not in taken)
+    if GO_SETTING_BYTES.search(raw):
+        # external/Go: GODEBUG and GOFIPS140 settings (go_settings).
+        runtime_choices_found.extend(go_settings(rel_path, lines))
     if TIMESTAMP_BYTES.search(raw):
         taken = {(p["path"], p["line"]) for p in runtime_choices_found}
         runtime_choices_found.extend(p for p in remote_timestamps(rel_path, lines)
