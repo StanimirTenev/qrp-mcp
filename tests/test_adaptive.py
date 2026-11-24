@@ -66,17 +66,19 @@ def test_each_ecosystem_used_is_listed_with_the_rule_that_found_it(tmp_path):
 def test_status_is_read_against_the_catalogue(tmp_path):
     result = scan_directory(_write(tmp_path, ECO_TREE))
     py = _eco(result, "Py")
-    # external/Py is in the catalogue; keysize, sign ... of Python are not.
+    # external/Py and keysize/Py are in the catalogue (keysize/Py since 24.11.2026); sign ... of
+    # Python are not.
     assert py["status"] == "partially_closed"
-    assert py["closed_operations"] == ["external"]
-    assert "keysize" in py["open_operations"]
+    assert py["closed_operations"] == ["external", "keysize"]
+    assert "sign" in py["open_operations"]
     assert "here we may miss" in py["may_miss"]
     # A tree without a VRF: vrf/Go is in the catalogue (row 535), but counts only where the scan
-    # found a VRF (independent review of 0.51.0, 19.11: Vault read `partially_closed`).
+    # found a VRF (independent review of 0.51.0, 19.11: Vault read `partially_closed`). Since
+    # external/Go is in the catalogue too (24.11.2026), Go's one known operation is closed.
     go = _eco(result, "Go")
-    assert go["status"] == "not_closed" and go["closed_operations"] == []
-    assert go["open_operations"] == ["external"] and "vrf" not in go["known_operations"]
-    assert go["may_miss"].startswith("here we may miss")
+    assert go["status"] == "closed" and go["closed_operations"] == ["external"]
+    assert go["open_operations"] == [] and "vrf" not in go["known_operations"]
+    assert "may_miss" not in go
     rust = _eco(result, "Rust")
     assert rust["status"] == "not_closed" and "vrf" not in rust["known_operations"]
     js = _eco(result, "JS")
@@ -379,8 +381,9 @@ def test_vrf_counts_where_the_scan_found_a_vrf(tmp_path):
     result = scan_directory(_write(tmp_path, tree))
     assert "vrf" in result["summary"]["by_role"]
     go = _eco(result, "Go")
-    assert go["status"] == "partially_closed" and go["closed_operations"] == ["vrf"]
-    assert go["open_operations"] == ["external"] and "vrf" in go["known_operations"]
+    # external/Go is in the catalogue since 24.11.2026: with the VRF found, both are closed.
+    assert go["status"] == "closed" and go["closed_operations"] == ["external", "vrf"]
+    assert go["open_operations"] == [] and "vrf" in go["known_operations"]
     # The tree has no Rust VRF; Rust's status does not move with Go's.
     assert "vrf" not in _eco(result, "Rust")["closed_operations"]
 
@@ -397,4 +400,6 @@ def test_a_vrf_only_in_test_code_does_not_move_the_status(tmp_path):
                                              "func e(s []byte, k *[64]byte) { vrf.Prove(s, k) }\n"}
     result = scan_directory(_write(tmp_path, tree))
     go = _eco(result, "Go")
-    assert go["status"] == "not_closed" and "vrf" not in go["known_operations"]
+    # external/Go is closed (24.11.2026); a VRF in test code still adds no operation.
+    assert go["status"] == "closed" and "vrf" not in go["known_operations"]
+    assert go["closed_operations"] == ["external"]
