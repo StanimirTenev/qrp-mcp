@@ -187,12 +187,15 @@ test.
   package carries a catalogue of the documented spellings (`src/qrp_mcp/data/operations/*.toml`),
   each with the page it comes from and the words quoted from it. Every spelling is a test: it is
   written to a file, scanned, and expected on its line (`tests/test_operation_closure.py`). In
-  0.52.0 the catalogue holds 19 pairs and 1,321 sourced spellings: IKE/IPsec, the public-key names
-  of seven C libraries, key files and key sizes in PKI, key sizes in .NET, TLS endpoints and TLS
-  groups in nginx-style configuration, SSH algorithms, liboqs and hash-based signatures in C,
-  Python dependencies, environment reads and RFC 3161 time-stamp requests, ECVRF (RFC 9381)
-  in Go and Rust, and `rng_source` in seven ecosystems (48 spellings): the random number
-  generators the code calls, below.
+  0.53.0 the catalogue holds 29 pairs and 1,848 sourced spellings: IKE/IPsec; public-key names in
+  C, Java and .NET; key sizes in PKI, .NET, Java, C and Python; key files and post-quantum keys and
+  certificates in PKI; signing in .NET and in CI; symmetric and hash choices in .NET; TLS endpoints
+  and TLS groups in nginx-style configuration; SSH algorithms; liboqs and hash-based signatures
+  in C; Python dependencies and environment reads, and environment and GODEBUG settings in Go;
+  ECVRF (RFC 9381) in Go and Rust; and `rng_source` in seven ecosystems (48 spellings), the random
+  number generators the code calls, below. From 0.53.0 a spelling can carry `variants`, the same
+  spelling with its free parts (a variable, setting or receiver name) changed, each its own test:
+  two gaps inside closed pairs (rows 540, 546) came from a catalogue that held those parts fixed.
 - **`randomness`: the generators the code calls, as context.** Each generator API called on a line
   is a row in one of three classes, from the generator's own documentation: `weak` (a non-cryptographic
   PRNG: Python `random` and `numpy.random`, Go `math/rand` and `math/rand/v2`,
@@ -225,7 +228,8 @@ test.
   are read from the finished result and change no row of it:
   - `ecosystems` names every ecosystem among the files read, with the rule that put it there, and
     says `closed`, `partially_closed` or `not_closed` against the catalogue, with "here we may
-    miss" where it is not closed;
+    miss" where it is not closed; from 0.53.0 `not_attributed` counts and lists the files read
+    that no rule puts in any ecosystem, with the same "here we may miss" (also in the CBOM);
   - `angles` sets dependency, code and configuration against each other: "declared, not seen",
     "seen, not declared", and `not_compared` where the imports of an ecosystem are not read (Go,
     Rust, Java, .NET, Ruby, PHP);
@@ -236,7 +240,7 @@ test.
   - `where_to_look` puts the three in one list, production code first.
 
   `operation_closure` and these four sections are in the scan JSON, the `scan_repo` tool and
-  `scan --out`. The CBOM and SARIF do not carry them.
+  `scan --out`. The SARIF does not carry them; the CBOM carries only `not_attributed`.
 - **Self-tuning, for the maintainer.** `tools/catalogue_refresh.py` is in the repository, not in
   the installed package, and is run by hand. It fetches each page the catalogue cites (or reads a
   saved copy with `--pages`), looks for names with that page's own pattern, and writes what the
@@ -250,9 +254,9 @@ test.
 quotation, and after that a candidate becomes a closure test. In the first judged round, of
 the 119 candidates the scanner was silent on, 21 were real spellings of their operation and 12 of
 those were gaps the scanner missed (they are closed in 0.50.0); the other candidates were noise or
-unclear. That figure is for those 119, not for all the candidates. Under the strict rule no
-ecosystem is `closed` today: an ecosystem is closed when the catalogue holds every operation
-in which a gap has been recorded for it, and PKI, the nearest, still lacks one. A spelling the
+unclear. That figure is for those 119, not for all the candidates. Under the strict rule an
+ecosystem is closed when the catalogue holds every operation in which a gap has been recorded
+for it; in 0.53.0 two are, PKI and Go, and the others are `partially_closed` or `not_closed`. A spelling the
 documentation does not list, or a page the catalogue does not cite, can still be missed.
 
 Why the operation and not the line, and what waiting for the first report costs, is set out in

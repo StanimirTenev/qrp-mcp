@@ -4,6 +4,54 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## 0.53.0 (2026-11-24)
+
+Detection changes: findings and their fingerprint move. Ten more (operation, ecosystem) pairs are
+closed, two closed pairs now vary their free parts, and a file read in no ecosystem is said so.
+
+- **What was wrong.** Almost every outside test after 0.50.0 found a scanner gap. Sorting those
+  rows against the closure catalogue showed two kinds. Most were outside every closed pair: the
+  space of pairs is large and 19 were closed. Two were inside closed pairs: ECVRF in Go (row 540)
+  and an environment read in Python (row 546). There the catalogue held each spelling with one
+  variable name, setting name or receiver, so a different name was never tested. Separately, a
+  file read in no ecosystem (an ECH key in JSON, an HTTPS record in a zone file, from Dong's ECH
+  bench) got no "here we may miss" at all, and any `.zone` file was counted as DNSSEC.
+- **Variants.** A catalogue spelling may now carry `variants`: the same documented spelling with
+  its free parts changed. Each variant is its own test. external/Py and vrf/Go were rewritten
+  with them; before the fix 13 variants failed, after it none.
+- **`ecosystems.not_attributed`.** Files read that no rule puts in an ecosystem are counted and
+  listed with "here we may miss", and `where_to_look` gets one `files_not_attributed` row. It
+  reaches the scan JSON, `scan_repo`, `scan --out` and the CBOM (`qrp:ecosystems:not_attributed:*`).
+  A zone file is DNSSEC only when it holds a DNSSEC record (DNSKEY, RRSIG, DS, NSEC/NSEC3, CDS,
+  CDNSKEY).
+- **Ten pairs closed, chosen before the work** (ZATVARYANE.md, stage 4): keysize in Java, C and
+  Python; apiname in Java and .NET; sign in .NET and CI; symhash in .NET; pqc in PKI; external in
+  Go. All ten closed; none had to ship open. The catalogue now holds 29 pairs and 1,848 sourced
+  spellings, each with its quotation checked against a saved copy of its page. Under the strict
+  rule two ecosystems are now `closed`: PKI and Go.
+- **Also fixed:** row 548, hybrid KEM names from a Go registry string (`mlkem768-x25519`) now give
+  both halves, and the CBOM shows the hybrid depending on each.
+- **New output.** `kind: go_setting` places (crypto GODEBUG settings, `//go:debug`, `GOFIPS140`);
+  `replaced_by` on a go.mod dependency; `go.work` is read; ci_pipeline types `notation_sign`,
+  `minisign_sign`, `ssh_keygen_sign`, `sigstore_action`; signing steps `set_authenticodesignature`,
+  `mage_sign`, `nuget_sign`, `sn_sign`, `strong_name_sign` with `strong_name_mode`; `.vbproj` read
+  for signing steps.
+- **How it is pinned.** Every new spelling and variant fails on 0.52.2 and passes here; each fix
+  was reverted alone and its cases turned red. Positive control on pinned public repositories
+  (santuario, jjwt, wolfssl-examples, Mbed TLS, OpenSSL demos, hpqc, smallstep, paramiko, cosign,
+  certbot, cfssl, nuclei, sigstore-python, Vault and others): every new or changed row was read
+  against its source line. On the 185-repository corpus, as disagreement with a model and not
+  as recall or precision: A' (the labeller names an algorithm, the scanner is silent) is unchanged
+  in both splits; B' (the scanner reports, the labeller does not) rises by 2 ECDSA chunks in the
+  training split and is unchanged in the held-out one. Each was read: a Java `Signature.getInstance`
+  of a same-file constant `"SHA256WithECDSA"` (GrapheneOS Auditor) and .NET `VerifyData` on an
+  `ECDsa` key (fido2-net-lib). Both are ECDSA; the name is outside the labelled chunk.
+- **What is not claimed.** That a closed pair cannot miss: a spelling the cited documentation
+  does not list is not tested. Not covered, by name: GOEXPERIMENT and build tags; composite
+  ML-KEM (draft OIDs); a receiver typed two ways in one file; Kotlin `const val` sizes. certreq
+  `.inf`, mage, nuget, `sn -R` and `CALG_*` pass their catalogue cases but fired in no control
+  repository.
+
 ## 0.52.2 (2026-11-23)
 
 Findability only. No detection, coverage or output change.

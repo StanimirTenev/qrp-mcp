@@ -64,7 +64,10 @@ DNSSEC Algorithm Numbers, read 22 Oct 2026), only in the shape of a record — `
 `static-key`/`initial-key`/`static-ds`/`initial-ds` trust anchors: 1, 5, 7, 8, 10 RSA; 2 DH;
 3, 6 DSA; 13, 14 ECDSA with the curve; 15 Ed25519; 16 Ed448; 17 SM2; 18 ML-DSA. A bare `8`
 is a number, not RSA. ECC-GOST (12, 23) is GOST R 34.10 from 0.36.0 (before, it was left unnamed). `.zone` files are
-read. Not read: PowerDNS's `ecdsa256`/`ecdsa384` as DNSSEC names — they are found as ECDSA by the
+read. From 0.53.0 a `.zone` file counts in the DNSSEC ecosystem only when it holds a DNSSEC record
+(`DNSKEY`, `RRSIG`, `DS`, `NSEC`, `NSEC3`, `NSEC3PARAM`, `CDS`, `CDNSKEY`); an unsigned zone (an
+`HTTPS` record with `ech=`, say) is still read, and is listed in `ecosystems.not_attributed` with
+"here we may miss". Not read: PowerDNS's `ecdsa256`/`ecdsa384` as DNSSEC names — they are found as ECDSA by the
 ordinary rule, without a curve, because the same word is a variable name in OpenSSH; a bare `DSA`
 (algorithm 3) as a mnemonic; the `.private` files `dnssec-keygen` writes; zone files saved under
 other names (`db.example`).
