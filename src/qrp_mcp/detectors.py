@@ -4640,6 +4640,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _dotnet_signing_receivers(findings, lines, rel_path)
     findings = _dotnet_aes_ecb(findings, lines, rel_path)
     findings = _rfc2898_default_sha1(findings, lines, rel_path)
+    findings = _powershell_continued_hash(findings, lines, rel_path)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5283,6 +5284,34 @@ def _rfc2898_default_sha1(findings: list[dict[str, Any]], lines: list[str], rel_
             added.append({"path": rel_path, "line": n, "algorithm": "SHA1",
                           "description": "SHA-1 as the default hash of Rfc2898DeriveBytes (no HashAlgorithmName given)",
                           "excerpt": line.strip()[:200], "evidence_kind": "call", "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 379 (its note: "the backtick lines not"; symhash/NET closure, zatv-a): a PowerShell
+# New-SelfSignedCertificate or Set-AuthenticodeSignature continued with backticks
+# (about_Parsing, "Line continuation") whose -HashAlgorithm SHA1/MD5 is on a later line of the
+# statement: a row of that hash on the -HashAlgorithm line.
+_PS_TOOL_START = re.compile(r"\b(?:New-SelfSignedCertificate|Set-AuthenticodeSignature)\b", re.IGNORECASE)
+_PS_HASH_ARGUMENT = re.compile(r"(?:^|\s)-HashAlgorithm\s+[\"']?(sha-?1|md5)\b", re.IGNORECASE)
+
+
+def _powershell_continued_hash(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith(_POWERSHELL_FILE):
+        return findings
+    added = []
+    for i, line in enumerate(lines):
+        if not _PS_TOOL_START.search(line) or not line.rstrip().endswith("`"):
+            continue
+        j = i
+        while j + 1 < len(lines) and lines[j].rstrip().endswith("`"):
+            j += 1
+            m = _PS_HASH_ARGUMENT.search(lines[j])
+            family = ("MD5" if m.group(1).lower() == "md5" else "SHA1") if m else None
+            if family and not any(f["line"] == j + 1 and f.get("algorithm") == family for f in findings + added):
+                added.append({"path": rel_path, "line": j + 1, "algorithm": family,
+                              "description": f"{family} named as the digest of a Windows signing or hashing tool",
+                              "excerpt": lines[j].strip()[:200], "evidence_kind": "reference",
+                              "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
