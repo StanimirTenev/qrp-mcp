@@ -145,7 +145,9 @@ DOTNET_CONFIG_NAME = re.compile(r"^(?:web|app|machine|applicationhost)(?:\.[\w-]
 # Scripts and build files read for signing commands as a pipeline is (ZA-OPRAVYANE rows 34,
 # 308, 387).
 SIGNING_SCRIPT_EXTENSIONS = {".sh", ".bash", ".zsh", ".ksh", ".bat", ".cmd",
-                             ".csproj", ".vcxproj", ".props", ".targets", ".mk"}
+                             ".csproj", ".vcxproj", ".props", ".targets", ".mk",
+                             # sign/NET closure (zatv-a): a VB.NET project signs as a C# one does.
+                             ".vbproj"}
 
 # The same files that carry no extension at all.
 CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
@@ -383,6 +385,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # include/openssl/dsa.h: the signing calls and the header (row 65).
         r"\bDSA_(?:do_)?(?:sign|verify)\b|[<\"]openssl/dsa\.h[>\"]|"
         r"\bDSACryptoServiceProvider\b|\bDSACng\b|\bDSA\.Create\b|"     # DSA.cs, row 70
+        # PowerShell's [System.Security.Cryptography.DSA]::Create() (apiname/NET closure, zatv-a)
+        r"\bDSA\]::Create\b|"
         r"(?<![A-Za-z])ssh-dss(?![A-Za-z])",
         re.IGNORECASE,
     )),
@@ -486,7 +490,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"\bDH_new\b|\bDH_generate_key\b|\bEVP_PKEY_DH\b|"
         r"\bgenerateKeyPair(?:Sync)?\(\s*[\"']dh[\"']|"      # Node, row 69
         # include/openssl/dh.h and the RFC 7919 group NIDs (crypto/objects/objects.txt).
-        r"\bDH_compute_key(?:_padded)?\b|\bNID_ffdhe\d+\b|[<\"]openssl/dh\.h[>\"]|"
+        # And the RFC 3526 ones DH_new_by_nid(3) lists, NID_modp_1536 ... NID_modp_8192
+        # (keysize/C closure, zatv-a).
+        r"\bDH_compute_key(?:_padded)?\b|\bNID_ffdhe\d+\b|\bNID_modp_\d{4}\b|[<\"]openssl/dh\.h[>\"]|"
         # Ruby, the Rust openssl crate, and BouncyCastle -- the vocabulary a rival
         # reads and this scanner did not. Fix #9 of the September comparison.
         r"\bdh\.compute_key\b|\bDh::generate_params\b|\bDh::from_params\b|"
@@ -505,6 +511,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"createHash\(\s*[\"']md5[\"']|openssl\s+dgst\s+-md5|"
         r"\bMD5_Init\b|\bMD5_Update\b|\bEVP_md5\b|"
         r"\bMD5CryptoServiceProvider\b|\bMD5\.Create\b|"
+        # PowerShell's [...MD5]::Create() and the CNG class MD5Cng (apiname/NET closure, zatv-a)
+        r"\bMD5\]::Create\b|\bMD5Cng\b|"
         # The idioms the comparison found in the wild: pyca objects, hashlib.new,
         # the BSD-style C calls and headers, and Go used without its import line.
         r"hashes\.MD5\s*\(|hashlib\.new\(\s*[\"']md5[\"']|"
@@ -751,7 +759,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # the EVP_des_ede* family (two- and three-key) must not fall in here.
         r"crypto/des\b|\bDES_set_key\w*|\bDES_ecb_encrypt\b|"
         r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b|\bdes\.NewCipher\b|"
-        r"\bDES\.Create\b|"                             # .NET DES.cs, row 70
+        r"\bDES\.Create\b|\bDES\]::Create\b|"          # .NET DES.cs, row 70; PowerShell [...DES]::Create()
         r"Crypto(?:dome)?\.Cipher\s+import\s+[^\n#]*\bDES\b|Crypto(?:dome)?\.Cipher\.DES\b|"   # row 71
         # Node passes the cipher name to OpenSSL: single DES in one of its modes, not
         # des-ede3-* (row 69).
@@ -932,7 +940,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?:WITH|With|with)SM2\b|\bcurveSM2\b|\bEVP_PKEY_SM2\b|\bsm2p256v1\b")),
     ("ElGamal", "ElGamal usage", re.compile(r"\bElGamal\w*|\bELGAMAL\w*")),
     ("RC2", "RC2 usage", re.compile(
-        r"\bRC2(?:Engine|WrapEngine|ParameterSpec|CryptoServiceProvider)\b|\bRC2\.Create\b|"
+        r"\bRC2(?:Engine|WrapEngine|ParameterSpec|CryptoServiceProvider)\b|\bRC2\.Create\b|\bRC2\]::Create\b|"
         r"\bEVP_rc2\w*|\bRC2_(?:set_key|ecb_encrypt|encrypt|decrypt|cbc_encrypt|cfb64_encrypt|"
         r"ofb64_encrypt)\b|[<\"]openssl/rc2\.h[>\"]|\balgorithms\.RC2\b|\bARC2\.(?:new|MODE_\w+)\b|"
         r"Crypto(?:dome)?\.Cipher\s+import\s+[^\n#]*\bARC2\b|Crypto(?:dome)?\.Cipher\.ARC2\b|"
@@ -1274,16 +1282,42 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     *[(family, CNG_MACRO_RULE % family, re.compile(
         r"\bBCryptOpenAlgorithmProvider\s*\([^,]*,\s*BCRYPT_" + family + r"(?:_SIGN)?_ALGORITHM\b"))
       for family in ("RSA", "DSA", "DH")],
+    # apiname/NET closure (zatv-a): every CNG identifier macro of bcrypt.h a tracked family has
+    # (Learn, "CNG Algorithm Identifiers"), wherever it is written -- held in a local before the
+    # call, or the hash and cipher providers the rule above leaves out (BCRYPT_MD5_ALGORITHM).
+    # A rule of its own, after that one: a provider opened by macro keeps its description.
+    *[(family, f"{family} named by its CNG algorithm identifier macro (bcrypt.h)",
+       re.compile(r"\bBCRYPT_(?:" + ids + r")_ALGORITHM\b")) for family, ids in (
+        ("RSA", "RSA|RSA_SIGN"), ("DSA", "DSA"), ("DH", "DH"), ("ECDSA", "ECDSA|ECDSA_P256|ECDSA_P384|ECDSA_P521"),
+        ("ECDH", "ECDH|ECDH_P256|ECDH_P384|ECDH_P521"), ("MD5", "MD5"), ("MD4", "MD4"), ("MD2", "MD2"),
+        ("SHA1", "SHA1"), ("3DES", "3DES|3DES_112"), ("DES", "DES|DESX"), ("RC4", "RC4"), ("RC2", "RC2"))],
+    # apiname/NET closure (zatv-a): CryptoAPI's ALG_ID constants of wincrypt.h (Learn, ALG_ID),
+    # as CryptGenKey, CryptCreateHash or CryptDeriveKey take them, or held in a local first.
+    *[(family, f"{family} named by its CryptoAPI ALG_ID", re.compile(r"\bCALG_(?:" + ids + r")\b"))
+      for family, ids in (
+        ("RSA", "RSA_KEYX|RSA_SIGN"), ("DSA", "DSS_SIGN"), ("DH", "DH_SF|DH_EPHEM"), ("ECDSA", "ECDSA"),
+        ("ECDH", "ECDH|ECDH_EPHEM"), ("MD5", "MD5"), ("MD4", "MD4"), ("MD2", "MD2"), ("SHA1", "SHA1|SHA"),
+        ("3DES", "3DES|3DES_112"), ("DES", "DES"), ("RC4", "RC4"), ("RC2", "RC2"))],
     # Rows 379, 382, 383 (W1): the digest a Windows certificate, signing or hashing tool is
     # told to use -- New-SelfSignedCertificate -HashAlgorithm, signtool /fd and /td,
     # certutil -hashfile FILE ALG, makecert -a.
     *[(family, f"{family} named as the digest of a Windows signing or hashing tool",
        re.compile(
            r"\bNew-SelfSignedCertificate\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
-           r"\bsigntool(?:\.exe)?\s+sign\b[^\n]*\s/[ft]d\s+\"?" + name + r"\b|"
+           r"\bsigntool(?:\.exe)?\"?\s+sign\b[^\n]*\s/[ft]d\s+\"?" + name + r"\b|"
+           r"\bSet-AuthenticodeSignature\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
+           r"\bmage(?:\.exe)?\b[^\n]*\s-(?:a|Algorithm)\s+" + name + r"RSA\b|"
            r"\bcertutil(?:\.exe)?\s+-hashfile\s+\S+\s+" + name + r"\b|"
            r"\bmakecert(?:\.exe)?\b[^\n]*\s-a\s+" + name + r"\b", re.IGNORECASE))
       for family, name in (("SHA1", "sha-?1"), ("MD5", "md5"))],
+    # sign/NET closure (zatv-a): the XML-DSig signature methods of SignedXml -- "XmlDsigRSASHA1Url
+    # Represents the Uniform Resource Identifier (URI) for the standard RSA signature method",
+    # XmlDsigDSAUrl the DSA one, both over SHA-1 (Learn, SignedXml fields).
+    ("RSA", "RSA named by the XML-DSig signature method of SignedXml",
+     re.compile(r"\bXmlDsigRSASHA(?:1|256|384|512)Url\b")),
+    ("DSA", "DSA named by the XML-DSig signature method of SignedXml", re.compile(r"\bXmlDsigDSAUrl\b")),
+    ("SHA1", "SHA-1 named by the XML-DSig signature or digest method of SignedXml",
+     re.compile(r"\bXmlDsig(?:RSASHA1|DSA|SHA1)Url\b")),
     # Row 380: Rfc2898DeriveBytes without a HashAlgorithmName defaults to SHA-1 (SYSLIB0041).
     ("SHA1", "SHA-1 as the default hash of Rfc2898DeriveBytes (no HashAlgorithmName given)",
      re.compile(r"\bnew\s+Rfc2898DeriveBytes\s*\((?!.*HashAlgorithmName)(?=.*\)\s*;)")),
@@ -1923,7 +1957,8 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?=\s|$)")),
     ("openssl_sign", re.compile(r"\bopenssl\s+(dgst|smime|cms)\b.*-sign\b")),
     ("cosign_sign", re.compile(r"\bcosign\s+sign\b")),
-    ("signtool_sign", re.compile(r"\bsigntool\s+sign\b", re.IGNORECASE)),
+    # sign/NET closure (zatv-a): also `signtool.exe sign` and a quoted path, `& "...\\signtool.exe" sign`.
+    ("signtool_sign", re.compile(r"\bsigntool(?:\.exe)?\"?\s+sign\b", re.IGNORECASE)),
     ("jarsigner", re.compile(r"\bjarsigner\b")),
     # Row 367: the command, followed by an option -- not `/f codesign.pfx`.
     ("codesign", re.compile(r"(?:^|[\s;&|(/\"'])codesign\s+-")),
@@ -1948,6 +1983,23 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("tpm2_sign", re.compile(r"\btpm2_sign\b")),
     ("pkcs11_tool_sign", re.compile(r"\bpkcs11-tool\b[^|;&\n]*\s(?:--sign|-s)(?=\s|$)")),
     ("openssl_sign", re.compile(r"\bopenssl\s+pkeyutl\b[^|;&\n]*\s-sign\b")),
+    # sign/NET closure (zatv-a): PowerShell's Set-AuthenticodeSignature, "-HashAlgorithm ...
+    # For earlier versions, the default is SHA1" (Learn).
+    ("set_authenticodesignature", re.compile(r"\bSet-AuthenticodeSignature\b", re.IGNORECASE)),
+    # sign/NET closure (zatv-a): mage(1)'s -Sign of a ClickOnce manifest ("-a, -Algorithm sha1RSA ...
+    # Value must be "sha256RSA" or "sha1RSA"", Learn, Mage.exe).
+    ("mage_sign", re.compile(r"\bmage(?:\.exe)?\"?\s+(?:[^|;&\n]*\s)?-Sign\b", re.IGNORECASE)),
+    # sign/NET closure (zatv-a): `nuget sign` and `dotnet nuget sign` of a package, "-HashAlgorithm
+    # Hash algorithm to be used to sign the package. Defaults to SHA256" (Learn, both commands).
+    ("nuget_sign", re.compile(r"\b(?:dotnet\s+)?nuget(?:\.exe)?\s+sign\b", re.IGNORECASE)),
+    # sign/NET closure (zatv-a): the Strong Name tool's re-signing, "-R[a] assembly infile Re-signs a
+    # previously signed or delay-signed assembly with the key pair in infile" (Learn, Sn.exe), as a
+    # command: at the start of the line or after `&`, a quote or a parenthesis.
+    ("sn_sign", re.compile(r"(?:^|[\s&\"'(])sn(?:\.exe)?\"?\s+-Ra?(?=\s)")),
+    # Row 363 (sign/NET closure, zatv-a): MSBuild's strong naming, <SignAssembly>true</SignAssembly>
+    # with "AssemblyOriginatorKeyFile ... the file used to sign the assembly ( .snk or .pfx )" (Learn,
+    # Common MSBuild project properties), in a project or a props file. A condition on it is kept.
+    ("strong_name_sign", re.compile(r"<SignAssembly\b[^>]*>\s*true\s*</SignAssembly>", re.IGNORECASE)),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
@@ -2132,6 +2184,13 @@ _JCA_NAME_FAMILY.update({
     "OAEP": "RSA", "PSS": "RSA", "RSAPSS": "RSA", "RSA-KTS-KEM-KWS": "RSA", "DDSA": "DSA",
     "DHKEM": "ECDH",
 })
+# apiname/Java closure (zatv-a): Bouncy Castle's "DHU", Diffie-Hellman Unified (docs/specifications.md,
+# Key Agreement).
+_JCA_NAME_FAMILY.update({"DHU": "DH"})
+# apiname/Java closure (zatv-a): rawDSA, "NONEwithDSA ... also known as rawDSA" (Standard Algorithm
+# Names), in any case inside getInstance -- "Standard names are not case-sensitive". Outside a
+# getInstance call the rule above keeps RAWDSA case-sensitive.
+_JCA_NAME_FAMILY.update({"RAWDSA": "DSA"})
 
 
 # COSE algorithm identifiers (IANA "COSE Algorithms", algorithms.csv, read 23.10.2026), as
@@ -2182,6 +2241,11 @@ def scan_jca_names(line: str) -> list[tuple[str, int, str]]:
         family = _JCA_NAME_FAMILY.get(m.group(1).upper())
         if family:
             out.append((family, m.start(), m.group(1)))
+        # apiname/Java closure (zatv-a): a bare "ECDSA" signature is SHA-1 with ECDSA --
+        # '"ECDSA" is an ambiguous name for the "SHA1withECDSA" algorithm' (Standard Algorithm
+        # Names, Signature).
+        if m.group(1).upper() == "ECDSA" and line[m.start():m.start() + 10] == "Signature.":
+            out.append(("SHA1", m.start(), "ECDSA, which is SHA1withECDSA"))
     return out
 
 
@@ -2405,6 +2469,12 @@ _KEY_SIZE = re.compile(
     r"\bRsaPrivateKey::new\([^,]*,\s*(\d{3,5})\b|\bwc_MakeRsaKey\([^,]*,\s*(\d{3,5})\b|"
     r"\bEVP_RSA_gen\(\s*(\d{3,5})\b|set_rsa_keygen_bits\([^,]*,\s*(\d{3,5})\b|"
     r"RSAKeyGenParameterSpec\(\s*(\d{3,5})\b|"
+    # keysize/C, keysize/Java closure (zatv-a; row 400): OpenSSL's RSA_generate_multi_prime_key
+    # (rsa, bits, primes, e, cb), Mbed TLS mbedtls_rsa_gen_key(ctx, f_rng, p_rng, nbits, e),
+    # Bouncy Castle RSAKeyGenerationParameters(publicExponent, random, strength, certainty).
+    r"\bRSA_generate_multi_prime_key\(\s*[^,]*,\s*(\d{3,5})\b|"
+    r"\bmbedtls_rsa_gen_key\([^,]*,[^,]*,[^,]*,\s*(\d{3,5})\b|"
+    r"\bRSAKeyGenerationParameters\([^,]*,[^,]*,\s*(\d{3,5})\b|"
     # Row 518: python-pkcs11, `session.generate_keypair(KeyType.RSA, 3072)`.
     r"\bgenerate_keypair\(\s*KeyType\.RSA\s*,\s*(\d{3,5})\b|"
     # Rows 369, 370, 374 (W1): .NET `RSA.Create(1024)`, `new RSACryptoServiceProvider(512)`,
@@ -2428,11 +2498,26 @@ _KEY_SIZE_GENERIC = re.compile(
     r"\bDSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:DSACryptoServiceProvider|DSACng)\(\s*(\d{3,5})\s*[,)]|"
     # CryptGenKey's upper 16 bits for a Diffie-Hellman ALG_ID, as for RSA above (stage 3b).
     r"\bCryptGenKey\s*\([^,]*,\s*CALG_DH_(?:EPHEM|SF)\s*,\s*\(?\s*(\d{3,5})\s*<<\s*16\b|"
+    # keysize/C, keysize/Java closure (zatv-a; row 400): OpenSSL DSA/DH_generate_parameters_ex
+    # (key, bits, ...), wolfCrypt wc_MakeDsaParameters(rng, modulus_size, dsa) and
+    # wc_DhGenerateParams(rng, modSz, dh), JCA DHGenParameterSpec(primeSize, exponentSize) and
+    # DSAGenParameterSpec(primePLen, subprimeQLen).
+    r"\b(?:DSA|DH)_generate_parameters_ex\(\s*[^,]*,\s*(\d{3,5})\b|"
+    r"\b(?:wc_MakeDsaParameters|wc_DhGenerateParams)\(\s*[^,]*,\s*(\d{3,5})\b|"
+    r"\b(?:DH|DSA)GenParameterSpec\(\s*(\d{3,5})\b|"
     + _SIZE_OPTIONS,
     re.IGNORECASE)
 
 
 _MODP_GROUP = re.compile(r"(?<![A-Za-z])modp(\d{3,5})(?![0-9])", re.IGNORECASE)
+# keysize/C closure (zatv-a): a named Diffie-Hellman group is its prime's size -- OpenSSL's
+# DH_get_1024_160/2048_224/2048_256 (RFC 5114), NID_ffdhe2048 and the "ffdheNNNN" group names
+# (RFC 7919), NID_modp_1536 (RFC 3526), Mbed TLS MBEDTLS_DHM_RFC3526_MODP_2048_P_BIN and
+# MBEDTLS_DHM_RFC7919_FFDHE2048_P_BIN. Several on one line: the smallest, as for modp above.
+_DH_NAMED_GROUP = re.compile(
+    r"\bDH_get_(1024|2048)_(?:160|224|256)\b|(?<![A-Za-z0-9])ffdhe(2048|3072|4096|6144|8192)(?![0-9])|"
+    r"(?<![A-Za-z0-9])modp_(1536|2048|3072|4096|6144|8192)\b|_MODP_(1536|2048|3072|4096|6144|8192)_",
+    re.IGNORECASE)
 
 
 def key_size_on_line(line: str, family: str = "RSA") -> int | None:
@@ -2446,6 +2531,10 @@ def key_size_on_line(line: str, family: str = "RSA") -> int | None:
         offered = [int(n) for n in _MODP_GROUP.findall(line) if int(n) in registry._SIZES]
         if offered:
             return min(offered)
+    if family == "DH":
+        named = [int(next(g for g in m.groups() if g)) for m in _DH_NAMED_GROUP.finditer(line)]
+        if named:
+            return min(named)
     if family == "RSA" and "CryptGenKey" in line:
         hexed = _CRYPTGENKEY_HEX.search(line)
         if hexed and int(hexed.group(1), 16) in registry._SIZES:
@@ -4547,6 +4636,16 @@ def scan_source_file(path: Path, rel_path: str,
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
     _powershell_statement_size(findings, lines, rel_path)
+    _size_through_a_name(findings, lines)
+    _jca_initialised_later(findings, lines)
+    findings = _psa_key_bits(findings, lines, rel_path)
+    findings = _ossl_param_size(findings, lines, rel_path)
+    _wolfcrypt_ecc_bytes(findings, lines)
+    findings = _dotnet_signing_receivers(findings, lines, rel_path)
+    findings = _dotnet_aes_ecb(findings, lines, rel_path)
+    findings = _rfc2898_default_sha1(findings, lines, rel_path)
+    findings = _powershell_continued_hash(findings, lines, rel_path)
+    findings = _certreq_request_hash(findings, lines, rel_path)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -4792,6 +4891,11 @@ def _android_keystore_spec(findings: list[dict[str, Any]], lines: list[str]) -> 
             continue
         if uses and "key_use_in_block" not in f:
             f["key_use_in_block"] = " ".join(sorted(uses))
+        # keysize/Java closure (zatv-a): an RSA key's modulus, "for RSA keys this sets the
+        # modulus size" (KeyGenParameterSpec.Builder.setKeySize).
+        if (f["algorithm"] == "RSA" and len(sizes) == 1 and f.get("key_size") in (None, "undetermined")
+                and next(iter(sizes)) in registry._SIZES):
+            f["key_size"] = next(iter(sizes))
         if f["algorithm"] != "EC" or f.get("curve"):
             continue
         if len(curves) == 1:
@@ -4907,6 +5011,415 @@ def _dotnet_key_size_property(findings: list[dict[str, Any]], lines: list[str]) 
                     and f.get("evidence_kind") not in ("comment", "ban")
                     and assigned.search(lines[f["line"] - 1])):
                 f["key_size"] = int(m.group(2))
+
+
+# keysize/C, keysize/Java (closure zatv-a, rows 393, 395): the size argument written as a name the
+# file gives one number -- `int bits = 2048;`, `#define KEY_BITS 2048`, `static final int
+# KEY_SIZE = 2048;`, `val bits = 2048` -- read as that number, on the line of the call; and the
+# size rules asked again for every RSA, DSA or DH row still without a size, whatever rule made it
+# (`EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, 1024)` came from one that never asked them). A name
+# assigned twice, declared as a parameter, or set to something else stays unread.
+_SIZE_CONSTANT = re.compile(
+    r"^\s*#\s*define\s+([A-Za-z_]\w*)\s+\(?\s*(\d{3,5})\s*\)?\s*(?://.*|/\*.*)?$|"
+    r"(?:^|[\s(;{])(?:(?:static|final|const|constexpr|private|public|protected|internal|unsigned|signed|"
+    r"long|short|int|Int|Long|size_t|uint32_t|uint16_t|word32|var|val|let|auto)\s+)+"
+    r"([A-Za-z_]\w*)\s*(?::\s*\w+\s*)?=\s*\(?\s*(\d{3,5})\s*\)?\s*;?\s*(?://.*)?$")
+
+
+def size_constants(lines: list[str]) -> dict[str, int]:
+    """The names this file gives one key size: assigned exactly once, to a number a key can
+    have (a modulus, or the field of an EC curve), never assigned again or declared otherwise
+    (a method's `int bits` parameter)."""
+    found: dict[str, list[int]] = {}
+    for line in lines:
+        m = _SIZE_CONSTANT.search(line) if ("=" in line or "define" in line) else None
+        if m:
+            name, value = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+            found.setdefault(name, []).append(int(value))
+    text = "\n".join(lines)
+    out = {}
+    for name, values in found.items():
+        if len(values) != 1 or values[0] not in registry._SIZES | _EC_FIELD_SIZES:
+            continue
+        assigned = len(re.findall(rf"(?<![\w.]){re.escape(name)}\s*=(?!=)", text))
+        declared = len(re.findall(rf"\b(?:int|Int|long|Long|size_t|unsigned|short|uint32_t|word32)\s+{re.escape(name)}\b"
+                                  rf"|\b{re.escape(name)}\s*:\s*(?:Int|Long)\b", text))
+        defined = len(re.findall(rf"#\s*define\s+{re.escape(name)}\b", text))
+        if assigned + defined == 1 and declared <= 1 and not _changed_later(name, text):
+            out[name] = values[0]
+    return out
+
+
+def _changed_later(name: str, text: str) -> bool:
+    """The name is changed after it is set -- `bits *= 2`, `bits += 1024`, `bits++` -- or its
+    address goes to a call that may write it (`scanf("%d", &bits)`). OpenSSL's
+    OSSL_PARAM_construct_*(key, &bits) only reads it (closure keysize/C, zatv-a)."""
+    n = re.escape(name)
+    if re.search(rf"(?<![\w.]){n}\s*(?:[-+*/%&|^]|<<|>>)=|(?:\+\+|--)\s*{n}\b|(?<![\w.]){n}\s*(?:\+\+|--)", text):
+        return True
+    for m in re.finditer(rf"&\s*{n}\b", text):
+        call = re.search(r"(\w+)\s*\([^()]*$", text[max(0, m.start() - 200):m.start()])
+        if not call or not call.group(1).startswith("OSSL_PARAM_construct_"):
+            return True
+    return False
+
+
+def resolve_size_names(line: str, constants: dict[str, int]) -> str:
+    """The line with each name of `constants` replaced by its number, where it is an argument
+    (not a member, not a call, not the target of an assignment)."""
+    if not constants:
+        return line
+    pattern = re.compile(r"(?<![\w.&])(" + "|".join(map(re.escape, constants)) + r")\b(?!\s*[(=.])")
+    return pattern.sub(lambda m: str(constants[m.group(1)]), line)
+
+
+def _size_through_a_name(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    constants = None
+    for f in findings:
+        if (f.get("algorithm") not in ("RSA", "DSA", "DH") or f.get("key_size") not in (None, "undetermined")
+                or f.get("evidence_kind") in ("comment", "ban") or not 0 < f["line"] <= len(lines)):
+            continue
+        if constants is None:
+            constants = size_constants(lines)
+        size = key_size_on_line(resolve_size_names(lines[f["line"] - 1], constants), f["algorithm"])
+        if size:
+            f["key_size"] = size
+
+
+# keysize/Java (closure zatv-a; rows 180, 395): the size a JCA generator is initialised with on a
+# later line -- the KeyPairGenerator javadoc's own example, `keyGen = getInstance("DSA", "SUN");`
+# then `keyGen.initialize(1024, random);` -- and AlgorithmParameterGenerator's `init(int size)`.
+# The size goes to the row of the getInstance that assigned the name (or the line above it, a
+# call split over two), when that name is initialised once before it is assigned again. EC's
+# `initialize(256)` is the field size of the curve the provider picks: the size, not the curve.
+_JCA_GENERATOR = re.compile(
+    r"\b([A-Za-z_]\w*)\s*(?::\s*[\w.]+\s*)?=\s*(?:new\s+)?(?:java\.security\.)?"
+    r"(KeyPairGenerator|AlgorithmParameterGenerator)\.getInstance\s*\(")
+_EC_FIELD_SIZES = {160, 163, 192, 193, 224, 233, 239, 256, 283, 384, 409, 521, 571}
+
+
+def _jca_initialised_later(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    constants = None
+    for f in findings:
+        if (f.get("algorithm") not in ("RSA", "DSA", "DH", "EC") or f.get("key_size") not in (None, "undetermined")
+                or f.get("evidence_kind") in ("comment", "ban") or not 0 < f["line"] <= len(lines)):
+            continue
+        at = f["line"] - 1
+        m = _JCA_GENERATOR.search(lines[at]) or (at > 0 and not lines[at - 1].rstrip().endswith(";")
+                                                  and _JCA_GENERATOR.search(lines[at - 1]))
+        if not m:
+            continue
+        name, engine = m.group(1), m.group(2)
+        verb = "initialize" if engine == "KeyPairGenerator" else "init"
+        call = re.compile(rf"(?<![\w.]){re.escape(name)}\.{verb}\s*\(\s*(\w+)\s*[,)]")
+        again = re.compile(rf"(?<![\w.]){re.escape(name)}\s*=(?!=)")
+        start = at if _JCA_GENERATOR.search(lines[at]) else at - 1
+        calls = []
+        for i in range(start, min(start + 40, len(lines))):
+            text = lines[i][m.end():] if i == start else lines[i]
+            if i > start and again.search(text):
+                break
+            calls += [c.group(1) for c in call.finditer(text)]
+        if len(calls) != 1:
+            continue
+        if constants is None:
+            constants = size_constants(lines)
+        value = calls[0] if calls[0].isdigit() else str(constants.get(calls[0], ""))
+        if not value.isdigit():
+            continue
+        size = int(value)
+        if size in (_EC_FIELD_SIZES if f["algorithm"] == "EC" else registry._SIZES):
+            f["key_size"] = size
+
+
+# keysize/C (closure zatv-a, row 400: "psa_set_key_bits lines have no evidence"): PSA Crypto sets
+# a key's type and size on two lines of the same attributes, `psa_set_key_type(&attributes,
+# PSA_KEY_TYPE_RSA_KEY_PAIR)` and `psa_set_key_bits(&attributes, 2048)` (psa/crypto.h). The bits
+# line becomes a row of the type's family with that size, when the file sets that attributes
+# variable's type once and its bits once. ECC: the curve where the family and size name one
+# (SECP_R1 with 256/384/521).
+_PSA_SET_TYPE = re.compile(
+    r"\bpsa_set_key_type\s*\(\s*&?\s*([A-Za-z_]\w*)\s*,\s*PSA_KEY_TYPE_(RSA|ECC|DH)_(?:KEY_PAIR|PUBLIC_KEY)\b"
+    r"(?:\s*\(\s*(PSA_(?:ECC|DH)_FAMILY_\w+)\s*\))?")
+_PSA_SET_BITS = re.compile(r"\bpsa_set_key_bits\s*\(\s*&?\s*([A-Za-z_]\w*)\s*,\s*(?:\(\s*size_t\s*\)\s*)?(\w+)\s*\)")
+_PSA_FAMILY = {"RSA": "RSA", "ECC": "EC", "DH": "DH"}
+
+
+def _psa_key_bits(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not any("psa_set_key_bits" in line for line in lines):
+        return findings
+    types: dict[str, list[tuple[int, str, str | None]]] = {}
+    bits: dict[str, list[tuple[int, str]]] = {}
+    for n, line in enumerate(lines, 1):
+        for m in _PSA_SET_TYPE.finditer(line):
+            types.setdefault(m.group(1), []).append((n, _PSA_FAMILY[m.group(2)], m.group(3)))
+        for m in _PSA_SET_BITS.finditer(line):
+            bits.setdefault(m.group(1), []).append((n, m.group(2)))
+    constants = size_constants(lines)
+    added = []
+    for name, set_bits in bits.items():
+        if len(set_bits) != 1 or len(types.get(name, [])) != 1:
+            continue
+        (line_no, value), (type_line, family, ecc_family) = set_bits[0], types[name][0]
+        size = int(value) if value.isdigit() else constants.get(value)
+        if size not in (_EC_FIELD_SIZES if family == "EC" else registry._SIZES):
+            continue
+        if any(f["line"] == line_no and f.get("algorithm") == family for f in findings):
+            continue
+        item = {"path": rel_path, "line": line_no, "algorithm": family,
+                "description": (f"{family} key size set by psa_set_key_bits, for the key type "
+                                f"psa_set_key_type gives at line {type_line}"),
+                "excerpt": lines[line_no - 1].strip()[:200], "evidence_kind": "call",
+                "key_size": size, "in_test_code": in_test_code(rel_path)}
+        if family == "EC" and ecc_family == "PSA_ECC_FAMILY_SECP_R1" and size in (256, 384, 521):
+            item["curve"] = f"P-{size}"
+        added.append(item)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# keysize/C (closure zatv-a, row 400): wolfCrypt's wc_ecc_make_key(rng, keysize, key) and
+# wc_ecc_make_key_ex(rng, keysize, key, curve_id) take the size in bytes ("keysize size of key to
+# be created in bytes", wolfSSL manual, ECC): 32 is a 256-bit key. A literal, or a local the file
+# assigns once.
+_WC_ECC_MAKE_KEY = re.compile(r"\bwc_ecc_make_key(?:_ex)?\s*\(\s*[^,]*,\s*([A-Za-z_]\w*|\d+)\s*,")
+_ECC_BYTES = {20: 160, 24: 192, 28: 224, 32: 256, 48: 384, 66: 521}
+
+
+# sign/NET (closure zatv-a): a .NET sign or verify call on a key whose type is written where the
+# name is made -- a parameter or local `ECDsa key`, `var signer = ECDsa.Create()`, `new DSACng()`,
+# `cert.GetECDsaPrivateKey()`, a signature formatter `new RSAPKCS1SignatureFormatter(rsa)` -- and
+# not on the call's line (Learn: RSA/ECDsa/DSA SignData, SignHash, VerifyData, VerifyHash,
+# CreateSignature, VerifySignature; the formatters' CreateSignature/VerifySignature). The call
+# line becomes a signature row of that family. A name given two families stays unread; so does a
+# key passed to CertificateRequest, which signs the request with it.
+_DOTNET_KEY_TYPE = {"RSA": "RSA", "RSACng": "RSA", "RSACryptoServiceProvider": "RSA", "RSAOpenSsl": "RSA",
+                    "ECDsa": "ECDSA", "ECDsaCng": "ECDSA", "ECDsaOpenSsl": "ECDSA",
+                    "DSA": "DSA", "DSACng": "DSA", "DSACryptoServiceProvider": "DSA", "DSAOpenSsl": "DSA",
+                    "RSAPKCS1SignatureFormatter": "RSA", "RSAPKCS1SignatureDeformatter": "RSA",
+                    "DSASignatureFormatter": "DSA", "DSASignatureDeformatter": "DSA"}
+_DOTNET_KEY_TYPES = "|".join(sorted(_DOTNET_KEY_TYPE, key=len, reverse=True))
+_DOTNET_KEY_NAMED = re.compile(
+    rf"\b({_DOTNET_KEY_TYPES})\??\s+([A-Za-z_]\w*)\s*(?=[,)=;]|$)|"                       # typed
+    rf"\b(?:var|Dim)\s+([A-Za-z_]\w*)\s*(?:As\s+New\s+|=\s*(?:new\s+)?)(?:System\.Security\.Cryptography\.)?"
+    rf"({_DOTNET_KEY_TYPES})\s*(?:\.Create\s*)?\(|"                                            # made
+    r"\b([A-Za-z_]\w*)\s*=\s*\w+\??\.Get(RSA|ECDsa|DSA)PrivateKey\s*\(")                      # a certificate's
+_DOTNET_SIGN_CALL = re.compile(
+    r"\b([A-Za-z_]\w*)!?\.(SignData|SignHash|VerifyData|VerifyHash|TrySignData|TrySignHash|CreateSignature|"
+    r"VerifySignature)\s*\(")
+_CERTIFICATE_REQUEST_KEY = re.compile(r"\b(?:new\s+CertificateRequest|CertificateRequest\s+\w+\s*=\s*new)\s*\([^,]*,\s*([A-Za-z_]\w*)\s*,")
+
+
+def _dotnet_signing_receivers(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith((".cs", ".vb")) or not any(
+            "Sign" in line or "Verify" in line or "CertificateRequest" in line for line in lines):
+        return findings
+    named: dict[str, set[tuple[str, int]]] = {}
+    for n, line in enumerate(lines, 1):
+        for m in _DOTNET_KEY_NAMED.finditer(line):
+            if m.group(1):
+                name, family = m.group(2), _DOTNET_KEY_TYPE[m.group(1)]
+            elif m.group(3):
+                name, family = m.group(3), _DOTNET_KEY_TYPE[m.group(4)]
+            else:
+                name, family = m.group(5), {"RSA": "RSA", "ECDsa": "ECDSA", "DSA": "DSA"}[m.group(6)]
+            named.setdefault(name, set()).add((family, n))
+    added = []
+    for n, line in enumerate(lines, 1):
+        calls = [(m.group(1), m.group(2)) for m in _DOTNET_SIGN_CALL.finditer(line)]
+        calls += [(m.group(1), "CertificateRequest") for m in _CERTIFICATE_REQUEST_KEY.finditer(line)]
+        for name, verb in calls:
+            families = {f for f, _ in named.get(name, ())}
+            if len(families) != 1:
+                continue
+            family = families.pop()
+            at = min(k for f, k in named[name])
+            row = next((f for f in findings + added if f["line"] == n and f.get("algorithm") == family), None)
+            if row is not None:
+                if family == "RSA" and row.get("role") in (None, "undetermined"):
+                    row["role"] = "signature"
+                continue
+            item = {"path": rel_path, "line": n, "algorithm": family,
+                    "description": f"{family} {'request signed with' if verb == 'CertificateRequest' else verb + ' on'} "
+                                   f"the key {name}, of the type written at line {at}",
+                    "excerpt": line.strip()[:200], "evidence_kind": "call", "in_test_code": in_test_code(rel_path)}
+            if family == "RSA":
+                item["role"] = "signature"
+            added.append(item)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 381 (symhash/NET closure, zatv-a): ECB mode on an AES object whatever its name -- the rule
+# above reads only a receiver with "aes" in it. A name whose type is written where it is made
+# (`Aes cipher`, `var alg = new AesManaged()`, `Aes.Create()`) and then `.Mode =
+# [System.Security.Cryptography.]CipherMode.ECB` or `.EncryptEcb(` / `.DecryptEcb(` (Learn,
+# CipherMode.ECB, SymmetricAlgorithm.EncryptEcb).
+_DOTNET_AES_TYPES = r"Aes|AesManaged|AesCng|AesCryptoServiceProvider|Rijndael|RijndaelManaged"
+_DOTNET_AES_NAMED = re.compile(
+    rf"\b(?:{_DOTNET_AES_TYPES})\??\s+([A-Za-z_]\w*)\s*(?=[,)=;]|$)|"
+    rf"\b(?:var|Dim)\s+([A-Za-z_]\w*)\s*(?:As\s+New\s+|=\s*(?:new\s+)?)(?:System\.Security\.Cryptography\.)?"
+    rf"(?:{_DOTNET_AES_TYPES})\s*(?:\.Create\s*)?\(")
+_DOTNET_ECB_USE = re.compile(
+    r"\b([A-Za-z_]\w*)\.(?:Mode\s*=\s*(?:System\.Security\.Cryptography\.)?CipherMode\.ECB\b|(?:En|De)cryptEcb\s*\()")
+
+
+def _dotnet_aes_ecb(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith((".cs", ".vb")) or not any("Ecb" in l or "ECB" in l for l in lines):
+        return findings
+    names = {m.group(1) or m.group(2) for line in lines for m in _DOTNET_AES_NAMED.finditer(line)}
+    added = []
+    for n, line in enumerate(lines, 1):
+        if any(m.group(1) in names for m in _DOTNET_ECB_USE.finditer(line)) and not any(
+                f["line"] == n and f.get("algorithm") == "AES-ECB" for f in findings):
+            added.append({"path": rel_path, "line": n, "algorithm": "AES-ECB",
+                          "description": "AES in ECB mode (.NET CipherMode.ECB or EncryptEcb) on an AES object",
+                          "excerpt": line.strip()[:200], "evidence_kind": "call", "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 380 (symhash/NET closure, zatv-a): Rfc2898DeriveBytes without a HashAlgorithmName is
+# PBKDF2 with SHA-1 -- also where the rule above, which wants the statement's `);` on the line,
+# does not see it: `using (var k = new Rfc2898DeriveBytes(password, salt))` and a constructor
+# whose arguments run over several lines. The arguments are read to the closing parenthesis.
+_RFC2898_NEW = re.compile(r"\bnew\s+Rfc2898DeriveBytes\s*\(")
+
+
+def _rfc2898_default_sha1(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith((".cs", ".vb")) or not any("Rfc2898DeriveBytes" in l for l in lines):
+        return findings
+    added = []
+    for n, line in enumerate(lines, 1):
+        for m in _RFC2898_NEW.finditer(line):
+            depth, args = 1, ""
+            text = "\n".join([line[m.end():]] + lines[n:n + 7])
+            for ch in text:
+                depth += ch == "("
+                depth -= ch == ")"
+                if depth == 0:
+                    break
+                args += ch
+            if depth != 0 or "HashAlgorithmName" in args or any(
+                    f["line"] == n and f.get("algorithm") == "SHA1" for f in findings + added):
+                continue
+            added.append({"path": rel_path, "line": n, "algorithm": "SHA1",
+                          "description": "SHA-1 as the default hash of Rfc2898DeriveBytes (no HashAlgorithmName given)",
+                          "excerpt": line.strip()[:200], "evidence_kind": "call", "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 379 (its note: "the backtick lines not"; symhash/NET closure, zatv-a): a PowerShell
+# New-SelfSignedCertificate or Set-AuthenticodeSignature continued with backticks
+# (about_Parsing, "Line continuation") whose -HashAlgorithm SHA1/MD5 is on a later line of the
+# statement: a row of that hash on the -HashAlgorithm line.
+_PS_TOOL_START = re.compile(r"\b(?:New-SelfSignedCertificate|Set-AuthenticodeSignature)\b", re.IGNORECASE)
+_PS_HASH_ARGUMENT = re.compile(r"(?:^|\s)-HashAlgorithm\s+[\"']?(sha-?1|md5)\b", re.IGNORECASE)
+
+
+def _powershell_continued_hash(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith(_POWERSHELL_FILE):
+        return findings
+    added = []
+    for i, line in enumerate(lines):
+        if not _PS_TOOL_START.search(line) or not line.rstrip().endswith("`"):
+            continue
+        j = i
+        while j + 1 < len(lines) and lines[j].rstrip().endswith("`"):
+            j += 1
+            m = _PS_HASH_ARGUMENT.search(lines[j])
+            family = ("MD5" if m.group(1).lower() == "md5" else "SHA1") if m else None
+            if family and not any(f["line"] == j + 1 and f.get("algorithm") == family for f in findings + added):
+                added.append({"path": rel_path, "line": j + 1, "algorithm": family,
+                              "description": f"{family} named as the digest of a Windows signing or hashing tool",
+                              "excerpt": lines[j].strip()[:200], "evidence_kind": "reference",
+                              "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 379 (its note: "certreq .inf HashAlgorithm ... not"; symhash/NET closure, zatv-a): a certreq
+# request file's [NewRequest] HashAlgorithm, the "Hash Algorithm to be used for this request"
+# (Learn, certreq: sha256, sha384, sha512, sha1, md5, md4, md2). Only inside [NewRequest] of an
+# .inf file.
+_INF_SECTION = re.compile(r"^\s*\[([^\]]+)\]\s*$")
+_INF_HASH = re.compile(r"^\s*HashAlgorithm\s*=\s*\"?(sha-?1|md5|md4|md2)\"?\s*(?:;.*)?$", re.IGNORECASE)
+_INF_HASH_FAMILY = {"sha1": "SHA1", "sha-1": "SHA1", "md5": "MD5", "md4": "MD4", "md2": "MD2"}
+
+
+def _certreq_request_hash(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.lower().endswith(".inf"):
+        return findings
+    added, section = [], None
+    for n, line in enumerate(lines, 1):
+        s = _INF_SECTION.match(line)
+        if s:
+            section = s.group(1).strip().lower()
+            continue
+        m = _INF_HASH.match(line) if section == "newrequest" else None
+        if m:
+            family = _INF_HASH_FAMILY[m.group(1).lower()]
+            if not any(f["line"] == n and f.get("algorithm") == family for f in findings):
+                added.append({"path": rel_path, "line": n, "algorithm": family,
+                              "description": f"{family} as the hash of a certreq request ([NewRequest] HashAlgorithm)",
+                              "excerpt": line.strip()[:200], "evidence_kind": "declaration",
+                              "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+def _wolfcrypt_ecc_bytes(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    for f in findings:
+        if (f.get("algorithm") != "EC" or f.get("key_size") not in (None, "undetermined")
+                or f.get("evidence_kind") in ("comment", "ban") or not 0 < f["line"] <= len(lines)):
+            continue
+        m = _WC_ECC_MAKE_KEY.search(lines[f["line"] - 1])
+        if not m:
+            continue
+        value = m.group(1)
+        if not value.isdigit():
+            once = [a.group(1) for line in lines
+                    for a in re.finditer(rf"(?<![\w.]){re.escape(value)}\s*=(?!=)\s*(\w+)", line)]
+            value = once[0] if len(once) == 1 and not _changed_later(value, "\n".join(lines)) else ""
+        if value.isdigit() and int(value) in _ECC_BYTES:
+            f["key_size"] = _ECC_BYTES[int(value)]
+
+
+# keysize/C (closure zatv-a, row 394): OpenSSL 3's key generation parameters, as the man7 pages'
+# examples write them -- `OSSL_PARAM_construct_uint("bits", &bits)` (EVP_PKEY-RSA(7), "bits"
+# (OSSL_PKEY_PARAM_RSA_BITS)) and `("pbits", &pbits)` (EVP_PKEY-DSA(7), EVP_PKEY-DH(7),
+# OSSL_PKEY_PARAM_FFC_PBITS), the number in a local the file assigns once. The family is the
+# macro's, or for the strings the one family the file's EVP_PKEY_CTX_new_from_name names.
+_OSSL_SIZE_PARAM = re.compile(
+    r"\bOSSL_PARAM_construct_u?int(?:32|64)?\s*\(\s*(\"bits\"|OSSL_PKEY_PARAM_RSA_BITS|\"pbits\"|"
+    r"OSSL_PKEY_PARAM_FFC_PBITS)\s*,\s*&\s*([A-Za-z_]\w*)\s*\)")
+_EVP_CTX_FAMILY = re.compile(r"\bEVP_PKEY_CTX_new_from_name\s*\([^,]*,\s*\"(RSA|RSA-PSS|DSA|DH|DHX|EC)\"")
+
+
+def _ossl_param_size(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not any("OSSL_PARAM_construct_u" in line for line in lines):
+        return findings
+    named = {{"RSA-PSS": "RSA", "DHX": "DH"}.get(m.group(1), m.group(1))
+             for line in lines for m in _EVP_CTX_FAMILY.finditer(line)}
+    constants = size_constants(lines)
+    added = []
+    for n, line in enumerate(lines, 1):
+        for m in _OSSL_SIZE_PARAM.finditer(line):
+            key, size = m.group(1), constants.get(m.group(2))
+            if key == "OSSL_PKEY_PARAM_RSA_BITS":
+                family = "RSA"
+            elif key == '"bits"':
+                family = "RSA" if named == {"RSA"} else None
+            else:
+                ffc = named & {"DSA", "DH"}
+                family = ffc.pop() if len(ffc) == 1 and len(named) == 1 else None
+            if family is None or size not in registry._SIZES:
+                continue
+            row = next((f for f in findings if f["line"] == n and f.get("algorithm") == family), None)
+            if row is not None:
+                if row.get("key_size") in (None, "undetermined"):
+                    row["key_size"] = size
+                continue
+            added.append({"path": rel_path, "line": n, "algorithm": family,
+                          "description": f"{family} key size given as the OpenSSL key generation parameter {key}",
+                          "excerpt": line.strip()[:200], "evidence_kind": "call", "key_size": size,
+                          "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 # Row 495: an RSA key that wraps a symmetric key -- `pub.encrypt(archive_key, padding.OAEP(...))`
@@ -5165,6 +5678,17 @@ def _link_recipient_key(step: dict[str, Any], key_files: dict[str, list[str]]) -
 
 
 _SIGNTOOL_DIGEST = re.compile(r"\s/fd\s+\"?([A-Za-z0-9-]+)")
+_WINDOWS_SIGNING_TOOLS = {"set_authenticodesignature", "mage_sign", "nuget_sign", "sn_sign", "strong_name_sign"}
+_SCRIPT_COMMENT = re.compile(r"^\s*(?:#|::|@?rem\b|<!--)", re.IGNORECASE)
+_STRONG_NAME_MODES = (("delay_sign", re.compile(r"<DelaySign\b[^>]*>\s*true\s*</DelaySign>", re.IGNORECASE)),
+                      ("public_sign", re.compile(r"<PublicSign\b[^>]*>\s*true\s*</PublicSign>", re.IGNORECASE)))
+# sign/NET closure (zatv-a): the digest each Windows signing tool is told to use.
+_SIGNING_DIGEST = {
+    "signtool_sign": _SIGNTOOL_DIGEST,
+    "set_authenticodesignature": re.compile(r"\s-HashAlgorithm\s+[\"']?([A-Za-z0-9-]+)", re.IGNORECASE),
+    "mage_sign": re.compile(r"\s-(?:a|Algorithm)\s+(sha1|sha256)RSA\b", re.IGNORECASE),
+    "nuget_sign": re.compile(r"\s(?:-HashAlgorithm|--hash-algorithm)\s+[\"']?([A-Za-z0-9-]+)", re.IGNORECASE),
+}
 
 
 def scan_ci_file(path: Path, rel_path: str,
@@ -5173,6 +5697,11 @@ def scan_ci_file(path: Path, rel_path: str,
     lines = (_read_lines(path) or []) if lines is None else lines
     for line_no, line in enumerate(lines, start=1):
         for command_type, pattern in SIGNING_COMMAND_PATTERNS:
+            # sign/NET closure (zatv-a), from the positive control (psconf 03-signing.ps1:8, a
+            # `# NOTE: ... Set-AuthenticodeSignature ...` line): the Windows tools added then are
+            # not read on a comment line (#, REM, ::, <!--). The older tools are as they were.
+            if command_type in _WINDOWS_SIGNING_TOOLS and _SCRIPT_COMMENT.match(line):
+                continue
             if pattern.search(line):
                 findings.append({
                     "path": rel_path,
@@ -5180,11 +5709,18 @@ def scan_ci_file(path: Path, rel_path: str,
                     "command_type": command_type,
                     "excerpt": line.strip()[:200],
                 })
-                # Row 382: signtool's file digest, `/fd SHA1`.
-                digest = (_SIGNTOOL_DIGEST.search(line) if command_type == "signtool_sign"
+                # Row 382: signtool's file digest, `/fd SHA1`; and the other Windows tools'.
+                digest = (_SIGNING_DIGEST[command_type].search(line) if command_type in _SIGNING_DIGEST
                           else None)
                 if digest:
                     findings[-1]["digest_algorithm"] = digest.group(1).upper()
+                # sign/NET closure (zatv-a), from the positive control (identitymodel's test
+                # projects): "DelaySign ... delay-sign the assembly rather than full-sign it"
+                # (Learn, MSBuild properties) -- the build reserves the signature and signs later;
+                # PublicSign writes the public key only. Said on the step, not dropped.
+                if command_type == "strong_name_sign":
+                    mode = next((m for m, rx in _STRONG_NAME_MODES if any(rx.search(l) for l in lines)), "full_sign")
+                    findings[-1]["strong_name_mode"] = mode
         if line.lstrip().startswith("#"):
             continue
         for command_type, pattern in ENCRYPTION_COMMAND_PATTERNS:
@@ -6015,6 +6551,11 @@ _SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])|\bECC_SECG_P256K1\b
 _BRAINPOOL_CURVE = re.compile(r"(?<![A-Za-z0-9])brainpoolP(160|192|224|256|320|384|512)([rt])1(?![0-9])",
                              re.IGNORECASE)
 _CURVE_SIZE = {"P-256": 256, "P-384": 384, "P-521": 521, "secp256k1": 256}
+# keysize/Java closure (zatv-a): the NIST curves by their object identifiers, which the SunEC
+# provider takes as names in ECGenParameterSpec ("the strings secp256r1, 1.2.840.10045.3.1.7,
+# NIST P-256, and X9.62 prime256v1 refer to the same curve", JDK Providers Documentation).
+_NIST_CURVE_OID = re.compile(r"(?<![\d.])(1\.2\.840\.10045\.3\.1\.7|1\.3\.132\.0\.34|1\.3\.132\.0\.35)(?![\d.])")
+_CURVE_OF_OID = {"1.2.840.10045.3.1.7": "P-256", "1.3.132.0.34": "P-384", "1.3.132.0.35": "P-521"}
 _ECDSA_SIZE_NAME = re.compile(r"(?<![A-Za-z0-9])ecdsa(256|384|521)(?![0-9])", re.IGNORECASE)
 # .NET's ECDsaCng(int keySize), ECDsaOpenSsl(int keySize), ECDiffieHellmanCng(int keySize): the
 # key size, which picks the NIST curve of that size (learn.microsoft.com, the constructors;
@@ -6036,6 +6577,7 @@ def _tag_curves(items: list[dict[str, Any]]) -> None:
             excerpt = item.get("excerpt") or ""
             found = {f"P-{next(g for g in m.groups() if g)}"
                      for m in _NIST_CURVE.finditer(excerpt)}
+            found |= {_CURVE_OF_OID[m.group(1)] for m in _NIST_CURVE_OID.finditer(excerpt)}
             if _SECP256K1.search(excerpt) or (item.get("description") == SECP256K1_RULE
                                               and _SECP256K1_ONLY.search(excerpt)):
                 found.add("secp256k1")

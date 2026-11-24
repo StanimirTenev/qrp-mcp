@@ -1,0 +1,1336 @@
+# Operation `sign`: a signing or verification call in code, or a signing step in a build or CLI
+# tool (definicii.md). Ecosystem NET (stage 4, 24.11.2026, rows 363, 382, 383): System.Security.Cryptography
+# SignData/SignHash/Verify*, the signature formatters, SignedXml, CertificateRequest, and the Windows
+# signing tools (signtool, Set-AuthenticodeSignature, mage, nuget, sn, MSBuild strong naming), from
+# learn.microsoft.com. `expect`: a row of the family on the call line (role signature for RSA), the
+# weak hash where the call names one, or a signing step in evidence.ci_pipeline with its digest.
+# Variants change the receiver (parameter, factory, certificate), the hash, the file kind.
+
+operation = "sign"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "NET"
+scope = "RSA SignData/SignHash/VerifyData/VerifyHash, ECDsa and DSA SignData/SignHash/CreateSignature/VerifyData/VerifyHash/VerifySignature, on a receiver from a parameter, a factory or a certificate getter, with the hash as a free part; RSAPKCS1SignatureFormatter/Deformatter; SignedXml RSA-SHA1 and DSA URIs; CertificateRequest with its hash; signtool sign /fd in .ps1/.cmd/.bat/.csproj (rows 382, 383); Set-AuthenticodeSignature -HashAlgorithm; mage -Sign; nuget sign and dotnet nuget sign; sn -R; MSBuild SignAssembly with AssemblyOriginatorKeyFile (row 363). Not covered: SignedCms/CmsSigner (the family is the certificate's, not written), signtool without /fd and Set-AuthenticodeSignature without -HashAlgorithm (the default is the tool version's), MLDsa/SlhDsa SignData, Azure Key Vault signing, a receiver whose name the file types two ways (overloads Sign(RSA key) and Sign(ECDsa key)): unread."
+
+[[ecosystems.spellings]]
+id = "rsa-signdata"
+spelling = "rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsa.signdata"
+quote = "public byte[] SignData(byte[] data, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding padding)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa, byte[] data, byte[] hash, byte[] signature)
+    {
+        return rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using RSA key = RSA.Create(3072);
+        var result = key.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        return result;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA signer, byte[] data, byte[] hash, byte[] signature)
+    {
+        return signer.SignData(data, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using RSA? k = cert.GetRSAPrivateKey();
+        return k!.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "rsa-signhash"
+spelling = "rsa.SignHash(hash, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsa.signhash"
+quote = "public abstract byte[] SignHash(byte[] hash, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding padding)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa, byte[] data, byte[] hash, byte[] signature)
+    {
+        return rsa.SignHash(hash, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using RSA key = RSA.Create(3072);
+        var result = key.SignHash(hash, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        return result;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA signer, byte[] data, byte[] hash, byte[] signature)
+    {
+        return signer.SignHash(hash, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using RSA? k = cert.GetRSAPrivateKey();
+        return k!.SignHash(hash, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "rsa-verifydata"
+spelling = "rsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsa.verifydata"
+quote = "public bool VerifyData(byte[] data, byte[] signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding padding)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa, byte[] data, byte[] hash, byte[] signature)
+    {
+        return rsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using RSA key = RSA.Create(3072);
+        var result = key.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        return result;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA signer, byte[] data, byte[] hash, byte[] signature)
+    {
+        return signer.VerifyData(data, signature, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using RSA? k = cert.GetRSAPrivateKey();
+        return k!.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "rsa-verifyhash"
+spelling = "rsa.VerifyHash(hash, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsa.verifyhash"
+quote = "public abstract bool VerifyHash(byte[] hash, byte[] signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm, System.Security.Cryptography.RSASignaturePadding padding)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa, byte[] data, byte[] hash, byte[] signature)
+    {
+        return rsa.VerifyHash(hash, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using RSA key = RSA.Create(3072);
+        var result = key.VerifyHash(hash, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        return result;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA signer, byte[] data, byte[] hash, byte[] signature)
+    {
+        return signer.VerifyHash(hash, signature, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using RSA? k = cert.GetRSAPrivateKey();
+        return k!.VerifyHash(hash, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-signdata"
+spelling = "ecdsa.SignData(data, HashAlgorithmName.SHA256)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdsa.signdata"
+quote = "public virtual byte[] SignData(byte[] data, System.Security.Cryptography.HashAlgorithmName hashAlgorithm)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(ECDsa key, byte[] data, byte[] hash, byte[] signature)
+    {
+        return key.SignData(data, HashAlgorithmName.SHA256);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using var signer = ECDsa.Create();
+        var r = signer.SignData(data, HashAlgorithmName.SHA256);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using ECDsa? k = cert.GetECDsaPrivateKey();
+        return k!.SignData(data, HashAlgorithmName.SHA256);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(ECDsa ecKey, byte[] data, byte[] signature)
+    {
+        return ecKey.SignData(data, HashAlgorithmName.SHA1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-signhash"
+spelling = "ecdsa.SignHash(hash)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdsa.signhash"
+quote = "public byte[] SignHash(byte[] hash, System.Security.Cryptography.DSASignatureFormat signatureFormat)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(ECDsa key, byte[] data, byte[] hash, byte[] signature)
+    {
+        return key.SignHash(hash);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using var signer = ECDsa.Create();
+        var r = signer.SignHash(hash);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using ECDsa? k = cert.GetECDsaPrivateKey();
+        return k!.SignHash(hash);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-verifydata"
+spelling = "ecdsa.VerifyData(data, signature, HashAlgorithmName.SHA256)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdsa.verifydata"
+quote = "public bool VerifyData(byte[] data, byte[] signature, System.Security.Cryptography.HashAlgorithmName hashAlgorithm)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(ECDsa key, byte[] data, byte[] hash, byte[] signature)
+    {
+        return key.VerifyData(data, signature, HashAlgorithmName.SHA256);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using var signer = ECDsa.Create();
+        var r = signer.VerifyData(data, signature, HashAlgorithmName.SHA256);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using ECDsa? k = cert.GetECDsaPrivateKey();
+        return k!.VerifyData(data, signature, HashAlgorithmName.SHA256);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(ECDsa ecKey, byte[] data, byte[] signature)
+    {
+        return ecKey.VerifyData(data, signature, HashAlgorithmName.SHA1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "ecdsa-verifyhash"
+spelling = "ecdsa.VerifyHash(hash, signature)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ecdsa.verifyhash"
+quote = "public bool VerifyHash(byte[] hash, byte[] signature, System.Security.Cryptography.DSASignatureFormat signatureFormat)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(ECDsa key, byte[] data, byte[] hash, byte[] signature)
+    {
+        return key.VerifyHash(hash, signature);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using var signer = ECDsa.Create();
+        var r = signer.VerifyHash(hash, signature);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using ECDsa? k = cert.GetECDsaPrivateKey();
+        return k!.VerifyHash(hash, signature);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "dsa-signdata"
+spelling = "dsa.SignData(data, HashAlgorithmName.SHA256)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.dsa.signdata"
+quote = "public byte[] SignData(byte[] data, System.Security.Cryptography.HashAlgorithmName hashAlgorithm)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(DSA key, byte[] data, byte[] hash, byte[] signature)
+    {
+        return key.SignData(data, HashAlgorithmName.SHA256);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using var signer = DSA.Create();
+        var r = signer.SignData(data, HashAlgorithmName.SHA256);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using DSA? k = cert.GetDSAPrivateKey();
+        return k!.SignData(data, HashAlgorithmName.SHA256);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(DSA ecKey, byte[] data, byte[] signature)
+    {
+        return ecKey.SignData(data, HashAlgorithmName.SHA1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "dsa-createsignature"
+spelling = "dsa.CreateSignature(hash)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.dsa.createsignature"
+quote = "public byte[] CreateSignature(byte[] rgbHash, System.Security.Cryptography.DSASignatureFormat signatureFormat)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(DSA key, byte[] data, byte[] hash, byte[] signature)
+    {
+        return key.CreateSignature(hash);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using var signer = DSA.Create();
+        var r = signer.CreateSignature(hash);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using DSA? k = cert.GetDSAPrivateKey();
+        return k!.CreateSignature(hash);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "dsa-verifysignature"
+spelling = "dsa.VerifySignature(hash, signature)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.dsa.verifysignature"
+quote = "public bool VerifySignature(byte[] rgbHash, byte[] rgbSignature, System.Security.Cryptography.DSASignatureFormat signatureFormat)"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(DSA key, byte[] data, byte[] hash, byte[] signature)
+    {
+        return key.VerifySignature(hash, signature);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using var signer = DSA.Create();
+        var r = signer.VerifySignature(hash, signature);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using DSA? k = cert.GetDSAPrivateKey();
+        return k!.VerifySignature(hash, signature);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "dsa-verifydata"
+spelling = "dsa.VerifyData(data, signature, HashAlgorithmName.SHA256)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.dsa.verifydata"
+quote = "VerifyData"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(DSA key, byte[] data, byte[] hash, byte[] signature)
+    {
+        return key.VerifyData(data, signature, HashAlgorithmName.SHA256);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] hash, byte[] signature)
+    {
+        using var signer = DSA.Create();
+        var r = signer.VerifyData(data, signature, HashAlgorithmName.SHA256);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Security.Cryptography.X509Certificates.X509Certificate2 cert, byte[] data, byte[] hash, byte[] signature)
+    {
+        using DSA? k = cert.GetDSAPrivateKey();
+        return k!.VerifyData(data, signature, HashAlgorithmName.SHA256);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(DSA ecKey, byte[] data, byte[] signature)
+    {
+        return ecKey.VerifyData(data, signature, HashAlgorithmName.SHA1);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "rsapkcs1signatureformatter-createsignature"
+spelling = "new RSAPKCS1SignatureFormatter(rsa).CreateSignature(...)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsapkcs1signatureformatter"
+quote = "RSAPKCS1SignatureFormatter"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa, byte[] hash, byte[] signature)
+    {
+        var f = new RSAPKCS1SignatureFormatter(rsa);
+        f.SetHashAlgorithm("SHA256");
+        return f.CreateSignature(hash);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA key, byte[] hash, byte[] signature)
+    {
+        RSAPKCS1SignatureFormatter fmt = new RSAPKCS1SignatureFormatter(key);
+        fmt.SetHashAlgorithm("SHA1");
+        var r = fmt.CreateSignature(hash);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa, byte[] hash, byte[] signature)
+    {
+        var g = new RSAPKCS1SignatureFormatter();
+        g.SetKey(rsa);
+        g.SetHashAlgorithm(nameof(SHA256));
+        return g.CreateSignature(hash);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 11, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "rsapkcs1signaturedeformatter-verifysignature"
+spelling = "new RSAPKCS1SignatureDeformatter(rsa).VerifySignature(...)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsapkcs1signaturedeformatter"
+quote = "RSAPKCS1SignatureDeformatter"
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa, byte[] hash, byte[] signature)
+    {
+        var f = new RSAPKCS1SignatureDeformatter(rsa);
+        f.SetHashAlgorithm("SHA256");
+        return f.VerifySignature(hash, signature);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA key, byte[] hash, byte[] signature)
+    {
+        RSAPKCS1SignatureDeformatter fmt = new RSAPKCS1SignatureDeformatter(key);
+        fmt.SetHashAlgorithm("SHA1");
+        var r = fmt.VerifySignature(hash, signature);
+        return r;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa, byte[] hash, byte[] signature)
+    {
+        var g = new RSAPKCS1SignatureDeformatter();
+        g.SetKey(rsa);
+        g.SetHashAlgorithm(nameof(SHA256));
+        return g.VerifySignature(hash, signature);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 11, algorithm = "RSA", role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "signedxml-xmldsigrsasha1url"
+spelling = "SignedXml.XmlDsigRSASHA1Url"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.xml.signedxml"
+quote = "XmlDsigRSASHA1Url Represents the Uniform Resource Identifier (URI) for the standard RSA signature method for XML digital signatures."
+file = "Sign.cs"
+snippet = '''
+using System.Security.Cryptography.Xml;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Xml.XmlDocument doc)
+    {
+        var signed = new SignedXml(doc);
+        signed.SignedInfo.SignatureMethod = SignedXml.XmlDsigRSASHA1Url;
+        signed.ComputeSignature();
+        return signed;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System.Security.Cryptography.Xml;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Xml.XmlDocument doc, AsymmetricAlgorithm key)
+    {
+        var sx = new SignedXml(doc) { SigningKey = key };
+        sx.SignedInfo!.SignatureMethod = SignedXml.XmlDsigRSASHA1Url;
+        return sx;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System.Security.Cryptography.Xml;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run()
+    {
+        string method = System.Security.Cryptography.Xml.SignedXml.XmlDsigRSASHA1Url;
+        return method;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "signedxml-xmldsigdsaurl"
+spelling = "SignedXml.XmlDsigDSAUrl"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.xml.signedxml"
+quote = "XmlDsigDSAUrl Represents the Uniform Resource Identifier (URI) for the standard DSA algorithm for XML digital signatures."
+file = "Sign.cs"
+snippet = '''
+using System.Security.Cryptography.Xml;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Xml.XmlDocument doc)
+    {
+        var signed = new SignedXml(doc);
+        signed.SignedInfo.SignatureMethod = SignedXml.XmlDsigDSAUrl;
+        signed.ComputeSignature();
+        return signed;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System.Security.Cryptography.Xml;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.Xml.XmlDocument doc, AsymmetricAlgorithm key)
+    {
+        var sx = new SignedXml(doc) { SigningKey = key };
+        sx.SignedInfo!.SignatureMethod = SignedXml.XmlDsigDSAUrl;
+        return sx;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 10, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Sign.cs"
+snippet = '''
+using System.Security.Cryptography.Xml;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run()
+    {
+        string method = System.Security.Cryptography.Xml.SignedXml.XmlDsigDSAUrl;
+        return method;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Sign.cs", line = 9, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "certificaterequest-rsa-sha1"
+spelling = "new CertificateRequest(subject, rsa, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1).CreateSelfSigned(...)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.certificaterequest"
+quote = "CertificateRequest"
+file = "Cert.cs"
+snippet = '''
+using System.Security.Cryptography.X509Certificates;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA rsa)
+    {
+        var req = new CertificateRequest("CN=example", rsa, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
+        return req.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddYears(1));
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cert.cs", line = 9, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Cert.cs", line = 9, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cert.cs"
+snippet = '''
+using System.Security.Cryptography.X509Certificates;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(RSA key)
+    {
+        CertificateRequest request = new("CN=example", key, HashAlgorithmName.SHA1, RSASignaturePadding.Pss);
+        return request.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddYears(1));
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cert.cs", line = 9, algorithm = "RSA", role = "signature"}}, {at = "evidence.source_code", match = {path = "Cert.cs", line = 9, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cert.cs"
+snippet = '''
+using System.Security.Cryptography.X509Certificates;
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run()
+    {
+        using var ec = ECDsa.Create();
+        var r = new CertificateRequest("CN=example", ec, HashAlgorithmName.SHA1);
+        return r.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddYears(1));
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cert.cs", line = 10, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Cert.cs", line = 10, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "signtool-sign-fd"
+spelling = "signtool sign /fd SHA1"
+source = "https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool"
+quote = "/fd SHA256 /tr http://timestamp.digicert.com /td SHA256 MyFile.exe"
+file = "sign.ps1"
+snippet = '''
+signtool sign /fd SHA1 /f cert.pfx /p $env:PFX_PASSWORD app.exe
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.ps1", line = 1, command_type = "signtool_sign", digest_algorithm = "SHA1"}}, {at = "evidence.source_code", match = {path = "sign.ps1", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.ps1"
+snippet = '''
+& "C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign /fd sha1 /a $file
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.ps1", line = 1, command_type = "signtool_sign", digest_algorithm = "SHA1"}}, {at = "evidence.source_code", match = {path = "sign.ps1", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.cmd"
+snippet = '''
+@echo off
+signtool sign /fd SHA1 /f %CERT% /p %PASS% %1
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.cmd", line = 2, command_type = "signtool_sign", digest_algorithm = "SHA1"}}, {at = "evidence.source_code", match = {path = "sign.cmd", line = 2, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.bat"
+snippet = '''
+signtool.exe sign /fd SHA256 /tr http://timestamp.example /td SHA256 build\app.exe
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.bat", line = 1, command_type = "signtool_sign", digest_algorithm = "SHA256"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "App.csproj"
+snippet = '''
+<Project Sdk="Microsoft.NET.Sdk">
+  <Target Name="Sign" AfterTargets="Build">
+    <Exec Command="signtool sign /fd SHA1 /f $(CertPath) $(TargetPath)" />
+  </Target>
+</Project>
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "App.csproj", line = 3, command_type = "signtool_sign", digest_algorithm = "SHA1"}}, {at = "evidence.source_code", match = {path = "App.csproj", line = 3, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "set-authenticodesignature-hashalgorithm"
+spelling = "Set-AuthenticodeSignature -HashAlgorithm SHA1"
+source = "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/set-authenticodesignature"
+quote = "For earlier versions, the default is SHA1."
+file = "sign.ps1"
+snippet = '''
+$cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert
+Set-AuthenticodeSignature -FilePath .\script.ps1 -Certificate $cert -HashAlgorithm SHA1
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.ps1", line = 2, command_type = "set_authenticodesignature", digest_algorithm = "SHA1"}}, {at = "evidence.source_code", match = {path = "sign.ps1", line = 2, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "release.ps1"
+snippet = '''
+Set-AuthenticodeSignature $files $signingCert -TimestampServer http://ts.example -HashAlgorithm sha1
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "release.ps1", line = 1, command_type = "set_authenticodesignature", digest_algorithm = "SHA1"}}, {at = "evidence.source_code", match = {path = "release.ps1", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.psm1"
+snippet = '''
+function Sign-It($p) { Set-AuthenticodeSignature -LiteralPath $p -Certificate $c -HashAlgorithm SHA256 }
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.psm1", line = 1, command_type = "set_authenticodesignature", digest_algorithm = "SHA256"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.ps1"
+snippet = '''
+# NOTE: On Windows: Set-AuthenticodeSignature -HashAlgorithm SHA256 -TimestampServer ...
+$x = 1
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.ps1", line = 1, command_type = "set_authenticodesignature"}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "mage-sign-algorithm"
+spelling = "mage -Sign ... -a sha1RSA"
+source = "https://learn.microsoft.com/en-us/dotnet/framework/tools/mage-exe-manifest-generation-and-editing-tool"
+quote = "-a, -Algorithm sha1RSA"
+file = "deploy.ps1"
+snippet = '''
+mage -Update app.exe.manifest -a sha1RSA
+mage -Sign app.exe.manifest -CertFile cert.pfx -Password $pw
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "deploy.ps1", line = 2, command_type = "mage_sign"}}, {at = "evidence.source_code", match = {path = "deploy.ps1", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "deploy.cmd"
+snippet = '''
+mage.exe -Sign MyApp.application -CertFile %CERT% -a sha1RSA
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "deploy.cmd", line = 1, command_type = "mage_sign", digest_algorithm = "SHA1"}}, {at = "evidence.source_code", match = {path = "deploy.cmd", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "deploy.ps1"
+snippet = '''
+& mage.exe -Sign "$manifest" -CertHash $thumb
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "deploy.ps1", line = 1, command_type = "mage_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "nuget-sign-hashalgorithm"
+spelling = "nuget sign -HashAlgorithm SHA256"
+source = "https://learn.microsoft.com/en-us/nuget/reference/cli-reference/cli-ref-sign"
+quote = "HashAlgorithm Hash algorithm to be used to sign the package. Defaults to SHA256."
+file = "pack.ps1"
+snippet = '''
+nuget sign .\out\*.nupkg -CertificatePath cert.pfx -HashAlgorithm SHA384
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "pack.ps1", line = 1, command_type = "nuget_sign", digest_algorithm = "SHA384"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "pack.cmd"
+snippet = '''
+nuget.exe sign MyPackage.nupkg -CertificateFingerprint %FP% -HashAlgorithm SHA512 -Timestamper http://ts.example
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "pack.cmd", line = 1, command_type = "nuget_sign", digest_algorithm = "SHA512"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "pack.ps1"
+snippet = '''
+nuget sign $pkg -CertificatePath $cert
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "pack.ps1", line = 1, command_type = "nuget_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "dotnet-nuget-sign-hash-algorithm"
+spelling = "dotnet nuget sign --hash-algorithm SHA256"
+source = "https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-nuget-sign"
+quote = "--hash-algorithm <HASHALGORITHM> Hash algorithm to be used to sign the package. Defaults to SHA256."
+file = "pack.ps1"
+snippet = '''
+dotnet nuget sign ./out/MyLib.1.0.0.nupkg --certificate-path cert.pfx --hash-algorithm SHA384
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "pack.ps1", line = 1, command_type = "nuget_sign", digest_algorithm = "SHA384"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "pack.cmd"
+snippet = '''
+dotnet nuget sign *.nupkg --certificate-fingerprint %FP% --hash-algorithm sha512
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "pack.cmd", line = 1, command_type = "nuget_sign", digest_algorithm = "SHA512"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "pack.ps1"
+snippet = '''
+dotnet nuget sign $nupkg --certificate-path $pfx --timestamper http://ts.example
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "pack.ps1", line = 1, command_type = "nuget_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "sn-resign"
+spelling = "sn -R assembly infile"
+source = "https://learn.microsoft.com/en-us/dotnet/framework/tools/sn-exe-strong-name-tool"
+quote = "-R[a] assembly infile Re-signs a previously signed or delay-signed assembly with the key pair in infile"
+file = "sign.ps1"
+snippet = '''
+sn -R .\bin\Release\MyLib.dll .\key.snk
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.ps1", line = 1, command_type = "sn_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.cmd"
+snippet = '''
+sn.exe -Ra bin\MyLib.dll keyPair.snk
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.cmd", line = 1, command_type = "sn_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.ps1"
+snippet = '''
+& sn.exe -R $assembly $keyFile
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.ps1", line = 1, command_type = "sn_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "csproj-signassembly"
+spelling = "<SignAssembly>true</SignAssembly> with <AssemblyOriginatorKeyFile>"
+source = "https://learn.microsoft.com/en-us/visualstudio/msbuild/common-msbuild-project-properties"
+quote = "AssemblyOriginatorKeyFile .NET Specifies the file used to sign the assembly ( .snk or .pfx )"
+file = "App.csproj"
+snippet = '''
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+</Project>
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "App.csproj", line = 4, command_type = "strong_name_sign", strong_name_mode = "full_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Lib.vbproj"
+snippet = '''
+<Project>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>..\shared.snk</AssemblyOriginatorKeyFile>
+    <SignAssembly>True</SignAssembly>
+  </PropertyGroup>
+</Project>
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "Lib.vbproj", line = 4, command_type = "strong_name_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Directory.Build.props"
+snippet = '''
+<Project>
+  <PropertyGroup>
+    <SignAssembly Condition="'$(Configuration)' == 'Release'">true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)key.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+</Project>
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "Directory.Build.props", line = 3, command_type = "strong_name_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "App.csproj"
+snippet = '''
+<Project>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>pub.snk</AssemblyOriginatorKeyFile>
+    <DelaySign>true</DelaySign>
+  </PropertyGroup>
+</Project>
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "App.csproj", line = 3, command_type = "strong_name_sign", strong_name_mode = "delay_sign"}}]}

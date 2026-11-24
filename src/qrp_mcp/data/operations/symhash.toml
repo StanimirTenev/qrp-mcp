@@ -1,0 +1,1476 @@
+# Operation `symhash`: a symmetric cipher, hash, MAC or KDF in use (definicii.md). Ecosystem NET
+# (stage 4, 24.11.2026, rows 379, 380, 381): the weak hashes and ciphers of System.Security.Cryptography,
+# AES in ECB mode, the SHA-1 defaults of the KDFs, and the hash of a certificate made by
+# New-SelfSignedCertificate or certreq, from learn.microsoft.com. `expect`: the family on its line.
+# Variants change the receiver and variable names, the file kind, line continuation.
+
+operation = "symhash"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "NET"
+scope = "MD5/SHA1 Create, HashData(Async), the CryptoServiceProvider/Managed classes, HMACMD5/HMACSHA1, IncrementalHash.CreateHash/CreateHMAC with HashAlgorithmName.MD5/SHA1; DES/TripleDES/RC2 Create; AES in ECB mode by CipherMode.ECB or EncryptEcb/DecryptEcb on any receiver (row 381); Rfc2898DeriveBytes without a hash (SHA-1, row 380) and with SHA1, Pbkdf2; PasswordDeriveBytes; HKDF with SHA1/MD5; New-SelfSignedCertificate -HashAlgorithm on one line, with backtick continuation and splatted, certreq .inf HashAlgorithm (row 379). Not covered: RSAEncryptionPadding.OaepSHA1 (SHA-1 in OAEP is not a weakness of the hash), System.Random (rng_source), SHA-2/SHA-3 (no finding), ProtectedData."
+
+[[ecosystems.spellings]]
+id = "md5-create-computehash"
+spelling = "MD5.Create().ComputeHash(data)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.md5"
+quote = "Create() Creates an instance of the default implementation of the MD5 hash algorithm."
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        using var h = MD5.Create();
+        return h.ComputeHash(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.IO.Stream stream)
+    {
+        using (var hasher = System.Security.Cryptography.MD5.Create())
+        {
+            return hasher.ComputeHash(stream);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.vb"
+snippet = '''
+Imports System.Security.Cryptography
+
+Module Hash
+    Function Run(d As Byte()) As Byte()
+        Using h = MD5.Create()
+            Return h.ComputeHash(d)
+        End Using
+    End Function
+End Module
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.vb", line = 5, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings]]
+id = "md5-hashdata"
+spelling = "MD5.HashData(data)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.md5"
+quote = "HashData(Byte[])"
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        return MD5.HashData(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.IO.Stream stream)
+    {
+        var digest = await MD5.HashDataAsync(stream);
+        return digest;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(ReadOnlySpan<byte> source)
+    {
+        Span<byte> dst = stackalloc byte[64];
+        int n = MD5.HashData(source, dst);
+        return n;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 9, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings]]
+id = "sha1-create-computehash"
+spelling = "SHA1.Create().ComputeHash(data)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.sha1"
+quote = "Create() Creates an instance of the default implementation of SHA1 ."
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        using var h = SHA1.Create();
+        return h.ComputeHash(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.IO.Stream stream)
+    {
+        using (var hasher = System.Security.Cryptography.SHA1.Create())
+        {
+            return hasher.ComputeHash(stream);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.vb"
+snippet = '''
+Imports System.Security.Cryptography
+
+Module Hash
+    Function Run(d As Byte()) As Byte()
+        Using h = SHA1.Create()
+            Return h.ComputeHash(d)
+        End Using
+    End Function
+End Module
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.vb", line = 5, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "sha1-hashdata"
+spelling = "SHA1.HashData(data)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.sha1"
+quote = "HashData(Byte[])"
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        return SHA1.HashData(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(System.IO.Stream stream)
+    {
+        var digest = await SHA1.HashDataAsync(stream);
+        return digest;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(ReadOnlySpan<byte> source)
+    {
+        Span<byte> dst = stackalloc byte[64];
+        int n = SHA1.HashData(source, dst);
+        return n;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 9, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "new-md5cryptoserviceprovider"
+spelling = "new MD5CryptoServiceProvider()"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.md5cryptoserviceprovider"
+quote = "MD5CryptoServiceProvider"
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        var h = new MD5CryptoServiceProvider();
+        return h.ComputeHash(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        using (MD5CryptoServiceProvider alg = new MD5CryptoServiceProvider())
+        {
+            return alg.ComputeHash(data);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "hash.ps1"
+snippet = '''
+$h = New-Object System.Security.Cryptography.MD5CryptoServiceProvider
+$h.ComputeHash($bytes)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "hash.ps1", line = 1, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings]]
+id = "new-sha1managed"
+spelling = "new SHA1Managed()"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.sha1managed"
+quote = "SHA1Managed"
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        var h = new SHA1Managed();
+        return h.ComputeHash(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        using (SHA1Managed alg = new SHA1Managed())
+        {
+            return alg.ComputeHash(data);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "hash.ps1"
+snippet = '''
+$h = New-Object System.Security.Cryptography.SHA1Managed
+$h.ComputeHash($bytes)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "hash.ps1", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "new-sha1cryptoserviceprovider"
+spelling = "new SHA1CryptoServiceProvider()"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.sha1cryptoserviceprovider"
+quote = "SHA1CryptoServiceProvider"
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        var h = new SHA1CryptoServiceProvider();
+        return h.ComputeHash(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        using (SHA1CryptoServiceProvider alg = new SHA1CryptoServiceProvider())
+        {
+            return alg.ComputeHash(data);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "hash.ps1"
+snippet = '''
+$h = New-Object System.Security.Cryptography.SHA1CryptoServiceProvider
+$h.ComputeHash($bytes)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "hash.ps1", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "hmacmd5"
+spelling = "new HMACMD5(key)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.hmacmd5"
+quote = "HMACMD5"
+file = "Mac.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key, byte[] data)
+    {
+        using var mac = new HMACMD5(key);
+        return mac.ComputeHash(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Mac.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Mac.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] secret, byte[] message)
+    {
+        return HMACMD5.HashData(secret, message);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Mac.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Mac.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] k, byte[] d)
+    {
+        var h = new HMACMD5 { Key = k };
+        return h.ComputeHash(d);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Mac.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings]]
+id = "hmacsha1"
+spelling = "new HMACSHA1(key)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.hmacsha1"
+quote = "HMACSHA1"
+file = "Mac.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key, byte[] data)
+    {
+        using var mac = new HMACSHA1(key);
+        return mac.ComputeHash(data);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Mac.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Mac.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] secret, byte[] message)
+    {
+        return HMACSHA1.HashData(secret, message);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Mac.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Mac.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] k, byte[] d)
+    {
+        var h = new HMACSHA1 { Key = k };
+        return h.ComputeHash(d);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Mac.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "incrementalhash-createhash-md5"
+spelling = "IncrementalHash.CreateHash(HashAlgorithmName.MD5)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.incrementalhash.createhash"
+quote = "CreateHash(HashAlgorithmName)"
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        using var ih = IncrementalHash.CreateHash(HashAlgorithmName.MD5);
+        ih.AppendData(data);
+        return ih.GetHashAndReset();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run()
+    {
+        var alg = HashAlgorithmName.MD5;
+        using var h = IncrementalHash.CreateHash(alg);
+        return h;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key)
+    {
+        using var mac = IncrementalHash.CreateHMAC(HashAlgorithmName.MD5, key);
+        return mac;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings]]
+id = "incrementalhash-createhash-sha1"
+spelling = "IncrementalHash.CreateHash(HashAlgorithmName.SHA1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.incrementalhash.createhash"
+quote = "CreateHash(HashAlgorithmName)"
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data)
+    {
+        using var ih = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
+        ih.AppendData(data);
+        return ih.GetHashAndReset();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run()
+    {
+        var alg = HashAlgorithmName.SHA1;
+        using var h = IncrementalHash.CreateHash(alg);
+        return h;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Hash.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key)
+    {
+        using var mac = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA1, key);
+        return mac;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Hash.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "des-create-encryptor"
+spelling = "DES.Create().CreateEncryptor()"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.des"
+quote = "DES"
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key)
+    {
+        using var c = DES.Create();
+        c.Key = key;
+        return c.CreateEncryptor();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 8, algorithm = "DES"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] iv)
+    {
+        using DES legacy = DES.Create();
+        return legacy.EncryptCbc(data, iv);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 8, algorithm = "DES"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "cipher.ps1"
+snippet = '''
+$c = [System.Security.Cryptography.DES]::Create()
+$c.CreateEncryptor()
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cipher.ps1", line = 1, algorithm = "DES"}}]}
+
+[[ecosystems.spellings]]
+id = "tripledes-create-encryptor"
+spelling = "TripleDES.Create().CreateEncryptor()"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.tripledes"
+quote = "TripleDES"
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key)
+    {
+        using var c = TripleDES.Create();
+        c.Key = key;
+        return c.CreateEncryptor();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 8, algorithm = "3DES"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] iv)
+    {
+        using TripleDES legacy = TripleDES.Create();
+        return legacy.EncryptCbc(data, iv);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 8, algorithm = "3DES"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "cipher.ps1"
+snippet = '''
+$c = [System.Security.Cryptography.TripleDES]::Create()
+$c.CreateEncryptor()
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cipher.ps1", line = 1, algorithm = "3DES"}}]}
+
+[[ecosystems.spellings]]
+id = "rc2-create-encryptor"
+spelling = "RC2.Create().CreateEncryptor()"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rc2"
+quote = "RC2"
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key)
+    {
+        using var c = RC2.Create();
+        c.Key = key;
+        return c.CreateEncryptor();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 8, algorithm = "RC2"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] data, byte[] iv)
+    {
+        using RC2 legacy = RC2.Create();
+        return legacy.EncryptCbc(data, iv);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 8, algorithm = "RC2"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "cipher.ps1"
+snippet = '''
+$c = [System.Security.Cryptography.RC2]::Create()
+$c.CreateEncryptor()
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cipher.ps1", line = 1, algorithm = "RC2"}}]}
+
+[[ecosystems.spellings]]
+id = "aes-mode-ecb"
+spelling = "aes.Mode = CipherMode.ECB"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.ciphermode"
+quote = "ECB"
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run()
+    {
+        using var aes = Aes.Create();
+        aes.Mode = CipherMode.ECB;
+        return aes.CreateEncryptor();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 9, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run()
+    {
+        using Aes cipher = Aes.Create();
+        cipher.Mode = CipherMode.ECB;
+        return cipher.CreateEncryptor();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 9, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run()
+    {
+        var alg = new AesManaged();
+        alg.Mode = CipherMode.ECB;
+        return alg;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 9, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key)
+    {
+        using var c = Aes.Create();
+        c.Key = key;
+        c.Mode = System.Security.Cryptography.CipherMode.ECB;
+        return c;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 10, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings]]
+id = "aes-encryptecb"
+spelling = "aes.EncryptEcb(data, PaddingMode.PKCS7)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.symmetricalgorithm.encryptecb"
+quote = "EncryptEcb"
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key, byte[] data)
+    {
+        using var aes = Aes.Create();
+        aes.Key = key;
+        return aes.EncryptEcb(data, PaddingMode.PKCS7);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 10, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key, byte[] data)
+    {
+        using Aes block = Aes.Create();
+        block.Key = key;
+        return block.EncryptEcb(data, PaddingMode.None);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 10, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(Aes algorithm, byte[] data)
+    {
+        return algorithm.EncryptEcb(data, PaddingMode.PKCS7);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 8, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings]]
+id = "aes-decryptecb"
+spelling = "aes.DecryptEcb(data, PaddingMode.PKCS7)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.symmetricalgorithm.decryptecb"
+quote = "DecryptEcb"
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key, byte[] data)
+    {
+        using var aes = Aes.Create();
+        aes.Key = key;
+        return aes.DecryptEcb(data, PaddingMode.PKCS7);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 10, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] key, byte[] data)
+    {
+        using Aes block = Aes.Create();
+        block.Key = key;
+        return block.DecryptEcb(data, PaddingMode.None);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 10, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Cipher.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(Aes algorithm, byte[] data)
+    {
+        return algorithm.DecryptEcb(data, PaddingMode.PKCS7);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Cipher.cs", line = 8, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings]]
+id = "rfc2898-password-salt"
+spelling = "new Rfc2898DeriveBytes(password, salt)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rfc2898derivebytes.-ctor"
+quote = "Rfc2898DeriveBytes"
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using var kdf = new Rfc2898DeriveBytes(password, salt);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string pw, byte[] salt)
+    {
+        var derive = new Rfc2898DeriveBytes(pw, salt);
+        byte[] key = derive.GetBytes(16);
+        return key;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using (var k = new Rfc2898DeriveBytes(password, salt))
+        {
+            return k.GetBytes(32);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using var kdf = new Rfc2898DeriveBytes(
+            password,
+            salt,
+            100000);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "rfc2898-password-saltsize"
+spelling = "new Rfc2898DeriveBytes(password, 16)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rfc2898derivebytes.-ctor"
+quote = "Rfc2898DeriveBytes"
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password)
+    {
+        using var kdf = new Rfc2898DeriveBytes(password, 16);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string pw)
+    {
+        var derive = new Rfc2898DeriveBytes(pw, 16);
+        byte[] key = derive.GetBytes(16);
+        return key;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password)
+    {
+        using (var k = new Rfc2898DeriveBytes(password, 16))
+        {
+            return k.GetBytes(32);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using var kdf = new Rfc2898DeriveBytes(
+            password,
+            salt,
+            100000);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "rfc2898-password-salt-iterations"
+spelling = "new Rfc2898DeriveBytes(password, salt, 100000)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rfc2898derivebytes.-ctor"
+quote = "Rfc2898DeriveBytes"
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using var kdf = new Rfc2898DeriveBytes(password, salt, 100000);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string pw, byte[] salt)
+    {
+        var derive = new Rfc2898DeriveBytes(pw, salt, 100000);
+        byte[] key = derive.GetBytes(16);
+        return key;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using (var k = new Rfc2898DeriveBytes(password, salt, 100000))
+        {
+            return k.GetBytes(32);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using var kdf = new Rfc2898DeriveBytes(
+            password,
+            salt,
+            100000);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "rfc2898-bytes-salt-iterations"
+spelling = "new Rfc2898DeriveBytes(passwordBytes, salt, 100000)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rfc2898derivebytes.-ctor"
+quote = "Rfc2898DeriveBytes"
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] passwordBytes, byte[] salt)
+    {
+        using var kdf = new Rfc2898DeriveBytes(passwordBytes, salt, 100000);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] pwBytes, byte[] salt)
+    {
+        var derive = new Rfc2898DeriveBytes(pwBytes, salt, 100000);
+        byte[] key = derive.GetBytes(16);
+        return key;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] passwordBytes, byte[] salt)
+    {
+        using (var k = new Rfc2898DeriveBytes(passwordBytes, salt, 100000))
+        {
+            return k.GetBytes(32);
+        }
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using var kdf = new Rfc2898DeriveBytes(
+            password,
+            salt,
+            100000);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "rfc2898-explicit-sha1"
+spelling = "new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA1)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rfc2898derivebytes.-ctor"
+quote = "HashAlgorithmName"
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        using var kdf = new Rfc2898DeriveBytes(password, salt, 100000, HashAlgorithmName.SHA1);
+        return kdf.GetBytes(32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        return Rfc2898DeriveBytes.Pbkdf2(password, salt, 600000, HashAlgorithmName.SHA1, 32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] pw, byte[] salt)
+    {
+        var name = HashAlgorithmName.SHA1;
+        return Rfc2898DeriveBytes.Pbkdf2(pw, salt, 1000, name, 16);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "passwordderivebytes"
+spelling = "new PasswordDeriveBytes(password, salt)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.passwordderivebytes"
+quote = "This class uses an extension of the PBKDF1 algorithm defined in the PKCS#5 v2.0 standard"
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string password, byte[] salt)
+    {
+        var pdb = new PasswordDeriveBytes(password, salt, "SHA1", 2);
+        return pdb.GetBytes(16);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(string pw, byte[] salt)
+    {
+        using var d = new PasswordDeriveBytes(pw, salt, "MD5", 1000);
+        return d.GetBytes(8);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.vb"
+snippet = '''
+Imports System.Security.Cryptography
+
+Module Kdf
+    Function Run(p As String, s As Byte()) As Byte()
+        Dim pdb As New PasswordDeriveBytes(p, s, "SHA1", 2)
+        Return pdb.GetBytes(16)
+    End Function
+End Module
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.vb", line = 5, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "hkdf-sha1"
+spelling = "HKDF.DeriveKey(HashAlgorithmName.SHA1, ikm, 32)"
+source = "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.hkdf.derivekey"
+quote = "DeriveKey"
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] ikm)
+    {
+        return HKDF.DeriveKey(HashAlgorithmName.SHA1, ikm, 32);
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] prk, byte[] info)
+    {
+        byte[] okm = HKDF.Expand(HashAlgorithmName.SHA1, prk, 32, info);
+        return okm;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Kdf.cs"
+snippet = '''
+using System;
+using System.Security.Cryptography;
+
+class Code
+{
+    object Run(byte[] ikm, byte[] salt)
+    {
+        var prk = HKDF.Extract(HashAlgorithmName.MD5, ikm, salt);
+        return prk;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Kdf.cs", line = 8, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings]]
+id = "new-selfsignedcertificate-hashalgorithm"
+spelling = "New-SelfSignedCertificate -HashAlgorithm SHA1"
+source = "https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate"
+quote = "-HashAlgorithm"
+file = "cert.ps1"
+snippet = '''
+New-SelfSignedCertificate -DnsName www.example.com -CertStoreLocation Cert:\LocalMachine\My -HashAlgorithm SHA1
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "cert.ps1"
+snippet = '''
+New-SelfSignedCertificate -Subject "CN=Test" `
+    -KeyAlgorithm RSA `
+    -HashAlgorithm SHA1 `
+    -CertStoreLocation Cert:\CurrentUser\My
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", line = 3, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "cert.ps1"
+snippet = '''
+$params = @{
+    DnsName = 'www.example.com'
+    HashAlgorithm = 'MD5'
+    CertStoreLocation = 'Cert:\CurrentUser\My'
+}
+New-SelfSignedCertificate @params
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", line = 3, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "cert.ps1"
+snippet = '''
+New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Code' -HashAlgorithm 'sha1'
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.ps1", line = 1, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "certreq-inf-hashalgorithm"
+spelling = "[NewRequest] HashAlgorithm = sha1"
+source = "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/certreq_1"
+quote = "HashAlgorithm"
+file = "request.inf"
+snippet = '''
+[Version]
+Signature="$Windows NT$"
+
+[NewRequest]
+Subject = "CN=www.example.com"
+KeyLength = 2048
+HashAlgorithm = sha1
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "request.inf", line = 7, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "req.inf"
+snippet = '''
+[NewRequest]
+Subject="CN=srv"
+HashAlgorithm=MD5
+KeyAlgorithm=RSA
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "req.inf", line = 3, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "cert.inf"
+snippet = '''
+[NewRequest]
+  HashAlgorithm = SHA1
+  Exportable = TRUE
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "cert.inf", line = 2, algorithm = "SHA1"}}]}
