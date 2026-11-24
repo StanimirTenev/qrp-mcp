@@ -1306,6 +1306,14 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
            r"\bcertutil(?:\.exe)?\s+-hashfile\s+\S+\s+" + name + r"\b|"
            r"\bmakecert(?:\.exe)?\b[^\n]*\s-a\s+" + name + r"\b", re.IGNORECASE))
       for family, name in (("SHA1", "sha-?1"), ("MD5", "md5"))],
+    # sign/NET closure (zatv-a): the XML-DSig signature methods of SignedXml -- "XmlDsigRSASHA1Url
+    # Represents the Uniform Resource Identifier (URI) for the standard RSA signature method",
+    # XmlDsigDSAUrl the DSA one, both over SHA-1 (Learn, SignedXml fields).
+    ("RSA", "RSA named by the XML-DSig signature method of SignedXml",
+     re.compile(r"\bXmlDsigRSASHA(?:1|256|384|512)Url\b")),
+    ("DSA", "DSA named by the XML-DSig signature method of SignedXml", re.compile(r"\bXmlDsigDSAUrl\b")),
+    ("SHA1", "SHA-1 named by the XML-DSig signature or digest method of SignedXml",
+     re.compile(r"\bXmlDsig(?:RSASHA1|DSA|SHA1)Url\b")),
     # Row 380: Rfc2898DeriveBytes without a HashAlgorithmName defaults to SHA-1 (SYSLIB0041).
     ("SHA1", "SHA-1 as the default hash of Rfc2898DeriveBytes (no HashAlgorithmName given)",
      re.compile(r"\bnew\s+Rfc2898DeriveBytes\s*\((?!.*HashAlgorithmName)(?=.*\)\s*;)")),
