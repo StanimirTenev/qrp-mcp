@@ -5045,9 +5045,23 @@ def size_constants(lines: list[str]) -> dict[str, int]:
         declared = len(re.findall(rf"\b(?:int|Int|long|Long|size_t|unsigned|short|uint32_t|word32)\s+{re.escape(name)}\b"
                                   rf"|\b{re.escape(name)}\s*:\s*(?:Int|Long)\b", text))
         defined = len(re.findall(rf"#\s*define\s+{re.escape(name)}\b", text))
-        if assigned + defined == 1 and declared <= 1:
+        if assigned + defined == 1 and declared <= 1 and not _changed_later(name, text):
             out[name] = values[0]
     return out
+
+
+def _changed_later(name: str, text: str) -> bool:
+    """The name is changed after it is set -- `bits *= 2`, `bits += 1024`, `bits++` -- or its
+    address goes to a call that may write it (`scanf("%d", &bits)`). OpenSSL's
+    OSSL_PARAM_construct_*(key, &bits) only reads it (closure keysize/C, zatv-a)."""
+    n = re.escape(name)
+    if re.search(rf"(?<![\w.]){n}\s*(?:[-+*/%&|^]|<<|>>)=|(?:\+\+|--)\s*{n}\b|(?<![\w.]){n}\s*(?:\+\+|--)", text):
+        return True
+    for m in re.finditer(rf"&\s*{n}\b", text):
+        call = re.search(r"(\w+)\s*\([^()]*$", text[max(0, m.start() - 200):m.start()])
+        if not call or not call.group(1).startswith("OSSL_PARAM_construct_"):
+            return True
+    return False
 
 
 def resolve_size_names(line: str, constants: dict[str, int]) -> str:
@@ -5361,7 +5375,7 @@ def _wolfcrypt_ecc_bytes(findings: list[dict[str, Any]], lines: list[str]) -> No
         if not value.isdigit():
             once = [a.group(1) for line in lines
                     for a in re.finditer(rf"(?<![\w.]){re.escape(value)}\s*=(?!=)\s*(\w+)", line)]
-            value = once[0] if len(once) == 1 else ""
+            value = once[0] if len(once) == 1 and not _changed_later(value, "\n".join(lines)) else ""
         if value.isdigit() and int(value) in _ECC_BYTES:
             f["key_size"] = _ECC_BYTES[int(value)]
 
