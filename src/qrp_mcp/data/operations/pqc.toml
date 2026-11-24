@@ -8948,3 +8948,435 @@ ignore = ["hss_error_none", "hss_extra_info", "hss_working_key", "hss_lib", "hss
 file = "candidate.c"
 snippet = "#include <hss.h>\nr = {candidate}(a, b);\n"
 expect = {rows = [{at = "evidence.source_code", match = {path = "candidate.c", line = 2}}]}
+
+# Ecosystem PKI (24.11.2026): post-quantum and composite keys, certificates and requests in PEM and
+# DER -- ML-DSA (RFC 9881), ML-KEM (RFC 9935), SLH-DSA and HashSLH-DSA (RFC 9909), composite ML-DSA
+# (RFC 10073). The material is made when the tests run (tests/_pqc_material.py, wired by
+# tests/conftest.py), never committed. `expect`: the row of the family with its parameter set, and on
+# a certificate the role (the subject key or the signature). Rows 449, 450, 477.
+[[ecosystems]]
+ecosystem = "PKI"
+scope = "SubjectPublicKeyInfo (PEM PUBLIC KEY, DER) for ML-DSA-44/65/87, ML-KEM-512/768/1024, the twelve SLH-DSA and twelve HashSLH-DSA sets, the eighteen composite ML-DSA OIDs; PKCS#8 PRIVATE KEY for ML-DSA and ML-KEM in the seed, expandedKey and both forms (PEM, DER); certificates (PEM, DER) with an ML-DSA, ML-KEM, SLH-DSA or composite subject key, signed by ML-DSA, SLH-DSA or a composite, an ML-DSA-65 key under an ML-DSA-87 issuer (row 450); an ML-DSA CERTIFICATE REQUEST. Not covered: composite ML-KEM (draft-ietf-lamps-pq-composite-kem, not an RFC: its OIDs are not final), HashML-DSA (RFC 9881 section 8.3: MUST NOT be used in certificates), the private key's agreement with its public key, LMS/XMSS certificates (RFC 9708/9802 not read here)."
+
+[[ecosystems.spellings]]
+id = "mldsa-spki-pem"
+spelling = "PUBLIC KEY (ML-DSA)"
+source = "https://www.rfc-editor.org/rfc/rfc9881.txt"
+quote = 'id-ml-dsa-44 OBJECT IDENTIFIER ::= { sigAlgs 17 } id-ml-dsa-65 OBJECT IDENTIFIER ::= { sigAlgs 18 }'
+file = "key.pub.pem"
+snippet = "{{MLDSA44_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pub.pem", algorithm = "ML-DSA", parameter_set = "44"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLDSA65_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLDSA87_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pub.pem", algorithm = "ML-DSA", parameter_set = "87"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "signer.pem"
+snippet = "{{MLDSA65_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "signer.pem", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-spki-der"
+spelling = "SubjectPublicKeyInfo DER (ML-DSA)"
+source = "https://www.rfc-editor.org/rfc/rfc9881.txt"
+quote = 'In the X.509 certificate, the subjectPublicKeyInfo field has the SubjectPublicKeyInfo type'
+file = "key.der"
+material = "MLDSA65_SPKI_DER"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.der", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-pkcs8-seed"
+spelling = "PRIVATE KEY (ML-DSA, seed form)"
+source = "https://www.rfc-editor.org/rfc/rfc9881.txt"
+quote = 'ML-DSA-44-PrivateKey ::= CHOICE { seed [0] OCTET STRING (SIZE (32)),'
+file = "key.pem"
+snippet = "{{MLDSA44_PKCS8_SEED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "44"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLDSA65_PKCS8_SEED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLDSA87_PKCS8_SEED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "87"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-pkcs8-expanded"
+spelling = "PRIVATE KEY (ML-DSA, expanded form)"
+source = "https://www.rfc-editor.org/rfc/rfc9881.txt"
+quote = 'expandedKey OCTET STRING (SIZE (2560)), both SEQUENCE { seed OCTET STRING (SIZE (32)), expandedKey OCTET STRING (SIZE (2560)) } }'
+file = "key.pem"
+snippet = "{{MLDSA44_PKCS8_EXPANDED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "44"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLDSA65_PKCS8_EXPANDED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLDSA87_PKCS8_EXPANDED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "87"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-pkcs8-both"
+spelling = "PRIVATE KEY (ML-DSA, both form)"
+source = "https://www.rfc-editor.org/rfc/rfc9881.txt"
+quote = 'expandedKey OCTET STRING (SIZE (2560)), both SEQUENCE { seed OCTET STRING (SIZE (32)), expandedKey OCTET STRING (SIZE (2560)) } }'
+file = "key.pem"
+snippet = "{{MLDSA44_PKCS8_BOTH_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "44"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLDSA65_PKCS8_BOTH_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLDSA87_PKCS8_BOTH_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.pem", algorithm = "ML-DSA", parameter_set = "87"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-pkcs8-der"
+spelling = "PKCS#8 DER (ML-DSA, seed form)"
+source = "https://www.rfc-editor.org/rfc/rfc9881.txt"
+quote = 'ML-DSA-44-PrivateKey ::= CHOICE { seed [0] OCTET STRING (SIZE (32)),'
+file = "key.der"
+material = "MLDSA65_PKCS8_SEED_DER"
+expect = {rows = [{at = "evidence.source_code", match = {path = "key.der", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-cert-pem"
+spelling = "CERTIFICATE (ML-DSA, self-signed)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = '-----BEGIN CERTIFICATE-----'
+file = "server.crt"
+snippet = "{{CERT_MLDSA65_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "server.crt", algorithm = "ML-DSA", parameter_set = "65", certificate_role = "subject_public_key"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{CERT_MLDSA44_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "server.crt", algorithm = "ML-DSA", parameter_set = "44", certificate_role = "subject_public_key"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "ca.pem"
+snippet = "{{CERT_MLDSA65_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "ca.pem", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-cert-der"
+spelling = "certificate DER (ML-DSA)"
+source = "https://www.rfc-editor.org/rfc/rfc9881.txt"
+quote = 'In the X.509 certificate, the subjectPublicKeyInfo field has the SubjectPublicKeyInfo type'
+file = "server.der"
+material = "CERT_MLDSA65_DER"
+expect = {rows = [{at = "evidence.source_code", match = {path = "server.der", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-cert-issuer-set"
+spelling = "CERTIFICATE (ML-DSA-65 key, ML-DSA-87 issuer signature)"
+source = "https://www.rfc-editor.org/rfc/rfc9881.txt"
+quote = 'id-ml-dsa-44 OBJECT IDENTIFIER ::= { sigAlgs 17 } id-ml-dsa-65 OBJECT IDENTIFIER ::= { sigAlgs 18 }'
+file = "leaf.crt"
+snippet = "{{CERT_MLDSA65_BY_MLDSA87_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "leaf.crt", algorithm = "ML-DSA", parameter_set = "65", certificate_role = "subject_public_key"}}, {at = "evidence.source_code", match = {path = "leaf.crt", algorithm = "ML-DSA", parameter_set = "87", certificate_role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "mldsa-csr-pem"
+spelling = "CERTIFICATE REQUEST (ML-DSA)"
+source = "https://www.rfc-editor.org/rfc/rfc7468.txt"
+quote = '-----BEGIN CERTIFICATE REQUEST-----'
+file = "req.csr"
+snippet = "{{CSR_MLDSA65_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "req.csr", algorithm = "ML-DSA", parameter_set = "65"}}]}
+
+[[ecosystems.spellings]]
+id = "mlkem-spki-pem"
+spelling = "PUBLIC KEY (ML-KEM)"
+source = "https://www.rfc-editor.org/rfc/rfc9935.txt"
+quote = 'id-alg-ml-kem-512 OBJECT IDENTIFIER ::= { kems 1 } id-alg-ml-kem-768 OBJECT IDENTIFIER ::= { kems 2 }'
+file = "kem.pub.pem"
+snippet = "{{MLKEM512_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pub.pem", algorithm = "ML-KEM", parameter_set = "512"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLKEM768_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pub.pem", algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLKEM1024_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pub.pem", algorithm = "ML-KEM", parameter_set = "1024"}}]}
+
+[[ecosystems.spellings]]
+id = "mlkem-pkcs8-seed"
+spelling = "PRIVATE KEY (ML-KEM, seed form)"
+source = "https://www.rfc-editor.org/rfc/rfc9935.txt"
+quote = 'ML-KEM-512-PrivateKey ::= CHOICE { seed [0] OCTET STRING (SIZE (64)),'
+file = "kem.pem"
+snippet = "{{MLKEM512_PKCS8_SEED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "512"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLKEM768_PKCS8_SEED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLKEM1024_PKCS8_SEED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "1024"}}]}
+
+[[ecosystems.spellings]]
+id = "mlkem-pkcs8-expanded"
+spelling = "PRIVATE KEY (ML-KEM, expanded form)"
+source = "https://www.rfc-editor.org/rfc/rfc9935.txt"
+quote = 'expandedKey OCTET STRING (SIZE (1632)), both SEQUENCE { seed OCTET STRING (SIZE (64)), expandedKey'
+file = "kem.pem"
+snippet = "{{MLKEM512_PKCS8_EXPANDED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "512"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLKEM768_PKCS8_EXPANDED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLKEM1024_PKCS8_EXPANDED_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "1024"}}]}
+
+[[ecosystems.spellings]]
+id = "mlkem-pkcs8-both"
+spelling = "PRIVATE KEY (ML-KEM, both form)"
+source = "https://www.rfc-editor.org/rfc/rfc9935.txt"
+quote = 'expandedKey OCTET STRING (SIZE (1632)), both SEQUENCE { seed OCTET STRING (SIZE (64)), expandedKey'
+file = "kem.pem"
+snippet = "{{MLKEM512_PKCS8_BOTH_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "512"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLKEM768_PKCS8_BOTH_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "768"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{MLKEM1024_PKCS8_BOTH_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.pem", algorithm = "ML-KEM", parameter_set = "1024"}}]}
+
+[[ecosystems.spellings]]
+id = "mlkem-cert-pem"
+spelling = "CERTIFICATE (ML-KEM key, ML-DSA issuer)"
+source = "https://www.rfc-editor.org/rfc/rfc9935.txt"
+quote = 'id-alg-ml-kem-512 OBJECT IDENTIFIER ::= { kems 1 } id-alg-ml-kem-768 OBJECT IDENTIFIER ::= { kems 2 }'
+file = "kem.crt"
+snippet = "{{CERT_MLKEM768_BY_MLDSA65_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.crt", algorithm = "ML-KEM", parameter_set = "768", certificate_role = "subject_public_key"}}, {at = "evidence.source_code", match = {path = "kem.crt", algorithm = "ML-DSA", parameter_set = "65", certificate_role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "slhdsa-spki-pem"
+spelling = "PUBLIC KEY (SLH-DSA)"
+source = "https://www.rfc-editor.org/rfc/rfc9909.txt"
+quote = 'id-slh-dsa-sha2-128s OBJECT IDENTIFIER ::= { sigAlgs 20 }'
+file = "slh.pub.pem"
+snippet = "{{SLHDSA_SHA2_128S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-128s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHA2_128F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-128f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHA2_192S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-192s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHA2_192F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-192f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHA2_256S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-256s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHA2_256F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-256f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHAKE_128S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-128s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHAKE_128F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-128f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHAKE_192S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-192s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHAKE_192F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-192f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHAKE_256S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-256s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{SLHDSA_SHAKE_256F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-256f"}}]}
+
+[[ecosystems.spellings]]
+id = "hash-slhdsa-spki-pem"
+spelling = "PUBLIC KEY (HashSLH-DSA)"
+source = "https://www.rfc-editor.org/rfc/rfc9909.txt"
+quote = 'The public key identifiers for HashSLH-DSA are defined here'
+file = "slh.pub.pem"
+snippet = "{{HASHSLHDSA_SHA2_128S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-128s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHA2_128F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-128f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHA2_192S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-192s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHA2_192F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-192f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHA2_256S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-256s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHA2_256F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHA2-256f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHAKE_128S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-128s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHAKE_128F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-128f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHAKE_192S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-192s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHAKE_192F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-192f"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHAKE_256S_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-256s"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{HASHSLHDSA_SHAKE_256F_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "slh.pub.pem", algorithm = "SLH-DSA", parameter_set = "SHAKE-256f"}}]}
+
+[[ecosystems.spellings]]
+id = "slhdsa-cert-pem"
+spelling = "CERTIFICATE (SLH-DSA, self-signed)"
+source = "https://www.rfc-editor.org/rfc/rfc9909.txt"
+quote = 'id-slh-dsa-sha2-128s OBJECT IDENTIFIER ::= { sigAlgs 20 }'
+file = "root.crt"
+snippet = "{{CERT_SLHDSA_SHA2_128S_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "root.crt", algorithm = "SLH-DSA", parameter_set = "SHA2-128s", certificate_role = "subject_public_key"}}]}
+
+[[ecosystems.spellings]]
+id = "composite-spki-pem"
+spelling = "PUBLIC KEY (composite ML-DSA)"
+source = "https://www.rfc-editor.org/rfc/rfc10073.txt"
+quote = 'id-MLDSA44-RSA2048-PSS-SHA256 OID: 1.3.6.1.5.5.7.6.37'
+file = "comp.pub.pem"
+snippet = "{{COMPOSITE_37_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "44"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_38_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "44"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_39_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "44"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_40_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "44"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_41_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_42_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_43_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_44_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_45_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_46_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_47_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_48_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "65"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_49_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "87"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_50_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "87"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_51_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "87"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "Ed448"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_52_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "87"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_53_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "87"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = "{{COMPOSITE_54_SPKI_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ML-DSA", parameter_set = "87"}}, {at = "evidence.source_code", match = {path = "comp.pub.pem", algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "composite-cert-pem"
+spelling = "CERTIFICATE (composite ML-DSA key and signature)"
+source = "https://www.rfc-editor.org/rfc/rfc10073.txt"
+quote = 'id-MLDSA65-ECDSA-P256-SHA512 OID: 1.3.6.1.5.5.7.6.45'
+file = "comp.crt"
+snippet = "{{CERT_COMPOSITE_45_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "comp.crt", algorithm = "ML-DSA", parameter_set = "65", certificate_role = "subject_public_key"}}, {at = "evidence.source_code", match = {path = "comp.crt", algorithm = "ECDSA", curve = "P-256", certificate_role = "subject_public_key"}}]}
+
+[[ecosystems.spellings]]
+id = "composite-issuer-cert-pem"
+spelling = "CERTIFICATE (ML-DSA-65 key, composite ML-DSA-87 issuer signature)"
+source = "https://www.rfc-editor.org/rfc/rfc10073.txt"
+quote = 'id-MLDSA65-ECDSA-P256-SHA512 OID: 1.3.6.1.5.5.7.6.45'
+file = "leaf.crt"
+snippet = "{{CERT_MLDSA65_BY_COMPOSITE_49_PEM}}"
+expect = {rows = [{at = "evidence.source_code", match = {path = "leaf.crt", algorithm = "ML-DSA", parameter_set = "65", certificate_role = "subject_public_key"}}, {at = "evidence.source_code", match = {path = "leaf.crt", algorithm = "ML-DSA", parameter_set = "87", certificate_role = "signature"}}, {at = "evidence.source_code", match = {path = "leaf.crt", algorithm = "ECDSA", curve = "P-384", certificate_role = "signature"}}]}
