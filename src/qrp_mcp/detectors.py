@@ -145,7 +145,9 @@ DOTNET_CONFIG_NAME = re.compile(r"^(?:web|app|machine|applicationhost)(?:\.[\w-]
 # Scripts and build files read for signing commands as a pipeline is (ZA-OPRAVYANE rows 34,
 # 308, 387).
 SIGNING_SCRIPT_EXTENSIONS = {".sh", ".bash", ".zsh", ".ksh", ".bat", ".cmd",
-                             ".csproj", ".vcxproj", ".props", ".targets", ".mk"}
+                             ".csproj", ".vcxproj", ".props", ".targets", ".mk",
+                             # sign/NET closure (zatv-a): a VB.NET project signs as a C# one does.
+                             ".vbproj"}
 
 # The same files that carry no extension at all.
 CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
@@ -1994,6 +1996,10 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     # previously signed or delay-signed assembly with the key pair in infile" (Learn, Sn.exe), as a
     # command: at the start of the line or after `&`, a quote or a parenthesis.
     ("sn_sign", re.compile(r"(?:^|[\s&\"'(])sn(?:\.exe)?\"?\s+-Ra?(?=\s)")),
+    # Row 363 (sign/NET closure, zatv-a): MSBuild's strong naming, <SignAssembly>true</SignAssembly>
+    # with "AssemblyOriginatorKeyFile ... the file used to sign the assembly ( .snk or .pfx )" (Learn,
+    # Common MSBuild project properties), in a project or a props file. A condition on it is kept.
+    ("strong_name_sign", re.compile(r"<SignAssembly\b[^>]*>\s*true\s*</SignAssembly>", re.IGNORECASE)),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
