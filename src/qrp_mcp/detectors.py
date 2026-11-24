@@ -164,6 +164,9 @@ CONFIG_FILENAMES = {"sshd_config", "ssh_config", "ssl.conf", "krb5.conf",
                     # selects a bootloader's signature type, and a Caddyfile is a TLS
                     # server's whole configuration (ZA-OPRAVYANE rows 79 and 52).
                     "Dockerfile", "Containerfile", "Kconfig", "Caddyfile",
+                    # A Go workspace: its godebug lines set the programs' GODEBUG
+                    # (go.dev/doc/godebug; external/Go, 24.11.2026).
+                    "go.work",
                     # Postfix's main.cf and master.cf: its TLS protocols, ciphers and curves
                     # (postconf(5); ZA-OPRAVYANE row 336).
                     "main.cf", "master.cf",
@@ -1955,7 +1958,10 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("gpg_sign", re.compile(
         r"\bgpg2?\b[^|;&\n]*?\s(?:--detach-sign|--sign|--clear-?sign|-[aequvz]*[sb][aequvzsb]*)"
         r"(?=\s|$)")),
-    ("openssl_sign", re.compile(r"\bopenssl\s+(dgst|smime|cms)\b.*-sign\b")),
+    # sign/CI (24.11.2026): and a digest command, openssl-dgst(1) "openssl sha256 -sign
+    # privatekey.pem -out signature.sign file.txt".
+    ("openssl_sign", re.compile(r"\bopenssl\s+(dgst|smime|cms|sha(?:1|224|256|384|512)|sha3-\d{3}|"
+                                r"sha512-2(?:24|56)|md5|sm3|ripemd160|blake2[bs]\d+)\b.*-sign\b")),
     ("cosign_sign", re.compile(r"\bcosign\s+sign\b")),
     # sign/NET closure (zatv-a): also `signtool.exe sign` and a quoted path, `& "...\\signtool.exe" sign`.
     ("signtool_sign", re.compile(r"\bsigntool(?:\.exe)?\"?\s+sign\b", re.IGNORECASE)),
@@ -2000,6 +2006,15 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     # with "AssemblyOriginatorKeyFile ... the file used to sign the assembly ( .snk or .pfx )" (Learn,
     # Common MSBuild project properties), in a project or a props file. A condition on it is kept.
     ("strong_name_sign", re.compile(r"<SignAssembly\b[^>]*>\s*true\s*</SignAssembly>", re.IGNORECASE)),
+    # sign/CI (24.11.2026), from each tool's page: notation sign (notation_sign.md), minisign
+    # `-S` alone or clustered (`-Sm`; `-V` verifies), ssh-keygen(1) `-Y sign` (not `-Y verify`),
+    # and the GitHub actions that sign with Sigstore: sigstore/gh-action-sigstore-python and
+    # actions/attest (actions/attest-build-provenance wraps it), on their `uses:` line.
+    ("notation_sign", re.compile(r"\bnotation\s+sign\b")),
+    ("minisign_sign", re.compile(r"\bminisign\b[^|;&\n]*?\s-[A-Za-z]*S[A-Za-z]*(?=\s|$)")),
+    ("ssh_keygen_sign", re.compile(r"\bssh-keygen\b[^|;&\n]*\s-Y\s+sign\b")),
+    ("sigstore_action", re.compile(
+        r"\buses:\s*[\"']?(?:sigstore/gh-action-sigstore-python|actions/attest(?:-build-provenance)?)@")),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
@@ -2044,8 +2059,10 @@ def _recipient_file(command_type: str, segment: str) -> str | None:
 # `-k KEY`.
 _SIGNING_KEY_ARG = re.compile(
     # Row 482: a quoted value whole, so a `pkcs11:` URI is not cut at its `;`.
+    # Row 510: a value never starts with `-`; `-sign -inkey KEY` took `-inkey` as -sign's value
+    # and the match swallowed the -inkey that names the key.
     r"(?:\s-sign|\s-inkey|\s--key(?:-dir|-file)?|\s/f|\s-k|\s-G)(?:\s+|=)"
-    r"(\"[^\"\n]*\"|'[^'\n]*'|[^\s;|&)]+)|"
+    r"(\"[^\"\n]*\"|'[^'\n]*'|(?!-)[^\s;|&)]+)|"
     r"(?:\bkmodsign|(?:^|[\s/])sign-file)\s+(?:-\w+\s+)*\w+\s+([^\s;|&)]+)")
 # Row 500: the FIT algorithm a firmware signer is given on its line, `binman sign -a
 # sha256,rsa4096`, `mkimage -o sha256,rsa2048`.
@@ -4646,6 +4663,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _rfc2898_default_sha1(findings, lines, rel_path)
     findings = _powershell_continued_hash(findings, lines, rel_path)
     findings = _certreq_request_hash(findings, lines, rel_path)
+    findings = _python_key_generation(findings, lines, rel_path)  # keysize/Py
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5419,6 +5437,200 @@ def _ossl_param_size(findings: list[dict[str, Any]], lines: list[str], rel_path:
                           "description": f"{family} key size given as the OpenSSL key generation parameter {key}",
                           "excerpt": line.strip()[:200], "evidence_kind": "call", "key_size": size,
                           "in_test_code": in_test_code(rel_path)})
+# keysize/Py (24.11.2026): the size or curve a Python library is asked for when it makes a key, read
+# from the call's own arguments -- keyword or positional, the call over several lines, the value a
+# literal or a name the file assigns one literal (every assignment of it the same). A name the file
+# does not fix (a parameter) leaves the size undetermined. The pages read: cryptography.io (rsa
+# generate_private_key(public_exponent, key_size), dsa generate_private_key(key_size) and
+# generate_parameters(key_size), dh generate_parameters(generator, key_size), ec
+# generate_private_key(curve) and derive_private_key(private_value, curve)); PyCryptodome
+# RSA.generate(bits), DSA.generate(bits), ECC.generate(curve=); paramiko RSAKey.generate(bits),
+# ECDSAKey.generate(curve=, bits=); pyOpenSSL PKey.generate_key(type, bits); M2Crypto
+# RSA.gen_key(bits, e), DSA.gen_params(bits), DH.gen_params(plen, g), EC.gen_params(curve nid).
+# A line with no row of the family gets one (`dsa.generate_parameters`, a bare imported
+# generate_private_key, M2Crypto's calls were silent).
+_PY_KEYGEN_CALLS = (
+    # (call, family, size keyword, size position, curve keyword, curve position, what, needs)
+    (r"\brsa\.generate_private_key", "RSA", "key_size", 1, None, None, "pyca rsa.generate_private_key", None),
+    (r"\bdsa\.generate_(?:private_key|parameters)", "DSA", "key_size", 0, None, None,
+     "pyca dsa.generate_private_key/generate_parameters", None),
+    (r"\bdh\.generate_parameters", "DH", "key_size", 1, None, None, "pyca dh.generate_parameters", None),
+    (r"\bec\.generate_private_key", "EC", None, None, "curve", 0, "pyca ec.generate_private_key", None),
+    (r"\bec\.derive_private_key", "EC", None, None, "curve", 1, "pyca ec.derive_private_key", None),
+    (r"(?<![\w.])RSA\.generate", "RSA", "bits", 0, None, None, "PyCryptodome RSA.generate",
+     r"(?:Crypto|Cryptodome)\.PublicKey\s+import\b[^\n]*\bRSA\b"),
+    (r"(?<![\w.])DSA\.generate", "DSA", "bits", 0, None, None, "PyCryptodome DSA.generate",
+     r"(?:Crypto|Cryptodome)\.PublicKey\s+import\b[^\n]*\bDSA\b"),
+    (r"(?<![\w.])ECC\.generate", "EC", None, None, "curve", None, "PyCryptodome ECC.generate",
+     r"(?:Crypto|Cryptodome)\.PublicKey\s+import\b[^\n]*\bECC\b"),
+    (r"\bRSAKey\.generate", "RSA", "bits", 0, None, None, "paramiko RSAKey.generate", r"\bparamiko\b"),
+    (r"\bECDSAKey\.generate", "ECDSA", "bits", None, "curve", None, "paramiko ECDSAKey.generate",
+     r"\bparamiko\b"),
+    (r"\.generate_key(?=\s*\((?:[^)]*?)\bTYPE_RSA\b)", "RSA", "bits", 1, None, None,
+     "pyOpenSSL PKey.generate_key", r"\bOpenSSL\b"),
+    (r"\.generate_key(?=\s*\((?:[^)]*?)\bTYPE_DSA\b)", "DSA", "bits", 1, None, None,
+     "pyOpenSSL PKey.generate_key", r"\bOpenSSL\b"),
+    (r"\bRSA\.gen_key", "RSA", "bits", 0, None, None, "M2Crypto RSA.gen_key", r"\bM2Crypto\b"),
+    (r"\bDSA\.gen_params", "DSA", "bits", 0, None, None, "M2Crypto DSA.gen_params", r"\bM2Crypto\b"),
+    (r"\bDH\.gen_params", "DH", "plen", 0, None, None, "M2Crypto DH.gen_params", r"\bM2Crypto\b"),
+    (r"\bEC\.gen_params", "EC", None, None, "curve", 0, "M2Crypto EC.gen_params", r"\bM2Crypto\b"),
+)
+# pyca's curve classes (cryptography.io, Elliptic Curves), PyCryptodome's ECC table names of the
+# NIST curves, OpenSSL's NIDs as M2Crypto names them: (curve, size).
+_PY_CURVES = {
+    "SECP192R1": ("P-192", 192), "SECP224R1": ("P-224", 224), "SECP256R1": ("P-256", 256),
+    "SECP384R1": ("P-384", 384), "SECP521R1": ("P-521", 521), "SECP256K1": ("secp256k1", 256),
+    "BrainpoolP256R1": ("brainpoolP256r1", 256), "BrainpoolP320R1": ("brainpoolP320r1", 320),
+    "BrainpoolP384R1": ("brainpoolP384r1", 384), "BrainpoolP512R1": ("brainpoolP512r1", 512),
+    "NID_X9_62_prime192v1": ("P-192", 192), "NID_secp224r1": ("P-224", 224),
+    "NID_X9_62_prime256v1": ("P-256", 256), "NID_secp384r1": ("P-384", 384),
+    "NID_secp521r1": ("P-521", 521), "NID_secp256k1": ("secp256k1", 256),
+}
+_PYCRYPTODOME_CURVES = {name.lower(): curve for curve, names in (
+    (("P-192", 192), ("NIST P-192", "p192", "P-192", "prime192v1", "secp192r1")),
+    (("P-224", 224), ("NIST P-224", "p224", "P-224", "prime224v1", "secp224r1")),
+    (("P-256", 256), ("NIST P-256", "p256", "P-256", "prime256v1", "secp256r1")),
+    (("P-384", 384), ("NIST P-384", "p384", "P-384", "prime384v1", "secp384r1")),
+    (("P-521", 521), ("NIST P-521", "p521", "P-521", "prime521v1", "secp521r1")),
+) for name in names}
+_PY_PYCA_BARE = re.compile(
+    r"^\s*from\s+cryptography\.hazmat\.primitives\.asymmetric\.(rsa|dsa|dh|ec)\s+import\s+([^#\n]+)")
+# A module-level assignment only (column 0): a local of another function, or a keyword line of an
+# unrelated call (`    bits=1024`), is not the name a call reads (review, 24.11.2026).
+_PY_LITERAL_ASSIGN = re.compile(r"^([A-Za-z_]\w*)\s*(?::\s*\w+\s*)?=\s*(.+?)\s*(?:#.*)?$")
+_PY_DEF_PARAMS = re.compile(r"^\s*(?:async\s+)?def\s+\w+\s*\(([^)]*)")
+
+
+def _py_call_arguments(lines: list[str], index: int, start: int) -> list[str] | None:
+    """The top-level arguments of the call whose `(` is at or after `start` on lines[index],
+    read over up to six lines; None when it does not close."""
+    text = lines[index][start:]
+    for extra in lines[index + 1:index + 7]:
+        if text.count("(") <= text.count(")") and "(" in text:
+            break
+        text += " " + extra.strip()
+    open_at = text.find("(")
+    if open_at < 0:
+        return None
+    depth, args, current = 0, [], ""
+    for ch in text[open_at + 1:]:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            if depth == 0:
+                args.append(current.strip())
+                return [a for a in args if a]
+            depth -= 1
+        if ch == "," and depth == 0:
+            args.append(current.strip())
+            current = ""
+            continue
+        current += ch
+    return None
+
+
+def _py_argument(args: list[str], keyword: str | None, position: int | None) -> str | None:
+    if keyword:
+        for a in args:
+            m = re.match(rf"{keyword}\s*=(?!=)\s*(.+)$", a)
+            if m:
+                return m.group(1).strip()
+    positional = [a for a in args if not re.match(r"[A-Za-z_]\w*\s*=(?!=)", a)]
+    if position is not None and position < len(positional):
+        return positional[position]
+    return None
+
+
+def _python_key_generation(findings: list[dict[str, Any]], lines: list[str],
+                           rel_path: str) -> list[dict[str, Any]]:
+    if not rel_path.endswith(".py"):
+        return findings
+    text = "\n".join(lines)
+    if not re.search(r"generate|gen_key|gen_params|derive_private_key", text):
+        return findings
+    # Names the file assigns, each with the one value every assignment gives it.
+    assigned: dict[str, str | None] = {}
+    for line in lines:
+        m = _PY_LITERAL_ASSIGN.match(line)
+        if m:
+            value = m.group(2)
+            assigned[m.group(1)] = value if assigned.get(m.group(1), value) == value else None
+
+    # A name a function takes as a parameter is that call's argument, not the module's constant
+    # of the same name (`KEY_SIZE = 2048` ... `def make(KEY_SIZE)`): never resolved.
+    for line in lines:
+        m = _PY_DEF_PARAMS.match(line)
+        if m:
+            for param in m.group(1).split(","):
+                name = param.split("=", 1)[0].split(":", 1)[0].strip().lstrip("*")
+                if name in assigned:
+                    assigned[name] = None
+
+    def resolve(value: str | None) -> str | None:
+        if value and re.fullmatch(r"[A-Za-z_]\w*", value) and value in assigned:
+            return assigned[value]
+        return value
+
+    calls = [(re.compile(c), *rest) for c, *rest in _PY_KEYGEN_CALLS
+             if rest[-1] is None or re.search(rest[-1], text)]
+    # `from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key`: the bare
+    # name is that module's.
+    for line in lines:
+        m = _PY_PYCA_BARE.match(line)
+        if m:
+            names = {n.strip().split(" as ")[-1].strip("() ") for n in m.group(2).split(",")}
+            for c, family, *rest in [x for x in _PY_KEYGEN_CALLS if x[0].startswith(rf"\b{m.group(1)}\.")]:
+                bare = c.split(".", 1)[1]
+                if any(re.fullmatch(bare, n) for n in names):
+                    calls.append((re.compile(r"(?<![\w.])" + bare), family, *rest))
+    added: list[dict[str, Any]] = []
+    in_string = False
+    for index, line in enumerate(lines):
+        code = line.split("#", 1)[0]
+        # A docstring or other triple-quoted text is prose: no row is made there (the other rules
+        # read it as a mention, test_retest_0_11_0).
+        quoted = in_string or '"""' in line or "'''" in line
+        if (line.count('"""') + line.count("'''")) % 2:
+            in_string = not in_string
+        for call, family, size_kw, size_pos, curve_kw, curve_pos, what, _ in calls:
+            m = call.search(code)
+            if not m:
+                continue
+            args = _py_call_arguments(lines, index, m.end())
+            if args is None:
+                continue
+            size = curve = None
+            if size_kw:
+                value = resolve(_py_argument(args, size_kw, size_pos))
+                if value and value.isdigit() and (int(value) in registry._SIZES
+                                                  or family in ("EC", "ECDSA")):
+                    size = int(value)
+            if curve_kw:
+                value = resolve(_py_argument(args, curve_kw, curve_pos))
+                if value:
+                    named = re.search(r"\b(SECP\d+[RK]1|BrainpoolP\d+R1|NID_\w+)\b", value)
+                    curve = (_PY_CURVES.get(named.group(1)) if named else
+                             _PYCRYPTODOME_CURVES.get(value.strip("\"'").lower()))
+            if size is None and curve is None and any(
+                    f["line"] == index + 1 and f["algorithm"] == family for f in findings):
+                break
+            same = [f for f in findings if f["line"] == index + 1
+                    and (f["algorithm"] == family or (family in ("EC", "ECDSA")
+                                                      and f["algorithm"] in ("EC", "ECDSA")))]
+            row = next((f for f in same if f.get("evidence_kind") not in ("comment", "ban")), None)
+            if row is None and (same or quoted):
+                # A row the other rules read as a mention or a rejection (row 497) stays one.
+                break
+            if row is None:
+                row = {"path": rel_path, "line": index + 1, "algorithm": family,
+                       "description": f"{family} key made by {what}", "excerpt": line.strip()[:200],
+                       "evidence_kind": "call", "in_test_code": in_test_code(rel_path)}
+                added.append(row)
+            if curve and not row.get("curve"):
+                row["curve"], row["key_size"] = curve
+            elif size and row.get("key_size") in (None, "undetermined"):
+                row["key_size"] = size
+            break
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
@@ -5953,10 +6165,14 @@ _RUNTIME_JCA = re.compile(
 # `getenv("KEX_FUZZ_DEBUG")`; caught on the positive control).
 # Python's bytes forms too: os.environb and os.getenvb (os module: "getenvb() uses
 # os.environb"), whose names are bytes literals.
+# external/Go (24.11.2026): Go's raw string (`os.Getenv(`KEM_SCHEME`)`), and os.ExpandEnv, whose
+# argument names the variable as `${NAME}` or `$NAME` (pkg.go.dev/os: "ExpandEnv replaces ${var} or
+# $var in the string according to the values of the current environment variables").
 _RUNTIME_ENV_NAME = re.compile(
     r"(?:os\.environb?(?:\.get)?\s*[\[(]|os\.getenvb?\s*\(|\bgetenv\s*\(|os\.(?:Getenv|LookupEnv)\s*\(|"
-    r"System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\()\s*b?[\"']([A-Za-z_][\w.-]*)[\"']|"
-    r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])")
+    r"System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\()\s*b?[\"'`]([A-Za-z_][\w.-]*)[\"'`]|"
+    r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])|"
+    r"os\.ExpandEnv\s*\(\s*[\"`]\$\{?([A-Za-z_]\w*)\}?[\"`]\s*\)")
 _NOT_A_CHOICE = re.compile(r"(?:^|_)(?:KEY|SECRET|PASS(?:WORD)?|TOKEN|SALT|IV|PATH|FILE|DIR|URL|"
                            r"DEBUG|TRACE|LOG|VERBOSE)$",
                            re.IGNORECASE)
@@ -5975,7 +6191,7 @@ def _runtime_env_name(text: str) -> re.Match | None:
 
 
 _RUNTIME_BYTES = (b"environ", b"getenv", b"Getenv", b"LookupEnv", b"process.env", b"System.getenv",
-                  b"GetEnvironmentVariable", b"${", b"$")
+                  b"GetEnvironmentVariable", b"${", b"$", b"os.Environ")  # os.Environ: external/Go
 
 
 # Row 440 (06.11.2026): `mech = os.environ.get("HSM_SIGN_MECH", "RSA-PSS")` gave RSA and no
@@ -6027,15 +6243,72 @@ def _runtime_default(text: str) -> dict[str, Any] | None:
 _CMAKE_VARIABLE = re.compile(r"\$\{[^}]*\}")
 
 
+# external/Go (24.11.2026): the variable's name held in a constant of the file (`const envScheme =
+# "KEM_SCHEME"` ... `os.Getenv(envScheme)`), one line or a `const ( ... )` block. Only a constant the
+# file itself declares with a string literal; another package's constant is not looked up.
+_GO_STRING_CONST = re.compile(r"^\s*(?:const\s+)?([A-Za-z_]\w*)\s*(?:string\s*)?=\s*[\"`]([A-Za-z_][\w.-]*)[\"`]\s*(?://.*)?$")
+_GO_ENV_BY_CONST = re.compile(r"\bos\.(Getenv|LookupEnv)\s*\(\s*([A-Za-z_]\w*)\s*\)")
+
+
+def _go_env_constants(lines: list[str]) -> dict[str, str]:
+    consts: dict[str, str] = {}
+    block = False
+    for text in lines:
+        stripped = text.strip()
+        if re.match(r"const\s*\($", stripped):
+            block = True
+            continue
+        if block and stripped == ")":
+            block = False
+            continue
+        if block or stripped.startswith("const "):
+            match = _GO_STRING_CONST.match(text)
+            if match:
+                consts[match.group(1)] = match.group(2)
+    return consts
+
+
+# external/Go (24.11.2026): os.Environ() read whole and searched for a setting by its name
+# (pkg.go.dev/os: Environ returns the environment "in the form "key=value""). The place is the line
+# that compares an entry to the name -- `strings.HasPrefix(kv, "KEM_SCHEME=")`, `k == "SIGN_ALG"`,
+# `case "KEM_SCHEME":` -- in a file that calls os.Environ().
+_GO_ENVIRON_NAME = re.compile(
+    r"(?:\bHasPrefix\s*\(\s*\w+\s*,\s*|==\s*|\bcase\s+)\"([A-Za-z_][\w.-]*)=?\"|"
+    r"\"([A-Za-z_][\w.-]*)=?\"\s*==")
+
+
+def _go_environ_places(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for number, text in enumerate(lines, 1):
+        stripped = text.strip()
+        if stripped.startswith("//"):
+            continue
+        for match in _GO_ENVIRON_NAME.finditer(text):
+            name = match.group(1) or match.group(2)
+            if _RUNTIME_SETTING.search(name) and not _NOT_A_CHOICE.search(name):
+                out.append({"path": rel_path, "line": number, "setting": name,
+                            "read_from": "os.Environ()", "excerpt": stripped[:200],
+                            "in_test_code": in_test_code(rel_path)})
+                break
+    return out
+
+
 def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     cmake = rel_path.rsplit("/", 1)[-1] == "CMakeLists.txt" or rel_path.endswith(".cmake")
+    go = rel_path.endswith(".go")
+    go_consts = _go_env_constants(lines) if go else {}
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
         if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
             continue
         if cmake:
             text = _CMAKE_VARIABLE.sub("", text)
+        if go_consts:
+            # external/Go: `os.Getenv(envScheme)` is read as the name the constant holds.
+            text = _GO_ENV_BY_CONST.sub(
+                lambda m: (f'os.{m.group(1)}("{go_consts[m.group(2)]}")'
+                           if m.group(2) in go_consts else m.group(0)), text)
         if not _RUNTIME_REFERENCE.search(text):
             continue
         # The reference must be the setting's value: right after it, past `=`, `:`, `(`, a
@@ -6055,6 +6328,78 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         if default:
             place.update({k: default[k] for k in ("default", "default_family", "overridable")})
         out.append(place)
+    if go and "os.Environ()" in "\n".join(lines):
+        taken = {p["line"] for p in out}
+        out.extend(p for p in _go_environ_places(rel_path, lines) if p["line"] not in taken)
+    return out
+
+
+# external/Go (24.11.2026): a GODEBUG setting switches what the standard library's cryptography
+# does -- `tlsmlkem=0` drops X25519MLKEM768 from the default groups, `rsa1024min=0` allows RSA keys
+# under 1024 bits, `fips140=only` refuses what is not FIPS 140-3 (go.dev/doc/godebug,
+# go.dev/doc/security/fips140) -- and GOFIPS140 picks the Go Cryptographic Module a build links. Each
+# is a place: the choice is made there, not on the line that calls crypto/tls. Written as a `godebug`
+# line or block of go.mod or go.work, a `//go:debug` directive, or `GODEBUG=` / `GOFIPS140=` in a
+# script's or a Dockerfile's environment. Only the settings whose names concern cryptography
+# (buildgap._GODEBUG_CRYPTO): `http2client=0` is not one. A value read from elsewhere (`$X`) is not
+# a setting written here.
+GO_SETTING_BYTES = re.compile(rb"godebug|go:debug|GODEBUG|GOFIPS140")
+_GO_DEBUG_DIRECTIVE = re.compile(r"^//go:debug\s+([\w.-]+)=(\S+)\s*$")
+_GO_MOD_GODEBUG = re.compile(r"^\s*godebug\s+([\w.-]+)=(\S+)\s*(?://.*)?$")
+_GO_MOD_GODEBUG_LINE = re.compile(r"^\s*([\w.-]+)=(\S+)\s*(?://.*)?$")
+_GO_ENV_SETTING = re.compile(r"\b(GODEBUG|GOFIPS140)\s*[=:]\s*[\"']?([^\s\"'$]+)")
+
+
+def _go_crypto_setting(name: str) -> bool:
+    from .buildgap import _GODEBUG_CRYPTO  # local: the one list of crypto GODEBUG prefixes
+    return name.startswith(_GODEBUG_CRYPTO)
+
+
+def go_settings(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    name = rel_path.rsplit("/", 1)[-1]
+    module_file = name in ("go.mod", "go.work")
+    block = False
+
+    def add(number: int, setting: str, value: str, read_from: str) -> None:
+        out.append({"path": rel_path, "line": number, "setting": setting, "value": value,
+                    "read_from": read_from, "kind": "go_setting",
+                    "excerpt": lines[number - 1].strip()[:200],
+                    "in_test_code": in_test_code(rel_path)})
+
+    for number, text in enumerate(lines, 1):
+        stripped = text.strip()
+        if module_file:
+            if block:
+                if stripped == ")":
+                    block = False
+                    continue
+                match = _GO_MOD_GODEBUG_LINE.match(text)
+                if match and _go_crypto_setting(match.group(1)):
+                    add(number, match.group(1), match.group(2), f"godebug ({name})")
+                continue
+            if re.match(r"godebug\s*\($", stripped):
+                block = True
+                continue
+            match = _GO_MOD_GODEBUG.match(text)
+            if match and _go_crypto_setting(match.group(1)):
+                add(number, match.group(1), match.group(2), f"godebug ({name})")
+            continue
+        if rel_path.endswith(".go"):
+            match = _GO_DEBUG_DIRECTIVE.match(stripped)
+            if match and _go_crypto_setting(match.group(1)):
+                add(number, match.group(1), match.group(2), "//go:debug")
+            continue
+        if stripped.startswith(("#", "//")):
+            continue
+        for match in _GO_ENV_SETTING.finditer(text):
+            if match.group(1) == "GOFIPS140":
+                add(number, "GOFIPS140", match.group(2), "GOFIPS140")
+                continue
+            for pair in match.group(2).split(","):
+                key, eq, value = pair.partition("=")
+                if eq and value and _go_crypto_setting(key):
+                    add(number, key, value, "GODEBUG")
     return out
 
 
@@ -6393,17 +6738,56 @@ _SETTING_PATTERNS = tuple(
 LINE_GATE = line_gate()
 
 
+# Row 548 (24.11.2026): a hybrid KEM by the name a scheme registry gives it -- katzenpost/hpqc's
+# combiner, kem/schemes/schemes.go at 30f6aab: `"MLKEM768-X25519"`, `"HQC-256-X448"`,
+# `"FrodoKEM-640-SHAKE-X448"`, and `"X25519-MLKEM768"` the other way round. A post-quantum KEM and
+# X25519 or X448 joined by a hyphen, the whole of a string literal; the halves from the name.
+_REGISTRY_PQ_HALF = (
+    (re.compile(r"ML-?KEM(?:Hedged)?(512|768|1024)", re.I), "ML-KEM", lambda m: m.group(1)),
+    (re.compile(r"Kyber(512|768|1024)", re.I), "Kyber", lambda m: m.group(1)),
+    (re.compile(r"HQC-?(128|192|256)", re.I), "HQC", lambda m: m.group(1)),
+    (re.compile(r"FrodoKEM-?(640|976|1344)-?(SHAKE|AES)", re.I), "FrodoKEM",
+     lambda m: f"{m.group(1)}-{m.group(2).upper()}"),
+    (re.compile(r"(sntrup\d{3,7})", re.I), "NTRU", lambda m: m.group(1).lower()),
+    (re.compile(r"mceliece(\d{6,7}f?)", re.I), "Classic McEliece", lambda m: m.group(1).lower()),
+    (re.compile(r"CTIDH(511|512|1024|2048)", re.I), "CSIDH/CTIDH", lambda m: m.group(1)),
+)
+_REGISTRY_HYBRID = re.compile(r"[\"'`]((?:[A-Za-z][\w-]*?-X(?:25519|448))|(?:X(?:25519|448)-[A-Za-z][\w-]*?))[\"'`]")
+
+
+def registry_hybrid(name: str) -> list[tuple[str, str | None]] | None:
+    """The two halves of a registry hybrid name (row 548), in the name's order, or None."""
+    for classical in ("X25519", "X448"):
+        if name.startswith(classical + "-"):
+            pq, order = name[len(classical) + 1:], "classical_first"
+        elif name.endswith("-" + classical):
+            pq, order = name[:-len(classical) - 1], "pq_first"
+        else:
+            continue
+        for pattern, family, param in _REGISTRY_PQ_HALF:
+            m = pattern.fullmatch(pq)
+            if m:
+                halves = [(family, param(m)), (classical, None)]
+                return halves if order == "pq_first" else halves[::-1]
+    return None
+
+
 def scan_hybrid_names(line: str) -> list[str]:
     """The hybrids this line names, by their registered spelling."""
     lowered = line.lower()
     if ("kem" not in lowered and "sntrup" not in lowered and "wing" not in lowered
-            and "mldsa" not in lowered and "5.5.7.6." not in lowered):
+            and "mldsa" not in lowered and "5.5.7.6." not in lowered
+            and "x25519" not in lowered and "x448" not in lowered):
         return []
     out: list[str] = []
     for match in _HYBRID_NAME.finditer(line):
         name = HYBRIDS[match.group(1).lower()][0]
         if name not in out:
             out.append(name)
+    # Row 548: a registry's hybrid names, as written.
+    for match in _REGISTRY_HYBRID.finditer(line):
+        if match.group(1) not in out and registry_hybrid(match.group(1)):
+            out.append(match.group(1))
     return out
 
 
@@ -6864,6 +7248,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
         taken = {(p["path"], p["line"]) for p in runtime_choices_found}
         runtime_choices_found.extend(p for p in remote_signing(rel_path, lines)
                                      if (p["path"], p["line"]) not in taken)
+    if GO_SETTING_BYTES.search(raw):
+        # external/Go: GODEBUG and GOFIPS140 settings (go_settings).
+        runtime_choices_found.extend(go_settings(rel_path, lines))
     if TIMESTAMP_BYTES.search(raw):
         taken = {(p["path"], p["line"]) for p in runtime_choices_found}
         runtime_choices_found.extend(p for p in remote_timestamps(rel_path, lines)
@@ -7719,7 +8106,8 @@ def scan_repo(repo_path: Path, exclude: Path | list[Path] | None = None,
     _tag_named_in_a_path(source_findings + iac_findings)
     _join_fips(source_findings + iac_findings, fips_findings)
     hybrids = [{"path": p, "line": n, "name": name,
-                "halves": [list(h) for h in HYBRIDS[name.lower()][1]]}
+                "halves": [list(h) for h in (HYBRIDS[name.lower()][1] if name.lower() in HYBRIDS
+                                             else registry_hybrid(name))]}  # row 548
                for p, n, name in hybrid_names]
     _link_kms_keys(hybrids, kms_refs)
     return {

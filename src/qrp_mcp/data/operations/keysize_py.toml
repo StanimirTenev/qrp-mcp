@@ -1,0 +1,520 @@
+# Operation `keysize`, ecosystem Python (24.11.2026): the size, curve or parameter set given to a key
+# when Python code makes one -- pyca/cryptography (rsa, dsa, dh, ec), PyCryptodome (RSA, DSA, ECC),
+# paramiko (RSAKey, ECDSAKey), pyOpenSSL (PKey.generate_key), M2Crypto (RSA.gen_key, DSA.gen_params,
+# EC.gen_params, DH.gen_params). Kept in a file of its own beside keysize.toml (NET, PKI) so the two
+# can be edited apart. Pages fetched 24.11.2026. `expect`: the evidence row of the line with its
+# algorithm, size and curve; a size held in a name of the file is read through the name, and a size
+# the file does not fix stays `undetermined` (a rule must not invent one). Rows 179, 397, 435, 458.
+
+operation = "keysize"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Py"
+scope = "pyca/cryptography rsa.generate_private_key (keyword, positional, over lines), dsa.generate_private_key and generate_parameters, dh.generate_parameters, ec.generate_private_key and derive_private_key with each curve class of the page (SECP192R1 ... SECP521R1, SECP256K1, the four Brainpool), imported bare or through the module; PyCryptodome RSA.generate, DSA.generate, ECC.generate(curve=) with the names of its ECC table for the NIST curves; paramiko RSAKey.generate, ECDSAKey.generate(bits=, curve=); pyOpenSSL PKey.generate_key(TYPE_RSA/TYPE_DSA, bits); M2Crypto RSA.gen_key, DSA.gen_params, EC.gen_params(EC.NID_*), DH.gen_params. The size as a literal, a keyword, or a name assigned a literal in the file. Not covered: a size computed or passed in from another module (undetermined, by design), key loading (keyfile), Ed25519/X25519 (no size to set), PyNaCl, python-ecdsa, the removed binary SECT curves."
+
+[[ecosystems.spellings]]
+id = "pyca-rsa-generate-keyword"
+spelling = "rsa.generate_private_key(public_exponent=65537, key_size=N)"
+source = "https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/"
+quote = "generate_private_key ( public_exponent , key_size ) [source]"
+file = "keys.py"
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+key = rsa.generate_private_key(public_exponent=65537, key_size=1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 1024}}, {at = "findings", match = {raw_value = "RSA-1024", weak_key = true}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+key = rsa.generate_private_key(65537, 3072)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 3072}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+bits = 1024
+key = rsa.generate_private_key(public_exponent=65537, key_size=bits)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+RSA_KEY_SIZE = 2048
+
+
+def make():
+    return rsa.generate_private_key(public_exponent=65537, key_size=RSA_KEY_SIZE)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 7, algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+key = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=4096,
+)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 4096}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric.rsa import generate_private_key
+key = generate_private_key(public_exponent=65537, key_size=1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+
+def make(size):
+    return rsa.generate_private_key(public_exponent=65537, key_size=size)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 5, algorithm = "RSA", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+KEY_SIZE = 2048
+
+
+def make(KEY_SIZE):
+    return rsa.generate_private_key(public_exponent=65537, key_size=KEY_SIZE)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 7, algorithm = "RSA", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+
+def legacy():
+    size = 1024
+    return size
+
+
+def make(size):
+    return rsa.generate_private_key(public_exponent=65537, key_size=size)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 10, algorithm = "RSA", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import RSA
+opts = dict(
+    bits=1024
+)
+
+
+def make(bits):
+    return RSA.generate(bits)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 8, algorithm = "RSA", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings]]
+id = "pyca-dsa-generate-private-key"
+spelling = "dsa.generate_private_key(key_size=N)"
+source = "https://cryptography.io/en/latest/hazmat/primitives/asymmetric/dsa/"
+quote = "dsa . generate_private_key ( ... key_size = 1024 , ... )"
+file = "keys.py"
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import dsa
+key = dsa.generate_private_key(key_size=1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DSA", key_size = 1024}}, {at = "findings", match = {raw_value = "DSA-1024", weak_key = true}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import dsa
+key = dsa.generate_private_key(2048)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DSA", key_size = 2048}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import dsa
+DSA_BITS = 1024
+key = dsa.generate_private_key(key_size=DSA_BITS)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "DSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "pyca-dsa-generate-parameters"
+spelling = "dsa.generate_parameters(key_size=N)"
+source = "https://cryptography.io/en/latest/hazmat/primitives/asymmetric/dsa/"
+quote = "generate_parameters ( key_size ) [source]"
+file = "keys.py"
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import dsa
+params = dsa.generate_parameters(key_size=2048)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DSA", key_size = 2048}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import dsa
+params = dsa.generate_parameters(1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "pyca-dh-generate-parameters"
+spelling = "dh.generate_parameters(generator=2, key_size=N)"
+source = "https://cryptography.io/en/latest/hazmat/primitives/asymmetric/dh/"
+quote = "parameters = dh . generate_parameters ( generator = 2 , key_size = 2048 )"
+file = "keys.py"
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import dh
+params = dh.generate_parameters(generator=2, key_size=512)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DH", key_size = 512}}, {at = "findings", match = {raw_value = "DH-512", weak_key = true, severity = "critical"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import dh
+params = dh.generate_parameters(2, 1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DH", key_size = 1024}}, {at = "findings", match = {raw_value = "DH-1024", weak_key = true}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import dh
+DH_BITS = 2048
+params = dh.generate_parameters(generator=5, key_size=DH_BITS)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "DH", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "pyca-ec-generate-private-key"
+spelling = "ec.generate_private_key(ec.CURVE())"
+source = "https://cryptography.io/en/latest/hazmat/primitives/asymmetric/ec/"
+quote = "ec . generate_private_key ( ... ec . SECP384R1 () ... )"
+file = "keys.py"
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.generate_private_key(ec.SECP384R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 384, curve = "P-384"}}, {at = "findings", match = {raw_value = "EC-384", weak_key = false}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.generate_private_key(ec.SECP256R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 256, curve = "P-256"}}, {at = "findings", match = {raw_value = "EC-256", weak_key = false}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.generate_private_key(ec.SECP521R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 521, curve = "P-521"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.generate_private_key(ec.SECP224R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 224, curve = "P-224"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.generate_private_key(ec.SECP192R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 192, curve = "P-192"}}, {at = "findings", match = {raw_value = "EC-192", weak_key = true}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.generate_private_key(ec.SECP256K1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 256, curve = "secp256k1"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.generate_private_key(ec.BrainpoolP320R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 320, curve = "brainpoolP320r1"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric.ec import SECP521R1, generate_private_key
+key = generate_private_key(SECP521R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 521, curve = "P-521"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+curve = ec.SECP384R1()
+key = ec.generate_private_key(curve)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "pyca-ec-derive-private-key"
+spelling = "ec.derive_private_key(value, ec.CURVE())"
+source = "https://cryptography.io/en/latest/hazmat/primitives/asymmetric/ec/"
+quote = "derive_private_key ( private_value , curve ) [source]"
+file = "keys.py"
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.derive_private_key(secret, ec.SECP256R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 256, curve = "P-256"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import ec
+key = ec.derive_private_key(private_value=k, curve=ec.SECP256K1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 256, curve = "secp256k1"}}]}
+
+[[ecosystems.spellings]]
+id = "pycryptodome-rsa-generate"
+spelling = "RSA.generate(bits)"
+source = "https://www.pycryptodome.org/src/public_key/rsa"
+quote = "Crypto.PublicKey.RSA. generate ( bits , randfunc = None , e = 65537 )"
+file = "keys.py"
+snippet = '''
+from Crypto.PublicKey import RSA
+key = RSA.generate(1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 1024}}, {at = "findings", match = {raw_value = "RSA-1024", weak_key = true}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import RSA
+key = RSA.generate(bits=3072, e=65537)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 3072}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import RSA
+KEY_BITS = 2048
+key = RSA.generate(KEY_BITS)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Cryptodome.PublicKey import RSA
+key = RSA.generate(1024)
+'''
+
+[[ecosystems.spellings]]
+id = "pycryptodome-dsa-generate"
+spelling = "DSA.generate(bits)"
+source = "https://www.pycryptodome.org/src/public_key/dsa"
+quote = "Crypto.PublicKey.DSA. generate ( bits , randfunc = None , domain = None )"
+file = "keys.py"
+snippet = '''
+from Crypto.PublicKey import DSA
+key = DSA.generate(2048)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DSA", key_size = 2048}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import DSA
+key = DSA.generate(bits=1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DSA", key_size = 1024}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import DSA
+n = 3072
+key = DSA.generate(n)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "DSA", key_size = 3072}}]}
+
+[[ecosystems.spellings]]
+id = "pycryptodome-ecc-generate"
+spelling = "ECC.generate(curve=NAME)"
+source = "https://www.pycryptodome.org/src/public_key/ecc"
+quote = "mykey = ECC . generate ( curve = 'p256' )"
+file = "keys.py"
+snippet = '''
+from Crypto.PublicKey import ECC
+key = ECC.generate(curve='p256')
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 256, curve = "P-256"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import ECC
+key = ECC.generate(curve="NIST P-384")
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import ECC
+key = ECC.generate(curve='secp521r1')
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 521, curve = "P-521"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import ECC
+key = ECC.generate(curve='prime256v1')
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 256, curve = "P-256"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import ECC
+CURVE = "P-384"
+key = ECC.generate(curve=CURVE)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "EC", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.spellings]]
+id = "paramiko-rsakey-generate"
+spelling = "paramiko.RSAKey.generate(bits)"
+source = "https://docs.paramiko.org/en/stable/api/keys.html"
+quote = "static generate ( bits , progress_func = None ) ¶ Generate a new private RSA key."
+file = "keys.py"
+snippet = '''
+import paramiko
+key = paramiko.RSAKey.generate(bits=1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from paramiko import RSAKey
+key = RSAKey.generate(2048)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import paramiko
+HOST_KEY_BITS = 3072
+key = paramiko.RSAKey.generate(HOST_KEY_BITS)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "RSA", key_size = 3072}}]}
+
+[[ecosystems.spellings]]
+id = "paramiko-ecdsakey-generate"
+spelling = "paramiko.ECDSAKey.generate(bits=N | curve=ec.CURVE())"
+source = "https://docs.paramiko.org/en/stable/api/keys.html"
+quote = "classmethod generate ( curve=<cryptography.hazmat.primitives.asymmetric.ec.SECP256R1 object> , progress_func=None , bits=None ) ¶ Generate a new private ECDSA key."
+file = "keys.py"
+snippet = '''
+import paramiko
+key = paramiko.ECDSAKey.generate(bits=384)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, key_size = 384}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import paramiko
+from cryptography.hazmat.primitives.asymmetric import ec
+key = paramiko.ECDSAKey.generate(curve=ec.SECP521R1())
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, key_size = 521, curve = "P-521"}}]}
+
+[[ecosystems.spellings]]
+id = "pyopenssl-generate-key"
+spelling = "OpenSSL.crypto.PKey().generate_key(TYPE_RSA | TYPE_DSA, bits)"
+source = "https://www.pyopenssl.org/en/latest/api/crypto.html"
+quote = "Generate a key pair of the given type, with the given number of bits."
+file = "keys.py"
+snippet = '''
+from OpenSSL import crypto
+key = crypto.PKey()
+key.generate_key(crypto.TYPE_RSA, 1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from OpenSSL import crypto
+key = crypto.PKey()
+key.generate_key(crypto.TYPE_DSA, 2048)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "DSA", key_size = 2048}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from OpenSSL import crypto
+pkey = crypto.PKey()
+pkey.generate_key(type=crypto.TYPE_RSA, bits=4096)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 3, algorithm = "RSA", key_size = 4096}}]}
+
+[[ecosystems.spellings]]
+id = "m2crypto-rsa-gen-key"
+spelling = "M2Crypto.RSA.gen_key(bits, e)"
+source = "https://m2crypto.readthedocs.io/en/latest/M2Crypto.html"
+quote = "M2Crypto.RSA. gen_key ( bits: int, e: int, callback: ~typing.Callable[[int, int], int] = <function keygen_callback> ) → RSA [source]"
+file = "keys.py"
+snippet = '''
+from M2Crypto import RSA
+key = RSA.gen_key(1024, 65537)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 1024}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import M2Crypto
+key = M2Crypto.RSA.gen_key(2048, 65537, lambda *a: None)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "m2crypto-dsa-gen-params"
+spelling = "M2Crypto.DSA.gen_params(bits)"
+source = "https://m2crypto.readthedocs.io/en/latest/M2Crypto.html"
+quote = "M2Crypto.DSA. gen_params ( bits: int, callback: ~typing.Callable[[int, int], int] = <function genparam_callback> ) → DSA [source]"
+file = "keys.py"
+snippet = '''
+from M2Crypto import DSA
+params = DSA.gen_params(1024)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DSA", key_size = 1024}}]}
+
+[[ecosystems.spellings]]
+id = "m2crypto-ec-gen-params"
+spelling = "M2Crypto.EC.gen_params(EC.NID_curve)"
+source = "https://m2crypto.readthedocs.io/en/latest/M2Crypto.html"
+quote = "M2Crypto.EC. gen_params ( curve : int ) → EC [source]"
+file = "keys.py"
+snippet = '''
+from M2Crypto import EC
+key = EC.gen_params(EC.NID_secp384r1)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 384, curve = "P-384"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from M2Crypto import EC
+key = EC.gen_params(EC.NID_X9_62_prime256v1)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "EC", key_size = 256, curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "m2crypto-dh-gen-params"
+spelling = "M2Crypto.DH.gen_params(plen, g)"
+source = "https://m2crypto.readthedocs.io/en/latest/M2Crypto.html"
+quote = "M2Crypto.DH. gen_params ( plen: int , g: int , callback: ~typing.Callable = <function genparam_callback> ) → DH [source]"
+file = "keys.py"
+snippet = '''
+from M2Crypto import DH
+params = DH.gen_params(512, 2)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 2, algorithm = "DH", key_size = 512}}]}

@@ -106,7 +106,8 @@ def test_a_tree_without_a_generator_keeps_its_status(tmp_path):
         (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / name).write_text(text)
     go = _eco(scan_directory(tmp_path), "Go")
-    assert go["status"] == "not_closed" and "rng_source" not in go["known_operations"]
+    # external/Go is in the catalogue since 24.11.2026: Go's one known operation is closed.
+    assert go["status"] == "closed" and "rng_source" not in go["known_operations"]
 
 
 def test_a_generator_row_never_moves_the_status(tmp_path):
@@ -120,7 +121,9 @@ def test_a_generator_row_never_moves_the_status(tmp_path):
     result = scan_directory(tmp_path)
     assert result["randomness"]["calls"]
     go = _eco(result, "Go")
-    assert go["status"] == "not_closed" and go["open_operations"] == ["external"]
+    # external/Go is closed since 24.11.2026; rng_source still never counts.
+    assert go["status"] == "closed" and go["open_operations"] == []
+    assert go["closed_operations"] == ["external"]
     assert "rng_source" not in go["known_operations"] + go["closed_operations"]
 
 

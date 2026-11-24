@@ -469,6 +469,11 @@ def pqc_set(oid: str | None) -> tuple[str, str] | None:
     if not _PQC_SET_BY_OID:
         from .cyclonedx import _PQC_OID  # local: avoids an import cycle
         _PQC_SET_BY_OID.update({dotted: key for key, dotted in _PQC_OID.items()})
+        # pqc/PKI (24.11.2026): HashSLH-DSA, RFC 9909 section 3 -- sigAlgs 35-46 are the same
+        # twelve parameter sets as pure SLH-DSA's 20-31, in the same order, with a pre-hash; its
+        # public key identifiers are these too ("The public key identifiers for HashSLH-DSA").
+        _PQC_SET_BY_OID.update({f"2.16.840.1.101.3.4.3.{int(dotted.rsplit('.', 1)[1]) + 15}": key
+                                for key, dotted in _PQC_OID.items() if key[0] == "SLH-DSA"})
     return _PQC_SET_BY_OID.get(oid or "")
 
 # `cryptography`'s curve names, in the spelling CURVE_OIDS uses.
@@ -706,8 +711,52 @@ def _certificate_rows(rel_path: str, line: int, excerpt: str, cert: dict[str, An
                        else cert["signature_algorithm"].get("oid"))
         if said and said[0] == family:
             row["parameter_set"] = said[1]
+        # pqc/PKI (24.11.2026): a composite's halves are the RFC 10073 table's -- the ML-DSA
+        # set, the curve or the RSA size of the traditional key -- where the row said neither.
+        halves = _composite_fields(key.get("oid") if role == "subject_public_key"
+                                   else cert["signature_algorithm"].get("oid"))
+        for name, value in halves.get(family, {}).items():
+            row.setdefault(name, value)
+        rows.append(row)
+    # Row 450: the issuer signed with the subject key's family but another set (an ML-DSA-65 key
+    # under an ML-DSA-87 issuer, or under a composite with ML-DSA-87): one row per family lost
+    # the signature's set. It is a row of its own, with the signature's role.
+    signature_oid = cert["signature_algorithm"].get("oid")
+    said = pqc_set(signature_oid)
+    signed = _composite_fields(signature_oid) or (
+        {said[0]: {"parameter_set": said[1]}} if said else {})
+    for family, fields in signed.items():
+        subject = next((r for r in rows if r["algorithm"] == family
+                        and r["certificate_role"] == "subject_public_key"), None)
+        if subject is None or any(r["algorithm"] == family and r["certificate_role"] == "signature"
+                                  for r in rows):
+            continue
+        if all(subject.get(name) == value for name, value in fields.items()):
+            continue
+        row = {k: v for k, v in subject.items()
+               if k not in ("key_size", "curve", "parameter_set")}
+        row.update(certificate_role="signature", **fields)
         rows.append(row)
     return rows
+
+
+def _composite_fields(oid: str | None) -> dict[str, dict[str, Any]]:
+    """pqc/PKI: {family: the fields its half of a composite ML-DSA identifier names}, from
+    oids.COMPOSITE_ML_DSA (RFC 10073 section 7); {} for any other identifier."""
+    entry = COMPOSITE_ML_DSA.get(oid or "")
+    if not entry:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for family, param in entry[2]:
+        if family == "ML-DSA":
+            out[family] = {"parameter_set": param}
+        elif family == "RSA" and param:
+            out[family] = {"key_size": int(param)}
+        elif param:
+            out[family] = {"curve": param}
+        else:
+            out[family] = {}
+    return out
 
 
 def _first_tlv(blob: bytes) -> bytes:
@@ -1408,6 +1457,20 @@ def scan_certificate_file(path: Path, rel_path: str,
         # own field order moves between runs cannot be diffed.
         for oid in sorted(_iter_oids(blob)):
             entry = _find_oid_family(oid)
+            if entry is None and oid in COMPOSITE_ML_DSA:
+                # pqc/PKI (24.11.2026, row 477): a composite ML-DSA key the library does not
+                # load is both its halves (RFC 10073 section 7), with the set, curve or size
+                # the identifier names, as on a certificate.
+                name = COMPOSITE_ML_DSA[oid][0]
+                for family, fields in _composite_fields(oid).items():
+                    record(family, f"{family} half of the composite {name}, object identifier "
+                           f"{oid} observed in the file; the file was not decoded as a "
+                           f"certificate", 1, oid, kind="reference")
+                    for item in algorithms:
+                        if item["algorithm"] == family and item["line"] == 1:
+                            for field, value in fields.items():
+                                item.setdefault(field, value)
+                continue
             if entry is not None:
                 # What this says, exactly: the identifier's bytes are in the file.
                 # It does not say the file decoded as a certificate. An independent
