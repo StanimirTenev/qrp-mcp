@@ -4547,6 +4547,7 @@ def scan_source_file(path: Path, rel_path: str,
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
     _powershell_statement_size(findings, lines, rel_path)
+    _size_through_a_name(findings, lines)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -4907,6 +4908,64 @@ def _dotnet_key_size_property(findings: list[dict[str, Any]], lines: list[str]) 
                     and f.get("evidence_kind") not in ("comment", "ban")
                     and assigned.search(lines[f["line"] - 1])):
                 f["key_size"] = int(m.group(2))
+
+
+# keysize/C, keysize/Java (closure zatv-a, rows 393, 395): the size argument written as a name the
+# file gives one number -- `int bits = 2048;`, `#define KEY_BITS 2048`, `static final int
+# KEY_SIZE = 2048;`, `val bits = 2048` -- read as that number, on the line of the call; and the
+# size rules asked again for every RSA, DSA or DH row still without a size, whatever rule made it
+# (`EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, 1024)` came from one that never asked them). A name
+# assigned twice, declared as a parameter, or set to something else stays unread.
+_SIZE_CONSTANT = re.compile(
+    r"^\s*#\s*define\s+([A-Za-z_]\w*)\s+\(?\s*(\d{3,5})\s*\)?\s*(?://.*|/\*.*)?$|"
+    r"(?:^|[\s(;{])(?:(?:static|final|const|constexpr|private|public|protected|internal|unsigned|signed|"
+    r"long|short|int|Int|Long|size_t|uint32_t|uint16_t|word32|var|val|let|auto)\s+)+"
+    r"([A-Za-z_]\w*)\s*(?::\s*\w+\s*)?=\s*\(?\s*(\d{3,5})\s*\)?\s*;?\s*(?://.*)?$")
+
+
+def size_constants(lines: list[str]) -> dict[str, int]:
+    """The names this file gives one key size: assigned exactly once, to a number a key can
+    have, never assigned again or declared otherwise (a method's `int bits` parameter)."""
+    found: dict[str, list[int]] = {}
+    for line in lines:
+        m = _SIZE_CONSTANT.search(line) if ("=" in line or "define" in line) else None
+        if m:
+            name, value = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+            found.setdefault(name, []).append(int(value))
+    text = "\n".join(lines)
+    out = {}
+    for name, values in found.items():
+        if len(values) != 1 or values[0] not in registry._SIZES:
+            continue
+        assigned = len(re.findall(rf"(?<![\w.]){re.escape(name)}\s*=(?!=)", text))
+        declared = len(re.findall(rf"\b(?:int|Int|long|Long|size_t|unsigned|short|uint32_t|word32)\s+{re.escape(name)}\b"
+                                  rf"|\b{re.escape(name)}\s*:\s*(?:Int|Long)\b", text))
+        defined = len(re.findall(rf"#\s*define\s+{re.escape(name)}\b", text))
+        if assigned + defined == 1 and declared <= 1:
+            out[name] = values[0]
+    return out
+
+
+def resolve_size_names(line: str, constants: dict[str, int]) -> str:
+    """The line with each name of `constants` replaced by its number, where it is an argument
+    (not a member, not a call, not the target of an assignment)."""
+    if not constants:
+        return line
+    pattern = re.compile(r"(?<![\w.&])(" + "|".join(map(re.escape, constants)) + r")\b(?!\s*[(=.])")
+    return pattern.sub(lambda m: str(constants[m.group(1)]), line)
+
+
+def _size_through_a_name(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    constants = None
+    for f in findings:
+        if (f.get("algorithm") not in ("RSA", "DSA", "DH") or f.get("key_size") not in (None, "undetermined")
+                or f.get("evidence_kind") in ("comment", "ban") or not 0 < f["line"] <= len(lines)):
+            continue
+        if constants is None:
+            constants = size_constants(lines)
+        size = key_size_on_line(resolve_size_names(lines[f["line"] - 1], constants), f["algorithm"])
+        if size:
+            f["key_size"] = size
 
 
 # Row 495: an RSA key that wraps a symmetric key -- `pub.encrypt(archive_key, padding.OAEP(...))`
