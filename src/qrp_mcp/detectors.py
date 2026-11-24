@@ -4576,6 +4576,7 @@ def scan_source_file(path: Path, rel_path: str,
     _powershell_statement_size(findings, lines, rel_path)
     _size_through_a_name(findings, lines)
     _jca_initialised_later(findings, lines)
+    findings = _psa_key_bits(findings, lines, rel_path)
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5041,6 +5042,51 @@ def _jca_initialised_later(findings: list[dict[str, Any]], lines: list[str]) -> 
         size = int(value)
         if size in (_EC_FIELD_SIZES if f["algorithm"] == "EC" else registry._SIZES):
             f["key_size"] = size
+
+
+# keysize/C (closure zatv-a, row 400: "psa_set_key_bits lines have no evidence"): PSA Crypto sets
+# a key's type and size on two lines of the same attributes, `psa_set_key_type(&attributes,
+# PSA_KEY_TYPE_RSA_KEY_PAIR)` and `psa_set_key_bits(&attributes, 2048)` (psa/crypto.h). The bits
+# line becomes a row of the type's family with that size, when the file sets that attributes
+# variable's type once and its bits once. ECC: the curve where the family and size name one
+# (SECP_R1 with 256/384/521).
+_PSA_SET_TYPE = re.compile(
+    r"\bpsa_set_key_type\s*\(\s*&?\s*([A-Za-z_]\w*)\s*,\s*PSA_KEY_TYPE_(RSA|ECC|DH)_(?:KEY_PAIR|PUBLIC_KEY)\b"
+    r"(?:\s*\(\s*(PSA_(?:ECC|DH)_FAMILY_\w+)\s*\))?")
+_PSA_SET_BITS = re.compile(r"\bpsa_set_key_bits\s*\(\s*&?\s*([A-Za-z_]\w*)\s*,\s*(?:\(\s*size_t\s*\)\s*)?(\w+)\s*\)")
+_PSA_FAMILY = {"RSA": "RSA", "ECC": "EC", "DH": "DH"}
+
+
+def _psa_key_bits(findings: list[dict[str, Any]], lines: list[str], rel_path: str) -> list[dict[str, Any]]:
+    if not any("psa_set_key_bits" in line for line in lines):
+        return findings
+    types: dict[str, list[tuple[int, str, str | None]]] = {}
+    bits: dict[str, list[tuple[int, str]]] = {}
+    for n, line in enumerate(lines, 1):
+        for m in _PSA_SET_TYPE.finditer(line):
+            types.setdefault(m.group(1), []).append((n, _PSA_FAMILY[m.group(2)], m.group(3)))
+        for m in _PSA_SET_BITS.finditer(line):
+            bits.setdefault(m.group(1), []).append((n, m.group(2)))
+    constants = size_constants(lines)
+    added = []
+    for name, set_bits in bits.items():
+        if len(set_bits) != 1 or len(types.get(name, [])) != 1:
+            continue
+        (line_no, value), (type_line, family, ecc_family) = set_bits[0], types[name][0]
+        size = int(value) if value.isdigit() else constants.get(value)
+        if size not in (_EC_FIELD_SIZES if family == "EC" else registry._SIZES):
+            continue
+        if any(f["line"] == line_no and f.get("algorithm") == family for f in findings):
+            continue
+        item = {"path": rel_path, "line": line_no, "algorithm": family,
+                "description": (f"{family} key size set by psa_set_key_bits, for the key type "
+                                f"psa_set_key_type gives at line {type_line}"),
+                "excerpt": lines[line_no - 1].strip()[:200], "evidence_kind": "call",
+                "key_size": size, "in_test_code": in_test_code(rel_path)}
+        if family == "EC" and ecc_family == "PSA_ECC_FAMILY_SECP_R1" and size in (256, 384, 521):
+            item["curve"] = f"P-{size}"
+        added.append(item)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 # Row 495: an RSA key that wraps a symmetric key -- `pub.encrypt(archive_key, padding.OAEP(...))`
