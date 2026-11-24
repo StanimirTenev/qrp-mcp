@@ -2187,6 +2187,10 @@ _JCA_NAME_FAMILY.update({
 # apiname/Java closure (zatv-a): Bouncy Castle's "DHU", Diffie-Hellman Unified (docs/specifications.md,
 # Key Agreement).
 _JCA_NAME_FAMILY.update({"DHU": "DH"})
+# apiname/Java closure (zatv-a): rawDSA, "NONEwithDSA ... also known as rawDSA" (Standard Algorithm
+# Names), in any case inside getInstance -- "Standard names are not case-sensitive". Outside a
+# getInstance call the rule above keeps RAWDSA case-sensitive.
+_JCA_NAME_FAMILY.update({"RAWDSA": "DSA"})
 
 
 # COSE algorithm identifiers (IANA "COSE Algorithms", algorithms.csv, read 23.10.2026), as
