@@ -718,6 +718,25 @@ def _certificate_rows(rel_path: str, line: int, excerpt: str, cert: dict[str, An
         for name, value in halves.get(family, {}).items():
             row.setdefault(name, value)
         rows.append(row)
+    # Row 450: the issuer signed with the subject key's family but another set (an ML-DSA-65 key
+    # under an ML-DSA-87 issuer, or under a composite with ML-DSA-87): one row per family lost
+    # the signature's set. It is a row of its own, with the signature's role.
+    signature_oid = cert["signature_algorithm"].get("oid")
+    said = pqc_set(signature_oid)
+    signed = _composite_fields(signature_oid) or (
+        {said[0]: {"parameter_set": said[1]}} if said else {})
+    for family, fields in signed.items():
+        subject = next((r for r in rows if r["algorithm"] == family
+                        and r["certificate_role"] == "subject_public_key"), None)
+        if subject is None or any(r["algorithm"] == family and r["certificate_role"] == "signature"
+                                  for r in rows):
+            continue
+        if all(subject.get(name) == value for name, value in fields.items()):
+            continue
+        row = {k: v for k, v in subject.items()
+               if k not in ("key_size", "curve", "parameter_set")}
+        row.update(certificate_role="signature", **fields)
+        rows.append(row)
     return rows
 
 
