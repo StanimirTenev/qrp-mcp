@@ -47,6 +47,30 @@ alg = os.environ["SIGN_ALG"]
 '''
 expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.environ["KEM_SCHEME"]
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.environ["KEM_ALGORITHM"]
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.environ["SIGNATURE_SCHEME"]
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.environ["TLS_CIPHER"]
+'''
+
 [[ecosystems.spellings]]
 id = "os-environ-get"
 spelling = "os.environ.get(NAME)"
@@ -59,6 +83,30 @@ alg = os.environ.get("SIGN_ALG")
 '''
 expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.environ.get("KEM_SCHEME")
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.environ.get("KEM_ALGORITHM")
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.environ.get("SIGNATURE_SCHEME")
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.environ.get("TLS_CIPHER")
+'''
+
 [[ecosystems.spellings]]
 id = "os-getenv"
 spelling = "os.getenv(NAME)"
@@ -70,6 +118,30 @@ import os
 alg = os.getenv("SIGN_ALG")
 '''
 expect = {rows = [{at = "chosen_outside_files.places", match = {path = "sign.py", line = 2}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.getenv("KEM_SCHEME")
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.getenv("KEM_ALGORITHM")
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.getenv("SIGNATURE_SCHEME")
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import os
+alg = os.getenv("TLS_CIPHER")
+'''
 
 [[ecosystems.spellings]]
 id = "os-getenvb"

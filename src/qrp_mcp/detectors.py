@@ -4651,17 +4651,27 @@ def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
         calls.append(re.compile(call.format(pkg=re.escape(pkg))))
         if method:
             methods.append(method)
-            keys |= set(re.findall(r"\b(\w+)\s+\*?" + re.escape(pkg) + r"\.(?:PrivateKey|PublicKey)\b",
-                                   text))
+            # `a, b *ecvrf.PublicKey` declares both (row 540, 24.11.2026: only `b` was taken).
+            for names in re.findall(r"\b((?:\w+\s*,\s*)*\w+)\s+\*?" + re.escape(pkg)
+                                    + r"\.(?:PrivateKey|PublicKey)\b", text):
+                keys |= {n.strip() for n in names.split(",")}
             for names in re.findall(r"((?:\w+\s*,\s*)*\w+)\s*:?=\s*" + re.escape(pkg)
                                     + r"\.(?:GenerateKey|NewPrivateKey|NewPublicKey)\s*\(", text):
                 keys |= {n.strip() for n in names.split(",")}
     if not imports:
         return findings
     keys.discard("_")
+    # A key derived from one the file declares: `pk := sk.Public()` (row 540).
+    while keys:
+        derived = {m for m in re.findall(r"\b(\w+)(?:\s*,\s*\w+)?\s*:?=\s*(\w+)\.Public\(\s*\)", text)
+                   if m[1] in keys and m[0] not in keys}
+        if not derived:
+            break
+        keys |= {name for name, _ in derived}
     if methods and keys:
+        # The method called, or taken as a value (`prove := sk.Prove`, row 540).
         calls.append(re.compile(r"\b(?:" + "|".join(re.escape(k) for k in sorted(keys))
-                                + r")\.(?:" + "|".join(methods) + r")\s*\("))
+                                + r")\.(?:" + "|".join(methods) + r")\b(?!\s*=[^=])"))
     rows = {f["line"]: f for f in findings if f["algorithm"] == "ECVRF"}
     added = []
     for n, line in enumerate(lines, 1):
@@ -5378,7 +5388,10 @@ _RUNTIME_REFERENCE = re.compile(
     r"\$\{[A-Za-z_][A-Za-z0-9_]*(?::-[^}]*)?\}|\$[A-Z][A-Z0-9_]{2,}\b")
 _RUNTIME_SETTING = re.compile(
     r"cipher|curve|ecdh|\bkex|key_?exchange|kexalgorithms|tls_?groups?|ssl_?groups?|"
-    r"(?:sig(?:n|ning|nature)?|jwt|jws|hash|key|token)_?alg(?:orithm)?s?\b|\balgorithms?\b|"
+    r"(?:sig(?:n|ning|nature)?|jwt|jws|hash|key|token)_?alg(?:orithm)?s?\b|(?<![a-z])algorithms?\b|"
+    # Row 546 (24.11.2026): `KEM_ALGORITHM` (`\b` does not fall between `_` and a letter),
+    # `KEM_SCHEME`, `SIGNATURE_SCHEME` -- a KEM or scheme chosen by name at run time.
+    r"(?<![a-z])kems?(?![a-z])|(?:kem|sig(?:n|nature)?|crypto|key)_?schemes?\b|"
     r"key_?size|key_?length|rsa_?bits|tls_?(?:min|max)_?version|ssl_?protocols",
     re.IGNORECASE)
 _RUNTIME_ASSIGNMENT = re.compile(

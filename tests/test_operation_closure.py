@@ -24,6 +24,7 @@ from qrp_mcp import operations
 from qrp_mcp.scan import scan_directory
 
 REQUIRED = ("id", "spelling", "source", "file", "expect")
+VARIANT_KEYS = {"snippet", "file", "expect"}
 EXPECT_KEYS = {"detected", "absent", "rows", "value"}
 
 
@@ -34,6 +35,14 @@ def _cases():
                 if s["source"] != "none":
                     yield pytest.param(doc["operation"], eco["ecosystem"], s,
                                        id=f"{doc['operation']}/{eco['ecosystem']}/{s['id']}")
+                    # A variant is the same spelling with its free parts changed -- the variable,
+                    # the setting's name, where a receiver comes from. A spelling closed with one
+                    # name only was not closed: rows 540 and 546 (24.11.2026) were inside closed
+                    # pairs, missed because the catalogue held the argument fixed.
+                    for n, variant in enumerate(s.get("variants", []), 1):
+                        yield pytest.param(doc["operation"], eco["ecosystem"],
+                                           {**s, **variant, "variants": []},
+                                           id=f"{doc['operation']}/{eco['ecosystem']}/{s['id']}~v{n}")
 
 
 # Key material is made when the test runs, never committed: a key in the catalogue would be a
@@ -223,6 +232,9 @@ def test_every_catalogue_entry_is_complete():
                 assert all(k in s for k in REQUIRED), s
                 assert ("snippet" in s) != ("material" in s), s["id"]
                 assert set(s["expect"]) <= EXPECT_KEYS and s["expect"], s["id"]
+                for variant in s.get("variants", []):
+                    assert "snippet" in variant and set(variant) <= VARIANT_KEYS, s["id"]
+                    assert "snippet" in s, f"{s['id']}: variants change a snippet"
                 if s["source"] != "none":
                     assert s["source"].startswith("https://") and s.get("quote"), s["id"]
                 key = (doc["operation"], eco["ecosystem"], s["id"])

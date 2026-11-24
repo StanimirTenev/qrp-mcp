@@ -83,6 +83,50 @@ func Draw(sk *ecvrf.PrivateKey, round []byte) ([]byte, []byte, error) {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "ECVRF", evidence_kind = "call"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+package draw
+
+import "github.com/ProtonMail/go-ecvrf/ecvrf"
+
+func Draw(key *ecvrf.PrivateKey, round []byte) ([]byte, []byte, error) {
+	return key.Prove(round)
+}
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package draw
+
+import "github.com/ProtonMail/go-ecvrf/ecvrf"
+
+func Draw(sk *ecvrf.PrivateKey, round []byte) ([]byte, []byte, error) {
+	prove := sk.Prove; return prove(round)
+}
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package draw
+
+import "github.com/ProtonMail/go-ecvrf/ecvrf"
+
+func Check(sk *ecvrf.PrivateKey, round, proof []byte) (bool, []byte, error) {
+	pk, _ := sk.Public(); return pk.Verify(round, proof)
+}
+'''
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package draw
+
+import "github.com/ProtonMail/go-ecvrf/ecvrf"
+
+func Check(a, b *ecvrf.PublicKey, round, proof []byte) (bool, []byte, error) {
+	return a.Verify(round, proof)
+}
+'''
+
 [[ecosystems.spellings]]
 id = "keytransparency-p256-evaluate"
 spelling = "k.Evaluate(m)"
