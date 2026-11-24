@@ -1457,6 +1457,20 @@ def scan_certificate_file(path: Path, rel_path: str,
         # own field order moves between runs cannot be diffed.
         for oid in sorted(_iter_oids(blob)):
             entry = _find_oid_family(oid)
+            if entry is None and oid in COMPOSITE_ML_DSA:
+                # pqc/PKI (24.11.2026, row 477): a composite ML-DSA key the library does not
+                # load is both its halves (RFC 10073 section 7), with the set, curve or size
+                # the identifier names, as on a certificate.
+                name = COMPOSITE_ML_DSA[oid][0]
+                for family, fields in _composite_fields(oid).items():
+                    record(family, f"{family} half of the composite {name}, object identifier "
+                           f"{oid} observed in the file; the file was not decoded as a "
+                           f"certificate", 1, oid, kind="reference")
+                    for item in algorithms:
+                        if item["algorithm"] == family and item["line"] == 1:
+                            for field, value in fields.items():
+                                item.setdefault(field, value)
+                continue
             if entry is not None:
                 # What this says, exactly: the identifier's bytes are in the file.
                 # It does not say the file decoded as a certificate. An independent
