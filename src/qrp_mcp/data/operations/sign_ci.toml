@@ -74,6 +74,19 @@ cosign sign --key=cosign.key "$IMAGE"
 '''
 expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "cosign_sign"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cosign sign --key "pkcs11:token=yubikey;slot-id=0;object=release" ghcr.io/acme/app@sha256:4f1c
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "cosign_sign", key_location = "pkcs11_token"}}]}
+
+
 [[ecosystems.spellings]]
 id = "cosign-sign-blob"
 spelling = 'cosign sign-blob --key KEY --bundle B FILE'
@@ -267,6 +280,19 @@ openssl dgst -sha512 -sign "$KEY" -out app.sig app.tar.gz
 '''
 expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "openssl_sign"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: openssl dgst -sha256 -engine pkcs11 -keyform engine -sign "pkcs11:object=release;type=private" -out app.sig app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "openssl_sign", key_location = "pkcs11_token"}}]}
+
+
 [[ecosystems.spellings]]
 id = "openssl-pkeyutl-sign"
 spelling = 'openssl pkeyutl -sign -in FILE -inkey KEY -out SIG'
@@ -295,6 +321,31 @@ jobs:
       - run: openssl pkeyutl -inkey team_rsa.pem -sign -in digest.bin -out sig
 '''
 expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "openssl_sign", signing_key = {path = "team_rsa.pem", in_tree = false}}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: openssl pkeyutl -sign -inkey team_rsa.pem -in digest.bin -out sig
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "openssl_sign", signing_key = {path = "team_rsa.pem", in_tree = false}}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: openssl pkeyutl -provider tpm2 -provider default -sign -inkey handle:0x81000001 -in digest.bin -out sig
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "openssl_sign", key_location = "tpm"}}]}
+
 
 [[ecosystems.spellings]]
 id = "signtool-sign"

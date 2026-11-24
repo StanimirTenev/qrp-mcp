@@ -9380,3 +9380,48 @@ quote = 'id-MLDSA65-ECDSA-P256-SHA512 OID: 1.3.6.1.5.5.7.6.45'
 file = "leaf.crt"
 snippet = "{{CERT_MLDSA65_BY_COMPOSITE_49_PEM}}"
 expect = {rows = [{at = "evidence.source_code", match = {path = "leaf.crt", algorithm = "ML-DSA", parameter_set = "65", certificate_role = "subject_public_key"}}, {at = "evidence.source_code", match = {path = "leaf.crt", algorithm = "ML-DSA", parameter_set = "87", certificate_role = "signature"}}, {at = "evidence.source_code", match = {path = "leaf.crt", algorithm = "ECDSA", curve = "P-384", certificate_role = "signature"}}]}
+
+[[ecosystems.spellings]]
+id = "composite-oid-text"
+spelling = "composite ML-DSA OID written as text (JSON, YAML, openssl.cnf)"
+source = "https://www.rfc-editor.org/rfc/rfc10073.txt"
+quote = "id-MLDSA65-ECDSA-P256-SHA512 OID: 1.3.6.1.5.5.7.6.45"
+file = "algs.json"
+snippet = '''
+{"sig": ["1.3.6.1.5.5.7.6.45", "1.3.6.1.5.5.7.6.37"]}
+'''
+expect = {rows = [{at = "hybrid_names", match = {path = "algs.json", line = 1, name = "id-MLDSA65-ECDSA-P256-SHA512"}}, {at = "hybrid_names", match = {path = "algs.json", line = 1, name = "id-MLDSA44-RSA2048-PSS-SHA256"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "pki.yaml"
+snippet = '''
+signature_algorithms:
+  - 1.3.6.1.5.5.7.6.49
+'''
+expect = {rows = [{at = "hybrid_names", match = {path = "pki.yaml", line = 2, name = "id-MLDSA87-ECDSA-P384-SHA512"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "openssl.cnf"
+snippet = '''
+[ req ]
+default_md = 1.3.6.1.5.5.7.6.51
+'''
+expect = {rows = [{at = "hybrid_names", match = {path = "openssl.cnf", line = 2, name = "id-MLDSA87-Ed448-SHAKE256"}}]}
+
+[[ecosystems.spellings]]
+id = "oid-under-watched-arc-not-known"
+spelling = "an OID one component under the composite (1.3.6.1.5.5.7.6) or CSOR sigAlgs arc that this version does not hold"
+source = "https://www.rfc-editor.org/rfc/rfc10073.txt"
+quote = "id-MLDSA44-RSA2048-PSS-SHA256 OID: 1.3.6.1.5.5.7.6.37"
+file = "algs.json"
+snippet = '''
+{"next": "1.3.6.1.5.5.7.6.99"}
+'''
+expect = {rows = [{at = "oids_not_known", match = {path = "algs.json", line = 1, oid = "1.3.6.1.5.5.7.6.99"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "pki.yaml"
+snippet = '''
+sig: 2.16.840.1.101.3.4.3.47
+'''
+expect = {rows = [{at = "oids_not_known", match = {path = "pki.yaml", line = 1, oid = "2.16.840.1.101.3.4.3.47"}}]}

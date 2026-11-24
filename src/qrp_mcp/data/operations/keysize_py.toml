@@ -79,6 +79,46 @@ def make(size):
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 5, algorithm = "RSA", key_size = "undetermined"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+KEY_SIZE = 2048
+
+
+def make(KEY_SIZE):
+    return rsa.generate_private_key(public_exponent=65537, key_size=KEY_SIZE)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 7, algorithm = "RSA", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+
+def legacy():
+    size = 1024
+    return size
+
+
+def make(size):
+    return rsa.generate_private_key(public_exponent=65537, key_size=size)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 10, algorithm = "RSA", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+from Crypto.PublicKey import RSA
+opts = dict(
+    bits=1024
+)
+
+
+def make(bits):
+    return RSA.generate(bits)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.py", line = 8, algorithm = "RSA", key_size = "undetermined"}}]}
+
 [[ecosystems.spellings]]
 id = "pyca-dsa-generate-private-key"
 spelling = "dsa.generate_private_key(key_size=N)"
