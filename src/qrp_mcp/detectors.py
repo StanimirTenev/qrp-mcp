@@ -5437,6 +5437,9 @@ def _ossl_param_size(findings: list[dict[str, Any]], lines: list[str], rel_path:
                           "description": f"{family} key size given as the OpenSSL key generation parameter {key}",
                           "excerpt": line.strip()[:200], "evidence_kind": "call", "key_size": size,
                           "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
 # keysize/Py (24.11.2026): the size or curve a Python library is asked for when it makes a key, read
 # from the call's own arguments -- keyword or positional, the call over several lines, the value a
 # literal or a name the file assigns one literal (every assignment of it the same). A name the file
