@@ -6269,6 +6269,11 @@ _SECP256K1 = re.compile(r"(?<![A-Za-z0-9])secp256k1(?![0-9])|\bECC_SECG_P256K1\b
 _BRAINPOOL_CURVE = re.compile(r"(?<![A-Za-z0-9])brainpoolP(160|192|224|256|320|384|512)([rt])1(?![0-9])",
                              re.IGNORECASE)
 _CURVE_SIZE = {"P-256": 256, "P-384": 384, "P-521": 521, "secp256k1": 256}
+# keysize/Java closure (zatv-a): the NIST curves by their object identifiers, which the SunEC
+# provider takes as names in ECGenParameterSpec ("the strings secp256r1, 1.2.840.10045.3.1.7,
+# NIST P-256, and X9.62 prime256v1 refer to the same curve", JDK Providers Documentation).
+_NIST_CURVE_OID = re.compile(r"(?<![\d.])(1\.2\.840\.10045\.3\.1\.7|1\.3\.132\.0\.34|1\.3\.132\.0\.35)(?![\d.])")
+_CURVE_OF_OID = {"1.2.840.10045.3.1.7": "P-256", "1.3.132.0.34": "P-384", "1.3.132.0.35": "P-521"}
 _ECDSA_SIZE_NAME = re.compile(r"(?<![A-Za-z0-9])ecdsa(256|384|521)(?![0-9])", re.IGNORECASE)
 # .NET's ECDsaCng(int keySize), ECDsaOpenSsl(int keySize), ECDiffieHellmanCng(int keySize): the
 # key size, which picks the NIST curve of that size (learn.microsoft.com, the constructors;
@@ -6290,6 +6295,7 @@ def _tag_curves(items: list[dict[str, Any]]) -> None:
             excerpt = item.get("excerpt") or ""
             found = {f"P-{next(g for g in m.groups() if g)}"
                      for m in _NIST_CURVE.finditer(excerpt)}
+            found |= {_CURVE_OF_OID[m.group(1)] for m in _NIST_CURVE_OID.finditer(excerpt)}
             if _SECP256K1.search(excerpt) or (item.get("description") == SECP256K1_RULE
                                               and _SECP256K1_ONLY.search(excerpt)):
                 found.add("secp256k1")
