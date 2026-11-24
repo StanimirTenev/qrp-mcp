@@ -2313,6 +2313,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("DIFFIEHELLMAN");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-diffiehellman"
 spelling = "KeyFactory.getInstance(\"DiffieHellman\")"
@@ -2381,6 +2398,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("DIFFIEHELLMAN");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-dsa"
@@ -2451,6 +2485,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("dsa");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-dsa"
 spelling = "KeyFactory.getInstance(\"DSA\")"
@@ -2519,6 +2570,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("dsa");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-rsa"
@@ -2589,6 +2657,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("rsa");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-rsa"
 spelling = "KeyFactory.getInstance(\"RSA\")"
@@ -2657,6 +2742,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("rsa");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-rsassa-pss"
@@ -2727,6 +2829,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("rsassa-pss");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-rsassa-pss"
 spelling = "KeyFactory.getInstance(\"RSASSA-PSS\")"
@@ -2795,6 +2914,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("rsassa-pss");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-ec"
@@ -2865,6 +3001,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EC"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("ec");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EC"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-ec"
 spelling = "KeyFactory.getInstance(\"EC\")"
@@ -2933,6 +3086,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EC"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("ec");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EC"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-eddsa"
@@ -3003,6 +3173,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EdDSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("EDDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-eddsa"
 spelling = "KeyFactory.getInstance(\"EdDSA\")"
@@ -3071,6 +3258,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EdDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("EDDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-ed25519"
@@ -3141,6 +3345,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed25519"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("ED25519");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-ed25519"
 spelling = "KeyFactory.getInstance(\"Ed25519\")"
@@ -3209,6 +3430,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("ED25519");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-ed448"
@@ -3279,6 +3517,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed448"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("ED448");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed448"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-ed448"
 spelling = "KeyFactory.getInstance(\"Ed448\")"
@@ -3347,6 +3602,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed448"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("ED448");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed448"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-xdh"
@@ -3417,6 +3689,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("xdh");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X25519"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-xdh"
 spelling = "KeyFactory.getInstance(\"XDH\")"
@@ -3485,6 +3774,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("xdh");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-x25519"
@@ -3555,6 +3861,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("x25519");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X25519"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-x25519"
 spelling = "KeyFactory.getInstance(\"X25519\")"
@@ -3623,6 +3946,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("x25519");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-x448"
@@ -3693,6 +4033,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X448"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("x448");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X448"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-x448"
 spelling = "KeyFactory.getInstance(\"X448\")"
@@ -3761,6 +4118,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X448"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("x448");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X448"}}]}
 
 [[ecosystems.spellings]]
 id = "keypairgenerator-dh"
@@ -3831,6 +4205,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator y = KeyPairGenerator.getInstance("dh");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
+
 [[ecosystems.spellings]]
 id = "keyfactory-dh"
 spelling = "KeyFactory.getInstance(\"DH\")"
@@ -3899,6 +4290,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyFactory y = KeyFactory.getInstance("dh");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-dh"
@@ -3969,6 +4377,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("dh");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
+
 [[ecosystems.spellings]]
 id = "keyagreement-diffiehellman"
 spelling = "KeyAgreement.getInstance(\"DiffieHellman\")"
@@ -4037,6 +4462,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("DIFFIEHELLMAN");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-ecdh"
@@ -4107,6 +4549,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("ecdh");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDH"}}]}
+
 [[ecosystems.spellings]]
 id = "keyagreement-ecmqv"
 spelling = "KeyAgreement.getInstance(\"ECMQV\")"
@@ -4175,6 +4634,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("ecmqv");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-xdh"
@@ -4245,6 +4721,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("xdh");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X25519"}}]}
+
 [[ecosystems.spellings]]
 id = "keyagreement-x25519"
 spelling = "KeyAgreement.getInstance(\"X25519\")"
@@ -4313,6 +4806,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("x25519");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X25519"}}]}
 
 [[ecosystems.spellings]]
 id = "keyagreement-x448"
@@ -4383,6 +4893,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "X448"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("x448");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "X448"}}]}
+
 [[ecosystems.spellings]]
 id = "algorithmparametergenerator-diffiehellman"
 spelling = "AlgorithmParameterGenerator.getInstance(\"DiffieHellman\")"
@@ -4451,6 +4978,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        AlgorithmParameterGenerator y = AlgorithmParameterGenerator.getInstance("DIFFIEHELLMAN");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "algorithmparametergenerator-dsa"
@@ -4521,6 +5065,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        AlgorithmParameterGenerator y = AlgorithmParameterGenerator.getInstance("dsa");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-nonewithrsa"
 spelling = "Signature.getInstance(\"NONEwithRSA\")"
@@ -4589,6 +5150,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("NONEWITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-md2withrsa"
@@ -4659,6 +5237,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD2"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("MD2WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "MD2"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-md5withrsa"
 spelling = "Signature.getInstance(\"MD5withRSA\")"
@@ -4727,6 +5322,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("MD5WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha1withrsa"
@@ -4797,6 +5409,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA1WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha224withrsa"
 spelling = "Signature.getInstance(\"SHA224withRSA\")"
@@ -4865,6 +5494,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA224WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withrsa"
@@ -4935,6 +5581,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha384withrsa"
 spelling = "Signature.getInstance(\"SHA384withRSA\")"
@@ -5003,6 +5666,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA384WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha512withrsa"
@@ -5073,6 +5753,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA512WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha512-224withrsa"
 spelling = "Signature.getInstance(\"SHA512/224withRSA\")"
@@ -5141,6 +5838,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA512/224WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha512-256withrsa"
@@ -5211,6 +5925,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA512/256WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha3-256withrsa"
 spelling = "Signature.getInstance(\"SHA3-256withRSA\")"
@@ -5279,6 +6010,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA3-256WITHRSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-rsassa-pss"
@@ -5349,6 +6097,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("rsassa-pss");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-nonewithdsa"
 spelling = "Signature.getInstance(\"NONEwithDSA\")"
@@ -5417,6 +6182,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("NONEWITHDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha1withdsa"
@@ -5487,6 +6269,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA1WITHDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha224withdsa"
 spelling = "Signature.getInstance(\"SHA224withDSA\")"
@@ -5555,6 +6354,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA224WITHDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withdsa"
@@ -5625,6 +6441,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha3-256withdsa"
 spelling = "Signature.getInstance(\"SHA3-256withDSA\")"
@@ -5693,6 +6526,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA3-256WITHDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-nonewithecdsa"
@@ -5763,6 +6613,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("NONEWITHECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha1withecdsa"
 spelling = "Signature.getInstance(\"SHA1withECDSA\")"
@@ -5831,6 +6698,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA1WITHECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha224withecdsa"
@@ -5901,6 +6785,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA224WITHECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha256withecdsa"
 spelling = "Signature.getInstance(\"SHA256withECDSA\")"
@@ -5969,6 +6870,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha384withecdsa"
@@ -6039,6 +6957,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA384WITHECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-sha512withecdsa"
 spelling = "Signature.getInstance(\"SHA512withECDSA\")"
@@ -6107,6 +7042,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA512WITHECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha3-256withecdsa"
@@ -6177,6 +7129,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA3-256WITHECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-nonewithdsainp1363format"
 spelling = "Signature.getInstance(\"NONEwithDSAinP1363Format\")"
@@ -6245,6 +7214,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("NONEWITHDSAINP1363FORMAT");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withdsainp1363format"
@@ -6315,6 +7301,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHDSAINP1363FORMAT");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-nonewithecdsainp1363format"
 spelling = "Signature.getInstance(\"NONEwithECDSAinP1363Format\")"
@@ -6383,6 +7386,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("NONEWITHECDSAINP1363FORMAT");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-sha256withecdsainp1363format"
@@ -6453,6 +7473,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHECDSAINP1363FORMAT");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-eddsa"
 spelling = "Signature.getInstance(\"EdDSA\")"
@@ -6521,6 +7558,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EdDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("EDDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EdDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-ed25519"
@@ -6591,6 +7645,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed25519"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("ED25519");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed25519"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-ed448"
 spelling = "Signature.getInstance(\"Ed448\")"
@@ -6659,6 +7730,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Ed448"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("ED448");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Ed448"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-ecdsa-ambiguous"
@@ -6729,6 +7817,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("ecdsa");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
+
 [[ecosystems.spellings]]
 id = "signature-md5withrsaandmgf1"
 spelling = "Signature.getInstance(\"MD5withRSAandMGF1\")"
@@ -6797,6 +7902,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("MD5WITHRSAANDMGF1");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "signature-rawdsa"
@@ -6867,6 +7989,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("rawdsa");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
+
 [[ecosystems.spellings]]
 id = "cipher-rsa"
 spelling = "Cipher.getInstance(\"RSA\")"
@@ -6935,6 +8074,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("rsa");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rsa-ecb-pkcs1padding"
@@ -7005,6 +8161,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("RSA/ECB/PKCS1PADDING");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "cipher-rsa-ecb-oaepwithsha-1andmgf1padding"
 spelling = "Cipher.getInstance(\"RSA/ECB/OAEPWithSHA-1AndMGF1Padding\")"
@@ -7073,6 +8246,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("RSA/ECB/OAEPWITHSHA-1ANDMGF1PADDING");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rsa-ecb-oaepwithsha-256andmgf1padding"
@@ -7143,6 +8333,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("RSA/ECB/OAEPWITHSHA-256ANDMGF1PADDING");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "cipher-ecies"
 spelling = "Cipher.getInstance(\"ECIES\")"
@@ -7211,6 +8418,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("ecies");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-des"
@@ -7281,6 +8505,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("des");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DES"}}]}
+
 [[ecosystems.spellings]]
 id = "cipher-des-cbc-pkcs5padding"
 spelling = "Cipher.getInstance(\"DES/CBC/PKCS5Padding\")"
@@ -7349,6 +8590,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("DES/CBC/PKCS5PADDING");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DES"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-desede"
@@ -7419,6 +8677,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("DESEDE");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "3DES"}}]}
+
 [[ecosystems.spellings]]
 id = "cipher-desede-ecb-nopadding"
 spelling = "Cipher.getInstance(\"DESede/ECB/NoPadding\")"
@@ -7487,6 +8762,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("DESEDE/ECB/NOPADDING");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "3DES"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-desedewrap"
@@ -7557,6 +8849,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("DESEDEWRAP");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "3DES"}}]}
+
 [[ecosystems.spellings]]
 id = "cipher-arcfour"
 spelling = "Cipher.getInstance(\"ARCFOUR\")"
@@ -7625,6 +8934,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC4"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("arcfour");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RC4"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-rc2"
@@ -7695,6 +9021,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC2"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("rc2");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RC2"}}]}
+
 [[ecosystems.spellings]]
 id = "cipher-rc4"
 spelling = "Cipher.getInstance(\"RC4\")"
@@ -7763,6 +9106,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC4"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("rc4");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RC4"}}]}
 
 [[ecosystems.spellings]]
 id = "cipher-pbewithmd5anddes"
@@ -7833,6 +9193,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("PBEWITHMD5ANDDES");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "MD5"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DES"}}]}
+
 [[ecosystems.spellings]]
 id = "cipher-aes-ecb-pkcs5padding"
 spelling = "Cipher.getInstance(\"AES/ECB/PKCS5Padding\")"
@@ -7901,6 +9278,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "AES-ECB"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("AES/ECB/PKCS5PADDING");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "AES-ECB"}}]}
 
 [[ecosystems.spellings]]
 id = "messagedigest-md2"
@@ -7971,6 +9365,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD2"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        MessageDigest y = MessageDigest.getInstance("md2");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "MD2"}}]}
+
 [[ecosystems.spellings]]
 id = "messagedigest-md5"
 spelling = "MessageDigest.getInstance(\"MD5\")"
@@ -8039,6 +9450,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        MessageDigest y = MessageDigest.getInstance("md5");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "messagedigest-sha-1"
@@ -8109,6 +9537,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        MessageDigest y = MessageDigest.getInstance("sha-1");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
+
 [[ecosystems.spellings]]
 id = "mac-hmacmd5"
 spelling = "Mac.getInstance(\"HmacMD5\")"
@@ -8177,6 +9622,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Mac y = Mac.getInstance("HMACMD5");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "MD5"}}]}
 
 [[ecosystems.spellings]]
 id = "keygenerator-hmacmd5"
@@ -8247,6 +9709,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "MD5"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyGenerator y = KeyGenerator.getInstance("HMACMD5");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "MD5"}}]}
+
 [[ecosystems.spellings]]
 id = "mac-hmacsha1"
 spelling = "Mac.getInstance(\"HmacSHA1\")"
@@ -8315,6 +9794,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Mac y = Mac.getInstance("HMACSHA1");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "keygenerator-hmacsha1"
@@ -8385,6 +9881,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyGenerator y = KeyGenerator.getInstance("HMACSHA1");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
+
 [[ecosystems.spellings]]
 id = "keygenerator-des"
 spelling = "KeyGenerator.getInstance(\"DES\")"
@@ -8453,6 +9966,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyGenerator y = KeyGenerator.getInstance("des");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DES"}}]}
 
 [[ecosystems.spellings]]
 id = "secretkeyfactory-des"
@@ -8523,6 +10053,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DES"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        SecretKeyFactory y = SecretKeyFactory.getInstance("des");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DES"}}]}
+
 [[ecosystems.spellings]]
 id = "keygenerator-desede"
 spelling = "KeyGenerator.getInstance(\"DESede\")"
@@ -8591,6 +10138,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyGenerator y = KeyGenerator.getInstance("DESEDE");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "3DES"}}]}
 
 [[ecosystems.spellings]]
 id = "secretkeyfactory-desede"
@@ -8661,6 +10225,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "3DES"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        SecretKeyFactory y = SecretKeyFactory.getInstance("DESEDE");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "3DES"}}]}
+
 [[ecosystems.spellings]]
 id = "keygenerator-arcfour"
 spelling = "KeyGenerator.getInstance(\"ARCFOUR\")"
@@ -8729,6 +10310,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC4"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyGenerator y = KeyGenerator.getInstance("arcfour");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RC4"}}]}
 
 [[ecosystems.spellings]]
 id = "secretkeyfactory-arcfour"
@@ -8799,6 +10397,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC4"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        SecretKeyFactory y = SecretKeyFactory.getInstance("arcfour");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RC4"}}]}
+
 [[ecosystems.spellings]]
 id = "keygenerator-rc2"
 spelling = "KeyGenerator.getInstance(\"RC2\")"
@@ -8867,6 +10482,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RC2"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyGenerator y = KeyGenerator.getInstance("rc2");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RC2"}}]}
 
 [[ecosystems.spellings]]
 id = "messagedigest-sha-alias"
@@ -8959,6 +10591,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHECDDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-signature-sha1withdetecdsa"
 spelling = "Signature.getInstance(\"SHA1withDetECDSA\")"
@@ -9027,6 +10676,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA1WITHDETECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withecnr"
@@ -9097,6 +10763,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "EC"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHECNR");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "EC"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withplain-ecdsa"
 spelling = "Signature.getInstance(\"SHA256withPLAIN-ECDSA\")"
@@ -9165,6 +10848,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHPLAIN-ECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withrsaandmgf1"
@@ -9235,6 +10935,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHRSAANDMGF1");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-signature-sha1withrsa-iso9796-2"
 spelling = "Signature.getInstance(\"SHA1withRSA/ISO9796-2\")"
@@ -9303,6 +11020,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA1WITHRSA/ISO9796-2");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}, {at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "SHA1"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withrsa-x931"
@@ -9373,6 +11107,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHRSA/X9.31");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-signature-sha256withddsa"
 spelling = "Signature.getInstance(\"SHA256withDDSA\")"
@@ -9441,6 +11192,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("SHA256WITHDDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-signature-ripemd160withecdsa"
@@ -9511,6 +11279,109 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("RIPEMD160WITHECDSA");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "bc-signature-falcon"
+spelling = "Signature.getInstance(\"Falcon\")"
+source = "https://raw.githubusercontent.com/bcgit/bc-java/main/docs/specifications.md"
+quote = "- Falcon"
+file = "Names.java"
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature x = Signature.getInstance("Falcon");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Falcon"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature engine = Signature.getInstance("Falcon", "BC");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Falcon"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Names.kt"
+snippet = '''
+
+fun make(): Any? {
+    val e = java.security.Signature.getInstance("Falcon")
+    return e
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.kt", line = 3, algorithm = "Falcon"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    private static final String ALGORITHM = "Falcon";
+
+    KeyPair make() throws Exception {
+        Signature inst = Signature.getInstance(ALGORITHM);
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "Falcon"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Signature y = Signature.getInstance("FALCON");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "Falcon"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-cipher-rsa-none-oaepwithsha256andmgf1padding"
 spelling = "Cipher.getInstance(\"RSA/NONE/OAEPWithSHA256AndMGF1Padding\")"
@@ -9579,6 +11450,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("RSA/NONE/OAEPWITHSHA256ANDMGF1PADDING");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-cipher-rsa-none-pkcs1padding"
@@ -9649,6 +11537,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "RSA"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("RSA/NONE/PKCS1PADDING");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "RSA"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-cipher-elgamal"
 spelling = "Cipher.getInstance(\"ElGamal\")"
@@ -9717,6 +11622,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ElGamal"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        Cipher y = Cipher.getInstance("ELGAMAL");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ElGamal"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-eccdh"
@@ -9787,6 +11709,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("eccdh");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDH"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-keyagreement-dhu"
 spelling = "KeyAgreement.getInstance(\"DHU\")"
@@ -9855,6 +11794,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("dhu");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-eccdhwithsha256kdf"
@@ -9925,6 +11881,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("ECCDHWITHSHA256KDF");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDH"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-keyagreement-ecmqvwithsha1ckdf"
 spelling = "KeyAgreement.getInstance(\"ECMQVwithSHA1CKDF\")"
@@ -9993,6 +11966,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("ECMQVWITHSHA1CKDF");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-keyagreement-ecdhwithsha256hkdf"
@@ -10063,6 +12053,23 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "ECDH"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("ECDHWITHSHA256HKDF");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "ECDH"}}]}
+
 [[ecosystems.spellings]]
 id = "bc-keyagreement-dhwithsha256kdf"
 spelling = "KeyAgreement.getInstance(\"DHwithSHA256KDF\")"
@@ -10131,6 +12138,23 @@ class Keys {
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 11, algorithm = "DH"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyAgreement y = KeyAgreement.getInstance("DHWITHSHA256KDF");
+        return null;
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Names.java", line = 9, algorithm = "DH"}}]}
 
 [[ecosystems.spellings]]
 id = "bc-sha256withrsaencryption"

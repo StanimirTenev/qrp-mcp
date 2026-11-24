@@ -4383,6 +4383,71 @@ class Keys {
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.java", algorithm = "RSA", key_size = "undetermined", line = 11}}]}
 
+[[ecosystems.spellings.variants]]
+file = "Keys.java"
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        int bits = 1024;
+        bits *= 2;
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(bits);
+        return kpg.generateKeyPair();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.java", algorithm = "RSA", key_size = "undetermined", line = 11}}]}
+
+[[ecosystems.spellings.variants]]
+file = "Keys.java"
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        int bits = 1024;
+        bits += 1024;
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("DSA");
+        kpg.initialize(bits);
+        return kpg.generateKeyPair();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.java", algorithm = "DSA", key_size = "undetermined", line = 11}}]}
+
+[[ecosystems.spellings]]
+id = "android-keystore-ec-default"
+spelling = "KeyGenParameterSpec.Builder(...) for EC, no size or curve"
+source = "none"
+quote = ""
+file = "Keys.java"
+snippet = '''
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+class Keys {
+    KeyPair make() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore");
+        kpg.initialize(new KeyGenParameterSpec.Builder("key1", KeyProperties.PURPOSE_SIGN).build());
+        return kpg.generateKeyPair();
+    }
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "Keys.java", algorithm = "EC", key_size = 256, line = 9, curve = "P-256"}}]}
+
 [[ecosystems.spellings]]
 id = "android-keystore-setkeysize-rsa"
 spelling = "KeyGenParameterSpec.Builder(...).setKeySize(1024)"
@@ -4705,6 +4770,58 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 2048, line = 8}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    RSA *rsa = RSA_new();
+    RSA_generate_key_ex(rsa, bits, e, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    RSA *rsa = RSA_new();
+    RSA_generate_key_ex(rsa, bits, e, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    RSA *rsa = RSA_new();
+    RSA_generate_key_ex(rsa, bits, e, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
 [[ecosystems.spellings]]
 id = "rsa-generate-key"
 spelling = "RSA_generate_key(1024, RSA_F4, NULL, NULL)"
@@ -4766,6 +4883,55 @@ int make(void)
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 2048, line = 7}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    RSA *key = RSA_generate_key(bits, RSA_F4, NULL, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 8}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    RSA *key = RSA_generate_key(bits, RSA_F4, NULL, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    RSA *key = RSA_generate_key(bits, RSA_F4, NULL, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 8}}]}
 
 [[ecosystems.spellings]]
 id = "rsa-generate-multi-prime-key"
@@ -4833,6 +4999,58 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 4096, line = 8}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    RSA *rsa = RSA_new();
+    RSA_generate_multi_prime_key(rsa, bits, 3, e, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    RSA *rsa = RSA_new();
+    RSA_generate_multi_prime_key(rsa, bits, 3, e, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    RSA *rsa = RSA_new();
+    RSA_generate_multi_prime_key(rsa, bits, 3, e, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
 [[ecosystems.spellings]]
 id = "dsa-generate-parameters-ex"
 spelling = "DSA_generate_parameters_ex(dsa, 1024, ...)"
@@ -4895,6 +5113,55 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = 2048, line = 7}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/dsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    DSA *dsa = DSA_new();
+    DSA_generate_parameters_ex(dsa, bits, NULL, 0, NULL, NULL, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 8}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/dsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    DSA *dsa = DSA_new();
+    DSA_generate_parameters_ex(dsa, bits, NULL, 0, NULL, NULL, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/dsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    DSA *dsa = DSA_new();
+    DSA_generate_parameters_ex(dsa, bits, NULL, 0, NULL, NULL, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 8}}]}
+
 [[ecosystems.spellings]]
 id = "dh-generate-parameters-ex"
 spelling = "DH_generate_parameters_ex(dh, 1024, DH_GENERATOR_2, cb)"
@@ -4956,6 +5223,55 @@ int make(void)
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = 2048, line = 7}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/dh.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    DH *dh = DH_new();
+    DH_generate_parameters_ex(dh, bits, DH_GENERATOR_2, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 8}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/dh.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    DH *dh = DH_new();
+    DH_generate_parameters_ex(dh, bits, DH_GENERATOR_2, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/dh.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    DH *dh = DH_new();
+    DH_generate_parameters_ex(dh, bits, DH_GENERATOR_2, NULL);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 8}}]}
 
 [[ecosystems.spellings]]
 id = "dh-get-1024-160"
@@ -5957,6 +6273,61 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 2048, line = 9}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 11}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 10}}]}
+
 [[ecosystems.spellings]]
 id = "evp-set-dsa-paramgen-bits"
 spelling = "EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, 1024)"
@@ -6027,6 +6398,61 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = 2048, line = 9}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 11}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 10}}]}
+
 [[ecosystems.spellings]]
 id = "evp-set-dh-paramgen-prime-len"
 spelling = "EVP_PKEY_CTX_set_dh_paramgen_prime_len(ctx, 1024)"
@@ -6096,6 +6522,61 @@ int make(void)
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = 2048, line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_dh_paramgen_prime_len(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_dh_paramgen_prime_len(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 11}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_dh_paramgen_prime_len(ctx, bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 10}}]}
 
 [[ecosystems.spellings]]
 id = "evp-set-dh-nid-ffdhe2048"
@@ -6371,6 +6852,55 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 4096, line = 7}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    EVP_PKEY *pkey = EVP_RSA_gen(bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 8}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    EVP_PKEY *pkey = EVP_RSA_gen(bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    EVP_PKEY *pkey = EVP_RSA_gen(bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 8}}]}
+
 [[ecosystems.spellings]]
 id = "evp-pkey-q-keygen-rsa"
 spelling = "EVP_PKEY_Q_keygen(NULL, NULL, \"RSA\", (size_t)1024)"
@@ -6432,6 +6962,55 @@ int make(void)
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 2048, line = 7}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    EVP_PKEY *pkey = EVP_PKEY_Q_keygen(NULL, NULL, "RSA", (size_t)bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 8}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    EVP_PKEY *pkey = EVP_PKEY_Q_keygen(NULL, NULL, "RSA", (size_t)bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <openssl/evp.h>
+#include <openssl/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    EVP_PKEY *pkey = EVP_PKEY_Q_keygen(NULL, NULL, "RSA", (size_t)bits);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 8}}]}
 
 [[ecosystems.spellings]]
 id = "evp-ec-gen-p-256"
@@ -6980,6 +7559,58 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 2048, line = 8}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <mbedtls/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    mbedtls_rsa_context ctx;
+    mbedtls_rsa_init(&ctx);
+    mbedtls_rsa_gen_key(&ctx, mbedtls_ctr_drbg_random, &ctr_drbg, bits, 65537);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <mbedtls/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    mbedtls_rsa_context ctx;
+    mbedtls_rsa_init(&ctx);
+    mbedtls_rsa_gen_key(&ctx, mbedtls_ctr_drbg_random, &ctr_drbg, bits, 65537);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <mbedtls/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    mbedtls_rsa_context ctx;
+    mbedtls_rsa_init(&ctx);
+    mbedtls_rsa_gen_key(&ctx, mbedtls_ctr_drbg_random, &ctr_drbg, bits, 65537);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
 [[ecosystems.spellings]]
 id = "mbedtls-ecp-group-load"
 spelling = "mbedtls_ecp_group_load(&grp, MBEDTLS_ECP_DP_SECP256R1);"
@@ -7468,6 +8099,58 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = 2048, line = 8}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    RsaKey ctx;
+    wc_InitRsaKey(&ctx, NULL);
+    wc_MakeRsaKey(&ctx, bits, WC_RSA_EXPONENT, &rng);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    RsaKey ctx;
+    wc_InitRsaKey(&ctx, NULL);
+    wc_MakeRsaKey(&ctx, bits, WC_RSA_EXPONENT, &rng);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/rsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    RsaKey ctx;
+    wc_InitRsaKey(&ctx, NULL);
+    wc_MakeRsaKey(&ctx, bits, WC_RSA_EXPONENT, &rng);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "RSA", key_size = "undetermined", line = 9}}]}
+
 [[ecosystems.spellings]]
 id = "wolfssl-wc-ecc-make-key"
 spelling = "wc_ecc_make_key(&rng, 32, &key);"
@@ -7632,6 +8315,58 @@ int make(void)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = 2048, line = 8}}]}
 
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/dsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    DsaKey ctx;
+    wc_InitDsaKey(&ctx);
+    wc_MakeDsaParameters(&rng, bits, &ctx);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/dsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    DsaKey ctx;
+    wc_InitDsaKey(&ctx);
+    wc_MakeDsaParameters(&rng, bits, &ctx);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/dsa.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    DsaKey ctx;
+    wc_InitDsaKey(&ctx);
+    wc_MakeDsaParameters(&rng, bits, &ctx);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DSA", key_size = "undetermined", line = 9}}]}
+
 [[ecosystems.spellings]]
 id = "wolfssl-wc-dhgenerateparams"
 spelling = "wc_DhGenerateParams(&rng, 1024, &dh)"
@@ -7697,3 +8432,55 @@ int make(void)
 }
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = 2048, line = 8}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/dh.h>
+
+int make(void)
+{
+    int bits = 1024;
+    bits *= 2;
+    DhKey ctx;
+    wc_InitDhKey(&ctx);
+    wc_DhGenerateParams(&rng, bits, &ctx);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 9}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/dh.h>
+
+int make(void)
+{
+    int bits = 1024;
+    if (strong)
+        bits += 1024;
+    DhKey ctx;
+    wc_InitDhKey(&ctx);
+    wc_DhGenerateParams(&rng, bits, &ctx);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 10}}]}
+
+[[ecosystems.spellings.variants]]
+file = "keys.c"
+snippet = '''
+#include <wolfssl/wolfcrypt/dh.h>
+
+int make(void)
+{
+    int bits = 1024;
+    scanf("%d", &bits);
+    DhKey ctx;
+    wc_InitDhKey(&ctx);
+    wc_DhGenerateParams(&rng, bits, &ctx);
+    return 0;
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "DH", key_size = "undetermined", line = 9}}]}

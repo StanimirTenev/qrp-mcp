@@ -11,7 +11,7 @@ catalogue_version = "1"
 
 [[ecosystems]]
 ecosystem = "NET"
-scope = "RSA SignData/SignHash/VerifyData/VerifyHash, ECDsa and DSA SignData/SignHash/CreateSignature/VerifyData/VerifyHash/VerifySignature, on a receiver from a parameter, a factory or a certificate getter, with the hash as a free part; RSAPKCS1SignatureFormatter/Deformatter; SignedXml RSA-SHA1 and DSA URIs; CertificateRequest with its hash; signtool sign /fd in .ps1/.cmd/.bat/.csproj (rows 382, 383); Set-AuthenticodeSignature -HashAlgorithm; mage -Sign; nuget sign and dotnet nuget sign; sn -R; MSBuild SignAssembly with AssemblyOriginatorKeyFile (row 363). Not covered: SignedCms/CmsSigner (the family is the certificate's, not written), signtool without /fd and Set-AuthenticodeSignature without -HashAlgorithm (the default is the tool version's), MLDsa/SlhDsa SignData, Azure Key Vault signing."
+scope = "RSA SignData/SignHash/VerifyData/VerifyHash, ECDsa and DSA SignData/SignHash/CreateSignature/VerifyData/VerifyHash/VerifySignature, on a receiver from a parameter, a factory or a certificate getter, with the hash as a free part; RSAPKCS1SignatureFormatter/Deformatter; SignedXml RSA-SHA1 and DSA URIs; CertificateRequest with its hash; signtool sign /fd in .ps1/.cmd/.bat/.csproj (rows 382, 383); Set-AuthenticodeSignature -HashAlgorithm; mage -Sign; nuget sign and dotnet nuget sign; sn -R; MSBuild SignAssembly with AssemblyOriginatorKeyFile (row 363). Not covered: SignedCms/CmsSigner (the family is the certificate's, not written), signtool without /fd and Set-AuthenticodeSignature without -HashAlgorithm (the default is the tool version's), MLDsa/SlhDsa SignData, Azure Key Vault signing, a receiver whose name the file types two ways (overloads Sign(RSA key) and Sign(ECDsa key)): unread."
 
 [[ecosystems.spellings]]
 id = "rsa-signdata"
@@ -1288,7 +1288,7 @@ snippet = '''
   </PropertyGroup>
 </Project>
 '''
-expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "App.csproj", line = 4, command_type = "strong_name_sign"}}]}
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "App.csproj", line = 4, command_type = "strong_name_sign", strong_name_mode = "full_sign"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "Lib.vbproj"
@@ -1313,3 +1313,16 @@ snippet = '''
 </Project>
 '''
 expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "Directory.Build.props", line = 3, command_type = "strong_name_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "App.csproj"
+snippet = '''
+<Project>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>pub.snk</AssemblyOriginatorKeyFile>
+    <DelaySign>true</DelaySign>
+  </PropertyGroup>
+</Project>
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "App.csproj", line = 3, command_type = "strong_name_sign", strong_name_mode = "delay_sign"}}]}
