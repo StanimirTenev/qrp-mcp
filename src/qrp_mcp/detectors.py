@@ -5678,6 +5678,8 @@ def _link_recipient_key(step: dict[str, Any], key_files: dict[str, list[str]]) -
 
 
 _SIGNTOOL_DIGEST = re.compile(r"\s/fd\s+\"?([A-Za-z0-9-]+)")
+_STRONG_NAME_MODES = (("delay_sign", re.compile(r"<DelaySign\b[^>]*>\s*true\s*</DelaySign>", re.IGNORECASE)),
+                      ("public_sign", re.compile(r"<PublicSign\b[^>]*>\s*true\s*</PublicSign>", re.IGNORECASE)))
 # sign/NET closure (zatv-a): the digest each Windows signing tool is told to use.
 _SIGNING_DIGEST = {
     "signtool_sign": _SIGNTOOL_DIGEST,
@@ -5705,6 +5707,13 @@ def scan_ci_file(path: Path, rel_path: str,
                           else None)
                 if digest:
                     findings[-1]["digest_algorithm"] = digest.group(1).upper()
+                # sign/NET closure (zatv-a), from the positive control (identitymodel's test
+                # projects): "DelaySign ... delay-sign the assembly rather than full-sign it"
+                # (Learn, MSBuild properties) -- the build reserves the signature and signs later;
+                # PublicSign writes the public key only. Said on the step, not dropped.
+                if command_type == "strong_name_sign":
+                    mode = next((m for m, rx in _STRONG_NAME_MODES if any(rx.search(l) for l in lines)), "full_sign")
+                    findings[-1]["strong_name_mode"] = mode
         if line.lstrip().startswith("#"):
             continue
         for command_type, pattern in ENCRYPTION_COMMAND_PATTERNS:
