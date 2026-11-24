@@ -367,6 +367,47 @@ def _packages_from_lock(kind: str, lines: list[str]) -> list[tuple[str, int, str
     return out
 
 
+# external/Go (24.11.2026): a go.mod line is read by the directive it belongs to (go.dev/ref/mod). A
+# line in an `exclude ( ... )` or `replace ( ... )` block has the shape of a requirement and is not
+# one; `exclude golang.org/x/crypto v0.1.0` says that version is not to be used.
+_GO_MOD_DIRECTIVE = re.compile(r"^\s*(require|replace|exclude|retract|godebug|tool|ignore)\b\s*(\()?")
+_GO_REPLACE = re.compile(r"^\s*(?:replace\s+)?([^\s=]+)(?:\s+(v\S+))?\s*=>\s*(\S+(?:\s+v\S+)?)")
+
+
+def _go_mod_directives(lines: list[str]) -> list[str | None]:
+    """The directive each go.mod line is under: `require` for a require line or a line of its
+    block, and so on; None for module, go, toolchain, blank and comment lines."""
+    out: list[str | None] = []
+    block: str | None = None
+    for text in lines:
+        stripped = text.split("//", 1)[0].strip()
+        if block is not None:
+            if stripped == ")":
+                out.append(None)
+                block = None
+            else:
+                out.append(block if stripped else None)
+            continue
+        match = _GO_MOD_DIRECTIVE.match(text)
+        if match and match.group(2):
+            block = match.group(1)
+            out.append(None)
+        else:
+            out.append(match.group(1) if match else None)
+    return out
+
+
+def _go_mod_replacements(lines: list[str]) -> dict[str, tuple[str | None, str]]:
+    """module -> (the version replaced, or None for every version; what replaces it)."""
+    out: dict[str, tuple[str | None, str]] = {}
+    for text, directive in zip(lines, _go_mod_directives(lines)):
+        if directive == "replace":
+            match = _GO_REPLACE.match(text.split("//", 1)[0])
+            if match:
+                out[match.group(1)] = (match.group(2), match.group(3))
+    return out
+
+
 def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tuple[str, int]]:
     """(package name, line number) pairs, read structurally."""
     out: list[tuple[str, int]] = []
@@ -406,11 +447,15 @@ def _names_from_manifest(ecosystem: str, name: str, lines: list[str]) -> list[tu
                 out.append((package.lower(), line))
         return out
     inside_cargo_deps = False
+    # external/Go: only the lines of a require directive are requirements.
+    go_directives = _go_mod_directives(lines) if ecosystem == "go" and name == "go.mod" else None
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
         if not stripped or stripped.startswith("#"):
             continue
         if ecosystem == "go":
+            if go_directives is not None and go_directives[number - 1] != "require":
+                continue
             match = _GO_REQUIRE.match(text)
             if match:
                 out.append((match.group(1), number))
@@ -781,8 +826,12 @@ def pinned_versions(path: Path, lines: list[str]) -> list[tuple[str, str, str, i
     else:
         return []
     out = []
+    # external/Go: a version in an exclude or replace line is not the one required.
+    go_directives = _go_mod_directives(lines) if path.name == "go.mod" else None
     for number, text in enumerate(lines, 1):
         if text.strip().startswith(("#", "//", "-")):
+            continue
+        if go_directives is not None and go_directives[number - 1] != "require":
             continue
         match = pattern.match(text)
         if match:
@@ -900,6 +949,7 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
     # pinned_versions, and a pyproject/Pipfile request that is a single `==` (below).
     pinned = {(package.lower(), number): version
               for _, package, version, number in pinned_versions(path, lines)}
+    replacements = _go_mod_replacements(lines) if path.name == "go.mod" else {}
     for package, number, requested in named:
         families = table.get(package)
         if families is None and ecosystem in ("pypi", "nuget"):
@@ -928,6 +978,13 @@ def scan_manifest(path: Path, rel_path: str, lines: list[str]) -> list[dict[str,
                    or (exact.group(1) if exact else None))
         if version:
             item["version"] = version
+        # external/Go: a replace directive swaps the module's code for another module or a
+        # directory (go.dev/ref/mod: "replace golang.org/x/net v1.2.3 => example.com/fork/net
+        # v1.4.5"); the row says what replaces it, for every version or for the one required.
+        if replacements and package in replacements:
+            replaced, target = replacements[package]
+            if replaced is None or replaced == item.get("version"):
+                item["replaced_by"] = target
         findings.append(item)
     return findings
 
