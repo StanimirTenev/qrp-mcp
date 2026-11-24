@@ -1990,6 +1990,10 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     # sign/NET closure (zatv-a): `nuget sign` and `dotnet nuget sign` of a package, "-HashAlgorithm
     # Hash algorithm to be used to sign the package. Defaults to SHA256" (Learn, both commands).
     ("nuget_sign", re.compile(r"\b(?:dotnet\s+)?nuget(?:\.exe)?\s+sign\b", re.IGNORECASE)),
+    # sign/NET closure (zatv-a): the Strong Name tool's re-signing, "-R[a] assembly infile Re-signs a
+    # previously signed or delay-signed assembly with the key pair in infile" (Learn, Sn.exe), as a
+    # command: at the start of the line or after `&`, a quote or a parenthesis.
+    ("sn_sign", re.compile(r"(?:^|[\s&\"'(])sn(?:\.exe)?\"?\s+-Ra?(?=\s)")),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
