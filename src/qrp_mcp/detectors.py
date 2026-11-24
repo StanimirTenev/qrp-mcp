@@ -1302,7 +1302,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     *[(family, f"{family} named as the digest of a Windows signing or hashing tool",
        re.compile(
            r"\bNew-SelfSignedCertificate\b[^\n]*\s-HashAlgorithm\s+[\"']?" + name + r"\b|"
-           r"\bsigntool(?:\.exe)?\s+sign\b[^\n]*\s/[ft]d\s+\"?" + name + r"\b|"
+           r"\bsigntool(?:\.exe)?\"?\s+sign\b[^\n]*\s/[ft]d\s+\"?" + name + r"\b|"
            r"\bcertutil(?:\.exe)?\s+-hashfile\s+\S+\s+" + name + r"\b|"
            r"\bmakecert(?:\.exe)?\b[^\n]*\s-a\s+" + name + r"\b", re.IGNORECASE))
       for family, name in (("SHA1", "sha-?1"), ("MD5", "md5"))],
@@ -1953,7 +1953,8 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?=\s|$)")),
     ("openssl_sign", re.compile(r"\bopenssl\s+(dgst|smime|cms)\b.*-sign\b")),
     ("cosign_sign", re.compile(r"\bcosign\s+sign\b")),
-    ("signtool_sign", re.compile(r"\bsigntool\s+sign\b", re.IGNORECASE)),
+    # sign/NET closure (zatv-a): also `signtool.exe sign` and a quoted path, `& "...\\signtool.exe" sign`.
+    ("signtool_sign", re.compile(r"\bsigntool(?:\.exe)?\"?\s+sign\b", re.IGNORECASE)),
     ("jarsigner", re.compile(r"\bjarsigner\b")),
     # Row 367: the command, followed by an option -- not `/f codesign.pfx`.
     ("codesign", re.compile(r"(?:^|[\s;&|(/\"'])codesign\s+-")),
