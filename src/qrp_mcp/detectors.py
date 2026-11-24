@@ -1987,6 +1987,9 @@ SIGNING_COMMAND_PATTERNS: list[tuple[str, re.Pattern]] = [
     # sign/NET closure (zatv-a): mage(1)'s -Sign of a ClickOnce manifest ("-a, -Algorithm sha1RSA ...
     # Value must be "sha256RSA" or "sha1RSA"", Learn, Mage.exe).
     ("mage_sign", re.compile(r"\bmage(?:\.exe)?\"?\s+(?:[^|;&\n]*\s)?-Sign\b", re.IGNORECASE)),
+    # sign/NET closure (zatv-a): `nuget sign` and `dotnet nuget sign` of a package, "-HashAlgorithm
+    # Hash algorithm to be used to sign the package. Defaults to SHA256" (Learn, both commands).
+    ("nuget_sign", re.compile(r"\b(?:dotnet\s+)?nuget(?:\.exe)?\s+sign\b", re.IGNORECASE)),
 ]
 
 # Row 479: encryption to a public key from a script -- the backups kept longest. The recipient
@@ -5533,6 +5536,7 @@ _SIGNING_DIGEST = {
     "signtool_sign": _SIGNTOOL_DIGEST,
     "set_authenticodesignature": re.compile(r"\s-HashAlgorithm\s+[\"']?([A-Za-z0-9-]+)", re.IGNORECASE),
     "mage_sign": re.compile(r"\s-(?:a|Algorithm)\s+(sha1|sha256)RSA\b", re.IGNORECASE),
+    "nuget_sign": re.compile(r"\s(?:-HashAlgorithm|--hash-algorithm)\s+[\"']?([A-Za-z0-9-]+)", re.IGNORECASE),
 }
 
 
