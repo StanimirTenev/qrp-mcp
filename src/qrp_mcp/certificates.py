@@ -711,8 +711,33 @@ def _certificate_rows(rel_path: str, line: int, excerpt: str, cert: dict[str, An
                        else cert["signature_algorithm"].get("oid"))
         if said and said[0] == family:
             row["parameter_set"] = said[1]
+        # pqc/PKI (24.11.2026): a composite's halves are the RFC 10073 table's -- the ML-DSA
+        # set, the curve or the RSA size of the traditional key -- where the row said neither.
+        halves = _composite_fields(key.get("oid") if role == "subject_public_key"
+                                   else cert["signature_algorithm"].get("oid"))
+        for name, value in halves.get(family, {}).items():
+            row.setdefault(name, value)
         rows.append(row)
     return rows
+
+
+def _composite_fields(oid: str | None) -> dict[str, dict[str, Any]]:
+    """pqc/PKI: {family: the fields its half of a composite ML-DSA identifier names}, from
+    oids.COMPOSITE_ML_DSA (RFC 10073 section 7); {} for any other identifier."""
+    entry = COMPOSITE_ML_DSA.get(oid or "")
+    if not entry:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for family, param in entry[2]:
+        if family == "ML-DSA":
+            out[family] = {"parameter_set": param}
+        elif family == "RSA" and param:
+            out[family] = {"key_size": int(param)}
+        elif param:
+            out[family] = {"curve": param}
+        else:
+            out[family] = {}
+    return out
 
 
 def _first_tlv(blob: bytes) -> bytes:
