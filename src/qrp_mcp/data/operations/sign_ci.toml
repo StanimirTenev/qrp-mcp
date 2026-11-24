@@ -1,0 +1,659 @@
+# Operation `sign`, ecosystem CI (24.11.2026): a signing step in a pipeline, a build or a release
+# script -- cosign sign / sign-blob, gpg --sign / --detach-sign / --clear-sign, openssl dgst -sign and
+# pkeyutl -sign, signtool sign, jarsigner, codesign, notation sign, minisign -S, ssh-keygen -Y sign,
+# tpm2_sign, pkcs11-tool --sign, and the Sigstore signing actions of GitHub (sigstore/gh-action-
+# sigstore-python, actions/attest and attest-build-provenance). Kept in a file of its own (sign/NET is
+# written elsewhere). Pages fetched 24.11.2026. `expect`: a ci_pipeline row on the line with its
+# command type, and the key it names where the line names one. Rows 191 (a), 367, 482, 510.
+
+operation = "sign"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "CI"
+scope = "GitHub Actions workflows (run: lines and uses: of the Sigstore signing actions) and shell scripts: cosign sign and sign-blob (--key file, KMS URI, keyless --yes), gpg -s/--sign, -b/--detach-sign, --clear-sign/--clearsign with -u/--local-user, short options clustered (-ab); openssl dgst -sign and openssl <digest> -sign, openssl pkeyutl -sign -inkey in either order; signtool sign /f, /a, /n with /fd; jarsigner; codesign -s/--sign; notation sign; minisign -S (-Sm); ssh-keygen -Y sign; tpm2_sign; pkcs11-tool --sign/-s; sigstore/gh-action-sigstore-python, actions/attest, actions/attest-build-provenance. Not covered: a command split over lines with a backslash (the line that names the command is the row; options on the next line are not read), GitLab/Azure/Jenkins syntax beyond the command line itself, rpmsign, debsigs, git tag -s / commit -S, SAML metadata signatures (row 191 (b): a file type, not a CI step)."
+
+[[ecosystems.spellings]]
+id = "cosign-sign-key"
+spelling = 'cosign sign --key KEY IMAGE'
+source = "https://raw.githubusercontent.com/sigstore/cosign/main/doc/cosign_sign.md"
+quote = 'cosign sign --key cosign.key <IMAGE DIGEST>'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cosign sign --key cosign.key ghcr.io/acme/app@sha256:4f1c
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "cosign_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cosign sign --yes "ghcr.io/acme/app@${DIGEST}"
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "cosign_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cosign sign --key awskms:///alias/release ghcr.io/acme/app@sha256:4f1c
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "cosign_sign", key_location = "kms"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cosign sign --key env://COSIGN_PRIVATE_KEY ghcr.io/acme/app@sha256:4f1c
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "cosign_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.sh"
+snippet = '''
+#!/bin/sh
+cosign sign --key=cosign.key "$IMAGE"
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "cosign_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "cosign-sign-blob"
+spelling = 'cosign sign-blob --key KEY --bundle B FILE'
+source = "https://raw.githubusercontent.com/sigstore/cosign/main/doc/cosign_sign-blob.md"
+quote = 'cosign sign-blob --key cosign.key --bundle <bundle.json> <FILE>'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cosign sign-blob --key cosign.key --bundle app.sigstore.json dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "cosign_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cosign sign-blob --yes --bundle app.sigstore.json dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "cosign_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.sh"
+snippet = '''
+#!/bin/sh
+cosign sign-blob -y --output-signature app.sig app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "cosign_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-detach-sign"
+spelling = 'gpg --detach-sign FILE'
+source = "https://www.gnupg.org/documentation/manuals/gnupg/Operational-GPG-Commands.html"
+quote = '--detach-sign -b Make a detached signature.'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gpg --batch --yes --default-key "$GPG_KEY_ID" --detach-sign dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gpg -b dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gpg --armor --local-user release@acme.example --detach-sign app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gpg -u $KEY -ab app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.sh"
+snippet = '''
+#!/bin/sh
+gpg2 --detach-sign --armor "$1"
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-sign"
+spelling = 'gpg --sign FILE'
+source = "https://www.gnupg.org/documentation/manuals/gnupg/Operational-GPG-Commands.html"
+quote = '--sign -s Sign a message.'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gpg --sign --output app.tar.gz.gpg app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gpg -s app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-clear-sign"
+spelling = 'gpg --clear-sign FILE'
+source = "https://www.gnupg.org/documentation/manuals/gnupg/Operational-GPG-Commands.html"
+quote = '--clear-sign --clearsign Make a cleartext signature.'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gpg --clear-sign SHA256SUMS
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gpg --batch --clearsign -u $GPG_KEY SHA256SUMS
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "gpg_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-dgst-sign"
+spelling = 'openssl dgst -sha256 -sign KEY -out SIG FILE'
+source = "https://docs.openssl.org/3.0/man1/openssl-dgst/"
+quote = 'openssl dgst -sha256 -sign privatekey.pem -out signature.sign file.txt'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: openssl dgst -sha256 -sign privatekey.pem -out signature.sign file.txt
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "openssl_sign", signing_key = {path = "privatekey.pem", in_tree = false}}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: openssl sha256 -sign privatekey.pem -out signature.sign file.txt
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "openssl_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.sh"
+snippet = '''
+#!/bin/sh
+openssl dgst -sha512 -sign "$KEY" -out app.sig app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "openssl_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "openssl-pkeyutl-sign"
+spelling = 'openssl pkeyutl -sign -in FILE -inkey KEY -out SIG'
+source = "https://docs.openssl.org/3.0/man1/openssl-pkeyutl/"
+quote = 'openssl pkeyutl -sign -in file -inkey key.pem -out sig'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: openssl pkeyutl -sign -in file -inkey key.pem -out sig
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "openssl_sign", signing_key = {path = "key.pem", in_tree = false}}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: openssl pkeyutl -inkey team_rsa.pem -sign -in digest.bin -out sig
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "openssl_sign", signing_key = {path = "team_rsa.pem", in_tree = false}}}]}
+
+[[ecosystems.spellings]]
+id = "signtool-sign"
+spelling = 'signtool sign /f CERT /fd SHA256 FILE'
+source = "https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe"
+quote = 'signtool sign /f MyCert.pfx /p MyPassword /fd SHA256 MyFile.exe'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: signtool sign /f codesign.pfx /p $env:PFX_PASSWORD /fd SHA256 MyFile.exe
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "signtool_sign", digest_algorithm = "SHA256"}}, {at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "codesign"}, absent = true}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: signtool sign /a /fd SHA256 MyFile.exe
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "signtool_sign", digest_algorithm = "SHA256"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: signtool.exe sign /n "My Company Certificate" /fd SHA1 MyFile.exe
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "signtool_sign", digest_algorithm = "SHA1"}}]}
+
+[[ecosystems.spellings]]
+id = "jarsigner"
+spelling = 'jarsigner [options] JAR ALIAS'
+source = "https://docs.oracle.com/en/java/javase/21/docs/specs/man/jarsigner.html"
+quote = 'jarsigner [ options ] jar-file alias'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: jarsigner -keystore /working/mystore -storepass keystore_password -keypass private_key_password -signedjar sbundle.jar bundle.jar jane
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "jarsigner"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: jarsigner -keystore release.p12 -storepass:env STOREPASS app.jar release
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "jarsigner"}}]}
+
+[[ecosystems.spellings]]
+id = "codesign"
+spelling = 'codesign -s IDENTITY PATH'
+source = "https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html"
+quote = 'codesign -s <identity> <code-path>'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: codesign -s "Developer ID Application: Acme" build/App.app
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "codesign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: codesign --force --timestamp --sign "$IDENTITY" build/App.app
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "codesign"}}]}
+
+[[ecosystems.spellings]]
+id = "notation-sign"
+spelling = 'notation sign [flags] REFERENCE'
+source = "https://raw.githubusercontent.com/notaryproject/notaryproject.dev/main/content/en/docs/user-guides/cli-reference/notation_sign.md"
+quote = 'notation sign [flags] <reference>'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: notation sign --key release ghcr.io/acme/app@sha256:4f1c
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "notation_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: notation sign --signature-format cose "$REGISTRY/app@$DIGEST"
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "notation_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.sh"
+snippet = '''
+#!/bin/sh
+notation sign -k release ghcr.io/acme/app@sha256:4f1c
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "notation_sign"}}]}
+
+[[ecosystems.spellings]]
+id = "minisign-sign"
+spelling = 'minisign -Sm FILE'
+source = "https://jedisct1.github.io/minisign/"
+quote = '$ minisign -Sm myfile.txt'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: minisign -Sm dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "minisign_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: minisign -S -s "$MINISIGN_KEY" -m dist/app.tar.gz -t "release"
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "minisign_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: minisign -Vm dist/app.tar.gz -P RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "minisign_sign"}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "ssh-keygen-y-sign"
+spelling = 'ssh-keygen -Y sign -f KEY -n NAMESPACE FILE'
+source = "https://man.openbsd.org/ssh-keygen.1"
+quote = 'ssh-keygen -Y sign [ -O option ] -f key_file -n namespace file ...'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ssh-keygen -Y sign -f ~/.ssh/release_ed25519 -n file dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "ssh_keygen_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.sh"
+snippet = '''
+#!/bin/sh
+ssh-keygen -Y sign -n file -f "$KEY" app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "ssh_keygen_sign"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ssh-keygen -Y verify -f allowed_signers -I release -n file -s app.tar.gz.sig < app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "ssh_keygen_sign"}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "tpm2-sign"
+spelling = 'tpm2_sign -c CONTEXT -g HASH -o SIG FILE'
+source = "https://raw.githubusercontent.com/tpm2-software/tpm2-tools/master/man/tpm2_sign.1.md"
+quote = 'tpm2_sign -c rsa.ctx -g sha256 -o sig.rssa message.dat'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: tpm2_sign -c rsa.ctx -g sha256 -o sig.rssa message.dat
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "tpm2_sign", key_location = "tpm"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "sign.sh"
+snippet = '''
+#!/bin/sh
+tpm2_sign --key-context=0x81010001 --scheme=ecdsa -g sha256 -o sig message.dat
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.sh", line = 2, command_type = "tpm2_sign", key_location = "tpm"}}]}
+
+[[ecosystems.spellings]]
+id = "pkcs11-tool-sign"
+spelling = 'pkcs11-tool --sign --mechanism MECH'
+source = "https://raw.githubusercontent.com/OpenSC/OpenSC/master/doc/tools/pkcs11-tool.1.xml"
+quote = '--sign , -s Sign some data.'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pkcs11-tool --sign --mechanism ECDSA-SHA256 --id 01 -i data.bin -o data.sig
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "pkcs11_tool_sign", key_location = "pkcs11_token"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pkcs11-tool -s -m SHA256-RSA-PKCS --id 02 --input-file data.bin --output-file data.sig
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "pkcs11_tool_sign", key_location = "pkcs11_token"}}]}
+
+[[ecosystems.spellings]]
+id = "gh-action-sigstore-python"
+spelling = 'uses: sigstore/gh-action-sigstore-python@REF'
+source = "https://raw.githubusercontent.com/sigstore/gh-action-sigstore-python/main/README.md"
+quote = '- uses: sigstore/gh-action-sigstore-python@v3.4.0 with: inputs: file.txt'
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sigstore/gh-action-sigstore-python@v3.4.0
+        with:
+          inputs: file.txt
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "sigstore_action"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sigstore/gh-action-sigstore-python@f514d46b907ebcd5bedc05145c03b69c1edd8b46 # v3.0.0
+        with:
+          inputs: file.txt
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "sigstore_action"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: "sigstore/gh-action-sigstore-python@v3"
+        with:
+          inputs: file.txt
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "sigstore_action"}}]}
+
+[[ecosystems.spellings]]
+id = "actions-attest"
+spelling = 'uses: actions/attest@REF'
+source = "https://raw.githubusercontent.com/actions/attest/main/README.md"
+quote = "- uses: actions/attest@v4 with: subject-path: '<PATH TO ARTIFACT>'"
+file = ".github/workflows/release.yml"
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/attest@v4
+        with:
+          subject-path: dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "sigstore_action"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "sigstore_action"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+name: release
+on: push
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/attest@daf44fb950173508f38bd2406030372c1d1162b1  # v3.0.0
+        with:
+          subject-path: dist/app.tar.gz
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = ".github/workflows/release.yml", line = 7, command_type = "sigstore_action"}}]}
