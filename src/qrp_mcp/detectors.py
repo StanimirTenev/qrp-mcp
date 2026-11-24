@@ -2405,6 +2405,12 @@ _KEY_SIZE = re.compile(
     r"\bRsaPrivateKey::new\([^,]*,\s*(\d{3,5})\b|\bwc_MakeRsaKey\([^,]*,\s*(\d{3,5})\b|"
     r"\bEVP_RSA_gen\(\s*(\d{3,5})\b|set_rsa_keygen_bits\([^,]*,\s*(\d{3,5})\b|"
     r"RSAKeyGenParameterSpec\(\s*(\d{3,5})\b|"
+    # keysize/C, keysize/Java closure (zatv-a; row 400): OpenSSL's RSA_generate_multi_prime_key
+    # (rsa, bits, primes, e, cb), Mbed TLS mbedtls_rsa_gen_key(ctx, f_rng, p_rng, nbits, e),
+    # Bouncy Castle RSAKeyGenerationParameters(publicExponent, random, strength, certainty).
+    r"\bRSA_generate_multi_prime_key\(\s*[^,]*,\s*(\d{3,5})\b|"
+    r"\bmbedtls_rsa_gen_key\([^,]*,[^,]*,[^,]*,\s*(\d{3,5})\b|"
+    r"\bRSAKeyGenerationParameters\([^,]*,[^,]*,\s*(\d{3,5})\b|"
     # Row 518: python-pkcs11, `session.generate_keypair(KeyType.RSA, 3072)`.
     r"\bgenerate_keypair\(\s*KeyType\.RSA\s*,\s*(\d{3,5})\b|"
     # Rows 369, 370, 374 (W1): .NET `RSA.Create(1024)`, `new RSACryptoServiceProvider(512)`,
@@ -2428,6 +2434,13 @@ _KEY_SIZE_GENERIC = re.compile(
     r"\bDSA\.Create\(\s*(\d{3,5})\s*\)|\b(?:DSACryptoServiceProvider|DSACng)\(\s*(\d{3,5})\s*[,)]|"
     # CryptGenKey's upper 16 bits for a Diffie-Hellman ALG_ID, as for RSA above (stage 3b).
     r"\bCryptGenKey\s*\([^,]*,\s*CALG_DH_(?:EPHEM|SF)\s*,\s*\(?\s*(\d{3,5})\s*<<\s*16\b|"
+    # keysize/C, keysize/Java closure (zatv-a; row 400): OpenSSL DSA/DH_generate_parameters_ex
+    # (key, bits, ...), wolfCrypt wc_MakeDsaParameters(rng, modulus_size, dsa) and
+    # wc_DhGenerateParams(rng, modSz, dh), JCA DHGenParameterSpec(primeSize, exponentSize) and
+    # DSAGenParameterSpec(primePLen, subprimeQLen).
+    r"\b(?:DSA|DH)_generate_parameters_ex\(\s*[^,]*,\s*(\d{3,5})\b|"
+    r"\b(?:wc_MakeDsaParameters|wc_DhGenerateParams)\(\s*[^,]*,\s*(\d{3,5})\b|"
+    r"\b(?:DH|DSA)GenParameterSpec\(\s*(\d{3,5})\b|"
     + _SIZE_OPTIONS,
     re.IGNORECASE)
 
