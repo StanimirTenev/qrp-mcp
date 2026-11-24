@@ -18,6 +18,10 @@ import pytest
 def _pqc_closure_material():
     module = sys.modules.get("test_operation_closure")
     if module is not None and "MLDSA65_SPKI_PEM" not in module._MADE:
-        import _pqc_material
-        module._MADE.update(_pqc_material.make())
+        try:
+            import _pqc_material
+            module._MADE.update(_pqc_material.make())
+        except Exception:  # noqa: BLE001 -- a `cryptography` without ML-DSA/ML-KEM (the floor
+            # is 43): only the pqc/PKI cases fail, on their missing material, not every test.
+            pass
     yield
