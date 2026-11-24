@@ -2187,6 +2187,11 @@ def scan_jca_names(line: str) -> list[tuple[str, int, str]]:
         family = _JCA_NAME_FAMILY.get(m.group(1).upper())
         if family:
             out.append((family, m.start(), m.group(1)))
+        # apiname/Java closure (zatv-a): a bare "ECDSA" signature is SHA-1 with ECDSA --
+        # '"ECDSA" is an ambiguous name for the "SHA1withECDSA" algorithm' (Standard Algorithm
+        # Names, Signature).
+        if m.group(1).upper() == "ECDSA" and line[m.start():m.start() + 10] == "Signature.":
+            out.append(("SHA1", m.start(), "ECDSA, which is SHA1withECDSA"))
     return out
 
 
