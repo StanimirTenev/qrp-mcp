@@ -1714,6 +1714,16 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
              {"name": f"{NS}findings_fingerprint:format",
               "value": scan_result["findings_fingerprint"]["format"]}]
             if scan_result.get("findings_fingerprint") else []) + (
+            # Files read that belong to no ecosystem: no operation of theirs is closed
+            # (ecosystems.not_attributed, 24.11.2026). The CBOM is the exit that leaves on its own.
+            [{"name": f"{NS}ecosystems:not_attributed:count",
+              "value": str(scan_result["ecosystems"]["not_attributed"]["count"])},
+             {"name": f"{NS}ecosystems:not_attributed:paths",
+              "value": json.dumps(scan_result["ecosystems"]["not_attributed"]["paths"],
+                                  ensure_ascii=False)},
+             {"name": f"{NS}ecosystems:not_attributed:meaning",
+              "value": scan_result["ecosystems"]["not_attributed"]["meaning"]}]
+            if (scan_result.get("ecosystems") or {}).get("not_attributed") else []) + (
             # Where the algorithm is chosen outside the files read (rows 156, 176).
             [{"name": f"{NS}chosen_outside_files:count",
               "value": str(scan_result["chosen_outside_files"]["count"])},

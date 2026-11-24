@@ -96,8 +96,10 @@ _CONFIG_NAMES = {
     "Chart.yaml": "IaC", "kustomization.yaml": "IaC", "kustomization.yml": "IaC",
 }
 _CONFIG_SUFFIXES = {".cnf": "C", ".ovpn": "IPsec", ".reg": "NET", ".tf": "IaC", ".tfvars": "IaC",
-                    ".dts": "embed", ".dtsi": "embed", ".dtso": "embed", ".its": "embed",
-                    ".zone": "DNSSEC"}
+                    ".dts": "embed", ".dtsi": "embed", ".dtso": "embed", ".its": "embed"}
+# A zone file is DNSSEC only when it carries a DNSSEC record: a zone of HTTPS records with an ECH
+# config was filed under DNSSEC by its suffix (row 552, Dong's ECH bench, 24.11.2026).
+_DNSSEC_RECORD = re.compile(r"\bIN\s+(?:DNSKEY|RRSIG|DS|NSEC3?|NSEC3PARAM|CDS|CDNSKEY)\b", re.I)
 _CONFIG_DIRS = {"nginx": "nginx", "haproxy": "nginx", "caddy": "nginx", "apache2": "Apache",
                 "httpd": "Apache", "sshd_config.d": "SSH", "ssh_config.d": "SSH",
                 "swanctl": "IPsec", "strongswan": "IPsec", "ipsec.d": "IPsec",
@@ -133,6 +135,14 @@ ECOSYSTEMS_MEANING = (
     "code. `rng_source` is in operation_closure but never counts toward a status here: its rows "
     "are in `randomness`. Context only: it does not affect the "
     "findings, their fingerprint, a gate or the exit code")
+
+
+NOT_ATTRIBUTED_MEANING = (
+    "here we may miss: files read that no rule puts in an ecosystem (by suffix, manifest, "
+    "configuration name or content, or key file), so no operation of theirs is in the closure "
+    "catalogue; what the scan reports in them comes from its rules, never tested spelling by "
+    "spelling. Context only: it does not affect the findings, their fingerprint, a gate or the "
+    "exit code")
 
 
 def _config_ecosystem(rel: str) -> str | None:
@@ -180,6 +190,9 @@ def _ecosystems(result: dict[str, Any], root: Path) -> dict[str, Any]:
         eco = _config_ecosystem(rel)
         if eco:
             add(eco, "config_name", rel)
+        elif suffix == ".zone":
+            if _DNSSEC_RECORD.search(_read(root, rel)):
+                add("DNSSEC", "config_content", rel)
         elif suffix in (".conf", "") and confidence._is_config(rel):
             text = _read(root, rel, 65536)
             for pattern, eco in _CONTENT_RULES:
@@ -237,7 +250,16 @@ def _ecosystems(result: dict[str, Any], root: Path) -> dict[str, Any]:
         else:
             entry["status"] = "closed"
         present.append(entry)
-    return {"meaning": ECOSYSTEMS_MEANING, "count": len(present), "present": present}
+    # A file read that no rule puts in an ecosystem has no closed operation either; without this
+    # it got no "here we may miss" at all (keys/ech-keys.json in Dong's ECH bench, 24.11.2026).
+    attributed = set().union(*(set().union(*rules.values()) for rules in files.values()))
+    unattributed = sorted(set(files_read) - attributed)
+    return {"meaning": ECOSYSTEMS_MEANING, "count": len(present), "present": present,
+            "not_attributed": {
+                "meaning": NOT_ATTRIBUTED_MEANING, "count": len(unattributed),
+                "only_in_test_code": bool(unattributed) and all(
+                    detectors.in_test_code(p) for p in unattributed),
+                "paths": unattributed}}
 
 
 # --- 2. angles ----------------------------------------------------------------------------------
@@ -619,13 +641,14 @@ def _leads(result: dict[str, Any], root: Path) -> dict[str, Any]:
 # and the scan could not read, then the angles that disagree, then the open operations of an
 # ecosystem the catalogue holds in part, then the import comparisons that did not run.
 KIND_ORDER = ("ecosystem_not_closed", "lead_not_followed", "contradiction",
-              "ecosystem_partially_closed", "angle_not_compared")
+              "ecosystem_partially_closed", "files_not_attributed", "angle_not_compared")
 WHERE_MEANING = (
     "one list of the places above where this scan may miss, for a reviewer to read from the "
     "top: an ecosystem the closure catalogue holds nothing of (ecosystems), a lead not followed "
     "(chosen_outside_files.leads, and the certificate and trust-store files named outside the "
     "files read in tls_termination and trust_stores), a contradiction between angles (angles), "
-    "an ecosystem held in part, and the comparisons that did not run")
+    "an ecosystem held in part, the files read that belong to no ecosystem "
+    "(ecosystems.not_attributed), and the comparisons that did not run")
 WHERE_ORDER = (
     "first what is in production code, then what is only in test code; within each, by kind in "
     "the order of `kinds`; an ecosystem by its number of files, most first; the rest by path "
@@ -647,6 +670,10 @@ def _where_to_look(ecosystems: dict[str, Any], angles: dict[str, Any], leads: di
             add(kind, e["only_in_test_code"], e["files"], e["ecosystem"], 0,
                 {"ecosystem": e["ecosystem"], "files": e["files"], "example": e["example"],
                  "open_operations": e["open_operations"], "statement": e["may_miss"]})
+    na = ecosystems.get("not_attributed") or {}
+    if na.get("count"):
+        add("files_not_attributed", na["only_in_test_code"], na["count"], "", 0,
+            {"files": na["count"], "example": na["paths"][0], "statement": na["meaning"]})
     absent = {(c["path"], c["line"]) for c in angles["contradictions"]
               if c["rule"] == "named_key_file_absent"}
     for lead in leads["items"]:

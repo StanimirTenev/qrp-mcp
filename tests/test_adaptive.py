@@ -398,3 +398,55 @@ def test_a_vrf_only_in_test_code_does_not_move_the_status(tmp_path):
     result = scan_directory(_write(tmp_path, tree))
     go = _eco(result, "Go")
     assert go["status"] == "not_closed" and "vrf" not in go["known_operations"]
+
+
+# --- files read in no ecosystem (24.11.2026, Dong's ECH bench) -------------------------------
+
+NA_TREE = {
+    "cmd/main.go": 'package main\nimport "crypto/rsa"\nfunc main() { _ = rsa.GenerateKey }\n',
+    "keys/ech-keys.json": '{"A": {"private_key_b64": "PjntTf1q+KbBhGczUxAis5BZQ1P0uLZyhLaOkFiuOdg="}}\n',
+    "dns/https-rr.zone": "_8441._https.inner.example. 300 IN HTTPS 1 inner.example. port=8441 "
+                         "ech=AEH+DQA9AQAgACDtAiDt\n",
+    "dns/signed.zone": "example. 3600 IN DNSKEY 257 3 13 mdsswUyr3DPW132mOi8V9xESWE8jTo0d\n",
+}
+
+
+def test_a_file_read_in_no_ecosystem_is_said_so(tmp_path):
+    result = scan_directory(_write(tmp_path, NA_TREE))
+    na = result["ecosystems"]["not_attributed"]
+    assert na["paths"] == ["dns/https-rr.zone", "keys/ech-keys.json"]
+    assert na["count"] == 2 and na["meaning"].startswith("here we may miss")
+    kinds = [i for i in result["where_to_look"]["items"] if i["kind"] == "files_not_attributed"]
+    assert len(kinds) == 1 and kinds[0]["files"] == 2
+
+
+def test_a_zone_is_dnssec_only_with_a_dnssec_record(tmp_path):
+    result = scan_directory(_write(tmp_path, NA_TREE))
+    assert _eco(result, "DNSSEC")["basis"] == {"config_content": 1}
+    assert _eco(result, "DNSSEC")["example"] == "dns/signed.zone"
+
+
+def test_not_attributed_leaves_by_every_exit(tmp_path):
+    src = _write(tmp_path / "src", NA_TREE)
+    direct = scan_directory(src)
+    tool = getattr(scan_repo, "fn", scan_repo)(str(src), level="full")
+    cli, _ = _cli(tmp_path, "na")
+    assert (direct["ecosystems"]["not_attributed"] == tool["ecosystems"]["not_attributed"]
+            == cli["ecosystems"]["not_attributed"])
+    from qrp_mcp.cyclonedx import build
+    props = {p["name"]: p["value"] for p in build(direct)["properties"]}
+    assert props["qrp:ecosystems:not_attributed:count"] == "2"
+    assert json.loads(props["qrp:ecosystems:not_attributed:paths"]) == [
+        "dns/https-rr.zone", "keys/ech-keys.json"]
+
+
+def test_not_attributed_reaches_the_cbom_of_the_command_and_of_the_tool(tmp_path):
+    from qrp_mcp.server import export_cbom
+    src = _write(tmp_path / "src", NA_TREE)
+    out = tmp_path / "cbom.json"
+    with pytest.raises(SystemExit):
+        main(["cbom", str(src), "--out", str(out), "--no-config"])
+    tool = getattr(export_cbom, "fn", export_cbom)(str(src))
+    for cbom in (json.loads(out.read_text()), tool):
+        props = {p["name"]: p["value"] for p in cbom["properties"]}
+        assert props["qrp:ecosystems:not_attributed:count"] == "2"
