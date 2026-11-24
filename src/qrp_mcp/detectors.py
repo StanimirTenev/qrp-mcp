@@ -5678,6 +5678,8 @@ def _link_recipient_key(step: dict[str, Any], key_files: dict[str, list[str]]) -
 
 
 _SIGNTOOL_DIGEST = re.compile(r"\s/fd\s+\"?([A-Za-z0-9-]+)")
+_WINDOWS_SIGNING_TOOLS = {"set_authenticodesignature", "mage_sign", "nuget_sign", "sn_sign", "strong_name_sign"}
+_SCRIPT_COMMENT = re.compile(r"^\s*(?:#|::|@?rem\b|<!--)", re.IGNORECASE)
 _STRONG_NAME_MODES = (("delay_sign", re.compile(r"<DelaySign\b[^>]*>\s*true\s*</DelaySign>", re.IGNORECASE)),
                       ("public_sign", re.compile(r"<PublicSign\b[^>]*>\s*true\s*</PublicSign>", re.IGNORECASE)))
 # sign/NET closure (zatv-a): the digest each Windows signing tool is told to use.
@@ -5695,6 +5697,11 @@ def scan_ci_file(path: Path, rel_path: str,
     lines = (_read_lines(path) or []) if lines is None else lines
     for line_no, line in enumerate(lines, start=1):
         for command_type, pattern in SIGNING_COMMAND_PATTERNS:
+            # sign/NET closure (zatv-a), from the positive control (psconf 03-signing.ps1:8, a
+            # `# NOTE: ... Set-AuthenticodeSignature ...` line): the Windows tools added then are
+            # not read on a comment line (#, REM, ::, <!--). The older tools are as they were.
+            if command_type in _WINDOWS_SIGNING_TOOLS and _SCRIPT_COMMENT.match(line):
+                continue
             if pattern.search(line):
                 findings.append({
                     "path": rel_path,
