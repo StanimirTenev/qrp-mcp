@@ -383,6 +383,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # include/openssl/dsa.h: the signing calls and the header (row 65).
         r"\bDSA_(?:do_)?(?:sign|verify)\b|[<\"]openssl/dsa\.h[>\"]|"
         r"\bDSACryptoServiceProvider\b|\bDSACng\b|\bDSA\.Create\b|"     # DSA.cs, row 70
+        # PowerShell's [System.Security.Cryptography.DSA]::Create() (apiname/NET closure, zatv-a)
+        r"\bDSA\]::Create\b|"
         r"(?<![A-Za-z])ssh-dss(?![A-Za-z])",
         re.IGNORECASE,
     )),
@@ -507,6 +509,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"createHash\(\s*[\"']md5[\"']|openssl\s+dgst\s+-md5|"
         r"\bMD5_Init\b|\bMD5_Update\b|\bEVP_md5\b|"
         r"\bMD5CryptoServiceProvider\b|\bMD5\.Create\b|"
+        # PowerShell's [...MD5]::Create() and the CNG class MD5Cng (apiname/NET closure, zatv-a)
+        r"\bMD5\]::Create\b|\bMD5Cng\b|"
         # The idioms the comparison found in the wild: pyca objects, hashlib.new,
         # the BSD-style C calls and headers, and Go used without its import line.
         r"hashes\.MD5\s*\(|hashlib\.new\(\s*[\"']md5[\"']|"
@@ -753,7 +757,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         # the EVP_des_ede* family (two- and three-key) must not fall in here.
         r"crypto/des\b|\bDES_set_key\w*|\bDES_ecb_encrypt\b|"
         r"\bEVP_des_(?!ede)\w+|\bDESCryptoServiceProvider\b|\bdes\.NewCipher\b|"
-        r"\bDES\.Create\b|"                             # .NET DES.cs, row 70
+        r"\bDES\.Create\b|\bDES\]::Create\b|"          # .NET DES.cs, row 70; PowerShell [...DES]::Create()
         r"Crypto(?:dome)?\.Cipher\s+import\s+[^\n#]*\bDES\b|Crypto(?:dome)?\.Cipher\.DES\b|"   # row 71
         # Node passes the cipher name to OpenSSL: single DES in one of its modes, not
         # des-ede3-* (row 69).
@@ -934,7 +938,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         r"(?:WITH|With|with)SM2\b|\bcurveSM2\b|\bEVP_PKEY_SM2\b|\bsm2p256v1\b")),
     ("ElGamal", "ElGamal usage", re.compile(r"\bElGamal\w*|\bELGAMAL\w*")),
     ("RC2", "RC2 usage", re.compile(
-        r"\bRC2(?:Engine|WrapEngine|ParameterSpec|CryptoServiceProvider)\b|\bRC2\.Create\b|"
+        r"\bRC2(?:Engine|WrapEngine|ParameterSpec|CryptoServiceProvider)\b|\bRC2\.Create\b|\bRC2\]::Create\b|"
         r"\bEVP_rc2\w*|\bRC2_(?:set_key|ecb_encrypt|encrypt|decrypt|cbc_encrypt|cfb64_encrypt|"
         r"ofb64_encrypt)\b|[<\"]openssl/rc2\.h[>\"]|\balgorithms\.RC2\b|\bARC2\.(?:new|MODE_\w+)\b|"
         r"Crypto(?:dome)?\.Cipher\s+import\s+[^\n#]*\bARC2\b|Crypto(?:dome)?\.Cipher\.ARC2\b|"
