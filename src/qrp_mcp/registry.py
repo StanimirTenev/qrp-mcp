@@ -349,7 +349,9 @@ CRYPTO_IMPORT = re.compile(
     r"^\s*import\s+(?:static\s+)?(?:java\.security|javax\.crypto|org\.bouncycastle)\b|"
     r"^\s*use\s+(?:ring|openssl|rsa|p256|p384|ed25519_dalek|x25519_dalek|rustls|sha1|md5|"
     r"aws_lc_rs)\b|"
-    r"^\s*using\s+System\.Security\.Cryptography\b", re.M)
+    r"^\s*using\s+System\.Security\.Cryptography\b|"
+    # apiname/NET closure (zatv-a): VB.NET's import of the same namespace.
+    r"^\s*Imports\s+System\.Security\.Cryptography\b", re.M)
 
 
 # Speed only: every key of components.FAMILY, and every name components() puts together
