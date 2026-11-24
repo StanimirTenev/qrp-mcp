@@ -5417,10 +5417,14 @@ _RUNTIME_JCA = re.compile(
 # `getenv("KEX_FUZZ_DEBUG")`; caught on the positive control).
 # Python's bytes forms too: os.environb and os.getenvb (os module: "getenvb() uses
 # os.environb"), whose names are bytes literals.
+# external/Go (24.11.2026): Go's raw string (`os.Getenv(`KEM_SCHEME`)`), and os.ExpandEnv, whose
+# argument names the variable as `${NAME}` or `$NAME` (pkg.go.dev/os: "ExpandEnv replaces ${var} or
+# $var in the string according to the values of the current environment variables").
 _RUNTIME_ENV_NAME = re.compile(
     r"(?:os\.environb?(?:\.get)?\s*[\[(]|os\.getenvb?\s*\(|\bgetenv\s*\(|os\.(?:Getenv|LookupEnv)\s*\(|"
-    r"System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\()\s*b?[\"']([A-Za-z_][\w.-]*)[\"']|"
-    r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])")
+    r"System\.getenv\s*\(|Environment\.GetEnvironmentVariable\s*\()\s*b?[\"'`]([A-Za-z_][\w.-]*)[\"'`]|"
+    r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])|"
+    r"os\.ExpandEnv\s*\(\s*[\"`]\$\{?([A-Za-z_]\w*)\}?[\"`]\s*\)")
 _NOT_A_CHOICE = re.compile(r"(?:^|_)(?:KEY|SECRET|PASS(?:WORD)?|TOKEN|SALT|IV|PATH|FILE|DIR|URL|"
                            r"DEBUG|TRACE|LOG|VERBOSE)$",
                            re.IGNORECASE)
@@ -5439,7 +5443,7 @@ def _runtime_env_name(text: str) -> re.Match | None:
 
 
 _RUNTIME_BYTES = (b"environ", b"getenv", b"Getenv", b"LookupEnv", b"process.env", b"System.getenv",
-                  b"GetEnvironmentVariable", b"${", b"$")
+                  b"GetEnvironmentVariable", b"${", b"$", b"os.Environ")  # os.Environ: external/Go
 
 
 # Row 440 (06.11.2026): `mech = os.environ.get("HSM_SIGN_MECH", "RSA-PSS")` gave RSA and no
@@ -5491,15 +5495,72 @@ def _runtime_default(text: str) -> dict[str, Any] | None:
 _CMAKE_VARIABLE = re.compile(r"\$\{[^}]*\}")
 
 
+# external/Go (24.11.2026): the variable's name held in a constant of the file (`const envScheme =
+# "KEM_SCHEME"` ... `os.Getenv(envScheme)`), one line or a `const ( ... )` block. Only a constant the
+# file itself declares with a string literal; another package's constant is not looked up.
+_GO_STRING_CONST = re.compile(r"^\s*(?:const\s+)?([A-Za-z_]\w*)\s*(?:string\s*)?=\s*[\"`]([A-Za-z_][\w.-]*)[\"`]\s*(?://.*)?$")
+_GO_ENV_BY_CONST = re.compile(r"\bos\.(Getenv|LookupEnv)\s*\(\s*([A-Za-z_]\w*)\s*\)")
+
+
+def _go_env_constants(lines: list[str]) -> dict[str, str]:
+    consts: dict[str, str] = {}
+    block = False
+    for text in lines:
+        stripped = text.strip()
+        if re.match(r"const\s*\($", stripped):
+            block = True
+            continue
+        if block and stripped == ")":
+            block = False
+            continue
+        if block or stripped.startswith("const "):
+            match = _GO_STRING_CONST.match(text)
+            if match:
+                consts[match.group(1)] = match.group(2)
+    return consts
+
+
+# external/Go (24.11.2026): os.Environ() read whole and searched for a setting by its name
+# (pkg.go.dev/os: Environ returns the environment "in the form "key=value""). The place is the line
+# that compares an entry to the name -- `strings.HasPrefix(kv, "KEM_SCHEME=")`, `k == "SIGN_ALG"`,
+# `case "KEM_SCHEME":` -- in a file that calls os.Environ().
+_GO_ENVIRON_NAME = re.compile(
+    r"(?:\bHasPrefix\s*\(\s*\w+\s*,\s*|==\s*|\bcase\s+)\"([A-Za-z_][\w.-]*)=?\"|"
+    r"\"([A-Za-z_][\w.-]*)=?\"\s*==")
+
+
+def _go_environ_places(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for number, text in enumerate(lines, 1):
+        stripped = text.strip()
+        if stripped.startswith("//"):
+            continue
+        for match in _GO_ENVIRON_NAME.finditer(text):
+            name = match.group(1) or match.group(2)
+            if _RUNTIME_SETTING.search(name) and not _NOT_A_CHOICE.search(name):
+                out.append({"path": rel_path, "line": number, "setting": name,
+                            "read_from": "os.Environ()", "excerpt": stripped[:200],
+                            "in_test_code": in_test_code(rel_path)})
+                break
+    return out
+
+
 def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     cmake = rel_path.rsplit("/", 1)[-1] == "CMakeLists.txt" or rel_path.endswith(".cmake")
+    go = rel_path.endswith(".go")
+    go_consts = _go_env_constants(lines) if go else {}
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
         if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
             continue
         if cmake:
             text = _CMAKE_VARIABLE.sub("", text)
+        if go_consts:
+            # external/Go: `os.Getenv(envScheme)` is read as the name the constant holds.
+            text = _GO_ENV_BY_CONST.sub(
+                lambda m: (f'os.{m.group(1)}("{go_consts[m.group(2)]}")'
+                           if m.group(2) in go_consts else m.group(0)), text)
         if not _RUNTIME_REFERENCE.search(text):
             continue
         # The reference must be the setting's value: right after it, past `=`, `:`, `(`, a
@@ -5519,6 +5580,9 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         if default:
             place.update({k: default[k] for k in ("default", "default_family", "overridable")})
         out.append(place)
+    if go and "os.Environ()" in "\n".join(lines):
+        taken = {p["line"] for p in out}
+        out.extend(p for p in _go_environ_places(rel_path, lines) if p["line"] not in taken)
     return out
 
 
