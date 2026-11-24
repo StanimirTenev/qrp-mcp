@@ -1172,6 +1172,14 @@ function Sign-It($p) { Set-AuthenticodeSignature -LiteralPath $p -Certificate $c
 '''
 expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.psm1", line = 1, command_type = "set_authenticodesignature", digest_algorithm = "SHA256"}}]}
 
+[[ecosystems.spellings.variants]]
+file = "sign.ps1"
+snippet = '''
+# NOTE: On Windows: Set-AuthenticodeSignature -HashAlgorithm SHA256 -TimestampServer ...
+$x = 1
+'''
+expect = {rows = [{at = "evidence.ci_pipeline", match = {path = "sign.ps1", line = 1, command_type = "set_authenticodesignature"}, absent = true}]}
+
 [[ecosystems.spellings]]
 id = "mage-sign-algorithm"
 spelling = "mage -Sign ... -a sha1RSA"
