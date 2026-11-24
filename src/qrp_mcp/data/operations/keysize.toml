@@ -7066,7 +7066,7 @@ int make(void)
     return 0;
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "ECDSA", key_size = 384, line = 5, curve = "P-384"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.c", algorithm = "EC", key_size = 384, line = 5, curve = "P-384"}}]}
 
 [[ecosystems.spellings]]
 id = "mbedtls-ecp-gen-key"
