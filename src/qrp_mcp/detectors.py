@@ -1285,6 +1285,13 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
         ("RSA", "RSA|RSA_SIGN"), ("DSA", "DSA"), ("DH", "DH"), ("ECDSA", "ECDSA|ECDSA_P256|ECDSA_P384|ECDSA_P521"),
         ("ECDH", "ECDH|ECDH_P256|ECDH_P384|ECDH_P521"), ("MD5", "MD5"), ("MD4", "MD4"), ("MD2", "MD2"),
         ("SHA1", "SHA1"), ("3DES", "3DES|3DES_112"), ("DES", "DES|DESX"), ("RC4", "RC4"), ("RC2", "RC2"))],
+    # apiname/NET closure (zatv-a): CryptoAPI's ALG_ID constants of wincrypt.h (Learn, ALG_ID),
+    # as CryptGenKey, CryptCreateHash or CryptDeriveKey take them, or held in a local first.
+    *[(family, f"{family} named by its CryptoAPI ALG_ID", re.compile(r"\bCALG_(?:" + ids + r")\b"))
+      for family, ids in (
+        ("RSA", "RSA_KEYX|RSA_SIGN"), ("DSA", "DSS_SIGN"), ("DH", "DH_SF|DH_EPHEM"), ("ECDSA", "ECDSA"),
+        ("ECDH", "ECDH|ECDH_EPHEM"), ("MD5", "MD5"), ("MD4", "MD4"), ("MD2", "MD2"), ("SHA1", "SHA1|SHA"),
+        ("3DES", "3DES|3DES_112"), ("DES", "DES"), ("RC4", "RC4"), ("RC2", "RC2"))],
     # Rows 379, 382, 383 (W1): the digest a Windows certificate, signing or hashing tool is
     # told to use -- New-SelfSignedCertificate -HashAlgorithm, signtool /fd and /td,
     # certutil -hashfile FILE ALG, makecert -a.
