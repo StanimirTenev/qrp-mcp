@@ -186,3 +186,45 @@ def test_a_verification_in_another_function_does_not_count(tmp_path):
 def test_a_local_function_named_decode_is_not_jsonwebtoken(tmp_path):
     text = "import { decode } from './codec'\nconst t = decode(userToken)\n"
     assert _rows(_scan(tmp_path, "u.ts", text)) == []
+
+
+# The corpus control of 25.11.2026 (korpus/sken-0cfd42e, 80 rows) and its review: names and "none"
+# are read only in a file of a JOSE library, and a verification follows only inside the same block.
+@pytest.mark.parametrize("name,text", [
+    ("c.js", "const opts = { algorithms: ['none', 'gzip'] };\n"),
+    ("c.py", "settings = dict(algorithms=['none', 'lz4'])\n"),
+    ("D.java", "class JWT { public DecodedJWT decodeJwt(String token) { return null; } }\n"),
+    ("h.ts", "export function decodeJwt (token: string) { return token.split('.') }\n"),
+    ("h.ts", "export class UnsecuredJWT {}\n"),
+])
+def test_names_and_none_outside_a_jose_file_are_not_rows(tmp_path, name, text):
+    assert _rows(_scan(tmp_path, name, text)) == []
+
+
+def _after(result: dict) -> list[tuple]:
+    return [(i["line"], i.get("verified_after")) for i in result["evidence"]["source_code"]
+            if i["algorithm"] == "JWT-unverified"]
+
+
+def test_a_verify_in_the_next_one_line_export_does_not_count(tmp_path):
+    text = ("import jws from 'jws'\n"
+            "export const decode = (t: string) => { return jws.decode(t)?.payload }\n"
+            "export const verify = (t: string) => jws.verify(t, 'RS256', publicKey)\n")
+    assert _after(_scan(tmp_path, "i.ts", text)) == [(2, None)]
+
+
+def test_a_top_level_decode_then_a_verifying_function_does_not_count(tmp_path):
+    text = ("import jwt from 'jsonwebtoken'\nconst claims = jwt.decode(token)\n"
+            "function check (t) {\n  return jwt.verify(t, key)\n}\n")
+    assert _after(_scan(tmp_path, "t.ts", text)) == [(2, None)]
+
+
+def test_android_store_keywords_are_not_masked(tmp_path):
+    from qrp_mcp.server import scan_repo
+    (tmp_path / "res/xml").mkdir(parents=True)
+    (tmp_path / "res/xml/nsc.xml").write_text(
+        '<network-security-config>\n  <base-config>\n    <trust-anchors>\n'
+        '      <certificates src="system"/>\n      <certificates src="user"/>\n'
+        '    </trust-anchors>\n  </base-config>\n</network-security-config>\n')
+    result = scan_repo(str(tmp_path))
+    assert sorted(p["file"] for p in result["trust_stores"]["places"]) == ["system", "user"]

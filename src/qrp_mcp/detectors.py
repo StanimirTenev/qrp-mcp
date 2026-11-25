@@ -5682,8 +5682,21 @@ _JOSE_NONE_LIST = re.compile(r"\balgorithms\s*[=:]\s*\[[^\]]*[\"']none[\"']")
 _JOSE_NONE_ONE = re.compile(r"\balgorithm\s*[=:]\s*[\"']none[\"']")
 _JOSE_UNVERIFIED = re.compile(
     r"\boptions\s*=\s*\{[^}]*[\"']verify_signature[\"']\s*:\s*False\b|"
-    r"\bget_unverified_claims\s*\(|\bUnsecuredJWT\b|\bdecodeJwt\s*\(|"
+    r"\bget_unverified_claims\s*\(|"
     r"\bjwt\.(?:SigningMethodNone|UnsafeAllowNoneSignatureType)\b|\.ParseUnverified\s*\(")
+# jose by panva, read in a JS/TS file that imports it (auth0's java-jwt has its own decodeJwt, and
+# the library's own sources define these names).
+_JOSE_PANVA = re.compile(r"\bUnsecuredJWT\b|\bdecodeJwt\s*\(")
+_JS_IMPORTS_JOSE = re.compile(r"""from\s+['"]jose(?:/[^'"]*)?['"]|require\(\s*['"]jose(?:/[^'"]*)?['"]\s*\)""")
+# "none" and verify_signature are read only in a file that imports a JOSE library.
+_IMPORTS_A_JOSE_LIBRARY = re.compile(
+    r"^\s*(?:import|from)\s+(?:jwt|jose|jwcrypto|authlib|josepy)\b|"
+    r"""from\s+['"](?:jsonwebtoken|jose|jws|express-jwt)(?:/[^'"]*)?['"]|"""
+    r"""require\(\s*['"](?:jsonwebtoken|jose|jws|express-jwt)(?:/[^'"]*)?['"]\s*\)""", re.M)
+# The guard: a file none of whose text could match any spelling is passed over in one search.
+_JOSE_GUARD = re.compile(
+    r"""['"]none['"]|[:=]\s*['"]?none\b|verify_signature|[Uu]nverified|[Uu]nsecured|decodeJwt|"""
+    r"""PlainJWT|\.NONE\b|ClaimsJwt|ContentJwt|SigningMethodNone|AllowNone|jsonwebtoken|['"]jws['"]""")
 # Names other APIs could share, read only in a file of that library: Nimbus (com.nimbusds), jjwt
 # (io.jsonwebtoken, Jwts).
 _JOSE_NIMBUS = re.compile(r"\bAlgorithm\.NONE\b|\bPlainJWT\b")
@@ -5695,9 +5708,6 @@ _JOSE_CALL = re.compile(r"\b(?:jwt|jws|jose)\.(?:encode|decode|sign|verify)\s*\(
 _JOSE_SETTING_NONE = re.compile(
     r"^\s*([\w.-]*?alg(?:orithm)?s?)\s*[:=]\s*[\"']?none[\"']?\s*(?:#.*)?$", re.IGNORECASE)
 _JOSE_CONTEXT = re.compile(r"jwt|jws|jose|token|oidc|oauth", re.IGNORECASE)
-_JOSE_WORDS = ("none", "None", "verify_signature", "unverified", "Unverified", "Unsecured", "unsecured",
-               "decodeJwt", "PlainJWT", "NONE", "ClaimsJwt", "ContentJwt", "SigningMethodNone",
-               "jsonwebtoken", "'jws'", '"jws"')
 # The names a file binds jsonwebtoken and jws to (the positive control on OWASP Juice Shop,
 # 25.11.2026: `import { decode } from 'jsonwebtoken'` and `jws.decode(...)` were missed): a default or
 # namespace import, a named import (`{ decode as peek }`), a require, destructured or not.
@@ -5746,9 +5756,13 @@ def _alternation(names) -> str:
 
 
 def _verified_after(lines: list[str], n: int, verify: re.Pattern, python: bool) -> int | None:
-    """The line, after line n and in the block it is in, that verifies a token; None if none does."""
+    """The line, after line n and in the block it is in, that verifies a token; None if none does.
+    A line at the top of a file, or a block that closes on the line itself, has no block after it
+    (a decode in one one-line export and a verify in the next are two functions)."""
     if python:
         indent = len(lines[n - 1]) - len(lines[n - 1].lstrip())
+        if indent == 0:
+            return None
         for k in range(n, min(len(lines), n + 60)):
             text = lines[k]
             if text.strip() and len(text) - len(text.lstrip()) < indent:
@@ -5756,7 +5770,10 @@ def _verified_after(lines: list[str], n: int, verify: re.Pattern, python: bool) 
             if verify.search(text):
                 return k + 1
         return None
-    depth = 0
+    outer = sum(t.count("{") - t.count("}") for t in lines[:n - 1])
+    depth = lines[n - 1].count("{") - lines[n - 1].count("}")
+    if outer + min(depth, 0) <= 0 or lines[n - 1].rstrip().endswith("}"):
+        return None
     for k in range(n, min(len(lines), n + 60)):
         text = lines[k]
         if verify.search(text):
@@ -5769,14 +5786,16 @@ def _verified_after(lines: list[str], n: int, verify: re.Pattern, python: bool) 
 
 def _jose_unverified(findings: list[dict[str, Any]], lines: list[str],
                      rel_path: str) -> list[dict[str, Any]]:
-    if not any(w in line for line in lines for w in _JOSE_WORDS) and not any(
-            "decode" in line for line in lines):
+    text = "\n".join(lines)
+    if not _JOSE_GUARD.search(text):
         return findings
+    jose_file = bool(_IMPORTS_A_JOSE_LIBRARY.search(text))
     js = rel_path.endswith((".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts"))
     python = rel_path.endswith(".py")
     go = rel_path.endswith(".go")
     config = confidence_is_config(rel_path)
-    nimbus = any("nimbusds" in line for line in lines)
+    panva = js and bool(_JS_IMPORTS_JOSE.search(text))
+    nimbus = "nimbusds" in text
     jjwt = any("jsonwebtoken" in line or "Jwts" in line for line in lines) and not js
     modules, named = _js_bindings(lines) if js else ({}, {})
     py_modules, py_named = {"jwt", "jws"}, set()
@@ -5825,13 +5844,15 @@ def _jose_unverified(findings: list[dict[str, Any]], lines: list[str],
                 or _JS_REQUIRE_LINE.match(stripped)):
             continue
         said = decode = None
-        if _JOSE_NONE_LIST.search(line) or (_JOSE_NONE_ONE.search(line) and calls.search(line)) or (
+        if (jose_file and (_JOSE_NONE_LIST.search(line) or (_JOSE_NONE_ONE.search(line)
+                                                            and calls.search(line)))) or (
                 jws_header_none and jws_header_none.search(line) and calls.search(line)):
             said = _UNSIGNED
         elif go and go_none.search(line):
             said = _UNSIGNED
-        elif (_JOSE_UNVERIFIED.search(line) or (nimbus and _JOSE_NIMBUS.search(line))
-              or (jjwt and _JOSE_JJWT.search(line))):
+        elif ((_JOSE_UNVERIFIED.search(line) and (jose_file or go))
+              or ((panva or "jose." in line) and js and _JOSE_PANVA.search(line))
+              or (nimbus and _JOSE_NIMBUS.search(line)) or (jjwt and _JOSE_JJWT.search(line))):
             if (re.search(r"NONE|None|Unsecured|unsecured|PlainJWT", line)
                     and not re.search(r"verify_signature|decodeJwt|ParseUnverified", line)):
                 said = _UNSIGNED

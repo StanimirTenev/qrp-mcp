@@ -65,6 +65,11 @@ Detection changes: findings and their fingerprint move where these constructs ar
   the token unverified. The row now carries `verified_after` and says only that. It does not say
   the token is accepted unverified, and the finding's reason says so too.
 
+  `none` lists and `verify_signature` are read only in a file that imports a JOSE library.
+  jose's `decodeJwt` and `UnsecuredJWT` are read only in a JS/TS file that imports `jose`, because
+  auth0's java-jwt has its own `decodeJwt`. A decode at the top of a file, or in a block that closes
+  on its own line, has no verification "after" it.
+
   Not covered: a library version that accepts `none` by itself, such as jsonwebtoken 0.4.0 or
   express-jwt 0.1.3. That is a dependency, not a line. Also not covered: the browser library
   jwt-decode.
