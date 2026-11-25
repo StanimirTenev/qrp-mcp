@@ -171,7 +171,11 @@ def test_a_solidity_comment_is_a_comment(tmp_path):
     ("plonk.py", "# the plonk is a plank of wood\nplonk = 3\n"),
     ("kzg_words.go", "package p\n\nfunc kzgish() {}\n"),
     ("pairing_word.py", "def pairing(a, b):\n    return (a, b)\nx = pairing(1, 2)\n"),
-], ids=["poseidon-keccak", "stark-fri", "plonk-word", "kzgish", "pairing-word"])
+    # Corpus, 25.11.2026: base64 in a certificate bundle and in a JWS fixture.
+    ("bundle.t", "> Z05phkOTOPu220+DkdRgfks+KzgHVZhepA==\n"),
+    ("jwe.php", "$x = '{\"iv\":\"0Toz-1TbKoLMgZY4sF8Kzg\",\"tag\":\"TPjfXltcP0YiWpIkfGpMt\"}';\n"),
+    ("jws.mjs", "const jws = 'hmMrKkUgZwGPQV_WUoXUVq_Z9WOenDZbfMmHpKritl0btWi29TC8eIyQyT1FAuW2kg3h6ALsvCrjX5tn3QKFQZYC0sBdRt0VNiDKzgHVZ';\n"),
+], ids=["poseidon-keccak", "stark-fri", "plonk-word", "kzgish", "pairing-word", "base64-bundle", "base64url-jwe", "base64-jws"])
 def test_what_is_not_a_pairing(tmp_path, name, body):
     result = _scan(tmp_path, name, body)
     assert "Pairing" not in result["detected_algorithms"]

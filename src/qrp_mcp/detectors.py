@@ -266,6 +266,23 @@ _CREATE_ECDH = re.compile(r"\bcreateECDH\(\s*[\"'`]$")
 PRE_STANDARD_DILITHIUM = ("round-3 CRYSTALS-Dilithium by a Bouncy Castle class or package "
                           "(crystals.dilithium), not FIPS 204 ML-DSA")
 PRE_STANDARD_SPHINCS = "round-3 SPHINCS+ by a liboqs or Bouncy Castle name, not FIPS 205 SLH-DSA"
+# Found on the corpus (25.11.2026): `...KzgHVZhepA==` in a certificate bundle and a JWS in a test
+# fixture read as KZG. A match inside a run of base64 (or base64url) characters of 20 or more, with a digit and
+# both cases in it, is no name.
+_BASE64_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=-_")
+
+
+def _in_base64_run(text: str, m: "re.Match") -> bool:
+    a, b = m.start(), m.end()
+    while a > 0 and text[a - 1] in _BASE64_CHARS:
+        a -= 1
+    while b < len(text) and text[b] in _BASE64_CHARS:
+        b += 1
+    run = text[a:b]
+    return (len(run) >= 20 and any(c.isdigit() for c in run)
+            and any(c.isupper() for c in run) and any(c.islower() for c in run))
+
+
 # Rows 562, 563: the pairing curve a Pairing rule's name gives.
 PAIRING_BN254 = "Pairing: the pairing-friendly curve BN254 (alt_bn128)"
 PAIRING_EIP4844_KZG = "Pairing: KZG commitments of EIP-4844 (c-kzg-4844, over BLS12-381)"
@@ -4325,6 +4342,9 @@ def scan_source_file(path: Path, rel_path: str,
                 # "dilithium" and "sphincs", are not a second, standard key.
                 matches = [m for m in matches
                            if not any(s <= m.start() < e for s, e in experimental)]
+            if algorithm == "Pairing":
+                # `Kzg` inside a base64 run (a JWS in a fixture, a certificate bundle): not a name.
+                matches = [m for m in matches if not _in_base64_run(searched, m)]
             if not matches:
                 continue
             if cipher_exclusions and all(_is_excluded(line, m.start()) for m in matches):
