@@ -943,6 +943,17 @@ def _trust_stores(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
             lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
+        # Row 556: an Android network security configuration's trust anchors. A raw resource
+        # (`@raw/my_ca`) is the file res/raw/my_ca.* beside the configuration's res/xml/.
+        android = suffix == "xml" and any("<network-security-config" in t for t in lines)
+        if android:
+            res = str(Path(rel).parent.parent)
+            for n, src in assets.android_trust_anchors(lines):
+                linked = sorted(f for f in read if src.startswith("@raw/")
+                                and str(Path(f).parent) == f"{res}/raw"
+                                and Path(f).stem == src[len("@raw/"):])
+                places.append(_trust_place(rel, n, "certificates src (Android network security "
+                                           "configuration)", src, read, anchors, linked))
         for n, line in enumerate(lines, 1):
             loads: list[tuple[str, str | None]] = []
             m = _TRUST_PYTHON.search(line) if suffix == "py" else None
@@ -953,7 +964,9 @@ def _trust_stores(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                 found = [f.group(1) for f in map(_GO_READ_FILE.search, lines[max(0, n - 11):n])
                          if f]
                 loads.append((m.group(1), found[-1] if found else None))
-            if suffix not in ("py", "go"):
+            if android and "<certificates" in line:
+                pass  # read below, from the whole file (row 556)
+            elif suffix not in ("py", "go"):
                 # Row 558: each nginx statement of the line.
                 for m in filter(None, map(_TRUST_NGINX.match, assets.nginx_statements(line)
                                           if "_certificate" in line else [line.split("#", 1)[0]])):
@@ -966,9 +979,11 @@ def _trust_stores(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
 
 
 def _trust_place(rel: str, n: int, setting: str, named: str | None, read: set[str],
-                 anchors: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
-    linked = sorted({c for c in (named, str(Path(rel).parent / named))
-                     if named and not named.startswith("/") and c in read}) if named else []
+                 anchors: dict[str, list[dict[str, Any]]],
+                 linked: list[str] | None = None) -> dict[str, Any]:
+    if linked is None:
+        linked = sorted({c for c in (named, str(Path(rel).parent / named))
+                         if named and not named.startswith("/") and c in read}) if named else []
     return {
         "path": rel, "line": n, "in_test_code": detectors.in_test_code(rel),
         "setting": setting, "file": named,

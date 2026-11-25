@@ -1519,6 +1519,58 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     return out
 
 
+# -- An Android app's network security configuration (row 556) ---------------------------
+#
+# `res/xml/network_security_config.xml` with `<pin-set><pin digest="SHA-256">` was an unread
+# `.xml`. The file is the app's choice of name (the manifest's `android:networkSecurityConfig`), so
+# it is known by its root element (developer.android.com/privacy-and-security/security-config, read
+# 25.11.2026): `<pin-set expiration=...>` with `<pin digest="SHA-256">`, "a set of certificates by
+# hash of the public key (SubjectPublicKeyInfo of the X.509 certificate)", "Currently, only
+# "SHA-256" is supported"; and `<trust-anchors><certificates src="system" | "user" | raw
+# resource>`. A pin is a hash of a key, so it names no family: the key is not in this file.
+ANDROID_NSC_MARKER = b"<network-security-config"
+_XML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+_NSC_PIN_SET = re.compile(r"<pin-set\b([^>]*)>(.*?)</pin-set\s*>", re.S)
+_NSC_PIN = re.compile(r"<pin\b[^>]*?\bdigest\s*=\s*[\"']([^\"']+)[\"']")
+_NSC_EXPIRATION = re.compile(r"\bexpiration\s*=\s*[\"']([^\"']+)[\"']")
+NSC_CERTIFICATES = re.compile(r"<certificates\b[^>]*?\bsrc\s*=\s*[\"']([^\"']+)[\"']")
+
+
+def _without_xml_comments(lines: list[str]) -> str:
+    return _XML_COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), "\n".join(lines))
+
+
+def android_pins(lines: list[str]) -> list[dict[str, Any]]:
+    """A protocols row for each <pin-set> of a network security configuration."""
+    text = _without_xml_comments(lines)
+    out: list[dict[str, Any]] = []
+    for m in _NSC_PIN_SET.finditer(text):
+        line = text.count("\n", 0, m.start()) + 1
+        digests = _NSC_PIN.findall(m.group(2))
+        expiration = _NSC_EXPIRATION.search(m.group(1))
+        digest = ", ".join(sorted(set(digests))) or None
+        out.append({
+            "line": line, "protocol": "tls", "version": None, "basis": "configured_pin",
+            "pinning": "public key", "pins": len(digests), "pin_digest": digest,
+            **({"pin_expiration": expiration.group(1)} if expiration else {}),
+            "deprecated": False, "excerpt": lines[line - 1].strip()[:200],
+            "description": (
+                f"TLS here accepts only a chain that holds one of {len(digests)} public key(s) "
+                f"pinned by their {digest or 'unnamed'} digest (Android network security "
+                f"configuration, <pin-set>). The pinned keys and their algorithm are not in this "
+                f"file; a key replaced, by a post-quantum one too, needs these pins replaced "
+                f"with it." + (f" After {expiration.group(1)} the pins are not checked."
+                               if expiration else ""))})
+    return out
+
+
+def android_trust_anchors(lines: list[str]) -> list[tuple[int, str]]:
+    """(line, src) for each <certificates src> of a network security configuration."""
+    text = _without_xml_comments(lines)
+    return [(text.count("\n", 0, m.start()) + 1, m.group(1))
+            for m in NSC_CERTIFICATES.finditer(text)]
+
+
 def _tls_version_name(match: re.Match) -> str:
     minor = next((g for g in match.groups() if g), None)
     text = match.group(0)

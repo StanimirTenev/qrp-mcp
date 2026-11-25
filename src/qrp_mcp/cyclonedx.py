@@ -274,6 +274,8 @@ _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versio
                     "post_quantum", "default_applied", "product", "fragmentation",
                     "fragmentation_default", "udp_setting", "udp_size", "included_by",
                     "listener", "library_defaults", "peer_verification",
+                    # Row 556: an Android <pin-set>.
+                    "pinning", "pins", "pin_digest", "pin_expiration",
                     "verification_setting", "dnssec_algorithm", "dnssec_mnemonic",
                     "recipient_family", "hndl", "key_exchange", "policy_known",
                     # switches.py (batch 0.42.0).
@@ -288,6 +290,8 @@ _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 def _protocol_label(asset: dict[str, Any]) -> str:
     if asset.get("listener"):
         return f"TLS listener ({asset['listener']})"
+    if asset.get("basis") == "configured_pin":
+        return f"TLS public-key pin ({asset.get('pin_digest') or 'digest not named'})"
     if asset.get("peer_verification"):
         # "off" for every row but nginx's ssl_verify_client on / optional (stage 3b).
         return f"TLS peer verification {asset['peer_verification']} ({asset['verification_setting']})"

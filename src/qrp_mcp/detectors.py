@@ -27,6 +27,7 @@ from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirec
 from . import grammar
 from .classifier import _PQC_SCHEMES
 from .assets import is_lockfile
+from .assets import ANDROID_NSC_MARKER, android_pins
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
 from .assets import _DEPRECATED_TLS, _TLS_VERSION, _tls_version_name, GROUP_CONSTANT
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
@@ -7318,7 +7319,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     sniffed = None
     if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
         sniffed = _read_file(real, repo_path)
-        claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
+        # Row 556: an Android network security configuration too, by its root element.
+        claimed = sniffed is not None and (opcua.SNIFF_MARKER in sniffed[0] or (
+            path.suffix.lower() == ".xml" and ANDROID_NSC_MARKER in sniffed[0]))
     # BIND's `db.<zone>`, `dsset-<zone>.` and a `<zone>.db` that starts like a zone file
     # (row 340); any other `.db` (SQLite) stays the declared boundary.
     if not claimed and (dnssec.ZONE_FILE_NAME.match(path.name)
@@ -7675,6 +7678,10 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                  "key_algorithm": row["algorithm"],
                  **({"key_size": row["key_size"]} if "key_size" in row else {})}
                 for row in private_rows)
+        if path.suffix.lower() == ".xml" and ANDROID_NSC_MARKER in raw:
+            for asset in android_pins(lines):  # row 556
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
         if path.suffix.lower() == ".mqsc":
             for asset in mqsc.scan(lines):
                 asset["path"] = rel_path

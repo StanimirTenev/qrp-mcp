@@ -32,7 +32,7 @@ from . import assets, confidence, detectors, operations
 # (qrp-kachestvo/obratna-proba/operacii/labels.tsv; the residual cells multi/none/other left out).
 # An ecosystem is `closed` when the catalogue holds every one of them: a statement about the gaps
 # known so far, not about every way the ecosystem can name an algorithm. `vrf` of Go and Rust:
-# row 535 (19.11.2026). keysize of CI: row 557 (25.11.2026).
+# row 535 (19.11.2026). keysize of CI: row 557, tlsend of Java (Android): row 556 (25.11.2026).
 KNOWN_OPERATIONS: dict[str, tuple[str, ...]] = {
     "C": ("apiname", "ciphers", "external", "keyfile", "keysize", "pqc", "protover", "sign",
           "tlsgroups", "usectx"),
@@ -43,7 +43,7 @@ KNOWN_OPERATIONS: dict[str, tuple[str, ...]] = {
     "IaC": ("ciphers", "encrypt", "external", "keyfile", "keysize", "pqc", "sign"),
     "JS": ("apiname", "encrypt", "keysize", "protover", "usectx"),
     "Java": ("apiname", "ciphers", "encrypt", "external", "keyfile", "keysize", "pqc", "protover",
-             "symhash"),
+             "symhash", "tlsend"),
     "NET": ("apiname", "ciphers", "external", "keyfile", "keysize", "protover", "sign", "symhash",
             "tlsgroups", "usectx"),
     "PHP": ("apiname", "encrypt", "keysize", "protover"),
