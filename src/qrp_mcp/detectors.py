@@ -4684,6 +4684,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = libcalls.calls(findings, lines, rel_path, ext, in_test_code)
     if ext == ".sol":
         findings = _evm_precompiles(findings, lines, rel_path)
+        findings = _solidity_signatures(findings, lines, rel_path)
     _android_keystore_spec(findings, lines)
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
@@ -4907,6 +4908,58 @@ _ADDRESS = r"(0x[0-9A-Fa-f]{1,40}|\d{1,3})"
 _PRECOMPILE_CALL = re.compile(
     r"\bstaticcall\(\s*(?:\w+\((?:[^()]|\([^()]*\))*\)|\w+)\s*,\s*" + _ADDRESS + r"\s*,"
     r"|\baddress\(\s*" + _ADDRESS + r"\s*\)\s*\.\s*staticcall\b")
+
+
+# Rows 564-566: OpenZeppelin's signature libraries in Solidity (contracts/utils/cryptography/*.sol).
+# P256 ("secp256r1 (P-256)"), WebAuthn and the P-256 signers are ECDSA over P-256; RSA.pkcs1Sha256 and
+# the RSA signers are RSA; ECDSA and SignatureChecker are the EVM's ECDSA, secp256k1 only (ecrecover).
+# The using-for spelling `h.recover(sig)` only in a file that says `using ECDSA for`.
+_SOL_SIGNATURES = (
+    (re.compile(r"\b(?:P256\.(?:verify|verifyNative|verifySolidity|recovery|isValidPublicKey)|"
+                r"WebAuthn\.(?:verify|tryDecodeAuth)|ERC7913P256Verifier|SignerP256|SignerWebAuthn)\b"),
+     "ECDSA", "P-256", "OpenZeppelin's P256 / WebAuthn (secp256r1)"),
+    (re.compile(r"\b(?:RSA\.pkcs1Sha256|SignerRSA|ERC7913RSAVerifier)\b"),
+     "RSA", None, "OpenZeppelin's RSA (PKCS#1 v1.5)"),
+    (re.compile(r"\b(?:ECDSA\.(?:recover|tryRecover|recoverCalldata|tryRecoverCalldata)|"
+                r"SignatureChecker\.(?:isValidSignatureNow|isValidSignatureNowCalldata|"
+                r"isValidERC1271SignatureNow|areValidSignaturesNow)|SignerECDSA)\b"),
+     "ECDSA", "secp256k1", "OpenZeppelin's ECDSA / SignatureChecker (secp256k1)"),
+)
+_SOL_USING_ECDSA = re.compile(r"\busing\s+ECDSA\s+for\b")
+_SOL_RECOVER_METHOD = re.compile(r"\.\s*(?:recover|tryRecover|recoverCalldata|tryRecoverCalldata)\s*\(")
+
+
+def _solidity_signatures(findings: list[dict[str, Any]], lines: list[str],
+                         rel_path: str) -> list[dict[str, Any]]:
+    using = bool(_SOL_USING_ECDSA.search("\n".join(lines)))
+    rules = _SOL_SIGNATURES + (((_SOL_RECOVER_METHOD, "ECDSA", "secp256k1",
+                                 "OpenZeppelin's ECDSA through `using ECDSA for` (secp256k1)"),)
+                               if using else ())
+    added = []
+    inside = False
+    for n, line in enumerate(lines, 1):
+        spans, inside = _comment_spans(line, ".sol", inside)
+        code = _code_only(line, spans)
+        if code.lstrip().startswith("import "):
+            continue
+        for pattern, family, curve, said in rules:
+            if not pattern.search(code):
+                continue
+            held = next((f for f in findings + added if f["line"] == n and f["algorithm"] == family), None)
+            if held is not None:
+                if held.get("evidence_kind") not in ("ban",):
+                    held["evidence_kind"] = "call"
+                    held.pop("not_a_use_rule", None)
+                if curve:
+                    held["curve"] = curve
+                continue
+            item = {"path": rel_path, "line": n, "algorithm": family,
+                    "description": f"{family} usage ({said})", "excerpt": line.strip()[:200],
+                    "evidence_kind": "call", "in_test_code": in_test_code(rel_path)}
+            if curve:
+                item["curve"] = curve
+            added.append(item)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
 def _evm_precompiles(findings: list[dict[str, Any]], lines: list[str],
