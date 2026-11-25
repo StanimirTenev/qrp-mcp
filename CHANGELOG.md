@@ -48,8 +48,14 @@ crypto-asset libraries, Vyper, and two false signals removed.
   Rust and CI; pqc in Go, Python and Rust; sign in Go. Each quote is cut from the saved page and
   checked verbatim, 82 of 82. `KNOWN_OPERATIONS` gains Go's apiname, pqc and sign and Rust's pqc.
   Go stays `closed`. JS and Rust move to `partially_closed`.
-- **Corpus regression** against 0.53.0: no growth in A' or B' in either split (disagreement with a
-  model, not recall or precision; the labeller has no Pairing family).
+- **Corpus regression** against 0.53.0. This is disagreement with a model, not recall or precision.
+  A' is unchanged in both splits, and so is B' in `merene`. B' in `obuchenie` rises by 10 ECDSA
+  chunks. All ten are in bitcoinjs-lib's tests: `psbt.signInput`, `signAllInputsHD`,
+  `validateSignaturesOfInput`, `bip32.fromSeed` and `keyPair.sign`. These are the documented calls
+  row 572 asked for, and the labeller saw no algorithm named in those chunks. Four chunks are in
+  `taproot.spec.ts`, where a Psbt signature on a Taproot input is Schnorr: the scan calls every
+  Psbt signing call ECDSA over secp256k1 and does not tell the input type. The labeller has no
+  Pairing family. The gate exits 1 on this rise; it was not loosened.
 - **Not claimed / not done.**
   - Solidity, Vyper and circom have no ecosystem in the catalogue; their spellings are tested
     apart.
@@ -59,6 +65,7 @@ crypto-asset libraries, Vyper, and two false signals removed.
     - the GG20 command-line binaries;
     - `tss.NewParameters(tss.S256(), ...)`;
     - the parameter set from slh-dsa's type.
+  - bitcoinjs' Psbt signing calls are ECDSA even for a Taproot input, which is Schnorr.
   - Error-message words such as "Not Taproot." are still read as Schnorr (row 589). It is the class
     row 113 left for the owner's decision.
   - A spelling is closed only as far as the saved pages name it. viem's generatePrivateKey,
