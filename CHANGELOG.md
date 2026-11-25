@@ -56,6 +56,11 @@ crypto-asset libraries, Vyper, and two false signals removed.
   `taproot.spec.ts`, where a Psbt signature on a Taproot input is Schnorr: the scan calls every
   Psbt signing call ECDSA over secp256k1 and does not tell the input type. The labeller has no
   Pairing family. The gate exits 1 on this rise; it was not loosened.
+  The new families are outside the labeller's set, so the cached scans of both versions were also
+  compared repository by repository. In 180 of 185 nothing changed, and in all 185
+  `pqc_readiness` and `readiness_by_role` are the same. The first comparison found `Kzg` inside
+  base64 in three repositories that are not chain projects (a JWS, a JWE, a certificate bundle);
+  that was fixed before this note.
 - **Not claimed / not done.**
   - Solidity, Vyper and circom have no ecosystem in the catalogue; their spellings are tested
     apart.
