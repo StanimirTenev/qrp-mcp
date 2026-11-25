@@ -170,6 +170,40 @@ settings as recorded. It reads only tables the toolchain wrote (`*.deps.json`, .
 names, `go version -m`, `go tool nm`), never code, and never a key size from the build —
 **robustness on known patterns**, not recall or coverage of the build. [Source against build](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/build-gap.md).
 
+### In GitHub code scanning
+
+From 0.54.0 the repository is also a GitHub Action. It runs
+`uvx --from qrp-mcp==<this release> qrp-mcp scan PATH --format sarif --out FILE --level LEVEL` on
+the runner, and `upload-sarif` puts the results in the Security tab:
+
+```yaml
+name: qrp-mcp
+on: [push, pull_request]
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: StanimirTenev/qrp-mcp@v0.53.0
+        id: qrp
+        with:
+          path: "."               # default; SARIF locations are relative to it
+          level: masked           # default; full or trimmed
+          output: qrp-mcp.sarif   # default
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.qrp.outputs.sarif }}
+          category: qrp-mcp
+```
+
+The inputs are only those `scan` already has; there is no "fail on" switch, and the step exits 0
+on findings. Every file not read is in the SARIF as a tool execution notification with its
+reason. Locations are relative to `path`, and code scanning reads them from the repository
+root, so keep `path` at `.` when uploading.
+
 ## How it adapts
 
 **An adaptive post-quantum readiness scanner.** It closes operations against a catalogue of their

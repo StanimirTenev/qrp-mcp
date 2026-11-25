@@ -4,6 +4,24 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## Unreleased
+
+### Extras (branch popravki-054-c)
+
+No detection change: findings and their fingerprint do not move.
+
+- **A GitHub Action** (`action.yml` at the root, composite). It installs uv, runs
+  `uvx --from qrp-mcp==X.Y.Z qrp-mcp scan PATH --format sarif --out FILE --level LEVEL`, and gives
+  the file as the output `sarif` for `github/codeql-action/upload-sarif` (example in the README).
+  Inputs `path`, `output` and `level` only, because those are what `scan` has; there is no
+  "fail on" input and the step exits 0 on findings. Inputs reach the command through `env`, not
+  through `${{ }}` in the script. `tests/test_github_action.py` holds the command to the real CLI:
+  each flag must be in `qrp-mcp scan --help`, the default level one of its choices, the same
+  arguments must write SARIF 2.1.0, and the pin and the README's `uses:` must be this release
+  (one more place to bump). Not claimed: it has not been run on GitHub yet. SARIF locations are
+  relative to `path`, so a `path` other than `.` misplaces them in code scanning; the README
+  says so.
+
 ## 0.53.0 (2026-11-24)
 
 Detection changes: findings and their fingerprint move. Ten more (operation, ecosystem) pairs are
