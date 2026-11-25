@@ -1,0 +1,61 @@
+# Operation `sign`, ecosystem Go (qrp-mcp 0.54.0, 25.11.2026): CometBFT's ed25519 keys sign and
+# verify (`pv.Sign(msg)`, `pv.PubKey().VerifySignature(msg, sig)`), ZA-OPRAVYANE row 586. Kept in a
+# file of its own (sign/NET and sign/CI are written elsewhere). Written by qrp-kachestvo/
+# roy-2026-11-25-kripto/katalog/gen_apiname_chains.py; quotes checked verbatim on the saved page.
+
+operation = "sign"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Go"
+scope = "CometBFT crypto/ed25519: Sign and VerifySignature on a key from GenPrivKey."
+
+[[ecosystems.spellings]]
+id = "cometbft-ed25519-sign"
+spelling = "Sign(msg []byte)"
+source = "https://pkg.go.dev/github.com/cometbft/cometbft/crypto/ed25519"
+quote = "func (privKey PrivKey) Sign(msg []byte) ([]byte, error)"
+file = "comet.go"
+snippet = '''
+package main
+
+import "github.com/cometbft/cometbft/crypto/ed25519"
+
+func run(msg []byte) {
+	pv := ed25519.GenPrivKey()
+	sig, _ := pv.Sign(msg)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "comet_v.go"
+snippet = '''
+package main
+
+import "github.com/cometbft/cometbft/crypto/ed25519"
+
+func run(msg []byte) {
+	validatorKey := ed25519.GenPrivKey()
+	sig, _ := validatorKey.Sign(msg)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "cometbft-ed25519-verify"
+spelling = "VerifySignature(msg []byte"
+source = "https://pkg.go.dev/github.com/cometbft/cometbft/crypto/ed25519"
+quote = "func (pubKey PubKey) VerifySignature(msg []byte, sig []byte) bool"
+file = "comet.go"
+snippet = '''
+package main
+
+import "github.com/cometbft/cometbft/crypto/ed25519"
+
+func run(msg []byte) {
+	pv := ed25519.GenPrivKey()
+	ok := pv.PubKey().VerifySignature(msg, sig)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519"}}]}

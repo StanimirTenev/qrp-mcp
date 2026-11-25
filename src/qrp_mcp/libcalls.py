@@ -131,6 +131,9 @@ def _imports(lib: Lib, text: str) -> tuple[set[str], dict[str, str], list[int]]:
             default = re.match(r"\s*(?:type\s+)?([A-Za-z_$][\w$]*)\s*(?:,|$)", clause)
             if default and default.group(1) != "type":
                 aliases.add(default.group(1))
+                # A default export may be the library's class or function (`import BIP32Factory
+                # from 'bip32'`).
+                named.setdefault(default.group(1), default.group(1))
             at(m)
     elif lib.lang == "go":
         for path in lib.modules:

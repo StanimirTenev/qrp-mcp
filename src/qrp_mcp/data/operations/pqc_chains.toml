@@ -1,0 +1,163 @@
+# Operation `pqc`, ecosystems Go, Py and Rust (qrp-mcp 0.54.0, 25.11.2026): post-quantum signature
+# libraries of the chains -- Algorand's Falcon (Go), pyspx (Py, round-3 SPHINCS+ by its README),
+# RustCrypto slh-dsa and leanSig's generalized XMSS (Rust, a research scheme, not RFC 8391 XMSS).
+# ZA-OPRAVYANE rows 576-579. Written by qrp-kachestvo/roy-2026-11-25-kripto/katalog/
+# gen_apiname_chains.py from the saved pages (docs/), every quote checked verbatim.
+
+operation = "pqc"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Go"
+scope = "github.com/algorand/falcon (GenerateKey; SignCompressed and Verify on its keys). Not covered: go-algorand's own Falcon types, other Go PQC libraries."
+
+[[ecosystems.spellings]]
+id = "algorand-falcon-generatekey"
+spelling = "func GenerateKey"
+source = "https://raw.githubusercontent.com/algorand/falcon/main/falcon.go"
+quote = "func GenerateKey(seed []byte) (PublicKey, PrivateKey, error) {"
+file = "falcon.go"
+snippet = '''
+package main
+
+import "github.com/algorand/falcon"
+
+func run(seed, msg []byte) error {
+	pub, priv, _ := falcon.GenerateKey(seed)
+	return nil
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "Falcon"}}]}
+
+[[ecosystems.spellings]]
+id = "algorand-falcon-signcompressed"
+spelling = ") SignCompressed("
+source = "https://raw.githubusercontent.com/algorand/falcon/main/falcon.go"
+quote = "func (sk *PrivateKey) SignCompressed(msg []byte) (CompressedSignature, error) {"
+file = "falcon.go"
+snippet = '''
+package main
+
+import "github.com/algorand/falcon"
+
+func run(seed, msg []byte) error {
+	pub, priv, _ := falcon.GenerateKey(seed)
+	sig, _ := priv.SignCompressed(msg)
+	return nil
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Falcon"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "falcon_v.go"
+snippet = '''
+package main
+
+import "github.com/algorand/falcon"
+
+func run(seed, msg []byte) error {
+	pk, sk, _ := falcon.GenerateKey(seed)
+	sig, _ := sk.SignCompressed(msg)
+	return nil
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Falcon"}}]}
+
+[[ecosystems.spellings]]
+id = "algorand-falcon-verify"
+spelling = ") Verify("
+source = "https://raw.githubusercontent.com/algorand/falcon/main/falcon.go"
+quote = "func (pk *PublicKey) Verify(signature CompressedSignature, msg []byte) error {"
+file = "falcon.go"
+snippet = '''
+package main
+
+import "github.com/algorand/falcon"
+
+func run(seed, msg []byte) error {
+	pub, priv, _ := falcon.GenerateKey(seed)
+	_ = pub.Verify(sig, msg)
+	return nil
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Falcon"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "falcon_v.go"
+snippet = '''
+package main
+
+import "github.com/algorand/falcon"
+
+func run(seed, msg []byte) error {
+	pk, sk, _ := falcon.GenerateKey(seed)
+	_ = pk.Verify(sig, msg)
+	return nil
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Falcon"}}]}
+
+[[ecosystems]]
+ecosystem = "Py"
+scope = "pyspx (round-3 SPHINCS+, by its README's words)."
+
+[[ecosystems.spellings]]
+id = "pyspx-generate-keypair"
+spelling = "pyspx.shake_128f.generate_keypair(seed)"
+source = "https://raw.githubusercontent.com/sphincs/pyspx/master/README.md"
+quote = ">>> public_key, secret_key = pyspx.shake_128f.generate_keypair(seed)"
+file = "s.py"
+snippet = '''
+import pyspx.shake_128f
+pk, sk = pyspx.shake_128f.generate_keypair(seed)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "SPHINCS+ round 3"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "s2.py"
+snippet = '''
+import pyspx.shake_128f as sphincs
+pk, sk = sphincs.generate_keypair(seed)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "SPHINCS+ round 3"}}]}
+
+[[ecosystems.spellings]]
+id = "pyspx-sign"
+spelling = "pyspx.shake_128f.sign(message, secret_key)"
+source = "https://raw.githubusercontent.com/sphincs/pyspx/master/README.md"
+quote = ">>> signature = pyspx.shake_128f.sign(message, secret_key)"
+file = "s.py"
+snippet = '''
+import pyspx.shake_128f
+sig = pyspx.shake_128f.sign(message, secret_key)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "SPHINCS+ round 3"}}]}
+
+[[ecosystems]]
+ecosystem = "Rust"
+scope = "RustCrypto slh-dsa (SigningKey) and leanSig's generalized_xmss. Not covered: the parameter set from the type."
+
+[[ecosystems.spellings]]
+id = "slh-dsa-signingkey"
+spelling = "SigningKey"
+source = "https://docs.rs/slh-dsa/latest/slh_dsa/"
+quote = "let sk = SigningKey::<Shake128f>::new( &mut rng);"
+file = "s.rs"
+snippet = '''
+use slh_dsa::*;
+fn main() {
+    let sk = SigningKey::<Shake128f>::new(&mut rng);
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "SLH-DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "leansig-generalized-xmss"
+spelling = "leansig::signature::generalized_xmss"
+source = "https://raw.githubusercontent.com/leanEthereum/leanSig/main/README.md"
+quote = "of this generic framework (using Poseidon1) are defined in `leansig::signature::generalized_xmss`."
+file = "l.rs"
+snippet = '''
+use leansig::signature::generalized_xmss::instantiations_poseidon::lifetime_2_to_the_18::winternitz::SIGWinternitzLifetime18W4;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Generalized XMSS"}}]}

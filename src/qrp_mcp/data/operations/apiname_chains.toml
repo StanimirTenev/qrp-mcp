@@ -1,0 +1,1366 @@
+# Operation `apiname`, ecosystems Go, JS, Py, Rust and CI (qrp-mcp 0.54.0, 25.11.2026): the calls of
+# crypto-asset libraries -- wallets (go-ethereum, ethers, viem, eth_account, eth_keys, alloy, ethers-rs,
+# tiny-secp256k1, bip32, rust-secp256k1, python-bitcoinlib, Solana, cosmjs, tss-lib), BLS (blst,
+# py_ecc), pairing-based proofs and commitments (gnark, snarkjs, arkworks, c-kzg, noble bn254) --
+# ZA-OPRAVYANE rows 561-593 (post-quantum ones in pqc_chains.toml, CometBFT signing in sign_chains.toml). Bounded: only
+# these libraries, and in each only the names on the saved page in `source` (fetched 25.11.2026,
+# qrp-kachestvo/roy-2026-11-25-kripto/docs). Written by roy-2026-11-25-kripto/katalog/
+# gen_apiname_chains.py, which cuts every quote from the saved page and checks it is there verbatim.
+# `expect`: the family on the line, read as a call (or the import/name it is), in a file that imports
+# the library. Solidity and Vyper are not here: the catalogue has no ecosystem for them (tests in
+# tests/test_rows_564_566_solidity.py, test_rows_562_563_pairing.py, test_row_567_vyper.py).
+
+operation = "apiname"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Go"
+scope = "go-ethereum/crypto, gnark groth16 and gnark-crypto ecc.BN254, bnb-chain tss-lib ecdsa/keygen, blst's Go binding, herumi bls-eth-go-binary (Falcon is in pqc/Go, CometBFT signing in sign/Go). Not covered: other Go chain libraries, a call through a variable the package is not imported under."
+
+[[ecosystems.spellings]]
+id = "geth-generatekey"
+spelling = "func GenerateKey"
+source = "https://pkg.go.dev/github.com/ethereum/go-ethereum/crypto"
+quote = "func GenerateKey() (*ecdsa.PrivateKey, error)"
+file = "geth.go"
+snippet = '''
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	key, _ := crypto.GenerateKey()
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "geth_alias.go"
+snippet = '''
+package main
+
+import (
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	key, _ := ethcrypto.GenerateKey()
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "geth-sign"
+spelling = "func Sign"
+source = "https://pkg.go.dev/github.com/ethereum/go-ethereum/crypto"
+quote = "func Sign(digestHash []byte, prv *ecdsa.PrivateKey) (sig []byte, err"
+file = "geth.go"
+snippet = '''
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	sig, _ := crypto.Sign(hash, key)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "geth_alias.go"
+snippet = '''
+package main
+
+import (
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	sig, _ := ethcrypto.Sign(hash, key)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "geth-sigtopub"
+spelling = "func SigToPub"
+source = "https://pkg.go.dev/github.com/ethereum/go-ethereum/crypto"
+quote = "func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error)"
+file = "geth.go"
+snippet = '''
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	pub, _ := crypto.SigToPub(hash, sig)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "geth_alias.go"
+snippet = '''
+package main
+
+import (
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	pub, _ := ethcrypto.SigToPub(hash, sig)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "geth-ecrecover"
+spelling = "func Ecrecover"
+source = "https://pkg.go.dev/github.com/ethereum/go-ethereum/crypto"
+quote = "func Ecrecover(hash, sig []byte) ([]byte, error)"
+file = "geth.go"
+snippet = '''
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	pub, _ := crypto.Ecrecover(hash, sig)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "geth_alias.go"
+snippet = '''
+package main
+
+import (
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	pub, _ := ethcrypto.Ecrecover(hash, sig)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "geth-verifysignature"
+spelling = "func VerifySignature"
+source = "https://pkg.go.dev/github.com/ethereum/go-ethereum/crypto"
+quote = "func VerifySignature(pubkey, digestHash, signature []byte) bool"
+file = "geth.go"
+snippet = '''
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	ok := crypto.VerifySignature(pub, hash, sig[:64])
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "geth_alias.go"
+snippet = '''
+package main
+
+import (
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	ok := ethcrypto.VerifySignature(pub, hash, sig[:64])
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "geth-hextoecdsa"
+spelling = "func HexToECDSA"
+source = "https://pkg.go.dev/github.com/ethereum/go-ethereum/crypto"
+quote = "func HexToECDSA(hexkey string) (*ecdsa.PrivateKey, error)"
+file = "geth.go"
+snippet = '''
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	k, _ := crypto.HexToECDSA(hexKey)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "geth_alias.go"
+snippet = '''
+package main
+
+import (
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	k, _ := ethcrypto.HexToECDSA(hexKey)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "geth-loadecdsa"
+spelling = "func LoadECDSA"
+source = "https://pkg.go.dev/github.com/ethereum/go-ethereum/crypto"
+quote = "func LoadECDSA(file string) (*ecdsa.PrivateKey, error)"
+file = "geth.go"
+snippet = '''
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	k, _ := crypto.LoadECDSA("node.key")
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "geth_alias.go"
+snippet = '''
+package main
+
+import (
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	k, _ := ethcrypto.LoadECDSA("node.key")
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "geth-pubkeytoaddress"
+spelling = "func PubkeyToAddress"
+source = "https://pkg.go.dev/github.com/ethereum/go-ethereum/crypto"
+quote = "func PubkeyToAddress(p ecdsa.PublicKey) common.Address"
+file = "geth.go"
+snippet = '''
+package main
+
+import (
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "geth_alias.go"
+snippet = '''
+package main
+
+import (
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+func run(hash []byte) {
+	addr := ethcrypto.PubkeyToAddress(key.PublicKey)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gnark-groth16-setup"
+spelling = "groth16.Setup("
+source = "https://raw.githubusercontent.com/Consensys/gnark/master/README.md"
+quote = "pk, vk, _ := groth16.Setup(ccs)"
+file = "gnark.go"
+snippet = '''
+package main
+
+import (
+	"github.com/consensys/gnark/backend/groth16"
+)
+
+func run() {
+	pk, vk, _ := groth16.Setup(ccs)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "gnark-groth16-prove"
+spelling = "groth16.Prove("
+source = "https://raw.githubusercontent.com/Consensys/gnark/master/README.md"
+quote = "proof, _ := groth16.Prove(ccs, pk, witness)"
+file = "gnark.go"
+snippet = '''
+package main
+
+import (
+	"github.com/consensys/gnark/backend/groth16"
+)
+
+func run() {
+	proof, _ := groth16.Prove(ccs, pk, witness)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "gnark-groth16-verify"
+spelling = "groth16.Verify("
+source = "https://raw.githubusercontent.com/Consensys/gnark/master/README.md"
+quote = "_ = groth16.Verify(proof, vk, publicWitness)"
+file = "gnark.go"
+snippet = '''
+package main
+
+import (
+	"github.com/consensys/gnark/backend/groth16"
+)
+
+func run() {
+	_ = groth16.Verify(proof, vk, publicWitness)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "gnark-bn254"
+spelling = "ecc.BN254.ScalarField()"
+source = "https://raw.githubusercontent.com/Consensys/gnark/master/README.md"
+quote = "ccs, _ := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)"
+file = "gnark.go"
+snippet = '''
+package main
+
+import "github.com/consensys/gnark-crypto/ecc"
+
+func run() {
+	ccs, _ := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "tss-lib-keygen-party"
+spelling = "keygen.NewLocalParty"
+source = "https://raw.githubusercontent.com/bnb-chain/tss-lib/master/README.md"
+quote = "party := keygen.NewLocalParty(params, outCh, endCh, preParams) // Omit the last arg to co"
+file = "tss.go"
+snippet = '''
+package main
+
+import (
+	"github.com/bnb-chain/tss-lib/v2/ecdsa/keygen"
+)
+
+func run() {
+	party := keygen.NewLocalParty(params, outCh, endCh, preParams)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "tss-lib-preparams"
+spelling = "keygen.GeneratePreParams"
+source = "https://raw.githubusercontent.com/bnb-chain/tss-lib/master/README.md"
+quote = "preParams, _ := keygen.GeneratePreParams(1 * time.Minute)"
+file = "tss.go"
+snippet = '''
+package main
+
+import (
+	"github.com/bnb-chain/tss-lib/v2/ecdsa/keygen"
+)
+
+func run() {
+	preParams, _ := keygen.GeneratePreParams(1 * time.Minute)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "blst-go-keygen"
+spelling = "sk := blst.KeyGen(ikm[:])"
+source = "https://raw.githubusercontent.com/supranational/blst/master/bindings/go/README.md"
+quote = "sk := blst.KeyGen(ikm[:])"
+file = "blst.go"
+snippet = '''
+package main
+
+import blst "github.com/supranational/blst/bindings/go"
+
+type PublicKey = blst.P1Affine
+type Signature = blst.P2Affine
+
+func run(ikm, msg, dst []byte) bool {
+	sk := blst.KeyGen(ikm)
+	pk := new(PublicKey).From(sk)
+	sig := new(Signature).Sign(sk, msg, dst)
+	return sig.Verify(true, pk, true, msg, dst)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 9, algorithm = "BLS"}}]}
+
+[[ecosystems.spellings]]
+id = "blst-go-from"
+spelling = "pk := new(PublicKey).From(sk)"
+source = "https://raw.githubusercontent.com/supranational/blst/master/bindings/go/README.md"
+quote = "pk := new(PublicKey).From(sk)"
+file = "blst.go"
+snippet = '''
+package main
+
+import blst "github.com/supranational/blst/bindings/go"
+
+type PublicKey = blst.P1Affine
+type Signature = blst.P2Affine
+
+func run(ikm, msg, dst []byte) bool {
+	sk := blst.KeyGen(ikm)
+	pk := new(PublicKey).From(sk)
+	sig := new(Signature).Sign(sk, msg, dst)
+	return sig.Verify(true, pk, true, msg, dst)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 10, algorithm = "BLS"}}]}
+
+[[ecosystems.spellings]]
+id = "blst-go-sign"
+spelling = "sig := new(Signature).Sign(sk, msg, dst)"
+source = "https://raw.githubusercontent.com/supranational/blst/master/bindings/go/README.md"
+quote = "sig := new(Signature).Sign(sk, msg, dst)"
+file = "blst.go"
+snippet = '''
+package main
+
+import blst "github.com/supranational/blst/bindings/go"
+
+type PublicKey = blst.P1Affine
+type Signature = blst.P2Affine
+
+func run(ikm, msg, dst []byte) bool {
+	sk := blst.KeyGen(ikm)
+	pk := new(PublicKey).From(sk)
+	sig := new(Signature).Sign(sk, msg, dst)
+	return sig.Verify(true, pk, true, msg, dst)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 11, algorithm = "BLS"}}]}
+
+[[ecosystems.spellings]]
+id = "blst-go-verify"
+spelling = "if !sig.Verify(true, pk, true, msg, dst) {"
+source = "https://raw.githubusercontent.com/supranational/blst/master/bindings/go/README.md"
+quote = "if !sig.Verify(true, pk, true, msg, dst) {"
+file = "blst.go"
+snippet = '''
+package main
+
+import blst "github.com/supranational/blst/bindings/go"
+
+type PublicKey = blst.P1Affine
+type Signature = blst.P2Affine
+
+func run(ikm, msg, dst []byte) bool {
+	sk := blst.KeyGen(ikm)
+	pk := new(PublicKey).From(sk)
+	sig := new(Signature).Sign(sk, msg, dst)
+	return sig.Verify(true, pk, true, msg, dst)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 12, algorithm = "BLS"}}]}
+
+[[ecosystems.spellings]]
+id = "herumi-setethmode"
+spelling = "SetETHmode(EthModeDraft05)"
+source = "https://raw.githubusercontent.com/herumi/bls-eth-go-binary/master/readme.md"
+quote = "- 2020/Apr/20 `EthModeDraft06` is default. Call `SetETHmode(EthModeDraft05)` to use older evrsion."
+file = "h.go"
+snippet = '''
+package main
+
+import "github.com/herumi/bls-eth-go-binary/bls"
+
+func run() {
+	bls.SetETHmode(bls.EthModeDraft07)
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "BLS"}}]}
+
+[[ecosystems.spellings]]
+id = "herumi-signbyte"
+spelling = "SecretKey::SignByte"
+source = "https://raw.githubusercontent.com/herumi/bls-eth-go-binary/master/readme.md"
+quote = "SecretKey::SignByte|Sign|"
+file = "h.go"
+snippet = '''
+package main
+
+import "github.com/herumi/bls-eth-go-binary/bls"
+
+func run(msg []byte) {
+	var sec bls.SecretKey
+	sec.SetByCSPRNG()
+	sig := sec.SignByte(msg)
+	_ = sig
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "BLS"}}]}
+
+[[ecosystems]]
+ecosystem = "JS"
+scope = "ethers v6 (and v5 by its namespace), viem, snarkjs, c-kzg (node), tiny-secp256k1, bip32, @solana/keys, @solana/web3.js Keypair, cosmjs DirectSecp256k1HdWallet, noble-curves bn254. A method only on a value the file got from the library."
+
+[[ecosystems.spellings]]
+id = "ethers-wallet-createrandom"
+spelling = "Wallet . createRandom"
+source = "https://docs.ethers.org/v6/api/wallet/"
+quote = "which may be a non-trivial duration. STATIC METHODS   <src> Wallet . createRandom ( provider ?: null | Provider ) ⇒ HDNodeWallet Creates a ne"
+file = "w.js"
+snippet = '''
+import { Wallet, HDNodeWallet, SigningKey } from "ethers";
+const w = Wallet.createRandom();
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "w_ns.js"
+snippet = '''
+const { ethers } = require("ethers");
+const w = ethers.Wallet.createRandom();
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ethers-new-wallet"
+spelling = "new Wallet ("
+source = "https://docs.ethers.org/v6/api/wallet/"
+quote = "onics and encrypte JSON wallets. CREATING INSTANCES   <src> new Wallet ( key : string | SigningKey , provider ?: null | Provider ) C"
+file = "w.js"
+snippet = '''
+import { Wallet, HDNodeWallet, SigningKey } from "ethers";
+const w = new Wallet(process.env.PRIVATE_KEY);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "w_ns.js"
+snippet = '''
+const { ethers } = require("ethers");
+const w = new ethers.Wallet(process.env.PRIVATE_KEY);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ethers-hd-fromphrase"
+spelling = "HDNodeWallet . fromPhrase"
+source = "https://docs.ethers.org/v6/api/wallet/"
+quote = ") ⇒ HDNodeWallet Create an HD Node from mnemonic .   <src> HDNodeWallet . fromPhrase ( phrase : string , password ?: string , path ?: string , w"
+file = "w.js"
+snippet = '''
+import { Wallet, HDNodeWallet, SigningKey } from "ethers";
+const hd = HDNodeWallet.fromPhrase(phrase);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "w_ns.js"
+snippet = '''
+const { ethers } = require("ethers");
+const hd = ethers.HDNodeWallet.fromPhrase(phrase);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ethers-signmessage"
+spelling = "signMessageSync"
+source = "https://docs.ethers.org/v6/api/wallet/"
+quote = "n Returns the Authorization for auth .   <src> baseWallet . signMessageSync ( message : string | Uint8Array ) ⇒ string Returns the sign"
+file = "w.js"
+snippet = '''
+import { Wallet, HDNodeWallet, SigningKey } from "ethers";
+const w = Wallet.createRandom();
+const s = w.signMessageSync("hi");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "w_ns.js"
+snippet = '''
+const { ethers } = require("ethers");
+const w = ethers.Wallet.createRandom();
+const s = w.signMessageSync("hi");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ethers-derivepath"
+spelling = "hdNodeWallet . derivePath"
+source = "https://docs.ethers.org/v6/api/wallet/"
+quote = "meric ) ⇒ HDNodeWallet Return the child for index .   <src> hdNodeWallet . derivePath ( path : string ) ⇒ HDNodeWallet Return the HDNode for path"
+file = "w.js"
+snippet = '''
+import { Wallet, HDNodeWallet, SigningKey } from "ethers";
+const hd = HDNodeWallet.fromPhrase(p);
+const c = hd.derivePath("m/44'/60'/0'/0/1");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "w_ns.js"
+snippet = '''
+const { ethers } = require("ethers");
+const hd = ethers.HDNodeWallet.fromPhrase(p);
+const c = hd.derivePath("m/44'/60'/0'/0/1");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ethers-signingkey-sign"
+spelling = "signingKey . sign ("
+source = "https://docs.ethers.org/v6/api/crypto/"
+quote = "<src> signingKey . sign ( digest : BytesLike ) ⇒ Signature Return the signature of th"
+file = "k.js"
+snippet = '''
+import { Wallet, HDNodeWallet, SigningKey } from "ethers";
+const sk = new SigningKey(privateKey);
+const raw = sk.sign(digest);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ethers-computesharedsecret"
+spelling = "signingKey . computeSharedSecret ("
+source = "https://docs.ethers.org/v6/api/crypto/"
+quote = ") Creates a new SigningKey for privateKey . METHODS   <src> signingKey . computeSharedSecret ( other : BytesLike ) ⇒ string Returns the ECDH shared secret"
+file = "k.js"
+snippet = '''
+import { Wallet, HDNodeWallet, SigningKey } from "ethers";
+const sk = new SigningKey(privateKey);
+const s = sk.computeSharedSecret(other);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDH"}}]}
+
+[[ecosystems.spellings]]
+id = "viem-privatekeytoaccount"
+spelling = "privateKeyToAccount("
+source = "https://raw.githubusercontent.com/wevm/viem/main/site/pages/docs/accounts/local/privateKeyToAccount.md"
+quote = "const account = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf"
+file = "v.ts"
+snippet = '''
+import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
+const account = privateKeyToAccount(pk)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "viem-account-signmessage"
+spelling = "signMessage"
+source = "https://raw.githubusercontent.com/wevm/viem/main/site/pages/docs/accounts/local/signMessage.md"
+quote = "# signMessage (Local Account) [Signs a message with the Account's private"
+file = "v.ts"
+snippet = '''
+import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
+const account = privateKeyToAccount(pk)
+const s = await account.signMessage({ message: 'hi' })
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "v2.ts"
+snippet = '''
+import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
+const signer = privateKeyToAccount(pk)
+const s = await signer.signMessage({ message: 'hi' })
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "viem-verifymessage"
+spelling = "verifyMessage"
+source = "https://raw.githubusercontent.com/wevm/viem/main/site/pages/docs/utilities/verifyMessage.md"
+quote = "# verifyMessage"
+file = "v.ts"
+snippet = '''
+import { verifyMessage } from 'viem'
+const ok = await verifyMessage({ address, message, signature })
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "viem-recoveraddress"
+spelling = "recoverAddress"
+source = "https://raw.githubusercontent.com/wevm/viem/main/site/pages/docs/utilities/recoverAddress.md"
+quote = "# recoverAddress"
+file = "v.ts"
+snippet = '''
+import { recoverAddress } from 'viem'
+const who = await recoverAddress({ hash, signature })
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "snarkjs-groth16-fullprove"
+spelling = "snarkjs.groth16.fullProve"
+source = "https://raw.githubusercontent.com/iden3/snarkjs/master/README.md"
+quote = "const { proof, publicSignals } = await snarkjs.groth16.fullProve({a: 10, b: 21}, \"circuit.wasm\", \"circuit_final.zkey\");"
+file = "s.js"
+snippet = '''
+const snarkjs = require("snarkjs");
+const { proof } = await snarkjs.groth16.fullProve(input, "c.wasm", "c.zkey");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "snarkjs-groth16-verify"
+spelling = "snarkjs.groth16.verify"
+source = "https://raw.githubusercontent.com/iden3/snarkjs/master/README.md"
+quote = "const res = await snarkjs.groth16.verify(vKey, publicSignals, proof);"
+file = "s.js"
+snippet = '''
+const snarkjs = require("snarkjs");
+const ok = await snarkjs.groth16.verify(vKey, publicSignals, proof);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "ckzg-node-commitment"
+spelling = "blobToKzgCommitment"
+source = "https://raw.githubusercontent.com/ethereum/c-kzg-4844/main/bindings/node.js/README.md"
+quote = "blobToKzgCommitment,"
+file = "k.js"
+snippet = '''
+const { blobToKzgCommitment, computeBlobKzgProof, verifyBlobKzgProof } = require("c-kzg");
+const c = blobToKzgCommitment(blob);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "ckzg-node-proof"
+spelling = "computeBlobKzgProof"
+source = "https://raw.githubusercontent.com/ethereum/c-kzg-4844/main/bindings/node.js/README.md"
+quote = "computeBlobKzgProof,"
+file = "k.js"
+snippet = '''
+const { blobToKzgCommitment, computeBlobKzgProof, verifyBlobKzgProof } = require("c-kzg");
+const p = computeBlobKzgProof(blob, c);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "ckzg-node-verify"
+spelling = "verifyBlobKzgProof"
+source = "https://raw.githubusercontent.com/ethereum/c-kzg-4844/main/bindings/node.js/README.md"
+quote = "verifyBlobKzgProofBatch,"
+file = "k.js"
+snippet = '''
+const { blobToKzgCommitment, computeBlobKzgProof, verifyBlobKzgProof } = require("c-kzg");
+const ok = verifyBlobKzgProof(blob, c, p);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "tiny-secp256k1-sign"
+spelling = "### sign (h, d[, e])"
+source = "https://raw.githubusercontent.com/bitcoinjs/tiny-secp256k1/master/README.md"
+quote = "### sign (h, d[, e])"
+file = "t.js"
+snippet = '''
+const ecc = require('tiny-secp256k1');
+const s = ecc.sign(hash, privateKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "t_esm.js"
+snippet = '''
+import * as secp from 'tiny-secp256k1';
+const s = secp.sign(hash, privateKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "tiny-secp256k1-pointfromscalar"
+spelling = "pointFromScalar"
+source = "https://raw.githubusercontent.com/bitcoinjs/tiny-secp256k1/master/README.md"
+quote = "### pointFromScalar (d[, compressed])"
+file = "t.js"
+snippet = '''
+const ecc = require('tiny-secp256k1');
+const p = ecc.pointFromScalar(privateKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "t_esm.js"
+snippet = '''
+import * as secp from 'tiny-secp256k1';
+const p = secp.pointFromScalar(privateKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "tiny-secp256k1-signschnorr"
+spelling = "signSchnorr"
+source = "https://raw.githubusercontent.com/bitcoinjs/tiny-secp256k1/master/README.md"
+quote = "### signSchnorr (h, d[, e])"
+file = "t.js"
+snippet = '''
+const ecc = require('tiny-secp256k1');
+const s = ecc.signSchnorr(hash, privateKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "t_esm.js"
+snippet = '''
+import * as secp from 'tiny-secp256k1';
+const s = secp.signSchnorr(hash, privateKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+
+[[ecosystems.spellings]]
+id = "tiny-secp256k1-verifyschnorr"
+spelling = "verifySchnorr"
+source = "https://raw.githubusercontent.com/bitcoinjs/tiny-secp256k1/master/README.md"
+quote = "### verifySchnorr (h, Q, signature)"
+file = "t.js"
+snippet = '''
+const ecc = require('tiny-secp256k1');
+const ok = ecc.verifySchnorr(hash, x, s);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "t_esm.js"
+snippet = '''
+import * as secp from 'tiny-secp256k1';
+const ok = secp.verifySchnorr(hash, x, s);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+
+[[ecosystems.spellings]]
+id = "tiny-secp256k1-xonlytweak"
+spelling = "xOnlyPointAddTweak"
+source = "https://raw.githubusercontent.com/bitcoinjs/tiny-secp256k1/master/README.md"
+quote = "### xOnlyPointAddTweak (p, tweak)"
+file = "t.js"
+snippet = '''
+const ecc = require('tiny-secp256k1');
+const t = ecc.xOnlyPointAddTweak(x, tweak);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "t_esm.js"
+snippet = '''
+import * as secp from 'tiny-secp256k1';
+const t = secp.xOnlyPointAddTweak(x, tweak);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+
+[[ecosystems.spellings]]
+id = "bip32-factory"
+spelling = "const bip32 = BIP32Factory(ecc);"
+source = "https://raw.githubusercontent.com/bitcoinjs/bip32/master/README.md"
+quote = "const bip32 = BIP32Factory(ecc);"
+file = "b.js"
+snippet = '''
+const ecc = require('tiny-secp256k1');
+const { BIP32Factory } = require('bip32');
+const bip32 = BIP32Factory(ecc);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "b_esm.js"
+snippet = '''
+import * as ecc from 'tiny-secp256k1';
+import BIP32Factory from 'bip32';
+const bip32 = BIP32Factory(ecc);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "bip32-derivepath"
+spelling = "derivePath"
+source = "https://raw.githubusercontent.com/bitcoinjs/bip32/master/README.md"
+quote = "const child: BIP32Interface = node.derivePath('m/0/0');"
+file = "b.js"
+snippet = '''
+const ecc = require('tiny-secp256k1');
+const { BIP32Factory } = require('bip32');
+const bip32 = BIP32Factory(ecc);
+const root = bip32.fromSeed(seed);
+const child = root.derivePath("m/0/1");
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 5, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "solana-keys-generatekeypair"
+spelling = "generateKeyPair"
+source = "https://raw.githubusercontent.com/anza-xyz/kit/main/packages/keys/README.md"
+quote = "### `generateKeyPair()`"
+file = "k.ts"
+snippet = '''
+import { generateKeyPair, signBytes, verifySignature } from '@solana/keys';
+const kp = await generateKeyPair();
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "solana-keys-signbytes"
+spelling = "signBytes"
+source = "https://raw.githubusercontent.com/anza-xyz/kit/main/packages/keys/README.md"
+quote = "### `signBytes()`"
+file = "k.ts"
+snippet = '''
+import { generateKeyPair, signBytes, verifySignature } from '@solana/keys';
+const s = await signBytes(privateKey, data);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "solana-keys-verifysignature"
+spelling = "verifySignature"
+source = "https://raw.githubusercontent.com/anza-xyz/kit/main/packages/keys/README.md"
+quote = "private key associated with some known public key, use the `verifySignature()` function in this package."
+file = "k.ts"
+snippet = '''
+import { generateKeyPair, signBytes, verifySignature } from '@solana/keys';
+const ok = await verifySignature(publicKey, s, data);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "solana-web3-keypair-generate"
+spelling = "static generate"
+source = "https://raw.githubusercontent.com/solana-foundation/solana-web3.js/maintenance/v1.x/src/keypair.ts"
+quote = "static generate(): Keypair {"
+file = "s.js"
+snippet = '''
+const { Keypair } = require('@solana/web3.js');
+const kp = Keypair.generate();
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "solana-web3-keypair-fromsecretkey"
+spelling = "static fromSecretKey"
+source = "https://raw.githubusercontent.com/solana-foundation/solana-web3.js/maintenance/v1.x/src/keypair.ts"
+quote = "static fromSecretKey("
+file = "s.js"
+snippet = '''
+const { Keypair } = require('@solana/web3.js');
+const kp = Keypair.fromSecretKey(secretKey);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "cosmjs-frommnemonic"
+spelling = "public static async fromMnemonic"
+source = "https://raw.githubusercontent.com/cosmos/cosmjs/main/packages/proto-signing/src/directsecp256k1hdwallet.ts"
+quote = "public static async fromMnemonic("
+file = "c.js"
+snippet = '''
+import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
+const w = await DirectSecp256k1HdWallet.fromMnemonic(m, { prefix: 'cosmos' });
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "cosmjs-signdirect"
+spelling = "public async signDirect"
+source = "https://raw.githubusercontent.com/cosmos/cosmjs/main/packages/proto-signing/src/directsecp256k1hdwallet.ts"
+quote = "public async signDirect(signerAddress: string, signDoc: SignDoc): Promise<DirectSig"
+file = "c.js"
+snippet = '''
+import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
+const w = await DirectSecp256k1HdWallet.fromMnemonic(m);
+const r = await w.signDirect(address, signDoc);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "noble-bn254"
+spelling = "bn254"
+source = "https://raw.githubusercontent.com/paulmillr/noble-curves/main/README.md"
+quote = "- [BLS signatures, bls12-381, bn254 aka alt\\_bn128](#bls-signatures-bls12-381-bn254-aka-alt_bn1"
+file = "n.js"
+snippet = '''
+import { bn254 } from '@noble/curves/bn254.js';
+const Fr = bn254.fields.Fr;
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+
+[[ecosystems]]
+ecosystem = "Py"
+scope = "eth_account, eth_keys, py_ecc.bls, python-bitcoinlib signmessage (pyspx is in pqc/Py)."
+
+[[ecosystems.spellings]]
+id = "eth-account-create"
+spelling = "Account.create"
+source = "https://eth-account.readthedocs.io/en/stable/eth_account.html"
+quote = "Account.create()"
+file = "a.py"
+snippet = '''
+from eth_account import Account
+acct = Account.create()
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "a_alias.py"
+snippet = '''
+from eth_account import Account as EthAccount
+acct = EthAccount.create()
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "eth-account-from-key"
+spelling = "Account.from_key"
+source = "https://eth-account.readthedocs.io/en/stable/eth_account.html"
+quote = "Account.from_key()"
+file = "a.py"
+snippet = '''
+from eth_account import Account
+acct = Account.from_key(private_key)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "a_alias.py"
+snippet = '''
+from eth_account import Account as EthAccount
+acct = EthAccount.from_key(private_key)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "eth-account-sign-message"
+spelling = "Account.sign_message"
+source = "https://eth-account.readthedocs.io/en/stable/eth_account.html"
+quote = "Account.sign_message()"
+file = "a.py"
+snippet = '''
+from eth_account import Account
+s = Account.sign_message(msg, private_key)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "a_alias.py"
+snippet = '''
+from eth_account import Account as EthAccount
+s = EthAccount.sign_message(msg, private_key)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "eth-account-sign-transaction"
+spelling = "Account.sign_transaction"
+source = "https://eth-account.readthedocs.io/en/stable/eth_account.html"
+quote = "Account.sign_transaction()"
+file = "a.py"
+snippet = '''
+from eth_account import Account
+s = Account.sign_transaction(tx, private_key)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "a_alias.py"
+snippet = '''
+from eth_account import Account as EthAccount
+s = EthAccount.sign_transaction(tx, private_key)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "eth-account-recover-message"
+spelling = "Account.recover_message"
+source = "https://eth-account.readthedocs.io/en/stable/eth_account.html"
+quote = "Account.recover_message()"
+file = "a.py"
+snippet = '''
+from eth_account import Account
+who = Account.recover_message(msg, signature=sig)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "a_alias.py"
+snippet = '''
+from eth_account import Account as EthAccount
+who = EthAccount.recover_message(msg, signature=sig)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "eth-account-local-sign-message"
+spelling = "sign_message"
+source = "https://eth-account.readthedocs.io/en/stable/eth_account.html"
+quote = "Account.sign_message()"
+file = "a.py"
+snippet = '''
+from eth_account import Account
+acct = Account.create()
+signed = acct.sign_message(msg)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "a_v.py"
+snippet = '''
+from eth_account import Account
+wallet = Account.from_key(k)
+signed = wallet.sign_message(msg)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "eth-keys-sign-msg"
+spelling = "sign_msg("
+source = "https://raw.githubusercontent.com/ethereum/eth-keys/main/README.md"
+quote = ">>> signature = pk.sign_msg(b'a message')"
+file = "k.py"
+snippet = '''
+from eth_keys import keys
+pk = keys.PrivateKey(b)
+sig = pk.sign_msg(b'a message')
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "py-ecc-bls-sign"
+spelling = "bls"
+source = "https://raw.githubusercontent.com/ethereum/py_ecc/main/README.md"
+quote = "curve crypto in python including secp256k1, alt_bn128, and bls12_381."
+file = "b.py"
+snippet = '''
+from py_ecc.bls import G2ProofOfPossession as bls_pop
+sig = bls_pop.Sign(sk, message)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "BLS"}}]}
+
+[[ecosystems.spellings]]
+id = "bitcoinlib-signmessage"
+spelling = "SignMessage"
+source = "https://raw.githubusercontent.com/petertodd/python-bitcoinlib/master/examples/sign-message.py"
+quote = "m bitcoin.signmessage import BitcoinMessage, VerifyMessage, SignMessage"
+file = "m.py"
+snippet = '''
+from bitcoin.signmessage import BitcoinMessage, VerifyMessage, SignMessage
+sig = SignMessage(key, message)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+
+[[ecosystems]]
+ecosystem = "Rust"
+scope = "alloy-signer(-local), ethers-signers, rust-secp256k1, solana-sdk, ark-groth16 and ark-bn254, blst (slh-dsa and leanSig are in pqc/Rust)."
+
+[[ecosystems.spellings]]
+id = "alloy-privatekeysigner-random"
+spelling = "PrivateKeySigner"
+source = "https://docs.rs/alloy-signer-local/latest/alloy_signer_local/"
+quote = "keystore : enables Ethereum keystore functionality on the PrivateKeySigner and Secp256k1Signer types."
+file = "a.rs"
+snippet = '''
+use alloy_signer_local::PrivateKeySigner;
+fn main() {
+    let signer = PrivateKeySigner::random();
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "alloy-sign-message-sync"
+spelling = "sign_message_sync"
+source = "https://docs.rs/alloy-signer/latest/alloy_signer/"
+quote = "let signature = signer.sign_message_sync(message.as_bytes()) ? ;"
+file = "a.rs"
+snippet = '''
+use alloy_signer_local::PrivateKeySigner;
+fn main() {
+    let signer = PrivateKeySigner::random();
+    let s = signer.sign_message_sync(b"hello").unwrap();
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "ethers-rs-localwallet"
+spelling = "LocalWallet"
+source = "https://docs.rs/ethers-signers/latest/ethers_signers/"
+quote = ".parse::<LocalWallet>() ? ;"
+file = "e.rs"
+snippet = '''
+use ethers_signers::{LocalWallet, Signer};
+fn main() {
+    let wallet = LocalWallet::new(&mut rng);
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "rust-secp256k1-sign-ecdsa"
+spelling = "sign_ecdsa"
+source = "https://raw.githubusercontent.com/rust-bitcoin/rust-secp256k1/master/src/lib.rs"
+quote = "//! // and can be passed directly to `sign_ecdsa`."
+file = "m.rs"
+snippet = '''
+use secp256k1::{Secp256k1, Keypair};
+fn main() {
+    let secp = Secp256k1::new();
+    let sig = secp.sign_ecdsa(message, &secret_key);
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "rust-secp256k1-generate-keypair"
+spelling = "generate_keypair"
+source = "https://raw.githubusercontent.com/rust-bitcoin/rust-secp256k1/master/src/lib.rs"
+quote = "//! let (secret_key, public_key) = secp256k1::generate_keypair(&mut rand::rng());"
+file = "m.rs"
+snippet = '''
+use secp256k1::{Secp256k1, Keypair};
+fn main() {
+    let secp = Secp256k1::new();
+    let (sk, pk) = secp.generate_keypair(&mut rng);
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA"}}]}
+
+[[ecosystems.spellings]]
+id = "rust-secp256k1-sign-schnorr"
+spelling = "sign_schnorr"
+source = "https://raw.githubusercontent.com/rust-bitcoin/rust-secp256k1/master/src/schnorr.rs"
+quote = "pub fn sign_schnorr(&self, msg: &[u8], keypair: &Keypair) -> Signature {"
+file = "m.rs"
+snippet = '''
+use secp256k1::{Secp256k1, Keypair};
+fn main() {
+    let secp = Secp256k1::new();
+    let s = secp.sign_schnorr(&digest, &keypair);
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "Schnorr"}}]}
+
+[[ecosystems.spellings]]
+id = "solana-keypair-new"
+spelling = "Keypair"
+source = "https://docs.rs/solana-keypair/latest/solana_keypair/struct.Keypair.html"
+quote = "Keypair in solana_keypair - Rust"
+file = "s.rs"
+snippet = '''
+use solana_sdk::signature::{Keypair, Signer};
+fn main() {
+    let kp = Keypair::new();
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "ark-groth16-prove"
+spelling = "Groth16"
+source = "https://raw.githubusercontent.com/arkworks-rs/groth16/master/README.md"
+quote = "ry contains an efficient implementation of the zkSNARK of [[Groth16]](https://eprint.iacr.org/2016/260)."
+file = "g.rs"
+snippet = '''
+use ark_groth16::Groth16;
+fn main() {
+    let proof = Groth16::<Bn254>::prove(&pk, c, &mut rng).unwrap();
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "ark-bn254"
+spelling = "Bn254"
+source = "https://docs.rs/ark-bn254/latest/ark_bn254/"
+quote = "nfig Fq6Config Fq12 Config FqConfig FrConfig Type Aliases § Bn254 Fq Fq2 Fq6 Fq12 Fr G1Affine G1Projective G2Affine G2Project"
+file = "g.rs"
+snippet = '''
+use ark_bn254::{Bn254, Fr};
+fn main() {}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 1, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "blst-key-gen"
+spelling = "key_gen"
+source = "https://raw.githubusercontent.com/supranational/blst/master/bindings/rust/README.md"
+quote = "let sk = SecretKey::key_gen(&ikm, &[]).unwrap();"
+file = "b.rs"
+snippet = '''
+use blst::min_pk::SecretKey;
+fn main() {
+    let sk = SecretKey::key_gen(&ikm, &[]).unwrap();
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "BLS"}}]}
+
+[[ecosystems]]
+ecosystem = "CI"
+scope = "snarkjs's command line: powersoftau, groth16 and plonk setup."
+
+[[ecosystems.spellings]]
+id = "snarkjs-powersoftau-new"
+spelling = "snarkjs powersoftau new bn128 14 pot14_0000.ptau -v"
+source = "https://raw.githubusercontent.com/iden3/snarkjs/master/README.md"
+quote = "snarkjs powersoftau new bn128 14 pot14_0000.ptau -v"
+file = "ceremony.sh"
+snippet = '''
+#!/bin/sh
+snarkjs powersoftau new bn128 14 pot14_0000.ptau -v
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "snarkjs-groth16-setup"
+spelling = "snarkjs groth16 setup circuit.r1cs pot14_final.ptau circuit_0000.zkey"
+source = "https://raw.githubusercontent.com/iden3/snarkjs/master/README.md"
+quote = "snarkjs groth16 setup circuit.r1cs pot14_final.ptau circuit_0000.zkey"
+file = "ceremony.sh"
+snippet = '''
+#!/bin/sh
+snarkjs groth16 setup circuit.r1cs pot14_final.ptau circuit_0000.zkey
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+
+[[ecosystems.spellings]]
+id = "snarkjs-plonk-setup"
+spelling = "snarkjs plonk setup circuit.r1cs pot14_final.ptau circuit_final.zkey"
+source = "https://raw.githubusercontent.com/iden3/snarkjs/master/README.md"
+quote = "snarkjs plonk setup circuit.r1cs pot14_final.ptau circuit_final.zkey"
+file = "ceremony.sh"
+snippet = '''
+#!/bin/sh
+snarkjs plonk setup circuit.r1cs pot14_final.ptau circuit_final.zkey
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}

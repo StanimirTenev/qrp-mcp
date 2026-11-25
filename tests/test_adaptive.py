@@ -69,20 +69,24 @@ def test_status_is_read_against_the_catalogue(tmp_path):
     # external/Py and keysize/Py are in the catalogue (keysize/Py since 24.11.2026); sign ... of
     # Python are not.
     assert py["status"] == "partially_closed"
-    assert py["closed_operations"] == ["external", "keysize"]
+    # apiname/Py and pqc/Py since 0.54.0 (the crypto-asset libraries, apiname_chains/pqc_chains).
+    assert py["closed_operations"] == ["apiname", "external", "keysize", "pqc"]
     assert "sign" in py["open_operations"]
     assert "here we may miss" in py["may_miss"]
     # A tree without a VRF: vrf/Go is in the catalogue (row 535), but counts only where the scan
     # found a VRF (independent review of 0.51.0, 19.11: Vault read `partially_closed`). Since
     # external/Go is in the catalogue too (24.11.2026), Go's one known operation is closed.
     go = _eco(result, "Go")
-    assert go["status"] == "closed" and go["closed_operations"] == ["external"]
+    # apiname, pqc and sign of Go since 0.54.0 (rows 561-587, known and catalogued together).
+    assert go["status"] == "closed" and go["closed_operations"] == ["apiname", "external", "pqc", "sign"]
     assert go["open_operations"] == [] and "vrf" not in go["known_operations"]
     assert "may_miss" not in go
     rust = _eco(result, "Rust")
-    assert rust["status"] == "not_closed" and "vrf" not in rust["known_operations"]
+    # Rust's and JS's apiname since 0.54.0; their other known operations stay open.
+    assert rust["status"] == "partially_closed" and "vrf" not in rust["known_operations"]
+    assert rust["closed_operations"] == ["apiname", "pqc"]
     js = _eco(result, "JS")
-    assert js["status"] == "not_closed" and js["closed_operations"] == []
+    assert js["status"] == "partially_closed" and js["closed_operations"] == ["apiname"]
     assert js["may_miss"].startswith("here we may miss")
 
 
@@ -223,7 +227,9 @@ def test_the_places_and_their_count_stay_as_they_were(tmp_path):
 
 def test_where_to_look_orders_production_before_tests_and_kinds_by_rule(tmp_path):
     result = scan_directory(_write(tmp_path, {
-        **LEAD_TREE, **ECO_TREE, "requirements.txt": "paramiko==3.4.0\ncryptography==47.0.0\n"}))
+        **LEAD_TREE, **ECO_TREE, "requirements.txt": "paramiko==3.4.0\ncryptography==47.0.0\n",
+        # An ecosystem with no operation in the catalogue (JS's apiname is, since 0.54.0).
+        "web/index.php": "<?php\n$k = openssl_pkey_new(['private_key_bits' => 2048]);\n"}))
     items = result["where_to_look"]["items"]
     assert [i["rank"] for i in items] == list(range(1, len(items) + 1))
     kinds = [i["kind"] for i in items if not i["in_test_code"]]
@@ -382,7 +388,8 @@ def test_vrf_counts_where_the_scan_found_a_vrf(tmp_path):
     assert "vrf" in result["summary"]["by_role"]
     go = _eco(result, "Go")
     # external/Go is in the catalogue since 24.11.2026: with the VRF found, both are closed.
-    assert go["status"] == "closed" and go["closed_operations"] == ["external", "vrf"]
+    assert go["status"] == "closed" and go["closed_operations"] == ["apiname", "external", "pqc",
+                                                                       "sign", "vrf"]
     assert go["open_operations"] == [] and "vrf" in go["known_operations"]
     # The tree has no Rust VRF; Rust's status does not move with Go's.
     assert "vrf" not in _eco(result, "Rust")["closed_operations"]
@@ -402,7 +409,7 @@ def test_a_vrf_only_in_test_code_does_not_move_the_status(tmp_path):
     go = _eco(result, "Go")
     # external/Go is closed (24.11.2026); a VRF in test code still adds no operation.
     assert go["status"] == "closed" and "vrf" not in go["known_operations"]
-    assert go["closed_operations"] == ["external"]
+    assert go["closed_operations"] == ["apiname", "external", "pqc", "sign"]
 
 
 # --- files read in no ecosystem (24.11.2026, Dong's ECH bench) -------------------------------
