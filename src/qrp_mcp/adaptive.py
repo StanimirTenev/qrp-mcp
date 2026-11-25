@@ -80,10 +80,10 @@ _FOUND_ONLY = {"vrf": "ECVRF"}
 # untested operations down `where_to_look` (Vault, Go rank 1 -> 39; the same effect as `vrf` in 0.51.0).
 # The parts of an operation catalogued under a name of their own (25.11.2026, rows 555-557, 560): gpg's
 # key generation is not all of keysize/CI, nor Spring placeholders all of external/Java, Android's
-# configuration all of tlsend/Java, standalone ML-KEM in Go all of pqc/Go. Their spellings are tested
+# configuration all of tlsend/Java, standalone ML-KEM in Go all of pqc/Go, an unverified JWT (row 594) all of sign. Their spellings are tested
 # like any other; a part does not close or open its ecosystem.
 _NOT_IN_STATUS = {"rng_source", "keysize_gpg", "external_placeholder", "tlsend_android",
-                  "pqc_standalone"}
+                  "pqc_standalone", "sign_unverified"}
 # A manifest's (or a dependency row's) package ecosystem, as the catalogue names ecosystems.
 _PACKAGE_ECOSYSTEM = {"pypi": "Py", "npm": "JS", "go": "Go", "cargo": "Rust", "maven": "Java",
                       "nuget": "NET", "rubygems": "PHP", "composer": "PHP"}

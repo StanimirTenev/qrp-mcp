@@ -270,7 +270,13 @@ _WEAK_TOKENS: list[tuple[str, str]] = [
     # RFC 6150 and RFC 6149 moved both to Historic (row 139).
     ("MD4", "MD4 is broken (RFC 6150)"),
     ("MD2", "MD2 is broken (RFC 6149)"),
+    # Row 594: a JOSE token accepted or made with no verified signature (detectors, JWT-unverified).
+    ("JWTUNVERIFIED", "JWT-unverified: a JSON Web Token accepted or made with no verified "
+                      "signature (alg \"none\", or verification switched off), so anyone can "
+                      "forge one. Not a quantum risk: there is no signature to break"),
 ]
+# The family a weak token names, where it is not the token itself.
+_WEAK_FAMILY = {"JWTUNVERIFIED": "JWT-unverified"}
 
 _SYMMETRIC_TOKENS: list[tuple[str, str]] = [
     ("CHACHA", "ChaCha20"),
@@ -888,7 +894,7 @@ def classify_algorithm(
             source=source,
             location=location,
             raw_value=raw_value,
-            algorithm_family=weak[0],
+            algorithm_family=_WEAK_FAMILY.get(weak[0], weak[0]),
             classification="deprecated_weak",
             quantum_vulnerable=False,
             weak_key=False,

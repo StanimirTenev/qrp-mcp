@@ -4666,6 +4666,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _certreq_request_hash(findings, lines, rel_path)
     findings = _python_key_generation(findings, lines, rel_path)  # keysize/Py
     findings = _gpg_key_generation(findings, lines, rel_path)  # keysize/CI, row 557
+    findings = _jose_unverified(findings, lines, rel_path)  # row 594
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5662,6 +5663,91 @@ def _gpg_key_generation(findings: list[dict[str, Any]], lines: list[str],
                       "in_test_code": in_test_code(rel_path),
                       **({"key_size": size} if size else {}), **({"curve": curve} if curve else {})})
     return sorted(findings + added, key=lambda f: f["line"]) if added or replaced else findings
+
+
+# Row 594 (25.11.2026): a JOSE token accepted or made with no verified signature. PyJWT's
+# `options={"verify_signature": False}` gave nothing, `algorithms=["none", "RS256"]` named only RSA,
+# jsonwebtoken's `algorithms: ['none']` and `{algorithm: 'none'}` and YAML `algorithm: none` gave
+# nothing. "An Unsecured JWS uses the "alg" value "none"" (RFC 7518 section 3.6). Each library's
+# documented spelling (pages read 25.11.2026): PyJWT ("you can set the verify_signature option to
+# False"; python-jose takes the same options and has get_unverified_claims), jsonwebtoken ("none |
+# No digital signature or MAC value included"; decode "Returns the decoded payload without
+# verifying"), jose by panva (UnsecuredJWT, decodeJwt "without validating its JWS Signature"),
+# Nimbus (Algorithm.NONE, PlainJWT), jjwt (unsecured(), parseUnsecuredClaims/-Content and the
+# deprecated parseClaimsJwt/parseContentJwt, Jwts.SIG.NONE), golang-jwt (SigningMethodNone,
+# UnsafeAllowNoneSignatureType, ParseUnverified). "none" is read only inside an algorithm setting or
+# argument, never as any string. The family JWT-unverified is classified deprecated_weak: there is
+# no signature for a quantum computer to break, and anyone can make a token this accepts.
+_JOSE_NONE_LIST = re.compile(r"\balgorithms\s*[=:]\s*\[[^\]]*[\"']none[\"']")
+_JOSE_NONE_ONE = re.compile(r"\balgorithm\s*[=:]\s*[\"']none[\"']")
+_JOSE_UNVERIFIED = re.compile(
+    r"\boptions\s*=\s*\{[^}]*[\"']verify_signature[\"']\s*:\s*False\b|"
+    r"\bget_unverified_claims\s*\(|\bUnsecuredJWT\b|\bdecodeJwt\s*\(|"
+    r"\bjwt\.(?:SigningMethodNone|UnsafeAllowNoneSignatureType)\b|\.ParseUnverified\s*\(")
+# Names other APIs could share, read only in a file of that library: Nimbus (com.nimbusds), jjwt
+# (io.jsonwebtoken, Jwts).
+_JOSE_NIMBUS = re.compile(r"\bAlgorithm\.NONE\b|\bPlainJWT\b")
+_JOSE_JJWT = re.compile(r"\.unsecured\(\s*\)|"
+                        r"\.parse(?:Unsecured(?:Claims|Content)|ClaimsJwt|ContentJwt)\s*\(|"
+                        r"\bJwts\.SIG\.NONE\b")
+_JS_REQUIRE_LINE = re.compile(r"(?:const|let|var)\s+[\w{}\s,]+=\s*require\(")
+_JOSE_CALL = re.compile(r"\b(?:jwt|jws|jose)\.(?:encode|decode|sign|verify)\s*\(")
+_JSONWEBTOKEN = re.compile(r"""require\(\s*['"]jsonwebtoken['"]\s*\)|from\s+['"]jsonwebtoken['"]""")
+_JSONWEBTOKEN_DECODE = re.compile(r"\b(?:jwt|jsonwebtoken)\.decode\s*\(")
+_JOSE_SETTING_NONE = re.compile(
+    r"^\s*([\w.-]*?alg(?:orithm)?s?)\s*[:=]\s*[\"']?none[\"']?\s*(?:#.*)?$", re.IGNORECASE)
+_JOSE_CONTEXT = re.compile(r"jwt|jws|jose|token|oidc|oauth", re.IGNORECASE)
+_JOSE_WORDS = ("none", "None", "verify_signature", "unverified", "Unverified", "Unsecured", "unsecured",
+               "decodeJwt", "PlainJWT", "NONE", "ClaimsJwt", "ContentJwt", "SigningMethodNone")
+_UNSIGNED = ("an Unsecured JWS: the token is accepted or made with no signature (alg \"none\", "
+             "RFC 7518 section 3.6), so anyone can make one this accepts")
+_UNVERIFIED = ("a JWT read without verifying its signature: what it claims is not "
+               "authenticated, so anyone can forge it")
+
+
+def _jose_unverified(findings: list[dict[str, Any]], lines: list[str],
+                     rel_path: str) -> list[dict[str, Any]]:
+    if not any(w in line for line in lines for w in _JOSE_WORDS) and not any(
+            "decode" in line for line in lines):
+        return findings
+    js = rel_path.endswith((".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts"))
+    jsonwebtoken = js and any(_JSONWEBTOKEN.search(line) for line in lines)
+    config = confidence_is_config(rel_path)
+    nimbus = any("nimbusds" in line for line in lines)
+    jjwt = any("jsonwebtoken" in line or "Jwts" in line for line in lines) and not js
+    added = []
+    for n, line in enumerate(lines, 1):
+        stripped = line.lstrip()
+        if (not stripped or stripped.startswith(("#", "//", "*", "/*", "import ", "from "))
+                or _JS_REQUIRE_LINE.match(stripped)):
+            continue
+        said = None
+        if _JOSE_NONE_LIST.search(line) or (_JOSE_NONE_ONE.search(line) and _JOSE_CALL.search(line)):
+            said = _UNSIGNED
+        elif (_JOSE_UNVERIFIED.search(line) or (nimbus and _JOSE_NIMBUS.search(line))
+              or (jjwt and _JOSE_JJWT.search(line))):
+            said = (_UNSIGNED if re.search(r"NONE|None|Unsecured|unsecured|PlainJWT", line)
+                    and not re.search(r"verify_signature|decodeJwt|ParseUnverified", line)
+                    else _UNVERIFIED)
+        elif jsonwebtoken and _JSONWEBTOKEN_DECODE.search(line):
+            said = _UNVERIFIED
+        elif config:
+            m = _JOSE_SETTING_NONE.match(line)
+            if m and (_JOSE_CONTEXT.search(m.group(1)) or any(
+                    _JOSE_CONTEXT.search(lines[k]) for k in range(max(0, n - 4), n - 1))):
+                said = _UNSIGNED
+        if said:
+            added.append({"path": rel_path, "line": n, "algorithm": "JWT-unverified",
+                          "description": said[0].upper() + said[1:],
+                          "excerpt": stripped.strip()[:200],
+                          "evidence_kind": "declaration" if config else "call",
+                          "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+def confidence_is_config(rel_path: str) -> bool:
+    name = rel_path.rsplit("/", 1)[-1].lower()
+    return "." not in name or "." + name.rsplit(".", 1)[-1] not in SOURCE_EXTENSIONS
 
 
 def _python_key_generation(findings: list[dict[str, Any]], lines: list[str],

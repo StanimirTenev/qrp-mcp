@@ -1,0 +1,238 @@
+# Operation `sign_unverified` (a part of sign, named apart so that it does not read as sign closed in
+# these ecosystems), 25.11.2026, row 594: a JOSE token accepted or made with no verified signature -- an
+# Unsecured JWS (alg "none", RFC 7518 section 3.6) or a token read without verifying its signature -- in
+# each library's documented spelling. Pages fetched 25.11.2026. `expect`: a source_code row of the family
+# JWT-unverified on the line.
+
+operation = "sign_unverified"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Py"
+scope = "PyJWT and python-jose: options verify_signature False, algorithms with none, encode with algorithm none, get_unverified_claims. Not covered: PyJWT 1.x verify=False, jwcrypto, Authlib."
+
+[[ecosystems.spellings]]
+id = "pyjwt-verify-signature-false"
+spelling = "jwt.decode(token, options={\"verify_signature\": False})"
+source = "https://pyjwt.readthedocs.io/en/stable/usage.html"
+quote = "you can set the verify_signature option to False"
+file = "a.py"
+snippet = '''
+import jwt
+c = jwt.decode(token, options={"verify_signature": False})
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "a.py", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "pyjwt-algorithms-none"
+spelling = "jwt.decode(t, key, algorithms=[\"none\", ...])"
+source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+quote = "An Unsecured JWS uses the \"alg\" value \"none\""
+file = "a.py"
+snippet = '''
+import jwt
+c = jwt.decode(t, key, algorithms=['none', 'RS256'])
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "a.py", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "pyjwt-encode-none"
+spelling = "jwt.encode(payload, None, algorithm=\"none\")"
+source = "https://www.rfc-editor.org/rfc/rfc7518.txt"
+quote = "An Unsecured JWS uses the \"alg\" value \"none\""
+file = "a.py"
+snippet = '''
+import jwt
+t = jwt.encode({"a": 1}, None, algorithm="none")
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "a.py", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "python-jose-get-unverified-claims"
+spelling = "jwt.get_unverified_claims(token)"
+source = "none"
+file = "a.py"
+snippet = '''
+from jose import jwt
+c = jwt.get_unverified_claims(token)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "a.py", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems]]
+ecosystem = "JS"
+scope = "jsonwebtoken (algorithms with none, sign with algorithm none, decode in a file that requires jsonwebtoken) and jose by panva (UnsecuredJWT, decodeJwt). Not covered: jwt-decode, jose-node-cjs-runtime aliases."
+
+[[ecosystems.spellings]]
+id = "jsonwebtoken-algorithms-none"
+spelling = "jwt.verify(t, k, { algorithms: ['none', ...] })"
+source = "https://raw.githubusercontent.com/auth0/node-jsonwebtoken/master/README.md"
+quote = "| none | No digital signature or MAC value included |"
+file = "b.js"
+snippet = '''
+const jwt = require('jsonwebtoken');
+const p = jwt.verify(t, k, { algorithms: ['none', 'HS256'] });
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "b.js", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jsonwebtoken-sign-none"
+spelling = "jwt.sign(payload, null, { algorithm: 'none' })"
+source = "https://raw.githubusercontent.com/auth0/node-jsonwebtoken/master/README.md"
+quote = "| none | No digital signature or MAC value included |"
+file = "b.js"
+snippet = '''
+const jwt = require('jsonwebtoken');
+const u = jwt.sign(payload, null, { algorithm: 'none' });
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "b.js", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jsonwebtoken-decode"
+spelling = "jwt.decode(token)"
+source = "https://raw.githubusercontent.com/auth0/node-jsonwebtoken/master/README.md"
+quote = "Returns the decoded payload without verifying if the signature is valid."
+file = "b.js"
+snippet = '''
+const jwt = require('jsonwebtoken');
+const c = jwt.decode(token);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "b.js", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "panva-unsecuredjwt"
+spelling = "new UnsecuredJWT(payload).encode()"
+source = "https://raw.githubusercontent.com/panva/jose/main/docs/jwt/unsecured/classes/UnsecuredJWT.md"
+quote = "Encodes and decodes `{ \"alg\": \"none\" }` Unsecured JWTs."
+file = "b.ts"
+snippet = '''
+import { UnsecuredJWT } from 'jose';
+const t = new UnsecuredJWT({ a: 1 }).encode();
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "b.ts", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "panva-decodejwt"
+spelling = "jose.decodeJwt(token)"
+source = "https://raw.githubusercontent.com/panva/jose/main/docs/util/decode_jwt/functions/decodeJwt.md"
+quote = "without validating its JWS Signature (digital signature or MAC)"
+file = "b.ts"
+snippet = '''
+import * as jose from 'jose';
+const c = jose.decodeJwt(token);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "b.ts", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems]]
+ecosystem = "Java"
+scope = "Nimbus JOSE+JWT (Algorithm.NONE, PlainJWT, in a file that names com.nimbusds) and jjwt (unsecured(), parseUnsecuredClaims/Content, parseClaimsJwt/parseContentJwt, Jwts.SIG.NONE, in a file that names io.jsonwebtoken or Jwts). Not covered: auth0 java-jwt, a builder without signWith."
+
+[[ecosystems.spellings]]
+id = "nimbus-algorithm-none"
+spelling = "Algorithm.NONE"
+source = "https://www.javadoc.io/static/com.nimbusds/nimbus-jose-jwt/9.37.3/com/nimbusds/jose/Algorithm.html"
+quote = "No algorithm (unsecured JOSE object without signature / encryption)."
+file = "A.java"
+snippet = '''
+import com.nimbusds.jose.*;
+class A { Algorithm a = Algorithm.NONE; }
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "A.java", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "nimbus-plainjwt"
+spelling = "new PlainJWT(claims)"
+source = "https://www.javadoc.io/static/com.nimbusds/nimbus-jose-jwt/9.37.3/com/nimbusds/jwt/PlainJWT.html"
+quote = "Unsecured (plain) JSON Web Token (JWT)."
+file = "A.java"
+snippet = '''
+import com.nimbusds.jwt.*;
+class A { JWT j = new PlainJWT(claims); }
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "A.java", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jjwt-unsecured"
+spelling = "Jwts.parser().unsecured()"
+source = "https://javadoc.io/static/io.jsonwebtoken/jjwt-api/0.12.6/io/jsonwebtoken/JwtParserBuilder.html"
+quote = "Enables parsing of Unsecured JWTs"
+file = "A.java"
+snippet = '''
+class A { Object p = Jwts.parser().unsecured().build(); }
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "A.java", line = 1, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jjwt-parse-unsecured-claims"
+spelling = "parser.parseUnsecuredClaims(jwt)"
+source = "https://javadoc.io/static/io.jsonwebtoken/jjwt-api/0.12.6/io/jsonwebtoken/JwtParser.html"
+quote = "Parses the jwt argument, expected to be an unsecured Claims JWT."
+file = "A.java"
+snippet = '''
+import io.jsonwebtoken.*;
+class A { Object c = parser.parseUnsecuredClaims(jwt); }
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "A.java", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jjwt-parse-claims-jwt"
+spelling = "parser.parseClaimsJwt(jwt) (deprecated)"
+source = "https://javadoc.io/static/io.jsonwebtoken/jjwt-api/0.12.6/io/jsonwebtoken/JwtParser.html"
+quote = "since 0.12.0 in favor of parseUnsecuredClaims(CharSequence)"
+file = "A.java"
+snippet = '''
+class A { Object c = Jwts.parser().setSigningKey(k).parseClaimsJwt(jwt); }
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "A.java", line = 1, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jjwt-sig-none"
+spelling = "Jwts.SIG.NONE"
+source = "https://javadoc.io/static/io.jsonwebtoken/jjwt-api/0.12.6/io/jsonwebtoken/JwtParserBuilder.html"
+quote = "Jwts.SIG.NONE"
+file = "A.java"
+snippet = '''
+class A { Object s = Jwts.SIG.NONE; }
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "A.java", line = 1, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems]]
+ecosystem = "Go"
+scope = "golang-jwt: SigningMethodNone, UnsafeAllowNoneSignatureType, ParseUnverified. Not covered: go-jose, lestrrat-go/jwx."
+
+[[ecosystems.spellings]]
+id = "golang-jwt-signingmethodnone"
+spelling = "jwt.SigningMethodNone"
+source = "https://pkg.go.dev/github.com/golang-jwt/jwt/v5"
+quote = "SigningMethodNone implements the none signing method."
+file = "m.go"
+snippet = '''
+package m
+import "github.com/golang-jwt/jwt/v5"
+var t = jwt.NewWithClaims(jwt.SigningMethodNone, c)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "m.go", line = 3, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "golang-jwt-unsafeallownone"
+spelling = "jwt.UnsafeAllowNoneSignatureType"
+source = "https://pkg.go.dev/github.com/golang-jwt/jwt/v5"
+quote = "tokens using alg=none will only be accepted if the constant jwt.UnsafeAllowNoneSignatureType is provided as the key."
+file = "m.go"
+snippet = '''
+package m
+import "github.com/golang-jwt/jwt/v5"
+var k = jwt.UnsafeAllowNoneSignatureType
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "m.go", line = 3, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "golang-jwt-parseunverified"
+spelling = "parser.ParseUnverified(s, claims)"
+source = "https://pkg.go.dev/github.com/golang-jwt/jwt/v5"
+quote = "(p) ParseUnverified(tokenString, claims)"
+file = "m.go"
+snippet = '''
+package m
+func f() { t, _, _ := jwt.NewParser().ParseUnverified(s, c); _ = t }
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "m.go", line = 2, algorithm = "JWT-unverified"}}]}
