@@ -1,10 +1,12 @@
-# Operation `keysize`, ecosystem CI (25.11.2026, row 557): the algorithm, size and curve a GnuPG key
+# Operation `keysize_gpg` (a part of keysize, named apart so that it does not read as keysize/CI
+# closed: openssl, ssh-keygen and the rest of CI key generation are not in this file), ecosystem CI
+# (25.11.2026, row 557): the algorithm, size and curve a GnuPG key
 # generation names in a script or a pipeline -- `--quick-generate-key` / `--quick-gen-key` and
 # `--quick-add-key` with an algo string, `--default-new-key-algo`, and the parameter file of
 # `--generate-key --batch`. Kept in a file of its own. Pages fetched 25.11.2026 (GnuPG manual).
 # `expect`: a source_code row on the line with the family, and the size or curve the string names.
 
-operation = "keysize"
+operation = "keysize_gpg"
 catalogue_version = "1"
 
 [[ecosystems]]

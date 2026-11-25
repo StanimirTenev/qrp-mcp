@@ -1,4 +1,6 @@
-# Operation `external`, ecosystems Java (Spring) and CI (Compose, the shell), 25.11.2026, row 560: a
+# Operation `external_placeholder` (a part of external, named apart so that it does not read as
+# external/Java or external/CI closed), ecosystems Java (Spring) and CI (Compose, the shell),
+# 25.11.2026, row 560: a
 # value read from outside the file with a default written beside it -- a Spring property placeholder
 # `${name:default}` in .properties, YAML and `@Value`, Compose's `${VAR:-default}` / `${VAR-default}`, the
 # shell's `${parameter:-word}` / `${parameter-word}` / `${parameter:=word}` / `${parameter=word}`. Kept in a
@@ -6,7 +8,7 @@
 # place in chosen_outside_files with the default, its family and `overridable: true`; a required value
 # (`:?`, `?`) and an alternative (`:+`, `+`) are no default.
 
-operation = "external"
+operation = "external_placeholder"
 catalogue_version = "1"
 
 [[ecosystems]]
