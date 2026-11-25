@@ -47,9 +47,10 @@ A new family and role, the calls of crypto-asset libraries, Vyper, and two false
   approved by the owner). A 4-byte selector's signature (`"4fb7db3f": "KYBER_PROXY()"`, Kyber
   Network's contracts in go-ethereum's `4byte.json`), an ABI entry's `name` and a Kyber name in
   Solidity are now identifiers. They made go-ethereum's key establishment `hybrid_pre_standard`.
-- **Closure catalogue**: 38 pairs and 1,930 sourced spellings. New pairs: apiname in Go, JS, Python,
-  Rust and CI; pqc in Go, Python and Rust; sign in Go. Each quote is cut from the saved page and
-  checked verbatim, 82 of 82. `KNOWN_OPERATIONS` gains Go's apiname, pqc and sign and Rust's pqc.
+- **Closure catalogue**: 48 pairs and 1,985 sourced spellings in 0.54.0; without the parts of rows
+  554-560 and 594 (below), 39 pairs and 1,930. New pairs: apiname in Go, JS, Python, Rust and
+  CI; pqc in Go, Python and Rust; sign in Go. Each quote is cut from the saved page and checked
+  verbatim, 82 of 82. `KNOWN_OPERATIONS` gains Go's apiname, pqc and sign and Rust's pqc.
   Go stays `closed`. JS and Rust move to `partially_closed`.
 - **`web3` and `ethers` as bare words** (row 598). These are no longer ECDSA; only an import plus
   a key or signing call is, read in `libcalls.py`, including a dynamic `await import('ethers')`.
