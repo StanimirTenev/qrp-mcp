@@ -10,7 +10,8 @@ the Python reference documents the import statement
 `from .b import f`. A dotted name resolves to the one file whose path ends with it; a name of one
 part only to a file at the top of the tree or beside the importer (the script's directory). A call
 through another name, a re-export, `importlib` or a module outside the tree is not followed, and
-the statement on each row says so.
+the statement on each row says so. So does a wrong link: an import is matched by name, so `import jwt`
+meant for an installed module, beside a local `jwt.py`, links the local file.
 """
 
 from __future__ import annotations
@@ -27,7 +28,9 @@ REACHED = ("reached from {n} place(s) in other files read, the first ten in reac
            "of the function or class this line is in, or, for a line at module level or a name "
            "imported and not called, the import: static, by import and name; a call through "
            "another name, a re-export, importlib or a module outside the tree is not followed, so "
-           "the list can be short")
+           "the list can be short; and an import is matched by name only, so a place can be wrong: "
+           "`import jwt` meant for an installed module beside a local jwt.py of the same name is "
+           "linked to the local file")
 LIMIT = 10
 
 

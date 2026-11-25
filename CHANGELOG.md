@@ -134,7 +134,9 @@ Findings and their fingerprint move where these constructs are present.
 - **Where a Python module's cryptography is reached from (row 554).** An occurrence inside a
   module of the tree carries `reached_from`: up to ten places in other files read that import its
   top-level function or class and call it, or the import line where no call is seen. It also
-  carries `reached_from_count`, and `reached`, which says the list is static and can be short.
+  carries `reached_from_count`, and `reached`, which says the list is static and can be short, and
+  that a place can be wrong: an import is matched by name, so `import jwt` meant for an installed
+  module, beside a local `jwt.py`, links the local file.
   The CBOM carries it as `qrp:reached_from`. It stays outside closure and baseline identity.
 - **A JOSE token with no verified signature (row 594).** These ways of accepting or making an
   Unsecured JWS (`alg: none`), or of reading a token without verifying it, are now a finding of

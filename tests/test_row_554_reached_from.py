@@ -138,3 +138,14 @@ def test_cli_mcp_and_cbom_carry_it(tmp_path):
               if p["name"] == "qrp:reached_from"]
     assert {"libs/cryptoutil/sign.py:5": ["svc-login/app.py:3", "svc-payments/app.py:2"]} in [
         {k: v for k, v in val.items() if k.endswith(":5")} for val in values]
+
+
+def test_a_local_file_with_an_imported_modules_name_is_linked_and_the_text_says_so(tmp_path):
+    # Owner's decision 6 (25.11.2026): `import jwt` meant for PyJWT, beside a local jwt.py, links the
+    # local file -- a one-part name resolves to the top of the tree or the importer's directory. The
+    # place may be wrong, not only missing, and `reached` says that too.
+    result = _scan(tmp_path, {"jwt.py": SIGN, "app.py": "import jwt\nt = jwt.sign(k, b'x')\n"})
+    assert _reached(result, "jwt.py")[8] == ["app.py:2"]
+    item = next(i for i in result["evidence"]["source_code"]
+                if i["path"] == "jwt.py" and i["line"] == 8)
+    assert "same name" in item["reached"] and "jwt.py" in item["reached"]

@@ -557,7 +557,9 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   tree carries `reached_from`. That is up to ten places in other files read that import the
   top-level function or class it is in and call it, or the import line where no call is seen. It
   also carries `reached_from_count`, and `reached`, which says the list is static and can be short:
-  a call through another name, a re-export or `importlib` is not followed.
+  a call through another name, a re-export or `importlib` is not followed. It also says a place can
+  be wrong: an import is matched by name, so `import jwt` meant for an installed module, beside a
+  local `jwt.py` of the same name, links the local file.
 - **A JOSE token with no verified signature** (row 594, 0.54.0): the family `JWT-unverified`,
   classified `deprecated_weak`, severity high and not quantum vulnerable. It covers an Unsecured
   JWS (`alg: none`) accepted or made, and a token read without verifying its signature, in these
