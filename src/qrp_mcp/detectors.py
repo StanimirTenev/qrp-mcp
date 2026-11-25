@@ -6136,7 +6136,11 @@ _RUNTIME_REFERENCE = re.compile(
     # Row 528 (audit #6): Go's os.Getenv / os.LookupEnv too.
     r"os\.environ|os\.getenv|\bgetenv\s*\(|os\.(?:Getenv|LookupEnv)\s*\(|process\.env\b|System\.getenv|"
     r"Environment\.GetEnvironmentVariable|\$\{\{\s*(?:secrets|vars|env|inputs)\.|"
-    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?::-[^}]*)?\}|\$[A-Z][A-Z0-9_]{2,}\b")
+    # Row 560: the shell's and Compose's `${X-d}`, `${X:=d}`, `${X=d}` beside `${X:-d}`, and a
+    # Spring placeholder with a default, `${name:default}` (a dotted name only with its default:
+    # Terraform's `${var.x}` is not read from the environment).
+    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?::?[-=][^}]*)?\}|\$\{[A-Za-z_][\w.-]*:(?![-=?+])[^}]*\}|"
+    r"\$[A-Z][A-Z0-9_]{2,}\b")
 _RUNTIME_SETTING = re.compile(
     r"cipher|curve|ecdh|\bkex|key_?exchange|kexalgorithms|tls_?groups?|ssl_?groups?|"
     r"(?:sig(?:n|ning|nature)?|jwt|jws|hash|key|token)_?alg(?:orithm)?s?\b|(?<![a-z])algorithms?\b|"
@@ -6203,12 +6207,22 @@ _RUNTIME_BYTES = (b"environ", b"getenv", b"Getenv", b"LookupEnv", b"process.env"
 # place too: the default's family stays a finding (it is what runs when nothing is set), and
 # the place carries the default and `overridable: true`. Python's os.environ.get / os.getenv,
 # Node's `process.env.X || "..."` / `?? "..."`, a shell `${X:-...}`.
+# Row 560 (25.11.2026): `signature_algorithm: ${SIGNING_ALG:ECDSA-P256}` was a finding and no place.
+# Each documented default: the shell's `${parameter:-word}`, `${parameter-word}`, `${parameter:=word}`,
+# `${parameter=word}` (Bash manual, Shell Parameter Expansion), Compose's `${VAR:-default}` and
+# `${VAR-default}` (Compose file reference, Interpolation), and Spring's `${name:default}` ("a : to
+# separate the default value from the property name", Spring Boot, Externalized Configuration;
+# `@Value("${catalog.name:defaultCatalog}")`, Spring Framework). `:?` / `?` (required) and `:+` / `+`
+# (alternative) are no default. In a shell `${X:word}` is a substring, so the Spring form is not read
+# in a shell script (_SPRING_DEFAULT, below).
 _RUNTIME_DEFAULT = re.compile(
     r"(?:os\.environ\.get|os\.getenv|System\.getenv\(\)\.getOrDefault)\s*\(\s*[\"']"
     r"([A-Za-z_][\w.-]*)[\"']\s*,\s*[\"']([^\"'\n]{2,80})[\"']\s*\)|"
     r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])\s*(?:\|\||\?\?)\s*"
     r"[\"'`]([^\"'`\n]{2,80})[\"'`]|"
-    r"\$\{([A-Za-z_]\w*):?-([^}\n]{2,80})\}")
+    r"\$\{([A-Za-z_]\w*):?[-=]([^}\n]{2,80})\}")
+_SPRING_DEFAULT = re.compile(r"\$\{([A-Za-z_][\w.-]*):(?![-=?+])([^}\n]{2,80})\}")
+_SHELL_SCRIPT = (".sh", ".bash", ".zsh", ".ksh")
 
 
 _DEFAULT_SHAPE = re.compile(r"^[A-Za-z][A-Za-z0-9_.+-]{1,40}$")
@@ -6217,9 +6231,12 @@ _DEFAULT_SHAPE = re.compile(r"^[A-Za-z][A-Za-z0-9_.+-]{1,40}$")
 _JOSE_DEFAULT = re.compile(r"^(?:(RS|PS)(256|384|512)|(ES)(256K?|384|512)|(EdDSA))$")
 
 
-def _runtime_default(text: str) -> dict[str, Any] | None:
+def _runtime_default(text: str, spring: bool = False) -> dict[str, Any] | None:
     from .classifier import classify_algorithm  # local: classifier is imported lazily here
-    for m in _RUNTIME_DEFAULT.finditer(text):
+    matches = list(_RUNTIME_DEFAULT.finditer(text))
+    if spring:
+        matches += list(_SPRING_DEFAULT.finditer(text))
+    for m in matches:
         groups = [g for g in m.groups() if g is not None]
         name, default = groups[0], groups[-1].strip()
         # A name, not a path or a command (`${HOME:-$(eval echo ~)}`), and one that spells its
@@ -6301,6 +6318,7 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     cmake = rel_path.rsplit("/", 1)[-1] == "CMakeLists.txt" or rel_path.endswith(".cmake")
     go = rel_path.endswith(".go")
     go_consts = _go_env_constants(lines) if go else {}
+    spring = not rel_path.lower().endswith(_SHELL_SCRIPT)  # row 560
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
         if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
@@ -6318,7 +6336,7 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         # comma or a space and an optional quote -- not merely on the same line.
         found = (_RUNTIME_ASSIGNMENT.search(text) or _RUNTIME_CRYPTO_CALL.search(text)
                  or _RUNTIME_JCA.search(text))
-        default = _runtime_default(text)
+        default = _runtime_default(text, spring)
         by_name = None if found or default else _runtime_env_name(text)
         if not found and not default and not by_name:
             continue
