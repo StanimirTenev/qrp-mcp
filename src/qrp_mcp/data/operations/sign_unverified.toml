@@ -47,6 +47,20 @@ t = jwt.encode({"a": 1}, None, algorithm="none")
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "a.py", line = 2, algorithm = "JWT-unverified"}}]}
 
+[[ecosystems.spellings.variants]]
+snippet = '''
+from jwt import encode
+t = encode({"a": 1}, None, algorithm="none")
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "a.py", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+import jwt as pyjwt
+t = pyjwt.encode({"a": 1}, None, algorithm="none")
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "a.py", line = 2, algorithm = "JWT-unverified"}}]}
+
 [[ecosystems.spellings]]
 id = "python-jose-get-unverified-claims"
 spelling = "jwt.get_unverified_claims(token)"
@@ -60,7 +74,7 @@ expect = {rows = [{at = "evidence.source_code", match = {path = "a.py", line = 2
 
 [[ecosystems]]
 ecosystem = "JS"
-scope = "jsonwebtoken (algorithms with none, sign with algorithm none, decode in a file that requires jsonwebtoken) and jose by panva (UnsecuredJWT, decodeJwt). Not covered: jwt-decode, jose-node-cjs-runtime aliases."
+scope = "jsonwebtoken and jws through any name the file binds them to (default, namespace or named import, require, destructured) -- algorithms with none, sign with algorithm none, decode, jws.sign with header alg none -- and jose by panva (UnsecuredJWT, decodeJwt). A decode a verification follows in the same block carries verified_after. Not covered: jwt-decode (the browser library), jose-node-cjs-runtime aliases, a library version that accepts none by itself (jsonwebtoken 0.4.0, express-jwt 0.1.3: a dependency, not a line)."
 
 [[ecosystems.spellings]]
 id = "jsonwebtoken-algorithms-none"
@@ -121,6 +135,73 @@ import * as jose from 'jose';
 const c = jose.decodeJwt(token);
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "b.ts", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jsonwebtoken-decode-named-import"
+spelling = "import { decode } from 'jsonwebtoken'; decode(token)"
+source = "https://raw.githubusercontent.com/auth0/node-jsonwebtoken/master/README.md"
+quote = "Returns the decoded payload without verifying if the signature is valid."
+file = "u.ts"
+snippet = '''
+import { decode } from 'jsonwebtoken'
+const t = decode(userToken, { json: true })
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "u.ts", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "u.js"
+snippet = '''
+const { decode: peek } = require('jsonwebtoken');
+const t = peek(userToken);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "u.js", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "u.ts"
+snippet = '''
+import * as token from 'jsonwebtoken'
+const t = token.decode(userToken)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "u.ts", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jsonwebtoken-decode-then-verify"
+spelling = "jwt.decode(token) with jwt.verify(token, ...) later in the same block"
+source = "https://raw.githubusercontent.com/auth0/node-jsonwebtoken/master/README.md"
+quote = "Returns the decoded payload without verifying if the signature is valid."
+file = "v.ts"
+snippet = '''
+import jwt from 'jsonwebtoken'
+function check (token) {
+  const decoded = jwt.decode(token)
+  jwt.verify(token, publicKey, (err) => { if (err === null) { use(decoded) } })
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "v.ts", line = 3, algorithm = "JWT-unverified", verified_after = "v.ts:4"}}]}
+
+[[ecosystems.spellings]]
+id = "jws-decode"
+spelling = "jws.decode(signature)"
+source = "https://raw.githubusercontent.com/brianloveswords/node-jws/master/readme.md"
+quote = "jws.decode(signature) (Synchronous) Returns the decoded header, decoded payload, and signature parts of the JWS Signature."
+file = "i.ts"
+snippet = '''
+import jws from 'jws'
+export const decode = (t: string) => { return jws.decode(t)?.payload }
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "i.ts", line = 2, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings]]
+id = "jws-sign-alg-none"
+spelling = "jws.sign({ header: { alg: 'none' }, ... })"
+source = "https://raw.githubusercontent.com/brianloveswords/node-jws/master/readme.md"
+quote = "none | No digital signature or MAC value included"
+file = "i.js"
+snippet = '''
+const jws = require('jws');
+const s = jws.sign({ header: { alg: 'none' }, payload: p });
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "i.js", line = 2, algorithm = "JWT-unverified"}}]}
 
 [[ecosystems]]
 ecosystem = "Java"
@@ -209,6 +290,14 @@ snippet = '''
 package m
 import "github.com/golang-jwt/jwt/v5"
 var t = jwt.NewWithClaims(jwt.SigningMethodNone, c)
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "m.go", line = 3, algorithm = "JWT-unverified"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+package m
+import gojwt "github.com/golang-jwt/jwt/v5"
+var t = gojwt.NewWithClaims(gojwt.SigningMethodNone, c)
 '''
 expect = {rows = [{at = "evidence.source_code", match = {path = "m.go", line = 3, algorithm = "JWT-unverified"}}]}
 

@@ -5690,19 +5690,81 @@ _JOSE_NIMBUS = re.compile(r"\bAlgorithm\.NONE\b|\bPlainJWT\b")
 _JOSE_JJWT = re.compile(r"\.unsecured\(\s*\)|"
                         r"\.parse(?:Unsecured(?:Claims|Content)|ClaimsJwt|ContentJwt)\s*\(|"
                         r"\bJwts\.SIG\.NONE\b")
-_JS_REQUIRE_LINE = re.compile(r"(?:const|let|var)\s+[\w{}\s,]+=\s*require\(")
+_JS_REQUIRE_LINE = re.compile(r"(?:const|let|var)\s+[\w{}\s,:]+=\s*require\(")
 _JOSE_CALL = re.compile(r"\b(?:jwt|jws|jose)\.(?:encode|decode|sign|verify)\s*\(")
-_JSONWEBTOKEN = re.compile(r"""require\(\s*['"]jsonwebtoken['"]\s*\)|from\s+['"]jsonwebtoken['"]""")
-_JSONWEBTOKEN_DECODE = re.compile(r"\b(?:jwt|jsonwebtoken)\.decode\s*\(")
 _JOSE_SETTING_NONE = re.compile(
     r"^\s*([\w.-]*?alg(?:orithm)?s?)\s*[:=]\s*[\"']?none[\"']?\s*(?:#.*)?$", re.IGNORECASE)
 _JOSE_CONTEXT = re.compile(r"jwt|jws|jose|token|oidc|oauth", re.IGNORECASE)
 _JOSE_WORDS = ("none", "None", "verify_signature", "unverified", "Unverified", "Unsecured", "unsecured",
-               "decodeJwt", "PlainJWT", "NONE", "ClaimsJwt", "ContentJwt", "SigningMethodNone")
+               "decodeJwt", "PlainJWT", "NONE", "ClaimsJwt", "ContentJwt", "SigningMethodNone",
+               "jsonwebtoken", "'jws'", '"jws"')
+# The names a file binds jsonwebtoken and jws to (the positive control on OWASP Juice Shop,
+# 25.11.2026: `import { decode } from 'jsonwebtoken'` and `jws.decode(...)` were missed): a default or
+# namespace import, a named import (`{ decode as peek }`), a require, destructured or not.
+_JS_IMPORT_BINDING = re.compile(r"""^\s*import\s+(.+?)\s+from\s+['"](jsonwebtoken|jws)['"]""")
+_JS_REQUIRE_BINDING = re.compile(
+    r"""^\s*(?:const|let|var)\s+(.+?)\s*=\s*require\(\s*['"](jsonwebtoken|jws)['"]\s*\)""")
+# Python: `import jwt as x`, `from jose import jwt as x`, `from jwt import encode`; Go: an import alias of
+# golang-jwt (or its predecessor dgrijalva/jwt-go).
+_PY_MODULE_ALIAS = re.compile(r"^\s*import\s+(?:jwt|jose\.jwt|jose\.jws)\s+as\s+(\w+)")
+_PY_FROM_JOSE = re.compile(r"^\s*from\s+jose\s+import\s+(.+)")
+_PY_FROM_NAMES = re.compile(r"^\s*from\s+(?:jwt|jose\.jwt|jose\.jws)\s+import\s+(.+)")
+_GO_JWT_ALIAS = re.compile(
+    r'^\s*(?:import\s+)?([A-Za-z_]\w*)\s+"github\.com/(?:golang-jwt/jwt|dgrijalva/jwt-go)(?:/v\d+)?"')
 _UNSIGNED = ("an Unsecured JWS: the token is accepted or made with no signature (alg \"none\", "
              "RFC 7518 section 3.6), so anyone can make one this accepts")
-_UNVERIFIED = ("a JWT read without verifying its signature: what it claims is not "
-               "authenticated, so anyone can forge it")
+_UNVERIFIED = ("a JWT read without verifying its signature, and no verification follows in the "
+               "same block: what it claims is not authenticated, so anyone can forge it")
+_VERIFIED_AFTER = ("a JWT decoded at this line without verifying its signature; a verification "
+                   "follows in the same block at line {line} (verified_after), so this row does not "
+                   "say the token is accepted unverified -- only that this line reads it unverified")
+
+
+def _js_bindings(lines: list[str]) -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
+    """(module alias -> library, local name -> (library, exported name)) for jsonwebtoken and jws."""
+    modules: dict[str, str] = {}
+    named: dict[str, tuple[str, str]] = {}
+    for line in lines:
+        m = _JS_IMPORT_BINDING.match(line) or _JS_REQUIRE_BINDING.match(line)
+        if not m:
+            continue
+        clause, lib = m.group(1).strip(), m.group(2)
+        braces = re.search(r"\{([^}]*)\}", clause)
+        if braces:
+            for part in braces.group(1).split(","):
+                bits = re.split(r"\s+as\s+|\s*:\s*", part.strip())
+                if bits and bits[0]:
+                    named[bits[-1]] = (lib, bits[0])
+            clause = clause[:braces.start()] + clause[braces.end():]
+        for alias in re.findall(r"(?:\*\s*as\s+)?([A-Za-z_$][\w$]*)", clause.replace("type ", "")):
+            modules[alias] = lib
+    return modules, named
+
+
+def _alternation(names) -> str:
+    return "|".join(re.escape(n) for n in sorted(names)) or r"(?!x)x"
+
+
+def _verified_after(lines: list[str], n: int, verify: re.Pattern, python: bool) -> int | None:
+    """The line, after line n and in the block it is in, that verifies a token; None if none does."""
+    if python:
+        indent = len(lines[n - 1]) - len(lines[n - 1].lstrip())
+        for k in range(n, min(len(lines), n + 60)):
+            text = lines[k]
+            if text.strip() and len(text) - len(text.lstrip()) < indent:
+                return None
+            if verify.search(text):
+                return k + 1
+        return None
+    depth = 0
+    for k in range(n, min(len(lines), n + 60)):
+        text = lines[k]
+        if verify.search(text):
+            return k + 1
+        depth += text.count("{") - text.count("}")
+        if depth < 0:
+            return None
+    return None
 
 
 def _jose_unverified(findings: list[dict[str, Any]], lines: list[str],
@@ -5711,37 +5773,92 @@ def _jose_unverified(findings: list[dict[str, Any]], lines: list[str],
             "decode" in line for line in lines):
         return findings
     js = rel_path.endswith((".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts"))
-    jsonwebtoken = js and any(_JSONWEBTOKEN.search(line) for line in lines)
+    python = rel_path.endswith(".py")
+    go = rel_path.endswith(".go")
     config = confidence_is_config(rel_path)
     nimbus = any("nimbusds" in line for line in lines)
     jjwt = any("jsonwebtoken" in line or "Jwts" in line for line in lines) and not js
+    modules, named = _js_bindings(lines) if js else ({}, {})
+    py_modules, py_named = {"jwt", "jws"}, set()
+    go_modules = {"jwt"}
+    for line in lines:
+        if python:
+            m = _PY_MODULE_ALIAS.match(line)
+            if m:
+                py_modules.add(m.group(1))
+            m = _PY_FROM_JOSE.match(line)
+            for part in (m.group(1).split(",") if m else ()):
+                bits = part.split(" as ")
+                if bits[0].strip() in ("jwt", "jws"):
+                    py_modules.add(bits[-1].strip())
+            m = _PY_FROM_NAMES.match(line)
+            for part in (m.group(1).replace("(", " ").replace(")", " ").split(",") if m else ()):
+                bits = part.split(" as ")
+                if bits[0].strip() in ("encode", "decode", "sign", "verify"):
+                    py_named.add(bits[-1].strip())
+        if go:
+            m = _GO_JWT_ALIAS.match(line)
+            if m:
+                go_modules.add(m.group(1))
+    js_mods = _alternation(modules)
+    js_decode = re.compile(
+        rf"(?<![\w.$])(?:{js_mods})\.decode\s*\(|(?<![\w.$])(?:"
+        + _alternation(k for k, v in named.items() if v[1] == "decode") + r")\s*\(")
+    calls = re.compile(
+        _JOSE_CALL.pattern + rf"|(?<![\w.$])(?:{js_mods}|{_alternation(py_modules)})\."
+        r"(?:encode|decode|sign|verify|createSign)\s*\(|(?<![\w.$])(?:"
+        + _alternation([k for k, v in named.items() if v[1] in ("sign", "verify")] + list(py_named))
+        + r")\s*\(")
+    jws_header_none = re.compile(r"\balg\s*:\s*[\"']none[\"']") if "jws" in modules.values() else None
+    go_none = re.compile(rf"(?<![\w.])(?:{_alternation(go_modules)})\."
+                         r"(?:SigningMethodNone|UnsafeAllowNoneSignatureType)\b")
+    verify = re.compile(
+        rf"(?<![\w.$])(?:{js_mods})\.verify\s*\(|(?<![\w.$])(?:"
+        + _alternation(k for k, v in named.items() if v[1] == "verify")
+        + r")\s*\(|\b(?:jwtVerify|compactVerify|flattenedVerify)\s*\(|"
+        + (rf"(?<![\w.])(?:{_alternation(py_modules)})\.decode\s*\((?![^)]*verify_signature)"
+           r"[^)]*\balgorithms\s*=" if python else r"\.Parse(?:WithClaims)?\s*\("))
     added = []
     for n, line in enumerate(lines, 1):
         stripped = line.lstrip()
         if (not stripped or stripped.startswith(("#", "//", "*", "/*", "import ", "from "))
                 or _JS_REQUIRE_LINE.match(stripped)):
             continue
-        said = None
-        if _JOSE_NONE_LIST.search(line) or (_JOSE_NONE_ONE.search(line) and _JOSE_CALL.search(line)):
+        said = decode = None
+        if _JOSE_NONE_LIST.search(line) or (_JOSE_NONE_ONE.search(line) and calls.search(line)) or (
+                jws_header_none and jws_header_none.search(line) and calls.search(line)):
+            said = _UNSIGNED
+        elif go and go_none.search(line):
             said = _UNSIGNED
         elif (_JOSE_UNVERIFIED.search(line) or (nimbus and _JOSE_NIMBUS.search(line))
               or (jjwt and _JOSE_JJWT.search(line))):
-            said = (_UNSIGNED if re.search(r"NONE|None|Unsecured|unsecured|PlainJWT", line)
-                    and not re.search(r"verify_signature|decodeJwt|ParseUnverified", line)
-                    else _UNVERIFIED)
-        elif jsonwebtoken and _JSONWEBTOKEN_DECODE.search(line):
-            said = _UNVERIFIED
+            if (re.search(r"NONE|None|Unsecured|unsecured|PlainJWT", line)
+                    and not re.search(r"verify_signature|decodeJwt|ParseUnverified", line)):
+                said = _UNSIGNED
+            else:
+                said = decode = _UNVERIFIED
+        elif js and (modules or named) and js_decode.search(line):
+            said = decode = _UNVERIFIED
         elif config:
             m = _JOSE_SETTING_NONE.match(line)
             if m and (_JOSE_CONTEXT.search(m.group(1)) or any(
                     _JOSE_CONTEXT.search(lines[k]) for k in range(max(0, n - 4), n - 1))):
                 said = _UNSIGNED
-        if said:
-            added.append({"path": rel_path, "line": n, "algorithm": "JWT-unverified",
-                          "description": said[0].upper() + said[1:],
-                          "excerpt": stripped.strip()[:200],
-                          "evidence_kind": "declaration" if config else "call",
-                          "in_test_code": in_test_code(rel_path)})
+        if not said:
+            continue
+        row = {"path": rel_path, "line": n, "algorithm": "JWT-unverified",
+               "excerpt": stripped.strip()[:200],
+               "evidence_kind": "declaration" if config else "call",
+               "in_test_code": in_test_code(rel_path)}
+        # A decode that a verification follows in the same block (Juice Shop routes/verify.ts:119):
+        # the row says what the line does and where the verification is, not that the token is
+        # accepted unverified.
+        after = _verified_after(lines, n, verify, python) if decode else None
+        if after:
+            said = _VERIFIED_AFTER.format(line=after)
+            row["verified_after"] = f"{rel_path}:{after}"
+        row["description"] = said[0].upper() + said[1:]
+        added.append(row)
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 

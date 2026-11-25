@@ -271,9 +271,11 @@ _WEAK_TOKENS: list[tuple[str, str]] = [
     ("MD4", "MD4 is broken (RFC 6150)"),
     ("MD2", "MD2 is broken (RFC 6149)"),
     # Row 594: a JOSE token accepted or made with no verified signature (detectors, JWT-unverified).
-    ("JWTUNVERIFIED", "JWT-unverified: a JSON Web Token accepted or made with no verified "
-                      "signature (alg \"none\", or verification switched off), so anyone can "
-                      "forge one. Not a quantum risk: there is no signature to break"),
+    ("JWTUNVERIFIED", "JWT-unverified: a JSON Web Token accepted or made with no signature "
+                      "(alg \"none\"), with verification switched off, or decoded without "
+                      "verification. Where nothing verifies it anyone can forge one; a decode that "
+                      "a verification follows says so on its row (verified_after). Not a quantum "
+                      "risk: there is no signature to break"),
 ]
 # The family a weak token names, where it is not the token itself.
 _WEAK_FAMILY = {"JWTUNVERIFIED": "JWT-unverified"}

@@ -61,7 +61,9 @@ _CONTEXT_FIELDS = ("in_test_code", "role", "provider", "tls_termination", "signi
                    # it, so a baseline from before does not close and reopen the row.
                    "standalone_pqc", "standalone_basis",
                    # Row 554: read from the files that import the module.
-                   "reached_from", "reached_from_count", "reached")
+                   "reached_from", "reached_from_count", "reached",
+                   # Row 594: read from a later line of the block.
+                   "verified_after")
 
 NOT_CLOSABLE = {
     "instrument_version_differs": "a different version of the tool read the second tree; "

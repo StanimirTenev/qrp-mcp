@@ -53,6 +53,21 @@ Detection changes: findings and their fingerprint move where these constructs ar
 
   It is classified `deprecated_weak` with severity high, and is not quantum vulnerable: there is
   no signature to break. `none` counts only inside an algorithm setting or argument.
+
+  Two gaps were found by a positive control on OWASP Juice Shop and are now closed:
+  - jsonwebtoken and `jws` are read through whatever name the file binds them to: a default,
+    namespace or named import, or a require, destructured or not. So are Python's and Go's import
+    aliases. This covers `import { decode } from 'jsonwebtoken'`, `jws.decode`, and
+    `jws.sign({ header: { alg: 'none' } })`.
+
+  The rule for a decode that a verification follows in the same block (Juice Shop
+  `routes/verify.ts:119`, verified six lines below): it is still a row, because the line does read
+  the token unverified. The row now carries `verified_after` and says only that. It does not say
+  the token is accepted unverified, and the finding's reason says so too.
+
+  Not covered: a library version that accepts `none` by itself, such as jsonwebtoken 0.4.0 or
+  express-jwt 0.1.3. That is a dependency, not a line. Also not covered: the browser library
+  jwt-decode.
 - **Catalogue.** The one-line nginx spelling is added to tlsend/nginx. The three pure ML-KEM groups
   in tlsgroups/nginx now expect the mark. Five new catalogue files hold one part of an operation
   each: `keysize_gpg`, `external_placeholder`, `tlsend_android`, `pqc_standalone` and

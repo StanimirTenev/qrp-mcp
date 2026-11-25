@@ -124,3 +124,65 @@ def test_cli_and_mcp_carry_it(tmp_path):
                    env=dict(os.environ))
     for result in (json.loads(out.read_text()), scan_repo(str(root))):
         assert "JWT-unverified" in [f["algorithm_family"] for f in result["findings"]]
+
+
+# The positive control on OWASP Juice Shop c9f9922 (25.11.2026, merene-0.54/red-594): a library is
+# reached through whatever name the file binds it to -- a named import, a destructured require, a
+# default or namespace import, a Python or Go import alias -- and the `jws` package ("jws.decode
+# (signature) ... Returns the decoded header, decoded payload, and signature parts", its README;
+# `alg: 'none'` is in its table: "none | No digital signature or MAC value included").
+@pytest.mark.parametrize("name,text,line", [
+    ("u.ts", "import { decode } from 'jsonwebtoken'\nconst t = decode(userToken, { json: true })\n", 2),
+    ("u.ts", "import { decode as peek } from 'jsonwebtoken'\nconst t = peek(userToken)\n", 2),
+    ("u.js", "const { decode } = require('jsonwebtoken');\nconst t = decode(userToken);\n", 2),
+    ("u.ts", "import * as token from 'jsonwebtoken'\nconst t = token.decode(userToken)\n", 2),
+    ("u.ts", "import tok from 'jsonwebtoken'\nconst u = tok.sign(p, null, { algorithm: 'none' })\n", 2),
+    ("u.ts", "import { sign } from 'jsonwebtoken'\nconst u = sign(p, null, { algorithm: 'none' })\n", 2),
+    ("i.ts", "import jws from 'jws'\nexport const decode = (t: string) => { return jws.decode(t)?.payload }\n", 2),
+    ("i.js", "const JWS = require('jws');\nconst p = JWS.decode(t).payload;\n", 2),
+    ("i.js", "const jws = require('jws');\nconst s = jws.sign({ header: { alg: 'none' }, payload: p });\n", 2),
+    ("a.py", "import jwt as pyjwt\nt = pyjwt.encode({'a': 1}, None, algorithm='none')\n", 2),
+    ("a.py", "from jwt import encode\nt = encode({'a': 1}, None, algorithm='none')\n", 2),
+    ("m.go", 'package m\nimport gojwt "github.com/golang-jwt/jwt/v5"\nvar t = gojwt.NewWithClaims(gojwt.SigningMethodNone, c)\n', 3),
+])
+def test_each_name_a_library_is_bound_to(tmp_path, name, text, line):
+    assert _rows(_scan(tmp_path, name, text)) == [line]
+
+
+def test_juice_shop_decode_by_name_is_a_row(tmp_path):
+    text = ("import { decode } from 'jsonwebtoken'\n\nasync function retrieveUserList () {\n"
+            "  const userToken = tokenOf(user)\n  if (userToken) {\n"
+            "    const parsedToken = decode(userToken, { json: true })\n  }\n}\n")
+    result = _scan(tmp_path, "routes/authenticatedUsers.ts", text)
+    row = next(i for i in result["evidence"]["source_code"] if i["algorithm"] == "JWT-unverified")
+    assert row["line"] == 6 and "verified_after" not in row
+
+
+def test_a_decode_that_a_verification_follows_says_so(tmp_path):
+    # routes/verify.ts:119: decoded, then verified at :125 in the same function, the payload used only
+    # in the verify callback. The decode is a row -- it is a decode without verification at that line
+    # -- and says where the verification follows; it does not say the token is accepted unverified.
+    text = ("import jwt from 'jsonwebtoken'\nimport jws from 'jws'\n\n"
+            "function jwtChallenge (req) {\n  const token = jwtFrom(req)\n  if (token) {\n"
+            "    const decoded = jws.decode(token) ? jwt.decode(token) : null\n"
+            "    if (decoded === null) {\n      return\n    }\n"
+            "    jwt.verify(token, publicKey, (err) => {\n      if (err === null) { solve(decoded) }\n"
+            "    })\n  }\n}\n")
+    result = _scan(tmp_path, "routes/verify.ts", text)
+    rows = [i for i in result["evidence"]["source_code"] if i["algorithm"] == "JWT-unverified"]
+    assert [(r["line"], r.get("verified_after")) for r in rows] == [(7, "routes/verify.ts:11")]
+    assert "verification follows" in rows[0]["description"]
+    assert "anyone can forge" not in rows[0]["description"]
+
+
+def test_a_verification_in_another_function_does_not_count(tmp_path):
+    text = ("import jwt from 'jsonwebtoken'\n\nfunction peek (t) {\n  return jwt.decode(t)\n}\n\n"
+            "function check (t) {\n  return jwt.verify(t, key)\n}\n")
+    rows = [i for i in _scan(tmp_path, "p.ts", text)["evidence"]["source_code"]
+            if i["algorithm"] == "JWT-unverified"]
+    assert [(r["line"], r.get("verified_after")) for r in rows] == [(4, None)]
+
+
+def test_a_local_function_named_decode_is_not_jsonwebtoken(tmp_path):
+    text = "import { decode } from './codec'\nconst t = decode(userToken)\n"
+    assert _rows(_scan(tmp_path, "u.ts", text)) == []
