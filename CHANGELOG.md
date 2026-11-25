@@ -4,6 +4,62 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## Unreleased
+
+### Rows 554-560 and 594 (branch popravki-054-b)
+
+Detection changes: findings and their fingerprint move where these constructs are present.
+
+- **nginx statements on one line (row 558).** `server { listen 443 ssl; ... ssl_certificate ...; }`
+  written on one line gave no `tls_listeners` and no `tls_termination.authentication_not_read`;
+  over lines it gave both. nginx ends a directive at `;` and a block at its braces, so the
+  listeners, the unread certificates, the trust stores, the `*_ssl_verify` switches, TLS upstreams
+  and `ssl_verify_client` are now read statement by statement. A row keeps its physical line.
+- **A placeholder's default is an overridable place (row 560).** `${SIGNING_ALG:ECDSA-P256}` was a
+  finding and no place in `chosen_outside_files`. Spring's `${name:default}` (YAML, .properties,
+  `@Value`), the shell's `${p:-w}`, `${p-w}`, `${p:=w}`, `${p=w}` and Compose's `${VAR:-d}`,
+  `${VAR-d}` now carry `default`, `default_family` and `overridable: true`, as
+  `os.environ.get(NAME, default)` does. `:?`, `?`, `:+`, `+` are no default.
+- **gpg key generation (row 557).** `gpg --quick-gen-key ... rsa3072` gave nothing. The algo
+  strings of `--quick-generate-key`, `--quick-gen-key` and `--quick-add-key`,
+  `--default-new-key-algo`, and the `--generate-key --batch` parameter file (`Key-Type`,
+  `Key-Length`, `Key-Curve`) are read, with size and curve. `default`, `future-default`, `-` and
+  `pqc` name no family.
+- **Android network security configuration (row 556).** An `.xml` whose root is
+  `<network-security-config>` is read (any name). A `<pin-set>` is a protocols row
+  (`basis: configured_pin`, `pins`, `pin_digest`, `pin_expiration`) that names no family, since a
+  pin is a hash of a key that is not in the file. A `<certificates src>` is a `trust_stores` place.
+  Every other `.xml` stays unclaimed.
+- **ML-KEM with no classical half (row 555).** A pure ML-KEM group (MLKEM512/768/1024) in a TLS
+  group setting, and Go's `crypto/mlkem` constructors and `tls.MLKEM1024`, mark the ML-KEM row
+  `standalone_pqc: true` with `standalone_basis`. The finding and
+  `summary.by_role.key_establishment` list the places, and so does the CBOM
+  (`qrp:standalone_pqc`). Said of the line: a hybrid built by hand elsewhere is not read.
+- **Where a Python module's cryptography is reached from (row 554).** An occurrence inside a
+  module of the tree carries `reached_from`: up to ten places in other files read that import its
+  top-level function or class and call it, or the import line where no call is seen. It also
+  carries `reached_from_count`, and `reached`, which says the list is static and can be short.
+  The CBOM carries it as `qrp:reached_from`. It stays outside closure and baseline identity.
+- **A JOSE token with no verified signature (row 594).** These ways of accepting or making an
+  Unsecured JWS (`alg: none`), or of reading a token without verifying it, are now a finding of
+  the family `JWT-unverified`:
+  - PyJWT and python-jose: `verify_signature: False`, `none` in `algorithms`;
+  - jsonwebtoken: `none` in `algorithms`, `sign` with `algorithm: 'none'`, `decode`;
+  - jose (panva): `UnsecuredJWT`, `decodeJwt`;
+  - Nimbus: `Algorithm.NONE`, `PlainJWT`;
+  - jjwt: `unsecured()`, `parseUnsecured*`, `Jwts.SIG.NONE`;
+  - golang-jwt: `SigningMethodNone`, `UnsafeAllowNoneSignatureType`, `ParseUnverified`;
+  - a JWT algorithm setting set to `none`.
+
+  It is classified `deprecated_weak` with severity high, and is not quantum vulnerable: there is
+  no signature to break. `none` counts only inside an algorithm setting or argument.
+- **Catalogue.** The one-line nginx spelling is added to tlsend/nginx. The three pure ML-KEM groups
+  in tlsgroups/nginx now expect the mark. Five new catalogue files hold one part of an operation
+  each: `keysize_gpg`, `external_placeholder`, `tlsend_android`, `pqc_standalone` and
+  `sign_unverified`. Like `rng_source`, they are kept out of an ecosystem's closed/open status. The
+  quotations were checked against saved copies of the pages (51 found, 0 missing, 2 without a page).
+- **Not done.** Row 559 (the OIDC `issuer-uri`) is marked for decision and was left.
+
 ## 0.53.0 (2026-11-24)
 
 Detection changes: findings and their fingerprint move. Ten more (operation, ecosystem) pairs are
