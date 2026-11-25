@@ -1415,6 +1415,24 @@ def _tokens(line: str) -> list[str]:
     return line.split("#", 1)[0].split()
 
 
+# Row 558 (25.11.2026): nginx ends a directive at its `;` and a block at its braces, not at a line
+# ("A simple directive consists of the name and parameters separated by spaces and ends with a
+# semicolon (;). A block directive has the same structure as a simple directive, but instead of the
+# semicolon it ends with a set of additional instructions surrounded by braces", nginx.org,
+# beginners_guide.html). `server { listen 443 ssl; ... ssl_certificate ...; }` on one line was one
+# line starting with `server`, and every directive after the brace was lost.
+_NGINX_STATEMENT = re.compile(r"[^;{}]*[;{]|\}|[^;{}]+$")
+
+
+def nginx_statements(line: str) -> list[str]:
+    """The statements one line of an nginx configuration holds, each ending with its `;` or `{`
+    and a `}` on its own, the comment cut first; the line itself where it holds one."""
+    text = line.split("#", 1)[0]
+    if text.count(";") + text.count("{") + text.count("}") <= 1:
+        return [text]
+    return [s for s in _NGINX_STATEMENT.findall(text) if s.strip()]
+
+
 def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     """HAProxy listeners that terminate TLS, with the settings left to the defaults, and
     backend connections whose certificate is not verified (HAProxy, nginx)."""
@@ -1429,7 +1447,10 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
             if words[0] == f"ssl-default-bind-{key}":
                 defaults[key] = True
     out: list[dict[str, Any]] = []
-    verify_set = set(_NGINX_VERIFY_SET.findall("\n".join(lines)))
+    # Row 558: the nginx directives are read as statements, wherever on a line they start.
+    statements = [nginx_statements(text) if "ssl" in text or "_pass" in text else [text]
+                  for text in lines]
+    verify_set = set(_NGINX_VERIFY_SET.findall("\n".join(s for each in statements for s in each)))
     said = {"versions": "protocol versions", "ciphers": "TLS 1.2 cipher list",
             "ciphersuites": "TLS 1.3 cipher suites", "curves": "groups"}
     for number, text in enumerate(lines, 1):
@@ -1453,27 +1474,29 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
                         "basis": "configured_listener", "listener": "HAProxy bind",
                         "library_defaults": absent, "deprecated": False,
                         "excerpt": text.strip()[:200], "description": description})
-        verify_off = None
-        if _HAPROXY_SERVER.match(text) and "ssl" in words:
+        offs: list[tuple[str, str]] = []
+        # An nginx `server { ... }` on one line is not an HAProxy server line (row 558).
+        if _HAPROXY_SERVER.match(text) and "ssl" in words and "{" not in text:
             at = [i for i, w in enumerate(words) if w == "verify"]
             if at and at[-1] + 1 < len(words) and words[at[-1] + 1] == "none":
-                verify_off = ("verify none", f"HAProxy, on a {words[0]} line")
+                offs.append(("verify none", f"HAProxy, on a {words[0]} line"))
         elif _HAPROXY_GLOBAL_VERIFY_NONE.match(text):
-            verify_off = ("ssl-server-verify none",
-                          "HAProxy, for every server line that does not say verify required")
-        elif _NGINX_VERIFY_OFF.match(text):
-            verify_off = (f"{_NGINX_VERIFY_OFF.match(text).group(1)} off",
-                          "nginx; off is also nginx's default")
+            offs.append(("ssl-server-verify none",
+                         "HAProxy, for every server line that does not say verify required"))
         elif _CADDY_SKIP_VERIFY.match(text):
-            verify_off = ("tls_insecure_skip_verify", "Caddy, a reverse_proxy transport")
-        elif _NGINX_TLS_UPSTREAM.match(text):
-            module = next(g for g in _NGINX_TLS_UPSTREAM.match(text).groups() if g)
-            if module not in verify_set:
-                verify_off = (f"{module}_ssl_verify not set",
-                              f"nginx's default is off, and the file does not set "
-                              f"{module}_ssl_verify")
-        client = _NGINX_VERIFY_CLIENT.match(text)
-        if client:
+            offs.append(("tls_insecure_skip_verify", "Caddy, a reverse_proxy transport"))
+        else:
+            for statement in statements[number - 1]:
+                if _NGINX_VERIFY_OFF.match(statement):
+                    offs.append((f"{_NGINX_VERIFY_OFF.match(statement).group(1)} off",
+                                 "nginx; off is also nginx's default"))
+                elif _NGINX_TLS_UPSTREAM.match(statement):
+                    module = next(g for g in _NGINX_TLS_UPSTREAM.match(statement).groups() if g)
+                    if module not in verify_set:
+                        offs.append((f"{module}_ssl_verify not set",
+                                     f"nginx's default is off, and the file does not set "
+                                     f"{module}_ssl_verify"))
+        for client in filter(None, map(_NGINX_VERIFY_CLIENT.match, statements[number - 1])):
             verified, what = _CLIENT_VERIFICATION[client.group(1)]
             out.append({
                 "path": rel_path, "line": number, "protocol": "tls", "version": None,
@@ -1482,8 +1505,7 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
                 "excerpt": text.strip()[:200],
                 "description": f"The client's certificate (ssl_verify_client {client.group(1)}): {what}",
             })
-        if verify_off:
-            setting, where = verify_off
+        for setting, where in dict(offs).items():
             out.append({
                 "path": rel_path, "line": number, "protocol": "tls", "version": None,
                 "basis": "configured_verification", "peer_verification": "off",

@@ -576,7 +576,9 @@ def _upstream_verification_across_includes(scan_result: dict[str, Any], root: Pa
             continue
         if "include" not in text:
             continue
-        sets[rel] = set(assets._NGINX_VERIFY_SET.findall(text))
+        # Row 558: a `proxy_ssl_verify on;` after another statement on its line sets it too.
+        sets[rel] = set(assets._NGINX_VERIFY_SET.findall("\n".join(
+            st for raw in text.splitlines() for st in assets.nginx_statements(raw))))
         for raw in text.splitlines():
             m = adaptive._INCLUDE.match(raw)
             if not m or m.group(1) != "include":
@@ -727,14 +729,14 @@ def _authentication_not_read(result: dict[str, Any], root: Path) -> None:
             lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
-        for n, line in enumerate(lines, 1):
-            m = _AUTHENTICATION_FILE.match(line)
-            if not m:
-                continue
-            named = m.group(2) or m.group(3)
-            if named.rsplit("/", 1)[-1] not in names_read:
-                places.append({"path": rel, "line": n,
-                               "setting": m.group(1) or "crt", "file": named})
+        for n, raw in enumerate(lines, 1):
+            # Row 558: every statement of the line, as nginx reads them.
+            for m in filter(None, map(_AUTHENTICATION_FILE.match, assets.nginx_statements(raw)
+                                      if "ssl_cert" in raw else [raw])):
+                named = m.group(2) or m.group(3)
+                if named.rsplit("/", 1)[-1] not in names_read:
+                    places.append({"path": rel, "line": n,
+                                   "setting": m.group(1) or "crt", "file": named})
     if not places:
         return
     tls["authentication_not_read"] = {
@@ -811,13 +813,16 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
             lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
-        if not any(_NGINX_SERVER.match(line) for line in lines):
+        # Row 558: read statement by statement, so a block or two directives on one line are
+        # read as nginx reads them; each keeps the line it is on.
+        statements = [(n, s) for n, raw in enumerate(lines, 1)
+                      for s in assets.nginx_statements(raw)]
+        if not any(_NGINX_SERVER.match(line) for _, line in statements):
             continue
         blocks: list[dict[str, Any]] = []
-        outside: dict[str, list[int]] = {"groups": [], "certificates": []}
+        outside: dict[str, list[tuple[int, str]]] = {"groups": [], "certificates": []}
         depth, current = 0, None
-        for n, raw in enumerate(lines, 1):
-            line = raw.split("#", 1)[0]
+        for n, line in statements:
             if current is None and _NGINX_SERVER.match(line):
                 current = {"line": n, "depth": depth, "listen": [], "server_name": [],
                            "groups": [], "certificates": []}
@@ -837,7 +842,7 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                     "certificates" if _AUTHENTICATION_FILE.match(line)
                     and not line.lstrip().startswith("bind") else None)
             if kind:
-                (target[kind] if target else outside[kind]).append(n)
+                (target[kind] if target else outside[kind]).append((n, line))
             depth += line.count("{") - line.count("}")
             if current is not None and depth <= current["depth"]:
                 blocks.append(current)
@@ -851,8 +856,8 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                     "in this file, outside the server block: nginx applies it unless the "
                     "block or an included file sets its own")
             if group_lines:
-                at = group_lines[-1]
-                value = _NGINX_GROUPS.match(lines[at - 1].split("#", 1)[0]).group(1)
+                at, text = group_lines[-1]
+                value = _NGINX_GROUPS.match(text).group(1)
                 groups = {"line": at, "set": where,
                           "groups": [_group_entry(g) for g in value.split(":") if g]}
             else:
@@ -864,8 +869,8 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                 cert_lines, where = outside["certificates"], (
                     "in this file, outside the server block")
             certificates = []
-            for at in cert_lines:
-                m = _AUTHENTICATION_FILE.match(lines[at - 1])
+            for at, text in cert_lines:
+                m = _AUTHENTICATION_FILE.match(text)
                 named = m.group(2) or ""
                 # Linked only where the written path is a file read: relative to the root or
                 # to this file's directory. An absolute path, or a file of the same name
@@ -939,36 +944,40 @@ def _trust_stores(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
         except OSError:
             continue
         for n, line in enumerate(lines, 1):
-            setting = named = None
+            loads: list[tuple[str, str | None]] = []
             m = _TRUST_PYTHON.search(line) if suffix == "py" else None
             if m:
-                setting, named = m.group(1) or m.group(3), m.group(2) or m.group(4)
+                loads.append((m.group(1) or m.group(3), m.group(2) or m.group(4)))
             m = _TRUST_GO.search(line) if suffix == "go" else None
             if m:
-                setting = m.group(1)
                 found = [f.group(1) for f in map(_GO_READ_FILE.search, lines[max(0, n - 11):n])
                          if f]
-                named = found[-1] if found else None
-            m = _TRUST_NGINX.match(line.split("#", 1)[0]) if suffix not in ("py", "go") else None
-            if m:
-                setting, named = m.group(1) or m.group(3), m.group(2) or m.group(4)
-            if not setting:
-                continue
-            linked = sorted({c for c in (named, str(Path(rel).parent / named))
-                             if named and not named.startswith("/") and c in read}) \
-                if named else []
-            places.append({
-                "path": rel, "line": n, "in_test_code": detectors.in_test_code(rel),
-                "setting": setting, "file": named,
-                "file_read": linked, "outside_the_tree": bool(named and named.startswith("/")),
-                "anchors": [{"path": a["path"], "line": a["line"], "family": a["algorithm"],
-                             **{k: a[k] for k in ("key_size", "curve") if k in a},
-                             "subject": a["certificate"].get("subject"),
-                             "self_signed": a["certificate"].get("self_signed")}
-                            for f in linked for a in anchors.get(f, [])]})
+                loads.append((m.group(1), found[-1] if found else None))
+            if suffix not in ("py", "go"):
+                # Row 558: each nginx statement of the line.
+                for m in filter(None, map(_TRUST_NGINX.match, assets.nginx_statements(line)
+                                          if "_certificate" in line else [line.split("#", 1)[0]])):
+                    loads.append((m.group(1) or m.group(3), m.group(2) or m.group(4)))
+            for setting, named in loads:
+                places.append(_trust_place(rel, n, setting, named, read, anchors))
     if not places:
         return None
     return {"meaning": TRUST_STORES_MEANING, "count": len(places), "places": places}
+
+
+def _trust_place(rel: str, n: int, setting: str, named: str | None, read: set[str],
+                 anchors: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    linked = sorted({c for c in (named, str(Path(rel).parent / named))
+                     if named and not named.startswith("/") and c in read}) if named else []
+    return {
+        "path": rel, "line": n, "in_test_code": detectors.in_test_code(rel),
+        "setting": setting, "file": named,
+        "file_read": linked, "outside_the_tree": bool(named and named.startswith("/")),
+        "anchors": [{"path": a["path"], "line": a["line"], "family": a["algorithm"],
+                     **{k: a[k] for k in ("key_size", "curve") if k in a},
+                     "subject": a["certificate"].get("subject"),
+                     "self_signed": a["certificate"].get("self_signed")}
+                    for f in linked for a in anchors.get(f, [])]}
 
 
 def _readiness_by_role(result: dict[str, Any]) -> None:

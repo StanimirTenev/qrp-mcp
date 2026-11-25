@@ -10,7 +10,7 @@ catalogue_version = "1"
 
 [[ecosystems]]
 ecosystem = "nginx"
-scope = "nginx http/stream listen ssl, proxy/grpc/uwsgi ssl_verify and *_ssl_trusted_certificate, ssl_client_certificate, ssl_trusted_certificate, ssl_verify_client as written; HAProxy bind ssl, verify none (server, default-server, ssl-server-verify), server ca-file; Caddy reverse_proxy tls_insecure_skip_verify. Not covered: ssl_verify_client by default (off), HAProxy bind verify (the client side), the upstream direction of *_ssl_protocols (row 193), Envoy, Traefik, listen quic, grpc/uwsgi verification by default."
+scope = "nginx http/stream listen ssl, proxy/grpc/uwsgi ssl_verify and *_ssl_trusted_certificate, ssl_client_certificate, ssl_trusted_certificate, ssl_verify_client as written; HAProxy bind ssl, verify none (server, default-server, ssl-server-verify), server ca-file; Caddy reverse_proxy tls_insecure_skip_verify; every nginx directive above read as a statement wherever it starts on a line (a block or several directives on one line, row 558). Not covered: ssl_verify_client by default (off), HAProxy bind verify (the client side), the upstream direction of *_ssl_protocols (row 193), Envoy, Traefik, listen quic, grpc/uwsgi verification by default."
 
 [[ecosystems.spellings]]
 id = "nginx-http-listen-ssl"
@@ -372,6 +372,41 @@ backend b
   server s1 10.0.0.1:443 ssl verify required ca-file /etc/ssl/up-ca.pem
 '''
 expect = {rows = [{at = "trust_stores.places", match = {path = "haproxy.cfg", line = 2}}]}
+
+[[ecosystems.spellings]]
+id = "nginx-statements-on-one-line"
+spelling = "server { listen 443 ssl; ssl_certificate ...; } on one line (row 558)"
+source = "https://nginx.org/en/docs/beginners_guide.html"
+quote = "A simple directive consists of the name and parameters separated by spaces and ends with a semicolon ( ; )."
+file = "nginx.conf"
+snippet = '''
+server { listen 443 ssl; server_name core.example; ssl_ecdh_curve X25519:prime256v1; ssl_certificate /etc/pki/core.crt; ssl_certificate_key /etc/pki/core.key; }
+'''
+expect = {rows = [{at = "tls_listeners.places", match = {path = "nginx.conf", line = 1}}, {at = "tls_termination.authentication_not_read.places", match = {path = "nginx.conf", line = 1, setting = "ssl_certificate"}}, {at = "tls_termination.authentication_not_read.places", match = {path = "nginx.conf", line = 1, setting = "ssl_certificate_key"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+http { server { listen 443 ssl; ssl_ecdh_curve X25519; ssl_certificate /e/a.crt; } server { listen 8443 ssl; ssl_certificate /e/b.crt; } }
+'''
+expect = {rows = [{at = "tls_listeners.places", match = {path = "nginx.conf", line = 1}}, {at = "tls_termination.authentication_not_read.places", match = {line = 1, file = "/e/b.crt"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+server { listen 443 ssl; location / { proxy_pass https://up; proxy_ssl_verify off; } }
+'''
+expect = {rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 1, basis = "configured_verification", peer_verification = "off", verification_setting = "proxy_ssl_verify off"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+server { listen 443 ssl; location / { grpc_pass grpcs://up; } }
+'''
+expect = {rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 1, basis = "configured_verification", peer_verification = "off", verification_setting = "grpc_ssl_verify not set"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+server { listen 443 ssl; ssl_verify_client on; ssl_client_certificate /e/ca.pem; }
+'''
+expect = {rows = [{at = "evidence.protocols", match = {path = "nginx.conf", line = 1, peer_verification = "on", verification_setting = "ssl_verify_client on"}}, {at = "trust_stores.places", match = {path = "nginx.conf", line = 1, setting = "ssl_client_certificate"}}]}
 
 [[ecosystems.refresh]]
 source = "https://nginx.org/en/docs/http/ngx_http_proxy_module.html"
