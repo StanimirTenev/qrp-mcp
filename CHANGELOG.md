@@ -48,19 +48,35 @@ crypto-asset libraries, Vyper, and two false signals removed.
   Rust and CI; pqc in Go, Python and Rust; sign in Go. Each quote is cut from the saved page and
   checked verbatim, 82 of 82. `KNOWN_OPERATIONS` gains Go's apiname, pqc and sign and Rust's pqc.
   Go stays `closed`. JS and Rust move to `partially_closed`.
-- **Corpus regression** against 0.53.0. This is disagreement with a model, not recall or precision.
-  A' is unchanged in both splits, and so is B' in `merene`. B' in `obuchenie` rises by 10 ECDSA
-  chunks. All ten are in bitcoinjs-lib's tests: `psbt.signInput`, `signAllInputsHD`,
-  `validateSignaturesOfInput`, `bip32.fromSeed` and `keyPair.sign`. These are the documented calls
-  row 572 asked for, and the labeller saw no algorithm named in those chunks. Four chunks are in
-  `taproot.spec.ts`, where a Psbt signature on a Taproot input is Schnorr: the scan calls every
-  Psbt signing call ECDSA over secp256k1 and does not tell the input type. The labeller has no
-  Pairing family. The gate exits 1 on this rise; it was not loosened.
-  The new families are outside the labeller's set, so the cached scans of both versions were also
-  compared repository by repository. In 180 of 185 nothing changed, and in all 185
-  `pqc_readiness` and `readiness_by_role` are the same. The first comparison found `Kzg` inside
-  base64 in three repositories that are not chain projects (a JWS, a JWE, a certificate bundle);
-  that was fixed before this note.
+- **`web3` and `ethers` as bare words** (row 598). These are no longer ECDSA; only an import plus
+  a key or signing call is, read in `libcalls.py`, including a dynamic `await import('ethers')`.
+  web3.py's `w3.eth.account` calls are read too. Measured on OWASP Juice Shop c9f9922 against
+  5316656: ECDSA rows went from 349 to 8. All 317 rows that hand-reading marked as no cryptography
+  are gone: routes, component names, test titles, i18n strings, `formatEther`. The one real key
+  derivation, `HDNodeWallet.fromPhrase`, is still read, now on the line of the call.
+- **Node's crypto in Juice Shop's tests** (row 599).
+  - `crypto.sign(..., { dsaEncoding })` over an EC key is ECDSA. It was DSA, read from the
+    option's name; Node: "For DSA and ECDSA, this option specifies the format".
+  - A `createECDH` object whose private key is set or read, in a file with no `computeSecret`, is an
+    EC key pair. A `createECDH` alone stays ECDH (row 413).
+- **`ecosystems.present[].closed_scope`.** Each closed operation now carries the `scope` of its
+  catalogue entry. `ecosystems.meaning` says an operation is closed against the libraries its
+  catalogue lists, not every library of the ecosystem. Go reads `closed` on that bounded list; JS,
+  Python and Rust read `partially_closed`. Findings and the fingerprint do not change.
+- **Corpus regression** against 0.53.0, at the last commit. This is disagreement with a model, not
+  recall or precision.
+  - A' is unchanged in both splits. B' falls: `obuchenie` 264 to 257, `merene` 42 to 34. The gate
+    passes.
+  - An earlier commit of this release made the gate exit 1: ECDSA B' rose by 10 chunks, all in
+    bitcoinjs-lib's tests (`psbt.signInput`, `bip32.fromSeed`, `keyPair.sign`). The owner decided to
+    ship 0.54.0 even so. Those ten rows are still there.
+  - The cached scans of both versions were also compared repository by repository, because the new
+    families are outside the labeller's set. 175 of 185 are unchanged.
+  - Two repositories move from `classical_only` to `unknown`: a hardhat template whose only ECDSA
+    was the word `ethers` (hardhat helpers, `parseEther`), and a package.json naming "web3". Row 598
+    asked for that change.
+  - The comparison also found `Kzg` inside base64 in three repositories that are not chain
+    projects; that was fixed.
 - **Not claimed / not done.**
   - Solidity, Vyper and circom have no ecosystem in the catalogue; their spellings are tested
     apart.
@@ -70,7 +86,10 @@ crypto-asset libraries, Vyper, and two false signals removed.
     - the GG20 command-line binaries;
     - `tss.NewParameters(tss.S256(), ...)`;
     - the parameter set from slh-dsa's type.
-  - bitcoinjs' Psbt signing calls are ECDSA even for a Taproot input, which is Schnorr.
+  - Known limit (row 595): bitcoinjs' Psbt signing calls are ECDSA even for a Taproot input,
+    which is Schnorr (BIP-340).
+  - Next release: an ecosystem for Solidity, Vyper and circom (row 596); one finding per file for
+    `kzg` field names (row 597).
   - On the probe's 237 lines, 164 had no row on 0.53.0 and 13 still have none. Examples: btcec's
     signature `.Verify`, Solana's `tx.sign`, `contract X is EIP712`, leanSig's generic calls,
     the GG20 binaries and circom.
