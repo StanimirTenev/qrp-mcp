@@ -782,7 +782,7 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # both secp256k1 only, gave nothing; the import names them.
     ("ECDSA", SECP256K1_RULE, re.compile(
         r"(?<!createECDH\(.)secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
-        r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|\bweb3\b|\beth_(?:keys|account)\b|"
+        r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|(?<!@solana/)\bweb3\b|\beth_(?:keys|account)\b|"
         # Whole method names: `personal_signature` is a form field, not the JSON-RPC
         # call (ZA-OPRAVYANE row 78).
         r"(?<![A-Za-z0-9])(?:eth_sign\w*|personal_sign)(?![A-Za-z0-9])|signTypedData",
@@ -4682,6 +4682,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _pq_operations(findings, lines, rel_path)
     findings = _vrf_calls(findings, lines, rel_path)
     findings = libcalls.calls(findings, lines, rel_path, ext, in_test_code)
+    findings = _schnorr_not_ecdsa(findings, lines, rel_path)
     if ext == ".sol":
         findings = _evm_precompiles(findings, lines, rel_path)
         findings = _solidity_signatures(findings, lines, rel_path)
@@ -4882,6 +4883,39 @@ def _contract_function_names(findings: list[dict[str, Any]], lines: list[str], e
             f["evidence_kind"] = "identifier"
             f["not_a_use_rule"] = _CONTRACT_NAME_RULE
             f.pop("_kind_if_used", None)
+
+
+# Row 573: libsecp256k1's BIP-340 Schnorr, extrakeys and MuSig2 functions carry the curve's name
+# (`secp256k1_schnorrsig_sign32`) and were read as ECDSA by it; `frost_secp256k1` likewise (row 588).
+# On a line naming one of them and no ECDSA word, the line's ECDSA row is a Schnorr row.
+_SCHNORR_SECP = re.compile(
+    r"\bsecp256k1_(?:schnorrsig|musig|keypair|xonly)\w*|"
+    r"[<\"]secp256k1_(?:schnorrsig|musig|extrakeys)\.h[>\"]|"
+    r"(?<![A-Za-z0-9])frost[-_](?:secp256k1(?:[-_]tr)?|p256|ristretto255|ed448)(?![A-Za-z0-9])")
+_ECDSA_WORD = re.compile(r"ecdsa|ecrecover", re.IGNORECASE)
+
+
+def _schnorr_not_ecdsa(findings: list[dict[str, Any]], lines: list[str],
+                       rel_path: str) -> list[dict[str, Any]]:
+    if not any(f["algorithm"] == "ECDSA" for f in findings):
+        return findings
+    out = []
+    schnorr_lines = {f["line"] for f in findings if f["algorithm"] == "Schnorr"}
+    for f in findings:
+        n = f.get("line", 0)
+        line = lines[n - 1] if 0 < n <= len(lines) else ""
+        if (f["algorithm"] == "ECDSA" and _SCHNORR_SECP.search(line)
+                and not _ECDSA_WORD.search(line)):
+            if n not in schnorr_lines:
+                f = {**f, "algorithm": "Schnorr",
+                     "description": "Schnorr usage (BIP-340 / MuSig2 / FROST over secp256k1)",
+                     "curve": "secp256k1"}
+                f.pop("key_size", None)
+                schnorr_lines.add(n)
+                out.append(f)
+            continue
+        out.append(f)
+    return out
 
 
 # Rows 562-564: a Solidity contract reaches the EVM's precompiled contracts by address, with no

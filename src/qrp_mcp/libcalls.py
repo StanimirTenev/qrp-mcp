@@ -48,6 +48,9 @@ class Lib:
     classes: tuple[str, ...] = ()
     functions: tuple[str, ...] = ()
     methods: tuple[str, ...] = ()
+    # Names that bind a receiver for `methods` without being read as a call themselves (a second
+    # entry for the same library, of another family: ethers' computeSharedSecret is ECDH).
+    binds: tuple[str, ...] = ()
     # Go: the package name a path is bound to when it is imported without an alias.
     go_names: dict[str, str] = field(default_factory=dict)
 
@@ -69,26 +72,30 @@ def _module_re(modules: tuple[str, ...], sep: str) -> str:
     return "(?:" + "|".join(re.escape(m) for m in modules) + ")(?:" + re.escape(sep) + r"[\w.@/-]*)?"
 
 
-def _split_names(text: str, as_word: str) -> list[str]:
-    """`a, b as c` / `a, b: c` -> the names bound: a, c."""
-    out = []
+def _split_names(text: str, as_word: str) -> dict[str, str]:
+    """`a, b as c` / `a, b: c` -> {bound name: exported name}: {a: a, c: b}."""
+    out = {}
     for part in text.replace("\n", " ").split(","):
         part = part.strip().strip("{}()").strip()
+        if part.startswith("type "):
+            part = part[5:].strip()
         if not part or part == "*":
             continue
         if as_word == ":" and ":" in part:
-            out.append(part.split(":", 1)[1].strip())
+            orig, bound = (s.strip() for s in part.split(":", 1))
         elif re.search(rf"\s{as_word}\s", part):
-            out.append(part.split(f" {as_word} ", 1)[1].strip())
+            orig, bound = (s.strip() for s in part.split(f" {as_word} ", 1))
         else:
-            out.append(part.split()[-1] if part.split() else part)
-    return [n for n in out if re.fullmatch(r"[A-Za-z_$][\w$]*", n)]
+            orig = bound = part.split()[-1] if part.split() else part
+        if re.fullmatch(r"[A-Za-z_$][\w$]*", bound) and re.fullmatch(r"[A-Za-z_$][\w$]*", orig):
+            out[bound] = orig
+    return out
 
 
-def _imports(lib: Lib, text: str) -> tuple[set[str], set[str], list[int]]:
+def _imports(lib: Lib, text: str) -> tuple[set[str], dict[str, str], list[int]]:
     """(aliases, named, import line numbers) the file binds for `lib`."""
     aliases: set[str] = set()
-    named: set[str] = set()
+    named: dict[str, str] = {}
     lines: list[int] = []
 
     def at(m: re.Match) -> None:
@@ -142,14 +149,14 @@ def _imports(lib: Lib, text: str) -> tuple[set[str], set[str], list[int]]:
             named.update(_split_names(m.group(2), "as"))
             at(m)
         for m in re.finditer(rf"(?m)^[ \t]*(?:pub[ \t]+)?use[ \t]+({mod})::(\w+)(?:[ \t]+as[ \t]+(\w+))?[ \t]*;", text):
-            named.add(m.group(3) or m.group(2))
+            named[m.group(3) or m.group(2)] = m.group(2)
             at(m)
         for m in re.finditer(rf"(?m)^[ \t]*(?:pub[ \t]+)?use[ \t]+({mod})(?:[ \t]+as[ \t]+(\w+))?[ \t]*;", text):
             if m.group(2):
                 aliases.add(m.group(2))
             at(m)
         for m in re.finditer(rf"(?m)^[ \t]*(?:pub[ \t]+)?use[ \t]+({mod})::\*[ \t]*;", text):
-            named.update(lib.classes + lib.functions)
+            named.update({n: n for n in lib.classes + lib.functions + lib.binds})
             at(m)
     return aliases, named, sorted(set(lines))
 
@@ -170,7 +177,8 @@ def _alt(names) -> str:
     return "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
 
 
-def _call_patterns(lib: Lib, aliases: set[str], named: set[str], receivers: set[str]) -> list[re.Pattern]:
+def _call_patterns(lib: Lib, aliases: set[str], named: dict[str, str],
+                   receivers: set[str]) -> list[re.Pattern]:
     sep = r"(?:\.|::)"
     pats: list[str] = []
     members = list(lib.classes) + list(lib.functions)
@@ -184,8 +192,8 @@ def _call_patterns(lib: Lib, aliases: set[str], named: set[str], receivers: set[
         if fns:
             body.append(rf"(?:{fns})\s*(?:<[^>()]*>\s*)?\(")
         pats.append(rf"(?<![\w.$])(?:{_alt(aliases)})(?:{sep}\w+)*?{sep}(?:{'|'.join(body)})")
-    named_classes = named & set(lib.classes)
-    named_functions = named & set(lib.functions)
+    named_classes = {b for b, o in named.items() if o in lib.classes}
+    named_functions = {b for b, o in named.items() if o in lib.functions}
     if named_classes:
         pats.append(rf"(?<![\w.$])(?:new\s+)?(?:{_alt(named_classes)})(?:\s*{sep}\s*\w+|\s*(?:<[^>()]*>\s*)?\()")
         # Rust: `Groth16::<Bn254>::prove`
@@ -205,11 +213,12 @@ _ASSIGN = {
 }
 
 
-def _receivers(lib: Lib, lines: list[str], aliases: set[str], named: set[str]) -> set[str]:
+def _receivers(lib: Lib, lines: list[str], aliases: set[str], named: dict[str, str]) -> set[str]:
     """Variables assigned from the library: from a bound name, then from those, to a fixed point."""
     if not lib.methods:
         return set()
-    heads = set(aliases) | (named & (set(lib.classes) | set(lib.functions)))
+    heads = set(aliases) | {b for b, o in named.items()
+                            if o in lib.classes or o in lib.functions or o in lib.binds}
     assigns = []
     for line in lines:
         m = _ASSIGN[lib.lang].match(_code(line, lib.lang))
@@ -236,10 +245,13 @@ def calls(findings: list[dict[str, Any]], lines: list[str], rel_path: str, ext: 
         if lib.lang != lang or not any(m.split("::")[0] in text for m in lib.modules):
             continue
         aliases, named, import_lines = _imports(lib, text)
+        # A named import of the library's namespace (`const { ethers } = require("ethers")`).
+        bases = {m.replace("::", "/").split("/")[-1].split(".")[-1] for m in lib.modules}
+        aliases |= {b for b, o in named.items() if o in bases}
         if lang == "rs":
             # The crate's own name counts only where it is used as a path (`solana_sdk::...`).
             aliases = {a for a in aliases if re.search(rf"(?<![\w:]){re.escape(a)}::", text)}
-        if not (aliases or named):
+        if not (aliases or named) and not import_lines:
             continue
         receivers = _receivers(lib, lines, aliases, named)
         patterns = _call_patterns(lib, aliases, named, receivers)
@@ -296,4 +308,150 @@ register(
     # Setup/Prove/Verify are И (the README shows the Groth16 ones).
     Lib("go", ("github.com/consensys/gnark/backend/plonk",), "Pairing", None,
         "gnark's PLONK backend", functions=("Setup", "Prove", "Verify")),
+)
+
+# Rows 561, 568-572, 574, 581, 583-588, 591-593: wallet and chain libraries (pages in the docstring of
+# tests/test_wallet_library_calls.py; a name not on its page is marked И).
+_K1 = "secp256k1"
+_ETHERS_SIGNERS = ("Wallet", "HDNodeWallet", "BaseWallet", "SigningKey", "HDNodeVoidWallet")
+_ETHERS_METHODS = ("signMessage", "signMessageSync", "signTransaction", "signTypedData",
+                   "_signTypedData", "authorize", "authorizeSync", "derivePath", "deriveChild",
+                   "sign", "signDigest")
+_BTC_SCHNORR = ("signSchnorr", "verifySchnorr", "xOnlyPointAddTweak", "xOnlyPointFromScalar",
+                "xOnlyPointFromPoint", "tweak")
+register(
+    # go-ethereum/crypto (pkg.go.dev): secp256k1 keys and signatures.
+    Lib("go", ("github.com/ethereum/go-ethereum/crypto",), "ECDSA", _K1, "go-ethereum's crypto",
+        functions=("CompressPubkey", "DecompressPubkey", "Ecrecover", "FromECDSA", "FromECDSAPub",
+                   "GenerateKey", "HexToECDSA", "LoadECDSA", "PubkeyToAddress", "S256",
+                   "SaveECDSA", "Sign", "SigToPub", "ToECDSA", "ToECDSAUnsafe", "UnmarshalPubkey",
+                   "ValidateSignatureValues", "VerifySignature")),
+    # ethers v6 (docs.ethers.org/v6/api/wallet, /crypto) and v5 (/v5/api/signer, utils/signing-key).
+    Lib("js", ("ethers",), "ECDSA", _K1, "ethers",
+        classes=_ETHERS_SIGNERS,
+        functions=("verifyMessage", "verifyTypedData", "recoverAddress", "computeAddress",
+                   "recoverPublicKey", "computePublicKey"),
+        methods=_ETHERS_METHODS),
+    # SigningKey.computeSharedSecret: "Returns the ECDH shared secret between this private key and
+    # the other key".
+    Lib("js", ("ethers",), "ECDH", _K1, "ethers", binds=_ETHERS_SIGNERS,
+        methods=("computeSharedSecret",)),
+    # viem (site/pages/docs/accounts/local/*, utilities/*).
+    Lib("js", ("viem",), "ECDSA", _K1, "viem",
+        functions=("generatePrivateKey", "privateKeyToAccount", "mnemonicToAccount",
+                   "hdKeyToAccount", "privateKeyToAddress", "verifyMessage", "verifyTypedData",
+                   "verifyHash", "recoverAddress", "recoverMessageAddress", "recoverPublicKey",
+                   "recoverTypedDataAddress", "signMessage", "signTypedData", "sign"),
+        methods=("signMessage", "signTypedData", "signTransaction", "sign", "signAuthorization")),
+    # web3.js v4 accounts (docs.web3js.org/libdocs/Accounts): the curve of its rows.
+    Lib("js", ("web3", "web3-eth-accounts"), "ECDSA", _K1, "web3.js", classes=("Web3",),
+        functions=("create", "privateKeyToAccount", "sign", "signTransaction", "recover",
+                   "recoverTransaction", "privateKeyToAddress", "privateKeyToPublicKey"),
+        methods=("create", "privateKeyToAccount", "sign", "signTransaction", "recover",
+                 "recoverTransaction", "privateKeyToAddress", "privateKeyToPublicKey")),
+    # eth_account (eth-account.readthedocs.io) and eth_keys (README).
+    Lib("py", ("eth_account",), "ECDSA", _K1, "eth_account", classes=("Account",),
+        methods=("sign_message", "sign_transaction", "sign_typed_data", "unsafe_sign_hash",
+                 "sign_authorization")),
+    Lib("py", ("eth_keys",), "ECDSA", _K1, "eth_keys", classes=("keys", "KeyAPI"),
+        methods=("sign_msg", "sign_msg_hash", "verify_msg", "verify_msg_hash", "recover_from_msg",
+                 "recover_from_msg_hash", "ecdsa_sign", "ecdsa_verify", "ecdsa_recover")),
+    # alloy-signer-local / alloy-signer (docs.rs); ethers-signers (docs.rs).
+    Lib("rs", ("alloy_signer_local", "alloy_signer", "alloy::signers"), "ECDSA", _K1, "alloy",
+        classes=("PrivateKeySigner", "LocalSigner", "MnemonicBuilder"),
+        methods=("sign_message", "sign_message_sync", "sign_hash", "sign_hash_sync",
+                 "sign_typed_data", "sign_typed_data_sync", "sign_transaction",
+                 "sign_transaction_sync", "recover_address_from_msg",
+                 "recover_address_from_prehash")),
+    Lib("rs", ("ethers_signers", "ethers::signers"), "ECDSA", _K1, "ethers-rs",
+        classes=("LocalWallet", "Wallet", "MnemonicBuilder"),
+        methods=("sign_message", "sign_transaction", "sign_typed_data", "sign_hash", "verify",
+                 "recover")),
+    # tiny-secp256k1 (README), bip32 (README), bitcoinjs-lib Psbt (README, ts_src/psbt.ts).
+    Lib("js", ("tiny-secp256k1", "@bitcoinerlab/secp256k1"), "ECDSA", _K1, "tiny-secp256k1",
+        functions=("sign", "signRecoverable", "verify", "recover", "pointFromScalar", "pointAdd",
+                   "pointAddScalar", "pointCompress", "pointMultiply", "privateAdd", "privateSub",
+                   "privateNegate")),
+    Lib("js", ("tiny-secp256k1", "@bitcoinerlab/secp256k1"), "Schnorr", _K1, "tiny-secp256k1",
+        functions=("signSchnorr", "verifySchnorr", "xOnlyPointAddTweak", "xOnlyPointFromScalar",
+                   "xOnlyPointFromPoint")),
+    Lib("js", ("bip32",), "ECDSA", _K1, "bip32", classes=("BIP32Factory",),
+        methods=("fromSeed", "fromBase58", "fromPrivateKey", "fromPublicKey", "derivePath",
+                 "derive", "deriveHardened", "sign", "verify")),
+    Lib("js", ("bip32", "ecpair"), "Schnorr", _K1, "bip32", binds=("BIP32Factory", "ECPairFactory"),
+        methods=("signSchnorr", "verifySchnorr", "tweak")),
+    Lib("js", ("ecpair",), "ECDSA", _K1, "ecpair", classes=("ECPairFactory",),
+        methods=("makeRandom", "fromWIF", "fromPrivateKey", "fromPublicKey", "sign", "verify")),
+    Lib("js", ("bitcoinjs-lib",), "ECDSA", _K1, "bitcoinjs-lib", classes=("Psbt",),
+        methods=("signInput", "signAllInputs", "signInputHD", "signAllInputsHD",
+                 "signInputAsync", "signAllInputsAsync", "validateSignaturesOfInput",
+                 "validateSignaturesOfAllInputs")),
+    Lib("js", ("bitcoinjs-lib",), "Schnorr", _K1, "bitcoinjs-lib", functions=("p2tr",)),
+    # rust-secp256k1 (src/lib.rs, src/schnorr.rs, src/ecdh.rs).
+    Lib("rs", ("secp256k1",), "ECDSA", _K1, "rust-secp256k1",
+        classes=("Secp256k1", "SecretKey", "PublicKey"),
+        methods=("generate_keypair", "sign_ecdsa", "verify_ecdsa", "sign_ecdsa_recoverable",
+                 "recover_ecdsa", "sign_ecdsa_low_r", "sign_ecdsa_with_noncedata")),
+    Lib("rs", ("secp256k1",), "Schnorr", _K1, "rust-secp256k1",
+        classes=("Keypair", "XOnlyPublicKey"), binds=("Secp256k1",),
+        methods=("sign_schnorr", "verify_schnorr", "sign_schnorr_no_aux_rand",
+                 "sign_schnorr_with_aux_rand", "x_only_public_key")),
+    Lib("rs", ("secp256k1::ecdh",), "ECDH", _K1, "rust-secp256k1's ecdh",
+        classes=("SharedSecret",), functions=("shared_secret_point",)),
+    # python-bitcoinlib (README example sign-message.py).
+    Lib("py", ("bitcoin.wallet", "bitcoin.signmessage", "bitcoin.core.key"), "ECDSA", _K1,
+        "python-bitcoinlib", classes=("CBitcoinSecret", "CKey", "CECKey"),
+        functions=("SignMessage", "VerifyMessage")),
+    # Solana: @solana/keys, @solana/kit, @solana/signers (README); web3.js v1 Keypair.
+    Lib("js", ("@solana/keys", "@solana/kit", "@solana/signers"), "Ed25519", None, "the Solana kit",
+        functions=("generateKeyPair", "createKeyPairFromBytes", "createKeyPairFromPrivateKeyBytes",
+                   "generateKeyPairSigner", "createKeyPairSignerFromBytes",
+                   "createKeyPairSignerFromPrivateKeyBytes", "createSignerFromKeyPair",
+                   "signBytes", "verifySignature")),
+    Lib("js", ("@solana/web3.js",), "Ed25519", None, "@solana/web3.js",
+        classes=("Keypair",), methods=("sign", "partialSign")),
+    Lib("rs", ("solana_sdk", "solana_keypair", "solana_signer", "solana_signature"), "Ed25519",
+        None, "the Solana SDK", classes=("Keypair",), functions=("read_keypair_file",),
+        methods=("sign_message", "try_sign_message")),
+    # CometBFT crypto/ed25519, crypto/secp256k1, cosmos-sdk crypto/keys/secp256k1 (pkg.go.dev).
+    Lib("go", ("github.com/cometbft/cometbft/crypto/ed25519",
+               "github.com/tendermint/tendermint/crypto/ed25519"), "Ed25519", None, "CometBFT's ed25519",
+        functions=("GenPrivKey", "GenPrivKeyFromSecret"), methods=("Sign", "VerifySignature")),
+    Lib("go", ("github.com/cometbft/cometbft/crypto/secp256k1",
+               "github.com/tendermint/tendermint/crypto/secp256k1",
+               "github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"), "ECDSA", _K1,
+        "CometBFT's secp256k1", functions=("GenPrivKey", "GenPrivKeyFromSecret"),
+        methods=("Sign", "VerifySignature")),
+    # cosmjs proto-signing / amino (README, directsecp256k1hdwallet.ts, secp256k1hdwallet.ts).
+    Lib("js", ("@cosmjs/proto-signing", "@cosmjs/amino"), "ECDSA", _K1, "cosmjs",
+        classes=("DirectSecp256k1HdWallet", "DirectSecp256k1Wallet", "Secp256k1HdWallet",
+                 "Secp256k1Wallet"),
+        methods=("signDirect", "signAmino")),
+    # bnb-chain tss-lib (README): threshold ECDSA, keygen and signing parties.
+    Lib("go", tuple(f"github.com/bnb-chain/tss-lib{v}/ecdsa/{p}" for v in ("", "/v2")
+                    for p in ("keygen", "signing", "resharing")), "ECDSA", None,
+        "tss-lib (threshold ECDSA)", functions=("NewLocalParty", "GeneratePreParams")),
+    # blst Rust (bindings/rust/README): BLS12-381 signatures.
+    Lib("rs", ("blst::min_pk", "blst::min_sig", "blst"), "BLS", "BLS12-381", "blst",
+        classes=("SecretKey", "PublicKey", "Signature", "AggregateSignature", "AggregatePublicKey"),
+        methods=("sk_to_pk", "sign", "verify", "aggregate_verify", "fast_aggregate_verify",
+                 "aggregate", "key_gen")),
+    # py_ecc.bls (README): G2Basic, G2MessageAugmentation, G2ProofOfPossession.
+    Lib("py", ("py_ecc.bls",), "BLS", "BLS12-381", "py_ecc.bls",
+        classes=("G2Basic", "G2MessageAugmentation", "G2ProofOfPossession")),
+    # noble-curves bls12-381 (README): longSignatures / shortSignatures.
+    Lib("js", ("@noble/curves",), "BLS", "BLS12-381", "noble-curves bls12-381",
+        classes=("bls12_381",), methods=("getPublicKey", "sign", "verify", "aggregatePublicKeys",
+                                         "aggregateSignatures", "verifyBatch")),
+)
+
+# FROST (ZcashFoundation/frost, book/src/tutorial: importing.md, dkg.md, signing.md): threshold
+# Schnorr. Over secp256k1 it is Schnorr, not ECDSA (row 588); over Ed25519 it gives Ed25519 signatures.
+_FROST = ("generate_with_dealer", "split", "part1", "part2", "part3", "commit", "sign", "aggregate")
+register(
+    Lib("rs", ("frost_secp256k1", "frost_secp256k1_tr"), "Schnorr", "secp256k1", "FROST",
+        functions=_FROST),
+    Lib("rs", ("frost_p256", "frost_ristretto255", "frost_ed448"), "Schnorr", None, "FROST",
+        functions=_FROST),
+    Lib("rs", ("frost_ed25519",), "Ed25519", None, "FROST", functions=_FROST),
 )
