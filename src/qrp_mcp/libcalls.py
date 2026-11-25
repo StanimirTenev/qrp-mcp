@@ -123,6 +123,14 @@ def _imports(lib: Lib, text: str) -> tuple[set[str], dict[str, str], list[int]]:
         for m in re.finditer(rf"\b(?:const|let|var)\s*\{{([^}}]*)\}}\s*=\s*(?:await\s+)?require\(\s*{q}{mod}{q}\s*\)", text):
             named.update(_split_names(m.group(1), ":"))
             at(m)
+        # A dynamic import: `const { HDNodeWallet } = await import('ethers')`, `const e = await
+        # import('ethers')` (Juice Shop routes/checkKeys.ts, row 598).
+        for m in re.finditer(rf"\b(?:const|let|var)\s+(\w+)\s*=\s*(?:await\s+)?import\(\s*{q}{mod}{q}\s*\)", text):
+            aliases.add(m.group(1))
+            at(m)
+        for m in re.finditer(rf"\b(?:const|let|var)\s*\{{([^}}]*)\}}\s*=\s*(?:await\s+)?import\(\s*{q}{mod}{q}\s*\)", text):
+            named.update(_split_names(m.group(1), ":"))
+            at(m)
         for m in re.finditer(rf"(?m)^[ \t]*import\s+([^;'\"]*?)\s+from\s+{q}{mod}{q}", text):
             clause = m.group(1)
             star = re.search(r"\*\s+as\s+(\w+)", clause)

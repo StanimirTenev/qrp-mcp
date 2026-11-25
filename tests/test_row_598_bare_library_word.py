@@ -43,7 +43,12 @@ def test_the_word_or_the_import_alone_is_not_ecdsa(tmp_path):
              "const signer = await p.getSigner()\nconst sig = await signer.signMessage('hi')\n", 4),
     ("a.js", "const { Web3 } = require('web3')\nconst web3 = new Web3()\nconst a = web3.eth.accounts.create()\n", 3),
     ("t.py", "from web3 import Web3\nw3 = Web3()\nsigned = w3.eth.account.sign_transaction(tx, key)\n", 3),
-], ids=["ethers-wallet", "ethers-verify", "ethers-signer", "web3js-create", "web3py-sign"])
+    # Juice Shop routes/checkKeys.ts: a dynamic import, found by the bare word before.
+    ("k.ts", "async function f () {\n  const { HDNodeWallet } = await import('ethers')\n"
+             "  const w = HDNodeWallet.fromPhrase(mnemonic)\n}\n", 3),
+    ("k2.js", "const ethersLib = await import('ethers')\nconst w = ethersLib.Wallet.createRandom()\n", 2),
+], ids=["ethers-wallet", "ethers-verify", "ethers-signer", "web3js-create", "web3py-sign",
+        "dynamic-import-named", "dynamic-import-namespace"])
 def test_an_import_and_a_signing_or_key_call_is_ecdsa(tmp_path, name, body, line):
     (tmp_path / name).write_text(body)
     rows = [r for r in scan_directory(tmp_path)["evidence"]["source_code"]
