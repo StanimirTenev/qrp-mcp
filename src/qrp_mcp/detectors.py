@@ -4922,10 +4922,13 @@ def _pyspx_alias(findings: list[dict[str, Any]], lines: list[str]) -> None:
 # Row 573: libsecp256k1's BIP-340 Schnorr, extrakeys and MuSig2 functions carry the curve's name
 # (`secp256k1_schnorrsig_sign32`) and were read as ECDSA by it; `frost_secp256k1` likewise (row 588).
 # On a line naming one of them and no ECDSA word, the line's ECDSA row is a Schnorr row.
-_SCHNORR_SECP = re.compile(
-    r"\bsecp256k1_(?:schnorrsig|musig|keypair|xonly)\w*|"
-    r"[<\"]secp256k1_(?:schnorrsig|musig|extrakeys)\.h[>\"]|"
+# libsecp256k1's names in C only: in Rust `secp256k1_keypair` is a variable's name (lighthouse).
+_SCHNORR_SECP_C = re.compile(
+    r"\bsecp256k1_(?:schnorrsig_\w+|musig_\w+|keypair_\w+|keypair\b|xonly_pubkey\w*)|"
+    r"[<\"]secp256k1_(?:schnorrsig|musig|extrakeys)\.h[>\"]")
+_SCHNORR_FROST = re.compile(
     r"(?<![A-Za-z0-9])frost[-_](?:secp256k1(?:[-_]tr)?|p256|ristretto255|ed448)(?![A-Za-z0-9])")
+_C_EXT = frozenset({".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh"})
 _ECDSA_WORD = re.compile(r"ecdsa|ecrecover", re.IGNORECASE)
 
 
@@ -4938,7 +4941,9 @@ def _schnorr_not_ecdsa(findings: list[dict[str, Any]], lines: list[str],
     for f in findings:
         n = f.get("line", 0)
         line = lines[n - 1] if 0 < n <= len(lines) else ""
-        if (f["algorithm"] == "ECDSA" and _SCHNORR_SECP.search(line)
+        if (f["algorithm"] == "ECDSA"
+                and (_SCHNORR_FROST.search(line)
+                     or (rel_path.lower().endswith(tuple(_C_EXT)) and _SCHNORR_SECP_C.search(line)))
                 and not _ECDSA_WORD.search(line)):
             if n not in schnorr_lines:
                 f = {**f, "algorithm": "Schnorr",

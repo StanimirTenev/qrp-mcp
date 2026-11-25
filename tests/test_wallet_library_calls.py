@@ -245,7 +245,9 @@ CASES = [
     *[("wallet.js", BITCOINJS, n, "Schnorr", "secp256k1") for n in (8, 9, 11)],
     # row 574: rust-secp256k1
     *[("main.rs", RUST_SECP, n, "ECDSA", "secp256k1") for n in (5, 7, 8)],
-    *[("main.rs", RUST_SECP, n, "Schnorr", "secp256k1") for n in (9, 10, 11)],
+    # Keypair::new is a secp256k1 key pair (read with the key types); the scheme is the method's.
+    ("main.rs", RUST_SECP, 9, "ECDSA", "secp256k1"),
+    *[("main.rs", RUST_SECP, n, "Schnorr", "secp256k1") for n in (10, 11)],
     ("main.rs", RUST_SECP, 12, "ECDH", "secp256k1"),
     # row 584: Solana kit / keys / web3.js
     *[("kit.ts", SOLANA_KIT, n, "Ed25519", None) for n in (3, 4, 5, 6, 7)],
@@ -353,3 +355,19 @@ def test_row_582_bls_in_go(tmp_path, name, body, lines):
     rows = _scan(tmp_path, name, body)["evidence"]["source_code"]
     got = {r["line"] for r in rows if r["algorithm"] == "BLS" and r["evidence_kind"] == "call"}
     assert set(lines) <= got, sorted((r["line"], r["algorithm"], r["evidence_kind"]) for r in rows)
+
+
+def test_a_second_family_of_a_library_adds_no_import_row(tmp_path):
+    """Importing ethers is not key agreement, and importing noble's secp256k1 is not BLS
+    (positive control on OpenZeppelin, 25.11.2026: 39 ECDH and 3 BLS import rows)."""
+    rows = _scan(tmp_path, "t.js", "const { ethers } = require('ethers');\n"
+                 "import { secp256k1 } from '@noble/curves/secp256k1';\n"
+                 "const x = ethers.id('ROLE');\n")["evidence"]["source_code"]
+    assert not [r for r in rows if r["algorithm"] in ("ECDH", "BLS")], rows
+
+
+def test_a_rust_variable_named_secp256k1_keypair_is_not_schnorr(tmp_path):
+    """lighthouse lcli: `let secp256k1_keypair = ...` -- a variable, not libsecp256k1's C API."""
+    rows = _scan(tmp_path, "enr.rs", "fn f() {\n    let secret = secp256k1_keypair.secret().to_bytes();\n"
+                 "    let k = k256::ecdsa::SigningKey::random(&mut rng);\n}\n")["evidence"]["source_code"]
+    assert not [r for r in rows if r["algorithm"] == "Schnorr"], rows

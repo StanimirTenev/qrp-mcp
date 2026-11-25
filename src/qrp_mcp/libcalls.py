@@ -51,6 +51,9 @@ class Lib:
     # Names that bind a receiver for `methods` without being read as a call themselves (a second
     # entry for the same library, of another family: ethers' computeSharedSecret is ECDH).
     binds: tuple[str, ...] = ()
+    # The import line is a row of this entry's family. False for a second entry of the same library
+    # (ethers' ECDH, tiny-secp256k1's Schnorr): importing ethers is not key agreement.
+    import_row: bool = True
     # Go: the package name a path is bound to when it is imported without an alias.
     go_names: dict[str, str] = field(default_factory=dict)
 
@@ -296,6 +299,8 @@ def calls(findings: list[dict[str, Any]], lines: list[str], rel_path: str, ext: 
             if not stripped or stripped.startswith(_COMMENT_START[lang]):
                 continue
             if n in import_lines:
+                if not lib.import_row:
+                    continue
                 kind = "import"
             elif any(p.search(_code(line, lang)) for p in patterns):
                 kind = "call"
@@ -365,7 +370,7 @@ register(
     # SigningKey.computeSharedSecret: "Returns the ECDH shared secret between this private key and
     # the other key".
     Lib("js", ("ethers",), "ECDH", _K1, "ethers", binds=_ETHERS_SIGNERS,
-        methods=("computeSharedSecret",)),
+        methods=("computeSharedSecret",), import_row=False),
     # viem (site/pages/docs/accounts/local/*, utilities/*).
     Lib("js", ("viem",), "ECDSA", _K1, "viem",
         functions=("generatePrivateKey", "privateKeyToAccount", "mnemonicToAccount",
@@ -404,29 +409,31 @@ register(
                    "privateNegate")),
     Lib("js", ("tiny-secp256k1", "@bitcoinerlab/secp256k1"), "Schnorr", _K1, "tiny-secp256k1",
         functions=("signSchnorr", "verifySchnorr", "xOnlyPointAddTweak", "xOnlyPointFromScalar",
-                   "xOnlyPointFromPoint")),
+                   "xOnlyPointFromPoint"), import_row=False),
     Lib("js", ("bip32",), "ECDSA", _K1, "bip32", classes=("BIP32Factory",),
         methods=("fromSeed", "fromBase58", "fromPrivateKey", "fromPublicKey", "derivePath",
                  "derive", "deriveHardened", "sign", "verify")),
     Lib("js", ("bip32", "ecpair"), "Schnorr", _K1, "bip32", binds=("BIP32Factory", "ECPairFactory"),
-        methods=("signSchnorr", "verifySchnorr", "tweak")),
+        methods=("signSchnorr", "verifySchnorr", "tweak"), import_row=False),
     Lib("js", ("ecpair",), "ECDSA", _K1, "ecpair", classes=("ECPairFactory",),
         methods=("makeRandom", "fromWIF", "fromPrivateKey", "fromPublicKey", "sign", "verify")),
     Lib("js", ("bitcoinjs-lib",), "ECDSA", _K1, "bitcoinjs-lib", classes=("Psbt",),
         methods=("signInput", "signAllInputs", "signInputHD", "signAllInputsHD",
                  "signInputAsync", "signAllInputsAsync", "validateSignaturesOfInput",
                  "validateSignaturesOfAllInputs")),
-    Lib("js", ("bitcoinjs-lib",), "Schnorr", _K1, "bitcoinjs-lib", functions=("p2tr",)),
+    Lib("js", ("bitcoinjs-lib",), "Schnorr", _K1, "bitcoinjs-lib", functions=("p2tr",),
+        import_row=False),
     # rust-secp256k1 (src/lib.rs, src/schnorr.rs, src/ecdh.rs).
+    # Keypair is a secp256k1 key pair, read with the key types: the scheme is the method's.
     Lib("rs", ("secp256k1",), "ECDSA", _K1, "rust-secp256k1",
-        classes=("Secp256k1", "SecretKey", "PublicKey"),
+        classes=("Secp256k1", "SecretKey", "PublicKey", "Keypair"),
         methods=("generate_keypair", "sign_ecdsa", "verify_ecdsa", "sign_ecdsa_recoverable",
                  "recover_ecdsa", "sign_ecdsa_low_r", "sign_ecdsa_with_noncedata")),
     Lib("rs", ("secp256k1",), "Schnorr", _K1, "rust-secp256k1",
-        classes=("Keypair", "XOnlyPublicKey"), binds=("Secp256k1",),
+        classes=("XOnlyPublicKey",), binds=("Secp256k1", "Keypair"),
         methods=("sign_schnorr", "verify_schnorr", "sign_schnorr_no_aux_rand",
-                 "sign_schnorr_with_aux_rand", "x_only_public_key")),
-    Lib("rs", ("secp256k1::ecdh",), "ECDH", _K1, "rust-secp256k1's ecdh",
+                 "sign_schnorr_with_aux_rand", "x_only_public_key"), import_row=False),
+    Lib("rs", ("secp256k1::ecdh",), "ECDH", _K1, "rust-secp256k1's ecdh", import_row=False,
         classes=("SharedSecret",), functions=("shared_secret_point",)),
     # python-bitcoinlib (README example sign-message.py).
     Lib("py", ("bitcoin.wallet", "bitcoin.signmessage", "bitcoin.core.key"), "ECDSA", _K1,
@@ -470,7 +477,8 @@ register(
     Lib("py", ("py_ecc.bls",), "BLS", "BLS12-381", "py_ecc.bls",
         classes=("G2Basic", "G2MessageAugmentation", "G2ProofOfPossession")),
     # noble-curves bls12-381 (README): longSignatures / shortSignatures.
-    Lib("js", ("@noble/curves",), "BLS", "BLS12-381", "noble-curves bls12-381",
+    Lib("js", ("@noble/curves/bls12-381", "@noble/curves/bls12-381.js"), "BLS", "BLS12-381",
+        "noble-curves bls12-381",
         classes=("bls12_381",), methods=("getPublicKey", "sign", "verify", "aggregatePublicKeys",
                                          "aggregateSignatures", "verifyBatch")),
 )
