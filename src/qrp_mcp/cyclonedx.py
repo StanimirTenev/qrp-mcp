@@ -825,7 +825,7 @@ def _certificate_components(located: list[dict[str, Any]],
 # What a family's own component says that its parameter-set components do not (release 3d).
 _CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_pins",
                                  "provider_configuration", "not_negotiable_by", "not_enabled",
-                                 "fallback_beside_hybrid", "identifier_only",
+                                 "fallback_beside_hybrid", "standalone_pqc", "identifier_only",
                                  "classification_if_used")}
 
 
@@ -1188,6 +1188,11 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["properties"].append({
                 "name": f"{NS}fallback_beside_hybrid",
                 "value": json.dumps(finding["fallback_beside_hybrid"], ensure_ascii=False)})
+        # ML-KEM with no classical half at these places (row 555).
+        if finding.get("standalone_pqc"):
+            component["properties"].append({
+                "name": f"{NS}standalone_pqc",
+                "value": json.dumps(finding["standalone_pqc"], ensure_ascii=False)})
         occurrences = _occurrences([item for item in located if id(item) not in routed],
                                    family, family_of)
         children = _parameter_components(family, finding, by_parameter, family_by_ref)

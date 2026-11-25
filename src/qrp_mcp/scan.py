@@ -102,6 +102,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     roles = _read_roles(scan_result)
     _mark_unread_sizes(scan_result)
     _read_order(scan_result)
+    _mark_standalone_pqc(scan_result)
 
     # Detected algorithms are passed as explicit algorithms so each one is classified.
     # (The gateway's ingest contract routes them through package_metadata instead, which
@@ -192,6 +193,11 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             part["pqc_readiness"] = "hybrid_partial"
             part["because"] = ["a classical key exchange is offered alone beside the hybrid: "
                                + ", ".join(p for places in fallbacks.values() for p in places)]
+
+    standalone = {family: note["standalone_pqc"] for family, note in sorted(notes.items())
+                  if note.get("standalone_pqc")}
+    if standalone:
+        summary.by_role["key_establishment"]["standalone_pqc"] = standalone
 
     coverage_block = coverage.build(
         repo_path=repo_path,
@@ -1288,6 +1294,17 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
             if place not in places:
                 places.append(place)
 
+    # Row 555: the places where a post-quantum family stands with no classical half.
+    for key in ("source_code_findings", "iac_findings"):
+        for item in scan_result.get(key) or []:
+            if item.get("standalone_pqc"):
+                family = family_of.get(item["algorithm"], item["algorithm"])
+                places = notes.setdefault(family, {}).setdefault("standalone_pqc", [])
+                place = f"{item['path']}:{item['line']}"
+                if place not in places:
+                    places.append(place)
+                    places.sort()
+
     # Row 117: the same, where what the image carries is not in this scan's table
     # (`support: not_established`). Not set aside -- nothing says it cannot -- but named, and
     # the headline withheld for it (_unestablished_negotiation).
@@ -1518,6 +1535,53 @@ def _read_order(scan_result: dict[str, Any]) -> None:
                 order = _order_on_line(item.get("path", ""), str(item.get("excerpt") or ""))
                 if order:
                     item["order"] = order
+
+
+# -- ML-KEM with no classical half (ZA-OPRAVYANE row 555) ---------------------------------
+#
+# `ssl_ecdh_curve MLKEM768` and Go's `mlkem.GenerateKey768()` were "ML-KEM usage", the same rows as a
+# hybrid's ML-KEM half. On the day a weakness in lattices is announced, the places where ML-KEM
+# stands alone are the ones whose key exchange it breaks. Pure groups from IANA's TLS Supported
+# Groups (MLKEM512, MLKEM768, MLKEM1024) in a group setting; Go's crypto/mlkem constructors and
+# crypto/tls's `MLKEM1024` CurveID (pkg.go.dev). Said of the line: Go code that combines ML-KEM with
+# a classical KEM by hand elsewhere is not read as a hybrid.
+_PURE_MLKEM_GROUP = re.compile(r"mlkem(?:512|768|1024)", re.IGNORECASE)
+_GO_MLKEM_ALONE = re.compile(
+    r"\bmlkem\.(?:GenerateKey|NewDecapsulationKey|NewEncapsulationKey)(?:768|1024)\b|"
+    r"\btls\.MLKEM(?:512|768|1024)\b")
+
+
+def _standalone_on_line(path: str, excerpt: str) -> str | None:
+    if excerpt.lstrip().startswith(assets._COMMENT_START):
+        return None
+    if path.endswith(".go"):
+        m = _GO_MLKEM_ALONE.search(excerpt)
+        return (f"{m.group(0)} uses ML-KEM as a KEM of its own on this line, with no classical "
+                f"half; a classical KEM combined with it by hand elsewhere in the code is not "
+                f"read") if m else None
+    setting = assets._group_setting(excerpt)
+    if not setting:
+        return None
+    value = _GROUP_VALUE.match(excerpt, setting.end())
+    names = [n.lstrip("*") for n in re.split(r"[:,/]", value.group(1) if value else "")
+             if n and n[0] not in "-!"]
+    pure = [n for n in names if _PURE_MLKEM_GROUP.fullmatch(n.replace("-", "").replace("_", ""))]
+    if not pure:
+        return None
+    where = " ".join(setting.group(0).replace("=", " ").split())
+    return (f"{pure[0]} is offered in {where} as a group of its own: ML-KEM with no classical "
+            f"half, so this key exchange rests on ML-KEM alone")
+
+
+def _mark_standalone_pqc(scan_result: dict[str, Any]) -> None:
+    for key in ("source_code_findings", "iac_findings"):
+        for item in scan_result.get(key) or []:
+            if item.get("algorithm") != "ML-KEM" or item.get("evidence_kind") in ("comment", "ban"):
+                continue
+            basis = _standalone_on_line(item.get("path", ""), str(item.get("excerpt") or ""))
+            if basis:
+                item["standalone_pqc"] = True
+                item["standalone_basis"] = basis
 
 
 def _negotiation(scan_result: dict[str, Any], name: str | None) -> dict[str, Any]:

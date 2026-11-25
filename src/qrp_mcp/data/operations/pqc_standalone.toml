@@ -1,0 +1,151 @@
+# Operation `pqc_standalone` (a part of pqc, named apart so that it does not read as pqc/Go closed),
+# ecosystem Go (25.11.2026, row 555): ML-KEM in Go's standard library, and whether the
+# line uses it alone or as a hybrid. crypto/mlkem's constructors and crypto/tls's CurveID values (pure
+# MLKEM1024 beside the hybrids). Kept in a file of its own. Pages fetched 25.11.2026 (pkg.go.dev).
+# `expect`: an ML-KEM row with its parameter set; `standalone_pqc` where the line uses ML-KEM with no
+# classical half, and not on a hybrid.
+
+operation = "pqc_standalone"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Go"
+scope = "crypto/mlkem GenerateKey768, GenerateKey1024, NewDecapsulationKey768/1024, NewEncapsulationKey768/1024; crypto/tls CurveID MLKEM1024 (standalone) and X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024 (hybrids). Said of the line: ML-KEM combined with a classical KEM by hand elsewhere is not read as a hybrid. Not covered: crypto/hpke KEM identifiers, golang.org/x/crypto, cloudflare/circl (its scheme registry is row 548)."
+
+[[ecosystems.spellings]]
+id = "go-mlkem-generatekey768"
+spelling = "mlkem.GenerateKey768()"
+source = "https://pkg.go.dev/crypto/mlkem"
+quote = "func GenerateKey768() (*DecapsulationKey768, error)"
+file = "kem.go"
+snippet = '''
+package main
+
+import "crypto/mlkem"
+
+func main() {
+	dk, _ := mlkem.GenerateKey768()
+	_ = dk.EncapsulationKey()
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.go", line = 6, algorithm = "ML-KEM", parameter_set = "768", standalone_pqc = true}}]}
+
+[[ecosystems.spellings]]
+id = "go-mlkem-generatekey1024"
+spelling = "mlkem.GenerateKey1024()"
+source = "https://pkg.go.dev/crypto/mlkem"
+quote = "func GenerateKey1024() (*DecapsulationKey1024, error)"
+file = "kem.go"
+snippet = '''
+package main
+
+import "crypto/mlkem"
+
+func main() {
+	dk, _ := mlkem.GenerateKey1024()
+	_ = dk.EncapsulationKey()
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.go", line = 6, algorithm = "ML-KEM", parameter_set = "1024", standalone_pqc = true}}]}
+
+[[ecosystems.spellings]]
+id = "go-mlkem-newdecapsulationkey768"
+spelling = "mlkem.NewDecapsulationKey768(seed)"
+source = "https://pkg.go.dev/crypto/mlkem"
+quote = "func NewDecapsulationKey768(seed []byte) (*DecapsulationKey768, error)"
+file = "kem.go"
+snippet = '''
+package main
+
+import "crypto/mlkem"
+
+func load(seed []byte) {
+	dk, _ := mlkem.NewDecapsulationKey768(seed)
+	_ = dk
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.go", line = 6, algorithm = "ML-KEM", parameter_set = "768", standalone_pqc = true}}]}
+
+[[ecosystems.spellings]]
+id = "go-mlkem-newdecapsulationkey1024"
+spelling = "mlkem.NewDecapsulationKey1024(seed)"
+source = "https://pkg.go.dev/crypto/mlkem"
+quote = "func NewDecapsulationKey1024(seed []byte) (*DecapsulationKey1024, error)"
+file = "kem.go"
+snippet = '''
+package main
+
+import "crypto/mlkem"
+
+func load(seed []byte) {
+	dk, _ := mlkem.NewDecapsulationKey1024(seed)
+	_ = dk
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.go", line = 6, algorithm = "ML-KEM", parameter_set = "1024", standalone_pqc = true}}]}
+
+[[ecosystems.spellings]]
+id = "go-mlkem-newencapsulationkey768"
+spelling = "mlkem.NewEncapsulationKey768(b)"
+source = "https://pkg.go.dev/crypto/mlkem"
+quote = "func NewEncapsulationKey768(encapsulationKey []byte) (*EncapsulationKey768, error)"
+file = "kem.go"
+snippet = '''
+package main
+
+import "crypto/mlkem"
+
+func peer(b []byte) {
+	ek, _ := mlkem.NewEncapsulationKey768(b)
+	_ = ek
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.go", line = 6, algorithm = "ML-KEM", parameter_set = "768", standalone_pqc = true}}]}
+
+[[ecosystems.spellings]]
+id = "go-mlkem-newencapsulationkey1024"
+spelling = "mlkem.NewEncapsulationKey1024(b)"
+source = "https://pkg.go.dev/crypto/mlkem"
+quote = "func NewEncapsulationKey1024(encapsulationKey []byte) (*EncapsulationKey1024, error)"
+file = "kem.go"
+snippet = '''
+package main
+
+import "crypto/mlkem"
+
+func peer(b []byte) {
+	ek, _ := mlkem.NewEncapsulationKey1024(b)
+	_ = ek
+}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "kem.go", line = 6, algorithm = "ML-KEM", parameter_set = "1024", standalone_pqc = true}}]}
+
+[[ecosystems.spellings]]
+id = "go-tls-mlkem1024"
+spelling = "tls.MLKEM1024 in CurvePreferences"
+source = "https://pkg.go.dev/crypto/tls"
+quote = "MLKEM1024 CurveID = 514"
+file = "tls.go"
+snippet = '''
+package main
+
+import "crypto/tls"
+
+var cfg = &tls.Config{CurvePreferences: []tls.CurveID{tls.MLKEM1024}}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "tls.go", line = 5, algorithm = "ML-KEM", parameter_set = "1024", standalone_pqc = true}}]}
+
+[[ecosystems.spellings]]
+id = "go-tls-x25519mlkem768-hybrid"
+spelling = "tls.X25519MLKEM768 in CurvePreferences (a hybrid: not standalone)"
+source = "https://pkg.go.dev/crypto/tls"
+quote = "X25519MLKEM768 CurveID = 4588"
+file = "tls.go"
+snippet = '''
+package main
+
+import "crypto/tls"
+
+var cfg = &tls.Config{CurvePreferences: []tls.CurveID{tls.X25519MLKEM768}}
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "tls.go", line = 5, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.source_code", match = {path = "tls.go", line = 5, standalone_pqc = true}, absent = true}]}
