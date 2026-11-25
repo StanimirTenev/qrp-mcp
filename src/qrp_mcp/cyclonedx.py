@@ -276,6 +276,8 @@ _PROTOCOL_FIELDS = ("security_policy", "policy_status", "policy", "allows_versio
                     "post_quantum", "default_applied", "product", "fragmentation",
                     "fragmentation_default", "udp_setting", "udp_size", "included_by",
                     "listener", "library_defaults", "peer_verification",
+                    # Row 556: an Android <pin-set>.
+                    "pinning", "pins", "pin_digest", "pin_expiration",
                     "verification_setting", "dnssec_algorithm", "dnssec_mnemonic",
                     "recipient_family", "hndl", "key_exchange", "policy_known",
                     # switches.py (batch 0.42.0).
@@ -290,6 +292,8 @@ _CDX_PROTOCOLS = {"tls", "ssh", "ipsec", "ike", "sstp", "wpa"}
 def _protocol_label(asset: dict[str, Any]) -> str:
     if asset.get("listener"):
         return f"TLS listener ({asset['listener']})"
+    if asset.get("basis") == "configured_pin":
+        return f"TLS public-key pin ({asset.get('pin_digest') or 'digest not named'})"
     if asset.get("peer_verification"):
         # "off" for every row but nginx's ssl_verify_client on / optional (stage 3b).
         return f"TLS peer verification {asset['peer_verification']} ({asset['verification_setting']})"
@@ -498,6 +502,23 @@ def _parameter(item: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
     if isinstance(item.get("key_size"), int):
         return str(item["key_size"]), {"key_size": item["key_size"]}
     return None
+
+
+def _reached_properties(components: list[dict[str, Any]], scan_result: dict[str, Any]) -> None:
+    """Row 554: `qrp:reached_from` on a component whose occurrences other files read import and
+    call, as {"path:line": [the places]} (an occurrence carries no properties of its own)."""
+    reached = {(i["path"], i["line"]): i["reached_from"]
+               for i in scan_result["evidence"].get("source_code") or []
+               if isinstance(i, dict) and i.get("reached_from")}
+    if not reached:
+        return
+    for component in components:
+        found = {f"{o['location']}:{o['line']}": reached[(o["location"], o["line"])]
+                 for o in component.get("evidence", {}).get("occurrences") or []
+                 if (o.get("location"), o.get("line")) in reached}
+        if found:
+            component.setdefault("properties", []).append(
+                {"name": f"{NS}reached_from", "value": json.dumps(found, ensure_ascii=False)})
 
 
 def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[str, Any],
@@ -823,7 +844,7 @@ def _certificate_components(located: list[dict[str, Any]],
 # What a family's own component says that its parameter-set components do not (release 3d).
 _CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_pins",
                                  "provider_configuration", "not_negotiable_by", "not_enabled",
-                                 "fallback_beside_hybrid", "identifier_only",
+                                 "fallback_beside_hybrid", "standalone_pqc", "identifier_only",
                                  "classification_if_used")}
 
 
@@ -1186,6 +1207,11 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             component["properties"].append({
                 "name": f"{NS}fallback_beside_hybrid",
                 "value": json.dumps(finding["fallback_beside_hybrid"], ensure_ascii=False)})
+        # ML-KEM with no classical half at these places (row 555).
+        if finding.get("standalone_pqc"):
+            component["properties"].append({
+                "name": f"{NS}standalone_pqc",
+                "value": json.dumps(finding["standalone_pqc"], ensure_ascii=False)})
         occurrences = _occurrences([item for item in located if id(item) not in routed],
                                    family, family_of)
         children = _parameter_components(family, finding, by_parameter, family_by_ref)
@@ -1642,6 +1668,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             [{"name": f"{NS}sha256_crlf_as_lf", "value": folded[path]}] if path in folded else []),
     } for path in cited]
     _confidence_properties(components, scan_result, family_of, family_by_ref)
+    _reached_properties(components, scan_result)
 
     # `complete` is a claim about the component list, so it is tied to the file
     # count rather than to the run finishing without error. Anything short of

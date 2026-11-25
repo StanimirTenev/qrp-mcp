@@ -451,6 +451,10 @@ def _mask_owners(result: dict[str, Any]) -> None:
     # Row 517: the path a trust store is loaded from is source text (a path under /etc that is
     # not in the tree), masked as a line is; a file read keeps its path, as every row does.
     for place in (result.get("trust_stores") or {}).get("places") or []:
+        # Row 556: Android's `system` and `user` name a store, not a path of the code.
+        if place.get("file") in ("system", "user") and str(place.get("setting", "")).startswith(
+                "certificates src"):
+            continue
         if place.get("file") and not place.get("file_read"):
             place["file"] = _mask_excerpt(str(place["file"]), "")
     # The same for the certificate a TLS server loads from outside the files read (row 200).

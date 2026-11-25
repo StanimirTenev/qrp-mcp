@@ -156,6 +156,11 @@ finding (row 463); a post-quantum one also has `qrp:classification: identifier_o
 `pqc_ready` / `pqc_pre_standard`, with `qrp:classification_if_used` beside it. A default
 written beside an environment read is listed in the document's
 `qrp:chosen_outside_files:overridable_defaults` (a JSON array of place, default, family; row 440).
+From 0.54.0 a component also carries these:
+- `qrp:standalone_pqc`: the places where ML-KEM stands with no classical half (row 555);
+- `qrp:reached_from`: for each occurrence another file read imports and calls, a
+  `{"path:line": [places]}` object (row 554);
+- an Android `<pin-set>`: its own protocol component, "TLS public-key pin (SHA-256)" (row 556).
 
 ⚠️ A banned algorithm is not marked, it is **absent**: `!RC4` in a cipher list never
 becomes a component. What the line forbids is not inventory; what it enables is.

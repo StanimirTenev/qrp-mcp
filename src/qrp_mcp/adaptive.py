@@ -33,18 +33,19 @@ from . import assets, confidence, detectors, operations
 # An ecosystem is `closed` when the catalogue holds every one of them: a statement about the gaps
 # known so far, not about every way the ecosystem can name an algorithm. `vrf` of Go and Rust:
 # row 535 (19.11.2026). Go's apiname, pqc and sign and Rust's pqc: the crypto-asset probe of
-# 25.11.2026 (rows 561, 576-579, 582, 586, 587); JS's sign: row 593.
+# 25.11.2026 (rows 561, 576-579, 582, 586, 587); JS's sign: row 593. keysize of CI: row 557,
+# tlsend of Java (Android): row 556 (25.11.2026).
 KNOWN_OPERATIONS: dict[str, tuple[str, ...]] = {
     "C": ("apiname", "ciphers", "external", "keyfile", "keysize", "pqc", "protover", "sign",
           "tlsgroups", "usectx"),
-    "CI": ("encrypt", "external", "sign", "usectx"),
+    "CI": ("encrypt", "external", "keysize", "sign", "usectx"),
     "DNSSEC": ("apiname", "keyfile"),
     "Go": ("apiname", "external", "pqc", "sign", "vrf"),
     "IPsec": ("ike", "keysize", "symhash"),
     "IaC": ("ciphers", "encrypt", "external", "keyfile", "keysize", "pqc", "sign"),
     "JS": ("apiname", "encrypt", "keysize", "protover", "sign", "usectx"),
     "Java": ("apiname", "ciphers", "encrypt", "external", "keyfile", "keysize", "pqc", "protover",
-             "symhash"),
+             "symhash", "tlsend"),
     "NET": ("apiname", "ciphers", "external", "keyfile", "keysize", "protover", "sign", "symhash",
             "tlsgroups", "usectx"),
     "PHP": ("apiname", "encrypt", "keysize", "protover"),
@@ -79,7 +80,12 @@ _FOUND_ONLY = {"vrf": "ECVRF"}
 # `rng_source` (rows 531, 539) is catalogued but never counts toward an ecosystem's status: almost every
 # tree calls a generator, so counting it could only raise a status and push an ecosystem with open,
 # untested operations down `where_to_look` (Vault, Go rank 1 -> 39; the same effect as `vrf` in 0.51.0).
-_NOT_IN_STATUS = {"rng_source"}
+# The parts of an operation catalogued under a name of their own (25.11.2026, rows 555-557, 560): gpg's
+# key generation is not all of keysize/CI, nor Spring placeholders all of external/Java, Android's
+# configuration all of tlsend/Java, standalone ML-KEM in Go all of pqc/Go, an unverified JWT (row 594) all of sign. Their spellings are tested
+# like any other; a part does not close or open its ecosystem.
+_NOT_IN_STATUS = {"rng_source", "keysize_gpg", "external_placeholder", "tlsend_android",
+                  "pqc_standalone", "sign_unverified"}
 # A manifest's (or a dependency row's) package ecosystem, as the catalogue names ecosystems.
 _PACKAGE_ECOSYSTEM = {"pypi": "Py", "npm": "JS", "go": "Go", "cargo": "Rust", "maven": "Java",
                       "nuget": "NET", "rubygems": "PHP", "composer": "PHP"}

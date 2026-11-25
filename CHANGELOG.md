@@ -6,8 +6,11 @@ is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on Git
 
 ## Unreleased (0.54.0)
 
-Detection changes: findings and their fingerprint move. A new family and role, the calls of
-crypto-asset libraries, Vyper, and two false signals removed.
+Detection changes: findings and their fingerprint move.
+
+### Crypto-asset libraries (rows 561-599)
+
+A new family and role, the calls of crypto-asset libraries, Vyper, and two false signals removed.
 
 - **How it was found.** A probe of the crypto-asset world on 25.11.2026: the documentation of each
   wallet, BLS, SNARK, KZG and chain library was saved, one call per line was written from it, and
@@ -98,6 +101,80 @@ crypto-asset libraries, Vyper, and two false signals removed.
   - A spelling is closed only as far as the saved pages name it. viem's generatePrivateKey,
     c-kzg's Python functions and FROST's `generate_with_dealer` are read by the rules but not
     catalogued.
+
+### Rows 554-560 and 594
+
+Findings and their fingerprint move where these constructs are present.
+
+- **nginx statements on one line (row 558).** `server { listen 443 ssl; ... ssl_certificate ...; }`
+  written on one line gave no `tls_listeners` and no `tls_termination.authentication_not_read`;
+  over lines it gave both. nginx ends a directive at `;` and a block at its braces, so the
+  listeners, the unread certificates, the trust stores, the `*_ssl_verify` switches, TLS upstreams
+  and `ssl_verify_client` are now read statement by statement. A row keeps its physical line.
+- **A placeholder's default is an overridable place (row 560).** `${SIGNING_ALG:ECDSA-P256}` was a
+  finding and no place in `chosen_outside_files`. Spring's `${name:default}` (YAML, .properties,
+  `@Value`), the shell's `${p:-w}`, `${p-w}`, `${p:=w}`, `${p=w}` and Compose's `${VAR:-d}`,
+  `${VAR-d}` now carry `default`, `default_family` and `overridable: true`, as
+  `os.environ.get(NAME, default)` does. `:?`, `?`, `:+`, `+` are no default.
+- **gpg key generation (row 557).** `gpg --quick-gen-key ... rsa3072` gave nothing. The algo
+  strings of `--quick-generate-key`, `--quick-gen-key` and `--quick-add-key`,
+  `--default-new-key-algo`, and the `--generate-key --batch` parameter file (`Key-Type`,
+  `Key-Length`, `Key-Curve`) are read, with size and curve. `default`, `future-default`, `-` and
+  `pqc` name no family.
+- **Android network security configuration (row 556).** An `.xml` whose root is
+  `<network-security-config>` is read (any name). A `<pin-set>` is a protocols row
+  (`basis: configured_pin`, `pins`, `pin_digest`, `pin_expiration`) that names no family, since a
+  pin is a hash of a key that is not in the file. A `<certificates src>` is a `trust_stores` place.
+  Every other `.xml` stays unclaimed.
+- **ML-KEM with no classical half (row 555).** A pure ML-KEM group (MLKEM512/768/1024) in a TLS
+  group setting, and Go's `crypto/mlkem` constructors and `tls.MLKEM1024`, mark the ML-KEM row
+  `standalone_pqc: true` with `standalone_basis`. The finding and
+  `summary.by_role.key_establishment` list the places, and so does the CBOM
+  (`qrp:standalone_pqc`). Said of the line: a hybrid built by hand elsewhere is not read.
+- **Where a Python module's cryptography is reached from (row 554).** An occurrence inside a
+  module of the tree carries `reached_from`: up to ten places in other files read that import its
+  top-level function or class and call it, or the import line where no call is seen. It also
+  carries `reached_from_count`, and `reached`, which says the list is static and can be short.
+  The CBOM carries it as `qrp:reached_from`. It stays outside closure and baseline identity.
+- **A JOSE token with no verified signature (row 594).** These ways of accepting or making an
+  Unsecured JWS (`alg: none`), or of reading a token without verifying it, are now a finding of
+  the family `JWT-unverified`:
+  - PyJWT and python-jose: `verify_signature: False`, `none` in `algorithms`;
+  - jsonwebtoken: `none` in `algorithms`, `sign` with `algorithm: 'none'`, `decode`;
+  - jose (panva): `UnsecuredJWT`, `decodeJwt`;
+  - Nimbus: `Algorithm.NONE`, `PlainJWT`;
+  - jjwt: `unsecured()`, `parseUnsecured*`, `Jwts.SIG.NONE`;
+  - golang-jwt: `SigningMethodNone`, `UnsafeAllowNoneSignatureType`, `ParseUnverified`;
+  - a JWT algorithm setting set to `none`.
+
+  It is classified `deprecated_weak` with severity high, and is not quantum vulnerable: there is
+  no signature to break. `none` counts only inside an algorithm setting or argument.
+
+  Two gaps were found by a positive control on OWASP Juice Shop and are now closed:
+  - jsonwebtoken and `jws` are read through whatever name the file binds them to: a default,
+    namespace or named import, or a require, destructured or not. So are Python's and Go's import
+    aliases. This covers `import { decode } from 'jsonwebtoken'`, `jws.decode`, and
+    `jws.sign({ header: { alg: 'none' } })`.
+
+  The rule for a decode that a verification follows in the same block (Juice Shop
+  `routes/verify.ts:119`, verified six lines below): it is still a row, because the line does read
+  the token unverified. The row now carries `verified_after` and says only that. It does not say
+  the token is accepted unverified, and the finding's reason says so too.
+
+  `none` lists and `verify_signature` are read only in a file that imports a JOSE library.
+  jose's `decodeJwt` and `UnsecuredJWT` are read only in a JS/TS file that imports `jose`, because
+  auth0's java-jwt has its own `decodeJwt`. A decode at the top of a file, or in a block that closes
+  on its own line, has no verification "after" it.
+
+  Not covered: a library version that accepts `none` by itself, such as jsonwebtoken 0.4.0 or
+  express-jwt 0.1.3. That is a dependency, not a line. Also not covered: the browser library
+  jwt-decode.
+- **Catalogue.** The one-line nginx spelling is added to tlsend/nginx. The three pure ML-KEM groups
+  in tlsgroups/nginx now expect the mark. Five new catalogue files hold one part of an operation
+  each: `keysize_gpg`, `external_placeholder`, `tlsend_android`, `pqc_standalone` and
+  `sign_unverified`. Like `rng_source`, they are kept out of an ecosystem's closed/open status. The
+  quotations were checked against saved copies of the pages (51 found, 0 missing, 2 without a page).
+- **Not done.** Row 559 (the OIDC `issuer-uri`) is marked for decision and was left.
 
 ## 0.53.0 (2026-11-24)
 

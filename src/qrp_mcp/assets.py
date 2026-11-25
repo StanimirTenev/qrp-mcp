@@ -1415,6 +1415,36 @@ def _tokens(line: str) -> list[str]:
     return line.split("#", 1)[0].split()
 
 
+# Row 558 (25.11.2026): nginx ends a directive at its `;` and a block at its braces, not at a line
+# ("A simple directive consists of the name and parameters separated by spaces and ends with a
+# semicolon (;). A block directive has the same structure as a simple directive, but instead of the
+# semicolon it ends with a set of additional instructions surrounded by braces", nginx.org,
+# beginners_guide.html). `server { listen 443 ssl; ... ssl_certificate ...; }` on one line was one
+# line starting with `server`, and every directive after the brace was lost.
+# Cut at each delimiter in one pass: a regex whose alternatives rescan a long segment that ends at
+# `}` was quadratic, and a 2.2 MB GeoJSON line (rust-bakery/nom, canada.json) did not finish in 15
+# minutes in the corpus regression of 25.11.2026.
+_NGINX_DELIMITER = re.compile(r"[;{}]")
+
+
+def nginx_statements(line: str) -> list[str]:
+    """The statements one line of an nginx configuration holds, each ending with its `;` or `{`
+    and a `}` on its own, the comment cut first; the line itself where it holds one."""
+    text = line.split("#", 1)[0]
+    if text.count(";") + text.count("{") + text.count("}") <= 1:
+        return [text]
+    out: list[str] = []
+    start = 0
+    for m in _NGINX_DELIMITER.finditer(text):
+        if m.group(0) == "}":
+            out.extend((text[start:m.start()], "}"))
+        else:
+            out.append(text[start:m.end()])
+        start = m.end()
+    out.append(text[start:])
+    return [s for s in out if s.strip()]
+
+
 def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     """HAProxy listeners that terminate TLS, with the settings left to the defaults, and
     backend connections whose certificate is not verified (HAProxy, nginx)."""
@@ -1429,7 +1459,10 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
             if words[0] == f"ssl-default-bind-{key}":
                 defaults[key] = True
     out: list[dict[str, Any]] = []
-    verify_set = set(_NGINX_VERIFY_SET.findall("\n".join(lines)))
+    # Row 558: the nginx directives are read as statements, wherever on a line they start.
+    statements = [nginx_statements(text) if "ssl" in text or "_pass" in text else [text]
+                  for text in lines]
+    verify_set = set(_NGINX_VERIFY_SET.findall("\n".join(s for each in statements for s in each)))
     said = {"versions": "protocol versions", "ciphers": "TLS 1.2 cipher list",
             "ciphersuites": "TLS 1.3 cipher suites", "curves": "groups"}
     for number, text in enumerate(lines, 1):
@@ -1453,27 +1486,29 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
                         "basis": "configured_listener", "listener": "HAProxy bind",
                         "library_defaults": absent, "deprecated": False,
                         "excerpt": text.strip()[:200], "description": description})
-        verify_off = None
-        if _HAPROXY_SERVER.match(text) and "ssl" in words:
+        offs: list[tuple[str, str]] = []
+        # An nginx `server { ... }` on one line is not an HAProxy server line (row 558).
+        if _HAPROXY_SERVER.match(text) and "ssl" in words and "{" not in text:
             at = [i for i, w in enumerate(words) if w == "verify"]
             if at and at[-1] + 1 < len(words) and words[at[-1] + 1] == "none":
-                verify_off = ("verify none", f"HAProxy, on a {words[0]} line")
+                offs.append(("verify none", f"HAProxy, on a {words[0]} line"))
         elif _HAPROXY_GLOBAL_VERIFY_NONE.match(text):
-            verify_off = ("ssl-server-verify none",
-                          "HAProxy, for every server line that does not say verify required")
-        elif _NGINX_VERIFY_OFF.match(text):
-            verify_off = (f"{_NGINX_VERIFY_OFF.match(text).group(1)} off",
-                          "nginx; off is also nginx's default")
+            offs.append(("ssl-server-verify none",
+                         "HAProxy, for every server line that does not say verify required"))
         elif _CADDY_SKIP_VERIFY.match(text):
-            verify_off = ("tls_insecure_skip_verify", "Caddy, a reverse_proxy transport")
-        elif _NGINX_TLS_UPSTREAM.match(text):
-            module = next(g for g in _NGINX_TLS_UPSTREAM.match(text).groups() if g)
-            if module not in verify_set:
-                verify_off = (f"{module}_ssl_verify not set",
-                              f"nginx's default is off, and the file does not set "
-                              f"{module}_ssl_verify")
-        client = _NGINX_VERIFY_CLIENT.match(text)
-        if client:
+            offs.append(("tls_insecure_skip_verify", "Caddy, a reverse_proxy transport"))
+        else:
+            for statement in statements[number - 1]:
+                if _NGINX_VERIFY_OFF.match(statement):
+                    offs.append((f"{_NGINX_VERIFY_OFF.match(statement).group(1)} off",
+                                 "nginx; off is also nginx's default"))
+                elif _NGINX_TLS_UPSTREAM.match(statement):
+                    module = next(g for g in _NGINX_TLS_UPSTREAM.match(statement).groups() if g)
+                    if module not in verify_set:
+                        offs.append((f"{module}_ssl_verify not set",
+                                     f"nginx's default is off, and the file does not set "
+                                     f"{module}_ssl_verify"))
+        for client in filter(None, map(_NGINX_VERIFY_CLIENT.match, statements[number - 1])):
             verified, what = _CLIENT_VERIFICATION[client.group(1)]
             out.append({
                 "path": rel_path, "line": number, "protocol": "tls", "version": None,
@@ -1482,8 +1517,7 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
                 "excerpt": text.strip()[:200],
                 "description": f"The client's certificate (ssl_verify_client {client.group(1)}): {what}",
             })
-        if verify_off:
-            setting, where = verify_off
+        for setting, where in dict(offs).items():
             out.append({
                 "path": rel_path, "line": number, "protocol": "tls", "version": None,
                 "basis": "configured_verification", "peer_verification": "off",
@@ -1495,6 +1529,58 @@ def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
                                 f"for the server. It is not visible from outside."),
             })
     return out
+
+
+# -- An Android app's network security configuration (row 556) ---------------------------
+#
+# `res/xml/network_security_config.xml` with `<pin-set><pin digest="SHA-256">` was an unread
+# `.xml`. The file is the app's choice of name (the manifest's `android:networkSecurityConfig`), so
+# it is known by its root element (developer.android.com/privacy-and-security/security-config, read
+# 25.11.2026): `<pin-set expiration=...>` with `<pin digest="SHA-256">`, "a set of certificates by
+# hash of the public key (SubjectPublicKeyInfo of the X.509 certificate)", "Currently, only
+# "SHA-256" is supported"; and `<trust-anchors><certificates src="system" | "user" | raw
+# resource>`. A pin is a hash of a key, so it names no family: the key is not in this file.
+ANDROID_NSC_MARKER = b"<network-security-config"
+_XML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+_NSC_PIN_SET = re.compile(r"<pin-set\b([^>]*)>(.*?)</pin-set\s*>", re.S)
+_NSC_PIN = re.compile(r"<pin\b[^>]*?\bdigest\s*=\s*[\"']([^\"']+)[\"']")
+_NSC_EXPIRATION = re.compile(r"\bexpiration\s*=\s*[\"']([^\"']+)[\"']")
+NSC_CERTIFICATES = re.compile(r"<certificates\b[^>]*?\bsrc\s*=\s*[\"']([^\"']+)[\"']")
+
+
+def _without_xml_comments(lines: list[str]) -> str:
+    return _XML_COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), "\n".join(lines))
+
+
+def android_pins(lines: list[str]) -> list[dict[str, Any]]:
+    """A protocols row for each <pin-set> of a network security configuration."""
+    text = _without_xml_comments(lines)
+    out: list[dict[str, Any]] = []
+    for m in _NSC_PIN_SET.finditer(text):
+        line = text.count("\n", 0, m.start()) + 1
+        digests = _NSC_PIN.findall(m.group(2))
+        expiration = _NSC_EXPIRATION.search(m.group(1))
+        digest = ", ".join(sorted(set(digests))) or None
+        out.append({
+            "line": line, "protocol": "tls", "version": None, "basis": "configured_pin",
+            "pinning": "public key", "pins": len(digests), "pin_digest": digest,
+            **({"pin_expiration": expiration.group(1)} if expiration else {}),
+            "deprecated": False, "excerpt": lines[line - 1].strip()[:200],
+            "description": (
+                f"TLS here accepts only a chain that holds one of {len(digests)} public key(s) "
+                f"pinned by their {digest or 'unnamed'} digest (Android network security "
+                f"configuration, <pin-set>). The pinned keys and their algorithm are not in this "
+                f"file; a key replaced, by a post-quantum one too, needs these pins replaced "
+                f"with it." + (f" After {expiration.group(1)} the pins are not checked."
+                               if expiration else ""))})
+    return out
+
+
+def android_trust_anchors(lines: list[str]) -> list[tuple[int, str]]:
+    """(line, src) for each <certificates src> of a network security configuration."""
+    text = _without_xml_comments(lines)
+    return [(text.count("\n", 0, m.start()) + 1, m.group(1))
+            for m in NSC_CERTIFICATES.finditer(text)]
 
 
 def _tls_version_name(match: re.Match) -> str:

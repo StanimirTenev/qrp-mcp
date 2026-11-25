@@ -11,7 +11,7 @@ from typing import Any
 
 from . import (__version__, adaptive, assets, aws_tls, baseline as baseline_mod, certificates,
                confidence, config, coverage, detectors, dnssec, ike, opcua, operations, profiles,
-               randomness, remediation, suppression)
+               randomness, reached, remediation, suppression)
 from .classifier import (_OID_FAMILIES, SIZED_FAMILIES, FingerprintRequest, classical_status,
                          fingerprint, known_algorithms, summarize)
 
@@ -102,6 +102,7 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     roles = _read_roles(scan_result)
     _mark_unread_sizes(scan_result)
     _read_order(scan_result)
+    _mark_standalone_pqc(scan_result)
 
     # Detected algorithms are passed as explicit algorithms so each one is classified.
     # (The gateway's ingest contract routes them through package_metadata instead, which
@@ -192,6 +193,11 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
             part["pqc_readiness"] = "hybrid_partial"
             part["because"] = ["a classical key exchange is offered alone beside the hybrid: "
                                + ", ".join(p for places in fallbacks.values() for p in places)]
+
+    standalone = {family: note["standalone_pqc"] for family, note in sorted(notes.items())
+                  if note.get("standalone_pqc")}
+    if standalone:
+        summary.by_role["key_establishment"]["standalone_pqc"] = standalone
 
     coverage_block = coverage.build(
         repo_path=repo_path,
@@ -428,6 +434,8 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     # that the table does not know, named rather than left out.
     files_read = result.get("files_read") or []
     assets.join_imports(repo_path, files_read, result["evidence"]["dependencies"])
+    # Row 554: the files read that import and call a Python module's cryptography.
+    reached.annotate(repo_path, files_read, result["evidence"]["source_code"])
     result["dependencies_not_in_table"] = _declared_not_known(repo_path, files_read)
     # Rows 156, 176: where the algorithm is chosen outside the files read.
     places = scan_result.get("runtime_choices") or []
@@ -576,7 +584,9 @@ def _upstream_verification_across_includes(scan_result: dict[str, Any], root: Pa
             continue
         if "include" not in text:
             continue
-        sets[rel] = set(assets._NGINX_VERIFY_SET.findall(text))
+        # Row 558: a `proxy_ssl_verify on;` after another statement on its line sets it too.
+        sets[rel] = set(assets._NGINX_VERIFY_SET.findall("\n".join(
+            st for raw in text.splitlines() for st in assets.nginx_statements(raw))))
         for raw in text.splitlines():
             m = adaptive._INCLUDE.match(raw)
             if not m or m.group(1) != "include":
@@ -727,14 +737,14 @@ def _authentication_not_read(result: dict[str, Any], root: Path) -> None:
             lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
-        for n, line in enumerate(lines, 1):
-            m = _AUTHENTICATION_FILE.match(line)
-            if not m:
-                continue
-            named = m.group(2) or m.group(3)
-            if named.rsplit("/", 1)[-1] not in names_read:
-                places.append({"path": rel, "line": n,
-                               "setting": m.group(1) or "crt", "file": named})
+        for n, raw in enumerate(lines, 1):
+            # Row 558: every statement of the line, as nginx reads them.
+            for m in filter(None, map(_AUTHENTICATION_FILE.match, assets.nginx_statements(raw)
+                                      if "ssl_cert" in raw else [raw])):
+                named = m.group(2) or m.group(3)
+                if named.rsplit("/", 1)[-1] not in names_read:
+                    places.append({"path": rel, "line": n,
+                                   "setting": m.group(1) or "crt", "file": named})
     if not places:
         return
     tls["authentication_not_read"] = {
@@ -811,13 +821,18 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
             lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
-        if not any(_NGINX_SERVER.match(line) for line in lines):
+        # Row 558: read statement by statement, so a block or two directives on one line are
+        # read as nginx reads them; each keeps the line it is on.
+        if not any("server" in raw for raw in lines):
+            continue
+        statements = [(n, s) for n, raw in enumerate(lines, 1)
+                      for s in assets.nginx_statements(raw)]
+        if not any(_NGINX_SERVER.match(line) for _, line in statements):
             continue
         blocks: list[dict[str, Any]] = []
-        outside: dict[str, list[int]] = {"groups": [], "certificates": []}
+        outside: dict[str, list[tuple[int, str]]] = {"groups": [], "certificates": []}
         depth, current = 0, None
-        for n, raw in enumerate(lines, 1):
-            line = raw.split("#", 1)[0]
+        for n, line in statements:
             if current is None and _NGINX_SERVER.match(line):
                 current = {"line": n, "depth": depth, "listen": [], "server_name": [],
                            "groups": [], "certificates": []}
@@ -837,7 +852,7 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                     "certificates" if _AUTHENTICATION_FILE.match(line)
                     and not line.lstrip().startswith("bind") else None)
             if kind:
-                (target[kind] if target else outside[kind]).append(n)
+                (target[kind] if target else outside[kind]).append((n, line))
             depth += line.count("{") - line.count("}")
             if current is not None and depth <= current["depth"]:
                 blocks.append(current)
@@ -851,8 +866,8 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                     "in this file, outside the server block: nginx applies it unless the "
                     "block or an included file sets its own")
             if group_lines:
-                at = group_lines[-1]
-                value = _NGINX_GROUPS.match(lines[at - 1].split("#", 1)[0]).group(1)
+                at, text = group_lines[-1]
+                value = _NGINX_GROUPS.match(text).group(1)
                 groups = {"line": at, "set": where,
                           "groups": [_group_entry(g) for g in value.split(":") if g]}
             else:
@@ -864,8 +879,8 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
                 cert_lines, where = outside["certificates"], (
                     "in this file, outside the server block")
             certificates = []
-            for at in cert_lines:
-                m = _AUTHENTICATION_FILE.match(lines[at - 1])
+            for at, text in cert_lines:
+                m = _AUTHENTICATION_FILE.match(text)
                 named = m.group(2) or ""
                 # Linked only where the written path is a file read: relative to the root or
                 # to this file's directory. An absolute path, or a file of the same name
@@ -938,37 +953,56 @@ def _trust_stores(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
             lines = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
+        # Row 556: an Android network security configuration's trust anchors. A raw resource
+        # (`@raw/my_ca`) is the file res/raw/my_ca.* beside the configuration's res/xml/.
+        android = suffix == "xml" and any("<network-security-config" in t for t in lines)
+        if android:
+            res = str(Path(rel).parent.parent)
+            for n, src in assets.android_trust_anchors(lines):
+                linked = sorted(f for f in read if src.startswith("@raw/")
+                                and str(Path(f).parent) == f"{res}/raw"
+                                and Path(f).stem == src[len("@raw/"):])
+                places.append(_trust_place(rel, n, "certificates src (Android network security "
+                                           "configuration)", src, read, anchors, linked))
         for n, line in enumerate(lines, 1):
-            setting = named = None
+            loads: list[tuple[str, str | None]] = []
             m = _TRUST_PYTHON.search(line) if suffix == "py" else None
             if m:
-                setting, named = m.group(1) or m.group(3), m.group(2) or m.group(4)
+                loads.append((m.group(1) or m.group(3), m.group(2) or m.group(4)))
             m = _TRUST_GO.search(line) if suffix == "go" else None
             if m:
-                setting = m.group(1)
                 found = [f.group(1) for f in map(_GO_READ_FILE.search, lines[max(0, n - 11):n])
                          if f]
-                named = found[-1] if found else None
-            m = _TRUST_NGINX.match(line.split("#", 1)[0]) if suffix not in ("py", "go") else None
-            if m:
-                setting, named = m.group(1) or m.group(3), m.group(2) or m.group(4)
-            if not setting:
-                continue
-            linked = sorted({c for c in (named, str(Path(rel).parent / named))
-                             if named and not named.startswith("/") and c in read}) \
-                if named else []
-            places.append({
-                "path": rel, "line": n, "in_test_code": detectors.in_test_code(rel),
-                "setting": setting, "file": named,
-                "file_read": linked, "outside_the_tree": bool(named and named.startswith("/")),
-                "anchors": [{"path": a["path"], "line": a["line"], "family": a["algorithm"],
-                             **{k: a[k] for k in ("key_size", "curve") if k in a},
-                             "subject": a["certificate"].get("subject"),
-                             "self_signed": a["certificate"].get("self_signed")}
-                            for f in linked for a in anchors.get(f, [])]})
+                loads.append((m.group(1), found[-1] if found else None))
+            if android and "<certificates" in line:
+                pass  # read below, from the whole file (row 556)
+            elif suffix not in ("py", "go"):
+                # Row 558: each nginx statement of the line.
+                for m in filter(None, map(_TRUST_NGINX.match, assets.nginx_statements(line)
+                                          if "_certificate" in line else [line.split("#", 1)[0]])):
+                    loads.append((m.group(1) or m.group(3), m.group(2) or m.group(4)))
+            for setting, named in loads:
+                places.append(_trust_place(rel, n, setting, named, read, anchors))
     if not places:
         return None
     return {"meaning": TRUST_STORES_MEANING, "count": len(places), "places": places}
+
+
+def _trust_place(rel: str, n: int, setting: str, named: str | None, read: set[str],
+                 anchors: dict[str, list[dict[str, Any]]],
+                 linked: list[str] | None = None) -> dict[str, Any]:
+    if linked is None:
+        linked = sorted({c for c in (named, str(Path(rel).parent / named))
+                         if named and not named.startswith("/") and c in read}) if named else []
+    return {
+        "path": rel, "line": n, "in_test_code": detectors.in_test_code(rel),
+        "setting": setting, "file": named,
+        "file_read": linked, "outside_the_tree": bool(named and named.startswith("/")),
+        "anchors": [{"path": a["path"], "line": a["line"], "family": a["algorithm"],
+                     **{k: a[k] for k in ("key_size", "curve") if k in a},
+                     "subject": a["certificate"].get("subject"),
+                     "self_signed": a["certificate"].get("self_signed")}
+                    for f in linked for a in anchors.get(f, [])]}
 
 
 def _readiness_by_role(result: dict[str, Any]) -> None:
@@ -1270,6 +1304,17 @@ def _what_the_evidence_adds(scan_result: dict[str, Any], findings: list[Any],
             if place not in places:
                 places.append(place)
 
+    # Row 555: the places where a post-quantum family stands with no classical half.
+    for key in ("source_code_findings", "iac_findings"):
+        for item in scan_result.get(key) or []:
+            if item.get("standalone_pqc"):
+                family = family_of.get(item["algorithm"], item["algorithm"])
+                places = notes.setdefault(family, {}).setdefault("standalone_pqc", [])
+                place = f"{item['path']}:{item['line']}"
+                if place not in places:
+                    places.append(place)
+                    places.sort()
+
     # Row 117: the same, where what the image carries is not in this scan's table
     # (`support: not_established`). Not set aside -- nothing says it cannot -- but named, and
     # the headline withheld for it (_unestablished_negotiation).
@@ -1500,6 +1545,53 @@ def _read_order(scan_result: dict[str, Any]) -> None:
                 order = _order_on_line(item.get("path", ""), str(item.get("excerpt") or ""))
                 if order:
                     item["order"] = order
+
+
+# -- ML-KEM with no classical half (ZA-OPRAVYANE row 555) ---------------------------------
+#
+# `ssl_ecdh_curve MLKEM768` and Go's `mlkem.GenerateKey768()` were "ML-KEM usage", the same rows as a
+# hybrid's ML-KEM half. On the day a weakness in lattices is announced, the places where ML-KEM
+# stands alone are the ones whose key exchange it breaks. Pure groups from IANA's TLS Supported
+# Groups (MLKEM512, MLKEM768, MLKEM1024) in a group setting; Go's crypto/mlkem constructors and
+# crypto/tls's `MLKEM1024` CurveID (pkg.go.dev). Said of the line: Go code that combines ML-KEM with
+# a classical KEM by hand elsewhere is not read as a hybrid.
+_PURE_MLKEM_GROUP = re.compile(r"mlkem(?:512|768|1024)", re.IGNORECASE)
+_GO_MLKEM_ALONE = re.compile(
+    r"\bmlkem\.(?:GenerateKey|NewDecapsulationKey|NewEncapsulationKey)(?:768|1024)\b|"
+    r"\btls\.MLKEM(?:512|768|1024)\b")
+
+
+def _standalone_on_line(path: str, excerpt: str) -> str | None:
+    if excerpt.lstrip().startswith(assets._COMMENT_START):
+        return None
+    if path.endswith(".go"):
+        m = _GO_MLKEM_ALONE.search(excerpt)
+        return (f"{m.group(0)} uses ML-KEM as a KEM of its own on this line, with no classical "
+                f"half; a classical KEM combined with it by hand elsewhere in the code is not "
+                f"read") if m else None
+    setting = assets._group_setting(excerpt)
+    if not setting:
+        return None
+    value = _GROUP_VALUE.match(excerpt, setting.end())
+    names = [n.lstrip("*") for n in re.split(r"[:,/]", value.group(1) if value else "")
+             if n and n[0] not in "-!"]
+    pure = [n for n in names if _PURE_MLKEM_GROUP.fullmatch(n.replace("-", "").replace("_", ""))]
+    if not pure:
+        return None
+    where = " ".join(setting.group(0).replace("=", " ").split())
+    return (f"{pure[0]} is offered in {where} as a group of its own: ML-KEM with no classical "
+            f"half, so this key exchange rests on ML-KEM alone")
+
+
+def _mark_standalone_pqc(scan_result: dict[str, Any]) -> None:
+    for key in ("source_code_findings", "iac_findings"):
+        for item in scan_result.get(key) or []:
+            if item.get("algorithm") != "ML-KEM" or item.get("evidence_kind") in ("comment", "ban"):
+                continue
+            basis = _standalone_on_line(item.get("path", ""), str(item.get("excerpt") or ""))
+            if basis:
+                item["standalone_pqc"] = True
+                item["standalone_basis"] = basis
 
 
 def _negotiation(scan_result: dict[str, Any], name: str | None) -> dict[str, Any]:

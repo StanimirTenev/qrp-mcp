@@ -1,0 +1,139 @@
+# Operation `external_placeholder` (a part of external, named apart so that it does not read as
+# external/Java or external/CI closed), ecosystems Java (Spring) and CI (Compose, the shell),
+# 25.11.2026, row 560: a
+# value read from outside the file with a default written beside it -- a Spring property placeholder
+# `${name:default}` in .properties, YAML and `@Value`, Compose's `${VAR:-default}` / `${VAR-default}`, the
+# shell's `${parameter:-word}` / `${parameter-word}` / `${parameter:=word}` / `${parameter=word}`. Kept in a
+# file of its own (external/Py and external/Go are external.toml). Pages fetched 25.11.2026. `expect`: a
+# place in chosen_outside_files with the default, its family and `overridable: true`; a required value
+# (`:?`, `?`) and an alternative (`:+`, `+`) are no default.
+
+operation = "external_placeholder"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Java"
+scope = "Spring property placeholders with a default, ${name:default}, in .properties, YAML and @Value(\"...\") on a line that names a cryptographic setting or whose default names an algorithm. Not covered: a placeholder without a default (read as a run-time reference only where the setting's name says so), nested placeholders, SpEL #{...}, @ConfigurationProperties defaults in code."
+
+[[ecosystems.spellings]]
+id = "spring-boot-placeholder-default"
+spelling = "${name:default} (application.yml / .properties)"
+source = "https://docs.spring.io/spring-boot/reference/features/external-config.html"
+quote = "Property placeholders can also specify a default value using a : to separate the default value from the property name, for example ${name:default} ."
+file = "crypto.yaml"
+snippet = '''
+crypto:
+  signature_algorithm: ${SIGNING_ALG:ECDSA-P256}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "crypto.yaml", line = 2, default = "ECDSA-P256", default_family = "ECDSA", overridable = true}}]}
+
+[[ecosystems.spellings.variants]]
+file = "src/main/resources/application.properties"
+snippet = '''
+app.jwt.signature-algorithm=${jwt.alg:RSA-PSS}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "src/main/resources/application.properties", line = 1, default = "RSA-PSS", default_family = "RSA", overridable = true}}]}
+
+[[ecosystems.spellings]]
+id = "spring-value-placeholder-default"
+spelling = "@Value(\"${name:default}\")"
+source = "https://docs.spring.io/spring-framework/reference/core/beans/annotation-config/value-annotations.html"
+quote = "public MovieRecommender(@Value(\"${catalog.name:defaultCatalog}\") String catalog)"
+file = "src/main/java/Keys.java"
+snippet = '''
+class Keys {
+  @Value("${jwt.signing-alg:RS256}") private String alg;
+}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "src/main/java/Keys.java", line = 2, default = "RS256", default_family = "RSA", overridable = true}}]}
+
+[[ecosystems]]
+ecosystem = "CI"
+scope = "Compose interpolation ${VAR:-default} and ${VAR-default}; the shell's ${parameter:-word}, ${parameter-word}, ${parameter:=word}, ${parameter=word}, where the default names an algorithm. ${VAR:?err}, ${VAR?err}, ${VAR:+alt}, ${VAR+alt} and the shell's ${parameter:offset} are no default. Not covered: nested defaults (${A:-${B:-x}}), .env files."
+
+[[ecosystems.spellings]]
+id = "compose-default-colon-dash"
+spelling = "${VAR:-default}"
+source = "https://docs.docker.com/reference/compose-file/interpolation/"
+quote = "${VAR:-default} -> value of VAR if set and non-empty, otherwise default"
+file = "docker-compose.yml"
+snippet = '''
+services:
+  app:
+    environment:
+      SIGNATURE_ALGORITHM: ${SIG_ALG:-ECDSA-P256}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "docker-compose.yml", line = 4, default = "ECDSA-P256", default_family = "ECDSA", overridable = true}}]}
+
+[[ecosystems.spellings]]
+id = "compose-default-dash"
+spelling = "${VAR-default}"
+source = "https://docs.docker.com/reference/compose-file/interpolation/"
+quote = "${VAR-default} -> value of VAR if set, otherwise default"
+file = "docker-compose.yml"
+snippet = '''
+services:
+  app:
+    environment:
+      SIGNATURE_ALGORITHM: ${SIG_ALG-ECDSA-P256}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "docker-compose.yml", line = 4, default = "ECDSA-P256", overridable = true}}]}
+
+[[ecosystems.spellings]]
+id = "compose-required-is-no-default"
+spelling = "${VAR:?error}"
+source = "https://docs.docker.com/reference/compose-file/interpolation/"
+quote = "${VAR:?error} -> value of VAR if set and non-empty, otherwise exit with error"
+file = "docker-compose.yml"
+snippet = '''
+services:
+  app:
+    environment:
+      SIGNATURE_ALGORITHM: ${SIG_ALG:?ECDSA-P256}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {line = 4, overridable = true}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "compose-alternative-is-no-default"
+spelling = "${VAR:+replacement}"
+source = "https://docs.docker.com/reference/compose-file/interpolation/"
+quote = "${VAR:+replacement} -> replacement if VAR is set and non-empty, otherwise empty"
+file = "docker-compose.yml"
+snippet = '''
+services:
+  app:
+    environment:
+      SIGNATURE_ALGORITHM: ${SIG_ALG:+ECDSA-P256}
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {line = 4, overridable = true}, absent = true}]}
+
+[[ecosystems.spellings]]
+id = "shell-assign-default"
+spelling = "${parameter:=word}"
+source = "https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html"
+quote = "${ parameter := word } If parameter is unset or null, the expansion of word is assigned to parameter , and the result of the expansion is the final value of parameter ."
+file = "run.sh"
+snippet = '''
+#!/bin/sh
+SIGNATURE_ALGORITHM="${SIG_ALG:=ECDSA-P256}"
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "run.sh", line = 2, default = "ECDSA-P256", default_family = "ECDSA", overridable = true}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+#!/bin/sh
+SIGNATURE_ALGORITHM="${SIG_ALG=ECDSA-P256}"
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "run.sh", line = 2, default = "ECDSA-P256", overridable = true}}]}
+
+[[ecosystems.spellings]]
+id = "shell-use-default"
+spelling = "${parameter:-word}"
+source = "https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html"
+quote = "$ echo ${v:-unset-or-null} unset-or-null"
+file = "run.sh"
+snippet = '''
+#!/bin/sh
+SIGNATURE_ALGORITHM="${SIG_ALG:-ECDSA-P256}"
+'''
+expect = {rows = [{at = "chosen_outside_files.places", match = {path = "run.sh", line = 2, default = "ECDSA-P256", overridable = true}}]}

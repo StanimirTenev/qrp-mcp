@@ -1,0 +1,96 @@
+# Operation `tlsend_android` (the Android part of tlsend, named apart so that it does not read as
+# tlsend/Java closed: JSSE and the rest are not in it), ecosystem Java (25.11.2026, row 556): what an Android app's network
+# security configuration sets about its TLS endpoints -- the public-key pins and the trust anchors.
+# Kept in a file of its own (tlsend/nginx is tlsend.toml). Page fetched 25.11.2026
+# (developer.android.com/privacy-and-security/security-config). `expect`: a pin-set is a protocols row
+# with basis configured_pin and no family; a `certificates src` is a trust_stores place.
+
+operation = "tlsend_android"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "Java"
+scope = "An Android network security configuration (an .xml whose root is <network-security-config>, any name, as the manifest's android:networkSecurityConfig gives it): <pin-set> with its <pin digest> and expiration, in domain-config; <trust-anchors><certificates src> as a raw resource (linked to res/raw/<name>.* where read), system or user, in base-config, domain-config and debug-overrides. Not covered: cleartextTrafficPermitted, overridePins, certificateTransparency, the manifest attribute itself, a configuration built in code."
+
+[[ecosystems.spellings]]
+id = "android-pin-set"
+spelling = "<pin-set expiration=...><pin digest=\"SHA-256\">"
+source = "https://developer.android.com/privacy-and-security/security-config"
+quote = "<pin-set expiration=\"2018-01-01\"> <pin digest=\"SHA-256\">7HIpactkIAq2Y49orFOOQKurWxmmSFZhBCoQYcRhJ3Y=</pin>"
+file = "app/src/main/res/xml/network_security_config.xml"
+snippet = '''
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="true">example.com</domain>
+        <pin-set expiration="2018-01-01">
+            <pin digest="SHA-256">7HIpactkIAq2Y49orFOOQKurWxmmSFZhBCoQYcRhJ3Y=</pin>
+            <!-- backup pin -->
+            <pin digest="SHA-256">fwza0LRMXouZHRC8Ei+4PyuldPDcf3UKgO/04cDM1oE=</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>
+'''
+expect = {rows = [{at = "evidence.protocols", match = {path = "app/src/main/res/xml/network_security_config.xml", line = 5, basis = "configured_pin", pins = 2, pin_digest = "SHA-256"}}]}
+
+[[ecosystems.spellings.variants]]
+file = "res/xml/net_config.xml"
+snippet = '''
+<network-security-config><domain-config><domain>api.bank.example</domain><pin-set><pin digest="SHA-256">7HIpactkIAq2Y49orFOOQKurWxmmSFZhBCoQYcRhJ3Y=</pin></pin-set></domain-config></network-security-config>
+'''
+expect = {rows = [{at = "evidence.protocols", match = {path = "res/xml/net_config.xml", line = 1, basis = "configured_pin", pins = 1}}]}
+
+[[ecosystems.spellings]]
+id = "android-certificates-raw"
+spelling = "<trust-anchors><certificates src=\"@raw/my_ca\"/>"
+source = "https://developer.android.com/privacy-and-security/security-config"
+quote = "<trust-anchors> <certificates src=\"@raw/my_ca\"/> </trust-anchors>"
+file = "app/src/main/res/xml/network_security_config.xml"
+snippet = '''
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="true">example.com</domain>
+        <trust-anchors>
+            <certificates src="@raw/my_ca"/>
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
+'''
+expect = {rows = [{at = "trust_stores.places", match = {path = "app/src/main/res/xml/network_security_config.xml", line = 6, file = "@raw/my_ca"}}]}
+
+[[ecosystems.spellings]]
+id = "android-certificates-system"
+spelling = "<base-config><trust-anchors><certificates src=\"system\"/>"
+source = "https://developer.android.com/privacy-and-security/security-config"
+quote = "<base-config> <trust-anchors> <certificates src=\"@raw/extracas\"/> <certificates src=\"system\"/> </trust-anchors> </base-config>"
+file = "app/src/main/res/xml/network_security_config.xml"
+snippet = '''
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config>
+        <trust-anchors>
+            <certificates src="@raw/extracas"/>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+'''
+expect = {rows = [{at = "trust_stores.places", match = {line = 5, file = "@raw/extracas"}}, {at = "trust_stores.places", match = {line = 6, file = "system"}}]}
+
+[[ecosystems.spellings]]
+id = "android-certificates-user"
+spelling = "<certificates src=\"user\"/>"
+source = "https://developer.android.com/privacy-and-security/security-config"
+quote = "<certificates src=[\"system\" | \"user\" | \" raw resource \"] overridePins=[\"true\" | \"false\"] />"
+file = "app/src/main/res/xml/network_security_config.xml"
+snippet = '''
+<network-security-config>
+  <debug-overrides>
+    <trust-anchors>
+      <certificates src="user"/>
+    </trust-anchors>
+  </debug-overrides>
+</network-security-config>
+'''
+expect = {rows = [{at = "trust_stores.places", match = {line = 4, file = "user"}}]}

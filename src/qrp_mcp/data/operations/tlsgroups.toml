@@ -4,7 +4,8 @@
 # once; the list syntax of OpenSSL 3.5 (SSL_CTX_set1_groups_list(3)). Pages fetched 18.11.2026.
 # `expect`: a classical group offered alone is a tls_groups row (family, offered alone, the
 # setting); a hybrid is an ML-KEM row with its parameter set and a row for its classical half, and
-# no tls_groups row, since its half is not offered alone; ML-KEM alone is no ECDH and no X25519.
+# no tls_groups row, since its half is not offered alone; ML-KEM alone is no ECDH and no X25519, and
+# its row carries standalone_pqc (row 555).
 
 operation = "tlsgroups"
 catalogue_version = "1"
@@ -763,7 +764,7 @@ http {
   }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "512"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "512", standalone_pqc = true}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
 
 [[ecosystems.spellings]]
 id = "iana-mlkem768"
@@ -779,7 +780,7 @@ http {
   }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "768", standalone_pqc = true}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
 
 [[ecosystems.spellings]]
 id = "iana-mlkem1024"
@@ -795,7 +796,7 @@ http {
   }
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "1024"}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
+expect = {rows = [{at = "evidence.source_code", match = {path = "nginx.conf", line = 4, algorithm = "ML-KEM", parameter_set = "1024", standalone_pqc = true}}, {at = "evidence.tls_groups", match = {path = "nginx.conf", line = 4}, absent = true}], absent = ["ECDH", "X25519"]}
 
 [[ecosystems.spellings]]
 id = "iana-secp256r1mlkem512"

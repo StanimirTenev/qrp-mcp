@@ -33,7 +33,13 @@ _NOT_IDENTITY = {"line", "in_test_code", "role", "provider", "tls_termination", 
                  # Row 500: read from whether the key is a file of the tree.
                  "key_algorithm",
                  # Row 519: read from another line of the file (the KMS client, the import).
-                 "key_location"}
+                 "key_location",
+                 # Row 555, as in closure.
+                 "standalone_pqc", "standalone_basis",
+                 # Row 554, as in closure.
+                 "reached_from", "reached_from_count", "reached",
+                 # Row 594, as in closure.
+                 "verified_after"}
 
 
 def family(item: dict[str, Any]) -> str:

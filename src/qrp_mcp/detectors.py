@@ -27,6 +27,7 @@ from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirec
 from . import grammar
 from .classifier import _PQC_SCHEMES
 from .assets import is_lockfile
+from .assets import ANDROID_NSC_MARKER, android_pins
 from .assets import _HAPROXY_CIPHERS, _HAPROXY_CURVES, _TLS_CIPHER_SETTING, _TLS_GROUP_SETTING
 from .assets import _DEPRECATED_TLS, _TLS_VERSION, _tls_version_name, GROUP_CONSTANT
 from .assets import (_COMMENT_START, _cipher_setting, _group_setting, image_pins, is_manifest,
@@ -4743,6 +4744,8 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _powershell_continued_hash(findings, lines, rel_path)
     findings = _certreq_request_hash(findings, lines, rel_path)
     findings = _python_key_generation(findings, lines, rel_path)  # keysize/Py
+    findings = _gpg_key_generation(findings, lines, rel_path)  # keysize/CI, row 557
+    findings = _jose_unverified(findings, lines, rel_path)  # row 594
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5902,6 +5905,347 @@ def _py_argument(args: list[str], keyword: str | None, position: int | None) -> 
     return None
 
 
+# Row 557 (25.11.2026): `gpg --batch --quick-gen-key ops@bank.example rsa3072 encrypt never` gave
+# nothing, while openssl genrsa and ssh-keygen on the same file were read. The algorithm a GnuPG key
+# generation names, as the GnuPG manual documents it (gnupg.org/documentation/manuals/gnupg, read
+# 25.11.2026): `--quick-generate-key user-id [algo [usage [expire]]]` and `--quick-gen-key`, and
+# `--quick-add-key fpr [algo ...]` (OpenPGP Key Management: "Supported algorithms are “rsa”, “dsa”,
+# “elg”, “ed25519”, “cv25519”, and other ECC curves ... a string “rsa4096” requests that the key
+# length is 4096 bits", the curves "in the format as used by key listings"); `--default-new-key-algo`
+# "rsa2048/cert,sign+rsa2048/encr" (Esoteric Options); and the parameter file of `--generate-key
+# --batch` (Unattended key generation: `Key-Type:` / `Subkey-Type:` "an OpenPGP algorithm number or
+# a string with the algorithm name" -- "RSA=1, DSA=17" --, `Key-Length:` / `Subkey-Length:` in bits,
+# `Key-Curve:` / `Subkey-Curve:`). "default", "future-default", "-" and "pqc" name what the gpg that
+# runs chooses and are no family here. A row an earlier rule already made for the family on the
+# line is given the size or curve, not a second row.
+_GPG_QUICK = re.compile(
+    r"\bgpg2?\b[^|;&\n]*?\s--quick-(?:gen(?:erate)?|add)-key\s+"
+    r"(?:\"[^\"]*\"|'[^']*'|[^\s\"']+)\s+[\"']?([A-Za-z][\w-]*)")
+_GPG_DEFAULT_ALGO = re.compile(r"(?:^|\s)(?:--)?default-new-key-algo\s+[\"']?([\w/,+-]+)")
+_GPG_BATCH = re.compile(r"^\s*(Key|Subkey)-(Type|Length|Curve):\s*(\S+)")
+_GPG_BATCH_TYPE = {"rsa": "RSA", "1": "RSA", "dsa": "DSA", "17": "DSA", "elg": "ElGamal",
+                   "elg-e": "ElGamal", "16": "ElGamal", "ecdsa": "ECDSA", "19": "ECDSA",
+                   "ecdh": "ECDH", "18": "ECDH", "eddsa": "EdDSA", "22": "EdDSA"}
+# The curve names gpg's key listings use (`gpg --with-colons --list-config curve`).
+_GPG_CURVES = {"ed25519": ("Ed25519", None, None), "ed448": ("Ed448", None, None),
+               "cv25519": ("X25519", None, None), "cv448": ("X448", None, None),
+               "nistp256": ("EC", 256, "P-256"), "nistp384": ("EC", 384, "P-384"),
+               "nistp521": ("EC", 521, "P-521"),
+               "brainpoolp256r1": ("EC", 256, "brainpoolP256r1"),
+               "brainpoolp384r1": ("EC", 384, "brainpoolP384r1"),
+               "brainpoolp512r1": ("EC", 512, "brainpoolP512r1"),
+               "secp256k1": ("ECDSA", 256, "secp256k1")}
+_GPG_ALGO = re.compile(r"^(rsa|dsa|elg)(\d{3,5})?$")
+_SAME_FAMILY = {"EC": {"EC", "ECDSA", "ECDH"}, "ECDSA": {"EC", "ECDSA", "ECDH"},
+                "ECDH": {"EC", "ECDSA", "ECDH"}, "Ed25519": {"Ed25519", "EdDSA"},
+                "Ed448": {"Ed448", "EdDSA"}}
+
+
+def _gpg_algo(word: str) -> tuple[str, int | None, str | None] | None:
+    low = word.lower()
+    m = _GPG_ALGO.match(low)
+    if m:
+        family = {"rsa": "RSA", "dsa": "DSA", "elg": "ElGamal"}[m.group(1)]
+        return family, int(m.group(2)) if m.group(2) else None, None
+    return _GPG_CURVES.get(low)
+
+
+def _gpg_key_generation(findings: list[dict[str, Any]], lines: list[str],
+                        rel_path: str) -> list[dict[str, Any]]:
+    if not any("gpg" in line or "-key-algo" in line or "ey-Type:" in line for line in lines):
+        return findings
+    # (line, family, size, curve, what, the Key-Curve line of an ECC key in a parameter file)
+    wanted: list[list[Any]] = []
+    batch: dict[str, Any] | None = None
+    # A parameter file is read as one where the file says it is gpg's (a control statement, a
+    # name parameter, or the command that takes it).
+    parameter_file = any(w in line for line in lines for w in (
+        "%commit", "Name-Real:", "Name-Email:", "--generate-key", "--gen-key"))
+    for n, line in enumerate(lines, 1):
+        if line.lstrip().startswith(("#", "//")):
+            continue
+        m = _GPG_QUICK.search(line)
+        algo = _gpg_algo(m.group(1)) if m else None
+        if algo:
+            wanted.append([n, *algo, "the algorithm of a gpg key generation "
+                                     "(--quick-generate-key / --quick-add-key)", None])
+        m = _GPG_DEFAULT_ALGO.search(line)
+        for part in m.group(1).split("+") if m else ():
+            algo = _gpg_algo(part.split("/", 1)[0])
+            if algo:
+                wanted.append([n, *algo, "the algorithm of gpg's new keys "
+                                         "(--default-new-key-algo)", None])
+        m = _GPG_BATCH.match(line) if parameter_file else None
+        if not m:
+            continue
+        which, field, value = m.group(1), m.group(2), m.group(3).lower()
+        if field == "Type":
+            family = _GPG_BATCH_TYPE.get(value)
+            batch = {"which": which, "row": None}
+            if family:
+                batch["row"] = [n, family, None, None, f"the {which.lower()} type of a gpg key "
+                                f"generation parameter file ({which}-Type)", None]
+                wanted.append(batch["row"])
+        elif batch and batch["which"] == which and batch["row"]:
+            row = batch["row"]
+            if field == "Length" and value.isdigit() and row[1] in ("RSA", "DSA"):
+                row[2] = int(value)
+            elif field == "Curve" and value in _GPG_CURVES and row[1] in ("ECDSA", "ECDH", "EdDSA"):
+                family, row[2], row[3] = _GPG_CURVES[value]
+                # The curve names the family where the type does not: EdDSA on ed25519 is
+                # Ed25519, ECDH on cv25519 is X25519; ECDSA and ECDH on a NIST curve stay so.
+                if family not in ("EC", "ECDSA"):
+                    row[1] = family
+                row[5] = n
+    # The key of a parameter file is one row on its Type line: the generic rows its type and curve
+    # words made on the two lines are that key, and are replaced by it.
+    ecc = {"EC", "ECDSA", "ECDH", "EdDSA", "Ed25519", "Ed448", "X25519", "X448"}
+    replaced = {(row[0], f) for row in wanted if row[5] for f in ecc} | {
+        (row[5], f) for row in wanted if row[5] for f in ecc}
+    if replaced:
+        findings = [f for f in findings if (f["line"], f.get("algorithm")) not in replaced]
+    added: list[dict[str, Any]] = []
+    for n, family, size, curve, said, curve_line in wanted:
+        held = [] if curve_line else [f for f in findings if f["line"] == n and f.get(
+            "algorithm") in _SAME_FAMILY.get(family, {family})]
+        for f in held:
+            if size and f.get("key_size") in (None, "undetermined"):
+                f["key_size"] = size
+            if curve and not f.get("curve"):
+                f["curve"] = curve
+        if held or any(a["line"] == n and a["algorithm"] == family for a in added):
+            continue
+        added.append({"path": rel_path, "line": n, "algorithm": family,
+                      "description": f"{family} as {said}",
+                      "excerpt": lines[n - 1].strip()[:200], "evidence_kind": "declaration",
+                      "in_test_code": in_test_code(rel_path),
+                      **({"key_size": size} if size else {}), **({"curve": curve} if curve else {})})
+    return sorted(findings + added, key=lambda f: f["line"]) if added or replaced else findings
+
+
+# Row 594 (25.11.2026): a JOSE token accepted or made with no verified signature. PyJWT's
+# `options={"verify_signature": False}` gave nothing, `algorithms=["none", "RS256"]` named only RSA,
+# jsonwebtoken's `algorithms: ['none']` and `{algorithm: 'none'}` and YAML `algorithm: none` gave
+# nothing. "An Unsecured JWS uses the "alg" value "none"" (RFC 7518 section 3.6). Each library's
+# documented spelling (pages read 25.11.2026): PyJWT ("you can set the verify_signature option to
+# False"; python-jose takes the same options and has get_unverified_claims), jsonwebtoken ("none |
+# No digital signature or MAC value included"; decode "Returns the decoded payload without
+# verifying"), jose by panva (UnsecuredJWT, decodeJwt "without validating its JWS Signature"),
+# Nimbus (Algorithm.NONE, PlainJWT), jjwt (unsecured(), parseUnsecuredClaims/-Content and the
+# deprecated parseClaimsJwt/parseContentJwt, Jwts.SIG.NONE), golang-jwt (SigningMethodNone,
+# UnsafeAllowNoneSignatureType, ParseUnverified). "none" is read only inside an algorithm setting or
+# argument, never as any string. The family JWT-unverified is classified deprecated_weak: there is
+# no signature for a quantum computer to break, and anyone can make a token this accepts.
+_JOSE_NONE_LIST = re.compile(r"\balgorithms\s*[=:]\s*\[[^\]]*[\"']none[\"']")
+_JOSE_NONE_ONE = re.compile(r"\balgorithm\s*[=:]\s*[\"']none[\"']")
+_JOSE_UNVERIFIED = re.compile(
+    r"\boptions\s*=\s*\{[^}]*[\"']verify_signature[\"']\s*:\s*False\b|"
+    r"\bget_unverified_claims\s*\(|"
+    r"\bjwt\.(?:SigningMethodNone|UnsafeAllowNoneSignatureType)\b|\.ParseUnverified\s*\(")
+# jose by panva, read in a JS/TS file that imports it (auth0's java-jwt has its own decodeJwt, and
+# the library's own sources define these names).
+_JOSE_PANVA = re.compile(r"\bUnsecuredJWT\b|\bdecodeJwt\s*\(")
+_JS_IMPORTS_JOSE = re.compile(r"""from\s+['"]jose(?:/[^'"]*)?['"]|require\(\s*['"]jose(?:/[^'"]*)?['"]\s*\)""")
+# "none" and verify_signature are read only in a file that imports a JOSE library.
+_IMPORTS_A_JOSE_LIBRARY = re.compile(
+    r"^\s*(?:import|from)\s+(?:jwt|jose|jwcrypto|authlib|josepy)\b|"
+    r"""from\s+['"](?:jsonwebtoken|jose|jws|express-jwt)(?:/[^'"]*)?['"]|"""
+    r"""require\(\s*['"](?:jsonwebtoken|jose|jws|express-jwt)(?:/[^'"]*)?['"]\s*\)""", re.M)
+# The guard: a file none of whose text could match any spelling is passed over in one search.
+_JOSE_GUARD = re.compile(
+    r"""['"]none['"]|[:=]\s*['"]?none\b|verify_signature|[Uu]nverified|[Uu]nsecured|decodeJwt|"""
+    r"""PlainJWT|\.NONE\b|ClaimsJwt|ContentJwt|SigningMethodNone|AllowNone|jsonwebtoken|['"]jws['"]""")
+# Names other APIs could share, read only in a file of that library: Nimbus (com.nimbusds), jjwt
+# (io.jsonwebtoken, Jwts).
+_JOSE_NIMBUS = re.compile(r"\bAlgorithm\.NONE\b|\bPlainJWT\b")
+_JOSE_JJWT = re.compile(r"\.unsecured\(\s*\)|"
+                        r"\.parse(?:Unsecured(?:Claims|Content)|ClaimsJwt|ContentJwt)\s*\(|"
+                        r"\bJwts\.SIG\.NONE\b")
+_JS_REQUIRE_LINE = re.compile(r"(?:const|let|var)\s+[\w{}\s,:]+=\s*require\(")
+_JOSE_CALL = re.compile(r"\b(?:jwt|jws|jose)\.(?:encode|decode|sign|verify)\s*\(")
+_JOSE_SETTING_NONE = re.compile(
+    r"^\s*([\w.-]*?alg(?:orithm)?s?)\s*[:=]\s*[\"']?none[\"']?\s*(?:#.*)?$", re.IGNORECASE)
+_JOSE_CONTEXT = re.compile(r"jwt|jws|jose|token|oidc|oauth", re.IGNORECASE)
+# The names a file binds jsonwebtoken and jws to (the positive control on OWASP Juice Shop,
+# 25.11.2026: `import { decode } from 'jsonwebtoken'` and `jws.decode(...)` were missed): a default or
+# namespace import, a named import (`{ decode as peek }`), a require, destructured or not.
+_JS_IMPORT_BINDING = re.compile(r"""^\s*import\s+(.+?)\s+from\s+['"](jsonwebtoken|jws)['"]""")
+_JS_REQUIRE_BINDING = re.compile(
+    r"""^\s*(?:const|let|var)\s+(.+?)\s*=\s*require\(\s*['"](jsonwebtoken|jws)['"]\s*\)""")
+# Python: `import jwt as x`, `from jose import jwt as x`, `from jwt import encode`; Go: an import alias of
+# golang-jwt (or its predecessor dgrijalva/jwt-go).
+_PY_MODULE_ALIAS = re.compile(r"^\s*import\s+(?:jwt|jose\.jwt|jose\.jws)\s+as\s+(\w+)")
+_PY_FROM_JOSE = re.compile(r"^\s*from\s+jose\s+import\s+(.+)")
+_PY_FROM_NAMES = re.compile(r"^\s*from\s+(?:jwt|jose\.jwt|jose\.jws)\s+import\s+(.+)")
+_GO_JWT_ALIAS = re.compile(
+    r'^\s*(?:import\s+)?([A-Za-z_]\w*)\s+"github\.com/(?:golang-jwt/jwt|dgrijalva/jwt-go)(?:/v\d+)?"')
+_UNSIGNED = ("an Unsecured JWS: the token is accepted or made with no signature (alg \"none\", "
+             "RFC 7518 section 3.6), so anyone can make one this accepts")
+_UNVERIFIED = ("a JWT read without verifying its signature, and no verification follows in the "
+               "same block: what it claims is not authenticated, so anyone can forge it")
+_VERIFIED_AFTER = ("a JWT decoded at this line without verifying its signature; a verification "
+                   "follows in the same block at line {line} (verified_after), so this row does not "
+                   "say the token is accepted unverified -- only that this line reads it unverified")
+
+
+def _js_bindings(lines: list[str]) -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
+    """(module alias -> library, local name -> (library, exported name)) for jsonwebtoken and jws."""
+    modules: dict[str, str] = {}
+    named: dict[str, tuple[str, str]] = {}
+    for line in lines:
+        m = _JS_IMPORT_BINDING.match(line) or _JS_REQUIRE_BINDING.match(line)
+        if not m:
+            continue
+        clause, lib = m.group(1).strip(), m.group(2)
+        braces = re.search(r"\{([^}]*)\}", clause)
+        if braces:
+            for part in braces.group(1).split(","):
+                bits = re.split(r"\s+as\s+|\s*:\s*", part.strip())
+                if bits and bits[0]:
+                    named[bits[-1]] = (lib, bits[0])
+            clause = clause[:braces.start()] + clause[braces.end():]
+        for alias in re.findall(r"(?:\*\s*as\s+)?([A-Za-z_$][\w$]*)", clause.replace("type ", "")):
+            modules[alias] = lib
+    return modules, named
+
+
+def _alternation(names) -> str:
+    return "|".join(re.escape(n) for n in sorted(names)) or r"(?!x)x"
+
+
+def _verified_after(lines: list[str], n: int, verify: re.Pattern, python: bool) -> int | None:
+    """The line, after line n and in the block it is in, that verifies a token; None if none does.
+    A line at the top of a file, or a block that closes on the line itself, has no block after it
+    (a decode in one one-line export and a verify in the next are two functions)."""
+    if python:
+        indent = len(lines[n - 1]) - len(lines[n - 1].lstrip())
+        if indent == 0:
+            return None
+        for k in range(n, min(len(lines), n + 60)):
+            text = lines[k]
+            if text.strip() and len(text) - len(text.lstrip()) < indent:
+                return None
+            if verify.search(text):
+                return k + 1
+        return None
+    outer = sum(t.count("{") - t.count("}") for t in lines[:n - 1])
+    depth = lines[n - 1].count("{") - lines[n - 1].count("}")
+    if outer + min(depth, 0) <= 0 or lines[n - 1].rstrip().endswith("}"):
+        return None
+    for k in range(n, min(len(lines), n + 60)):
+        text = lines[k]
+        if verify.search(text):
+            return k + 1
+        depth += text.count("{") - text.count("}")
+        if depth < 0:
+            return None
+    return None
+
+
+def _jose_unverified(findings: list[dict[str, Any]], lines: list[str],
+                     rel_path: str) -> list[dict[str, Any]]:
+    text = "\n".join(lines)
+    if not _JOSE_GUARD.search(text):
+        return findings
+    jose_file = bool(_IMPORTS_A_JOSE_LIBRARY.search(text))
+    js = rel_path.endswith((".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".mts", ".cts"))
+    python = rel_path.endswith(".py")
+    go = rel_path.endswith(".go")
+    config = confidence_is_config(rel_path)
+    panva = js and bool(_JS_IMPORTS_JOSE.search(text))
+    nimbus = "nimbusds" in text
+    jjwt = any("jsonwebtoken" in line or "Jwts" in line for line in lines) and not js
+    modules, named = _js_bindings(lines) if js else ({}, {})
+    py_modules, py_named = {"jwt", "jws"}, set()
+    go_modules = {"jwt"}
+    for line in lines:
+        if python:
+            m = _PY_MODULE_ALIAS.match(line)
+            if m:
+                py_modules.add(m.group(1))
+            m = _PY_FROM_JOSE.match(line)
+            for part in (m.group(1).split(",") if m else ()):
+                bits = part.split(" as ")
+                if bits[0].strip() in ("jwt", "jws"):
+                    py_modules.add(bits[-1].strip())
+            m = _PY_FROM_NAMES.match(line)
+            for part in (m.group(1).replace("(", " ").replace(")", " ").split(",") if m else ()):
+                bits = part.split(" as ")
+                if bits[0].strip() in ("encode", "decode", "sign", "verify"):
+                    py_named.add(bits[-1].strip())
+        if go:
+            m = _GO_JWT_ALIAS.match(line)
+            if m:
+                go_modules.add(m.group(1))
+    js_mods = _alternation(modules)
+    js_decode = re.compile(
+        rf"(?<![\w.$])(?:{js_mods})\.decode\s*\(|(?<![\w.$])(?:"
+        + _alternation(k for k, v in named.items() if v[1] == "decode") + r")\s*\(")
+    calls = re.compile(
+        _JOSE_CALL.pattern + rf"|(?<![\w.$])(?:{js_mods}|{_alternation(py_modules)})\."
+        r"(?:encode|decode|sign|verify|createSign)\s*\(|(?<![\w.$])(?:"
+        + _alternation([k for k, v in named.items() if v[1] in ("sign", "verify")] + list(py_named))
+        + r")\s*\(")
+    jws_header_none = re.compile(r"\balg\s*:\s*[\"']none[\"']") if "jws" in modules.values() else None
+    go_none = re.compile(rf"(?<![\w.])(?:{_alternation(go_modules)})\."
+                         r"(?:SigningMethodNone|UnsafeAllowNoneSignatureType)\b")
+    verify = re.compile(
+        rf"(?<![\w.$])(?:{js_mods})\.verify\s*\(|(?<![\w.$])(?:"
+        + _alternation(k for k, v in named.items() if v[1] == "verify")
+        + r")\s*\(|\b(?:jwtVerify|compactVerify|flattenedVerify)\s*\(|"
+        + (rf"(?<![\w.])(?:{_alternation(py_modules)})\.decode\s*\((?![^)]*verify_signature)"
+           r"[^)]*\balgorithms\s*=" if python else r"\.Parse(?:WithClaims)?\s*\("))
+    added = []
+    for n, line in enumerate(lines, 1):
+        stripped = line.lstrip()
+        if (not stripped or stripped.startswith(("#", "//", "*", "/*", "import ", "from "))
+                or _JS_REQUIRE_LINE.match(stripped)):
+            continue
+        said = decode = None
+        if (jose_file and (_JOSE_NONE_LIST.search(line) or (_JOSE_NONE_ONE.search(line)
+                                                            and calls.search(line)))) or (
+                jws_header_none and jws_header_none.search(line) and calls.search(line)):
+            said = _UNSIGNED
+        elif go and go_none.search(line):
+            said = _UNSIGNED
+        elif ((_JOSE_UNVERIFIED.search(line) and (jose_file or go))
+              or ((panva or "jose." in line) and js and _JOSE_PANVA.search(line))
+              or (nimbus and _JOSE_NIMBUS.search(line)) or (jjwt and _JOSE_JJWT.search(line))):
+            if (re.search(r"NONE|None|Unsecured|unsecured|PlainJWT", line)
+                    and not re.search(r"verify_signature|decodeJwt|ParseUnverified", line)):
+                said = _UNSIGNED
+            else:
+                said = decode = _UNVERIFIED
+        elif js and (modules or named) and js_decode.search(line):
+            said = decode = _UNVERIFIED
+        elif config:
+            m = _JOSE_SETTING_NONE.match(line)
+            if m and (_JOSE_CONTEXT.search(m.group(1)) or any(
+                    _JOSE_CONTEXT.search(lines[k]) for k in range(max(0, n - 4), n - 1))):
+                said = _UNSIGNED
+        if not said:
+            continue
+        row = {"path": rel_path, "line": n, "algorithm": "JWT-unverified",
+               "excerpt": stripped.strip()[:200],
+               "evidence_kind": "declaration" if config else "call",
+               "in_test_code": in_test_code(rel_path)}
+        # A decode that a verification follows in the same block (Juice Shop routes/verify.ts:119):
+        # the row says what the line does and where the verification is, not that the token is
+        # accepted unverified.
+        after = _verified_after(lines, n, verify, python) if decode else None
+        if after:
+            said = _VERIFIED_AFTER.format(line=after)
+            row["verified_after"] = f"{rel_path}:{after}"
+        row["description"] = said[0].upper() + said[1:]
+        added.append(row)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+def confidence_is_config(rel_path: str) -> bool:
+    name = rel_path.rsplit("/", 1)[-1].lower()
+    return "." not in name or "." + name.rsplit(".", 1)[-1] not in SOURCE_EXTENSIONS
+
+
 def _python_key_generation(findings: list[dict[str, Any]], lines: list[str],
                            rel_path: str) -> list[dict[str, Any]]:
     if not rel_path.endswith(".py"):
@@ -6494,7 +6838,11 @@ _RUNTIME_REFERENCE = re.compile(
     # Row 528 (audit #6): Go's os.Getenv / os.LookupEnv too.
     r"os\.environ|os\.getenv|\bgetenv\s*\(|os\.(?:Getenv|LookupEnv)\s*\(|process\.env\b|System\.getenv|"
     r"Environment\.GetEnvironmentVariable|\$\{\{\s*(?:secrets|vars|env|inputs)\.|"
-    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?::-[^}]*)?\}|\$[A-Z][A-Z0-9_]{2,}\b")
+    # Row 560: the shell's and Compose's `${X-d}`, `${X:=d}`, `${X=d}` beside `${X:-d}`, and a
+    # Spring placeholder with a default, `${name:default}` (a dotted name only with its default:
+    # Terraform's `${var.x}` is not read from the environment).
+    r"\$\{[A-Za-z_][A-Za-z0-9_]*(?::?[-=][^}]*)?\}|\$\{[A-Za-z_][\w.-]*:(?![-=?+])[^}]*\}|"
+    r"\$[A-Z][A-Z0-9_]{2,}\b")
 _RUNTIME_SETTING = re.compile(
     r"cipher|curve|ecdh|\bkex|key_?exchange|kexalgorithms|tls_?groups?|ssl_?groups?|"
     r"(?:sig(?:n|ning|nature)?|jwt|jws|hash|key|token)_?alg(?:orithm)?s?\b|(?<![a-z])algorithms?\b|"
@@ -6561,12 +6909,22 @@ _RUNTIME_BYTES = (b"environ", b"getenv", b"Getenv", b"LookupEnv", b"process.env"
 # place too: the default's family stays a finding (it is what runs when nothing is set), and
 # the place carries the default and `overridable: true`. Python's os.environ.get / os.getenv,
 # Node's `process.env.X || "..."` / `?? "..."`, a shell `${X:-...}`.
+# Row 560 (25.11.2026): `signature_algorithm: ${SIGNING_ALG:ECDSA-P256}` was a finding and no place.
+# Each documented default: the shell's `${parameter:-word}`, `${parameter-word}`, `${parameter:=word}`,
+# `${parameter=word}` (Bash manual, Shell Parameter Expansion), Compose's `${VAR:-default}` and
+# `${VAR-default}` (Compose file reference, Interpolation), and Spring's `${name:default}` ("a : to
+# separate the default value from the property name", Spring Boot, Externalized Configuration;
+# `@Value("${catalog.name:defaultCatalog}")`, Spring Framework). `:?` / `?` (required) and `:+` / `+`
+# (alternative) are no default. In a shell `${X:word}` is a substring, so the Spring form is not read
+# in a shell script (_SPRING_DEFAULT, below).
 _RUNTIME_DEFAULT = re.compile(
     r"(?:os\.environ\.get|os\.getenv|System\.getenv\(\)\.getOrDefault)\s*\(\s*[\"']"
     r"([A-Za-z_][\w.-]*)[\"']\s*,\s*[\"']([^\"'\n]{2,80})[\"']\s*\)|"
     r"process\.env(?:\.([A-Za-z_]\w*)|\[\s*[\"']([A-Za-z_]\w*)[\"']\s*\])\s*(?:\|\||\?\?)\s*"
     r"[\"'`]([^\"'`\n]{2,80})[\"'`]|"
-    r"\$\{([A-Za-z_]\w*):?-([^}\n]{2,80})\}")
+    r"\$\{([A-Za-z_]\w*):?[-=]([^}\n]{2,80})\}")
+_SPRING_DEFAULT = re.compile(r"\$\{([A-Za-z_][\w.-]*):(?![-=?+])([^}\n]{2,80})\}")
+_SHELL_SCRIPT = (".sh", ".bash", ".zsh", ".ksh")
 
 
 _DEFAULT_SHAPE = re.compile(r"^[A-Za-z][A-Za-z0-9_.+-]{1,40}$")
@@ -6575,9 +6933,12 @@ _DEFAULT_SHAPE = re.compile(r"^[A-Za-z][A-Za-z0-9_.+-]{1,40}$")
 _JOSE_DEFAULT = re.compile(r"^(?:(RS|PS)(256|384|512)|(ES)(256K?|384|512)|(EdDSA))$")
 
 
-def _runtime_default(text: str) -> dict[str, Any] | None:
+def _runtime_default(text: str, spring: bool = False) -> dict[str, Any] | None:
     from .classifier import classify_algorithm  # local: classifier is imported lazily here
-    for m in _RUNTIME_DEFAULT.finditer(text):
+    matches = list(_RUNTIME_DEFAULT.finditer(text))
+    if spring:
+        matches += list(_SPRING_DEFAULT.finditer(text))
+    for m in matches:
         groups = [g for g in m.groups() if g is not None]
         name, default = groups[0], groups[-1].strip()
         # A name, not a path or a command (`${HOME:-$(eval echo ~)}`), and one that spells its
@@ -6659,6 +7020,7 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
     cmake = rel_path.rsplit("/", 1)[-1] == "CMakeLists.txt" or rel_path.endswith(".cmake")
     go = rel_path.endswith(".go")
     go_consts = _go_env_constants(lines) if go else {}
+    spring = not rel_path.lower().endswith(_SHELL_SCRIPT)  # row 560
     for number, text in enumerate(lines, 1):
         stripped = text.strip()
         if not stripped or stripped.startswith(("#", "//", "*", "/*", ";", "--")):
@@ -6676,7 +7038,7 @@ def runtime_choices(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:
         # comma or a space and an optional quote -- not merely on the same line.
         found = (_RUNTIME_ASSIGNMENT.search(text) or _RUNTIME_CRYPTO_CALL.search(text)
                  or _RUNTIME_JCA.search(text))
-        default = _runtime_default(text)
+        default = _runtime_default(text, spring)
         by_name = None if found or default else _runtime_env_name(text)
         if not found and not default and not by_name:
             continue
@@ -7539,7 +7901,9 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
     sniffed = None
     if not claimed and path.suffix.lower() in opcua.SNIFF_EXTENSIONS:
         sniffed = _read_file(real, repo_path)
-        claimed = sniffed is not None and opcua.SNIFF_MARKER in sniffed[0]
+        # Row 556: an Android network security configuration too, by its root element.
+        claimed = sniffed is not None and (opcua.SNIFF_MARKER in sniffed[0] or (
+            path.suffix.lower() == ".xml" and ANDROID_NSC_MARKER in sniffed[0]))
     # BIND's `db.<zone>`, `dsset-<zone>.` and a `<zone>.db` that starts like a zone file
     # (row 340); any other `.db` (SQLite) stays the declared boundary.
     if not claimed and (dnssec.ZONE_FILE_NAME.match(path.name)
@@ -7896,6 +8260,10 @@ def _read_one(r: dict[str, Any], path: Path, repo_path: Path, resolved_exclude: 
                  "key_algorithm": row["algorithm"],
                  **({"key_size": row["key_size"]} if "key_size" in row else {})}
                 for row in private_rows)
+        if path.suffix.lower() == ".xml" and ANDROID_NSC_MARKER in raw:
+            for asset in android_pins(lines):  # row 556
+                asset["path"] = rel_path
+                protocol_findings.append(asset)
         if path.suffix.lower() == ".mqsc":
             for asset in mqsc.scan(lines):
                 asset["path"] = rel_path
