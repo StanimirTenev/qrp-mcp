@@ -338,7 +338,7 @@ docstring makes it a rejection test ("... is rejected.") still runs what it call
 ## Measured
 
 Five trees this project did not write, scanned on 25 Nov 2026 with a pre-release build of 0.54.0
-(commit `5316656`), `scan --level full --no-config --as-of 2026-11-25`: OWASP Juice Shop at `c9f9922` and DVWA at `502ac15` (shallow clones of
+(commit `06ed7e3`), `scan --level full --no-config --as-of 2026-11-25`: OWASP Juice Shop at `c9f9922` and DVWA at `502ac15` (shallow clones of
 their default branches), OpenSSH at `7fe3b24`, certbot at `56ee049`, Vault at `41e571b`.
 `coverage_pct` is the share of the files present that were read; `read_in_full_pct` leaves out the
 files read only in part (a device configuration, a certificate block that did not parse).
@@ -350,11 +350,11 @@ check the family the scanner gave.
 
 | Repository | Files present | Read | `coverage_pct` | Read in part | `read_in_full_pct` | Findings | Weak | Occurrences | Read by hand |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Juice Shop | 1,498 | 936 | 62.48% | 2 | 62.35% | 11 | 6 | 393 | 393 |
+| Juice Shop | 1,498 | 936 | 62.48% | 2 | 62.35% | 11 | 7 | 53 | 53 |
 | DVWA | 252 | 191 | 75.79% | 0 | 75.79% | 2 | 1 | 34 | 34 |
 | OpenSSH | 873 | 742 | 84.99% | 5 | 84.42% | 76 | 55 | 9,352 | 30 |
 | certbot | 1,250 | 850 | 68.00% | 0 | 68.00% | 41 | 28 | 769 | 30 |
-| Vault | 9,281 | 5,437 | 58.58% | 9 | 58.49% | 74 | 62 | 3,816 | 30 |
+| Vault | 9,281 | 5,437 | 58.58% | 9 | 58.49% | 74 | 62 | 3,811 | 30 |
 
 **DVWA**, all 34 read: all 34 are uses. 31 are MD5: password hashing in the login and in every
 security level, the seeded user rows, a CSRF session token, a weak-session-id cookie, a client-side
@@ -364,27 +364,30 @@ MD5 in the seed rows of two `.sql` files (`database/create_postgresql_db.sql:3`,
 AES-128-CBC (`token_library_high.php:4`), AES-GCM and SHA-256 in `.php` files; and the minified MD5
 implementation on one line (`javascript/source/low.php:10`; its call on line 18 is reported).
 
-**Juice Shop**, all 393 read, the 215 rows in 44 UI translation files among them.
+**Juice Shop**, all 53 read.
 
-- 31 are uses: RS256 signing with an embedded RSA private key (`lib/insecurity.ts`), MD5 password
+- 40 are uses: RS256 signing with an embedded RSA private key (`lib/insecurity.ts`), MD5 password
   hashing, HMAC-SHA1, an ALB TLS policy in Terraform, the WebAuthn algorithm list, OpenPGP EdDSA
-  signatures, and P-256 keys in tests.
-- 28 are a library that implements the family (ethers, jsonwebtoken), declared, imported or called
-  with the browser wallet's signer. The line itself holds no signature.
-- 11 only name the family: comments, test titles, a key file's URL. The scanner marks 10 of them as
-  named, not used.
-- 6, all in test code, are cryptography of another family. DSA is reported for an ECDSA
-  `crypto.sign` with `dsaEncoding`. ECDH is reported for a `createECDH` that only makes a P-256
-  signing key.
-- **317 are false positives, all ECDSA.** 307 are the word `web3` in route paths, file and
-  component names, tags, test titles and the 215 translation strings. 10 are ethers unit helpers
-  (`formatEther`, `parseUnits`). The scanner marks 75 of the 317 as named, not used, and gives 2
-  more low confidence (an import line). It reports the other 240 at medium or high confidence.
+  signatures, an ethers key derived from a phrase (`HDNodeWallet.fromPhrase`), and P-256 keys and
+  ECDSA signatures in tests. 4 of them are `JWT-unverified`: two decodes with no verification
+  (`lib/insecurity.ts:56`, `routes/authenticatedUsers.ts:20`) and two that a verification follows
+  in the same function, which carry `verified_after`.
+- 3 are declared dependencies that implement the family (ethers, jsonwebtoken). The line itself
+  holds no signature.
+- 10 only name the family: comments, test titles, a key file's URL. The scanner marks 9 of them as
+  named, not used, and reports the URL (`config/defcon33.yml:39`) at high confidence.
+
+The pre-release build before row 598 (`5316656`) gave 393 rows here. 317 of them were ECDSA for the
+word `web3` (routes, component names, test titles, translation strings) or an ethers unit helper,
+and 6 gave the wrong family (DSA for an ECDSA `crypto.sign` with `dsaEncoding`, ECDH for a
+`createECDH` that only makes a P-256 key). None of those 323 rows is reported now.
 
 **OpenSSH, certbot, Vault**: there are too many to read them all. 30 of each were read: the
 occurrences sorted by category, path, line and family, then every k-th from the first (k = 312,
 26 and 128). The rule was fixed before any of them was read. These counts describe those 30 lines
-only; nothing is inferred from them about the rest.
+only; nothing is inferred from them about the rest. Vault's 30 were drawn from the 3,816 rows of
+`5316656`. All 30 are still reported; the 5 rows that are gone are the word `web3` in test user
+names.
 
 - **OpenSSH**: 25 uses, 5 only named. The scanner marks 3 of the 5 (generated comments) as named,
   not used. It reports the other 2 at medium or high confidence: a `CKM_DSA_SHA512` constant in `pkcs11.h:546`

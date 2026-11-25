@@ -201,12 +201,13 @@ No detection change: findings and their fingerprint do not move.
   says so.
 - **README "Measured"** replaces "Coverage on three public repositories". It covers OWASP Juice Shop
   and DVWA (shallow clones, commits named) besides OpenSSH, certbot and Vault, with occurrences and
-  how many were read by hand. Juice Shop and DVWA were read in full (393 and 34); for the other
-  three, 30 each were taken by a fixed rule. What was read is stated plainly, false positives
-  included. In Juice Shop, 317 of the 393 rows are ECDSA for the word
-  `web3` or an ethers unit helper, and 240 of those are at medium or high confidence. This is
-  stated as found and is not fixed here. Counts of lines read, not detection figures: no recall
-  or precision.
+  how many were read by hand. Juice Shop and DVWA were read in full; for the other three, 30 each
+  were taken by a fixed rule. What was read is stated plainly, false positives included. Measured
+  first on 5316656: Juice Shop gave 393 rows, 317 of them ECDSA for the word `web3` or an ethers
+  unit helper (240 at medium or high confidence). Measured again on the merged release (06ed7e3),
+  after row 598: Juice Shop gives 53 rows, all read, none of the 317 among them, and 10 new rows
+  (4 `JWT-unverified`, 6 EC/ECDSA) read one by one; Vault gives 3,811 (5 `web3` rows gone, the 30
+  read still reported). Counts of lines read, not detection figures: no recall or precision.
 
 ## 0.53.0 (2026-11-24)
 
