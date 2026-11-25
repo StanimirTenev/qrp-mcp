@@ -165,7 +165,8 @@ Findings and their fingerprint move where these constructs are present.
   `JWT-unverified` row of the tree carries `verified_after` (the owner's decision), the finding is
   `low` with `verified_after_only: true` and is not counted: `weak_count`, `highest_severity` and
   `total_findings` do not move for it, as for a family named only in identifiers. One row without
-  `verified_after` keeps the finding high and counted.
+  `verified_after` keeps the finding high and counted. The CBOM component carries
+  `qrp:verified_after_only`, and in SARIF a row with `verified_after` is a `note`, not a `warning`.
 
   `none` lists and `verify_signature` are read only in a file that imports a JOSE library.
   jose's `decodeJwt` and `UnsecuredJWT` are read only in a JS/TS file that imports `jose`, because

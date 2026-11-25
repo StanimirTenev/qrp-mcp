@@ -263,3 +263,38 @@ def test_an_unverified_row_beside_it_keeps_the_finding_high(tmp_path):
     assert finding["severity"] == "high" and "verified_after_only" not in finding
     assert result["summary"]["weak_count"] == 1
     assert result["summary"]["highest_severity"] == "high"
+
+
+def test_the_cli_says_it_low_in_json_and_a_note_in_sarif(tmp_path):
+    # The Action uploads the SARIF: a decode a verification follows is a note there, not a warning;
+    # an unverified decode beside it stays a warning.
+    root = tmp_path / "tree"
+    root.mkdir()
+    (root / "v.ts").write_text(_VERIFIED_LATER)
+    (root / "p.ts").write_text("import jwt from 'jsonwebtoken'\nconst c = jwt.decode(token)\n")
+    out, sarif = tmp_path / "s.json", tmp_path / "s.sarif"
+    for args in (["--out", str(out)], ["--format", "sarif", "--out", str(sarif)]):
+        subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "scan",
+                        str(root), *args], check=True, capture_output=True, env=dict(os.environ))
+    levels = {r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]: r["level"]
+              for r in json.loads(sarif.read_text())["runs"][0]["results"]
+              if r["ruleId"] == "qrp/JWT-unverified"}
+    assert levels == {"v.ts": "note", "p.ts": "warning"}
+    (root / "p.ts").unlink()
+    subprocess.run([sys.executable, "-c", "from qrp_mcp.server import main; main()", "scan",
+                    str(root), "--out", str(out)], check=True, capture_output=True,
+                   env=dict(os.environ))
+    result = json.loads(out.read_text())
+    assert _jwt_finding(result)["severity"] == "low" and result["summary"]["weak_count"] == 0
+
+
+def test_the_cbom_marks_it_verified_after_only(tmp_path):
+    from qrp_mcp.cyclonedx import build
+    (tmp_path / "v.ts").write_text(_VERIFIED_LATER)
+    bom = build(scan_directory(tmp_path))
+    jwt = next(c for c in bom["components"] if c["name"] == "JWT-unverified")
+    assert {"name": "qrp:verified_after_only", "value": "true"} in jwt["properties"]
+    (tmp_path / "p.ts").write_text("import jwt from 'jsonwebtoken'\nconst c = jwt.decode(token)\n")
+    bom = build(scan_directory(tmp_path))
+    jwt = next(c for c in bom["components"] if c["name"] == "JWT-unverified")
+    assert "qrp:verified_after_only" not in {p["name"] for p in jwt["properties"]}

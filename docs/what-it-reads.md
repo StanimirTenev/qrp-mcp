@@ -569,7 +569,9 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   A library is read through any name the file binds it to (named import, alias, destructured
   require), and `jws` is in the class. A decode that a verification follows in the same block
   carries `verified_after`: the row says the line reads the token unverified, not that the token is
-  accepted unverified.
+  accepted unverified. Such a row is a SARIF `note`, not a `warning`. Where every `JWT-unverified`
+  row carries `verified_after`, the finding is low with `verified_after_only: true` and is not
+  counted in the summary (`weak_count`, `highest_severity`); one row without it keeps it high.
   From 0.49.0 (row 528, audit #7) a JOSE name as the default (`os.environ.get('JWT_ALG',
   'ES256')`, `process.env.JWT_ALG || 'RS256'`) is a place too: RS/PS = RSA, ES = ECDSA, EdDSA.
 - **Which environment reads are places** (row 528, audit #6). Until 0.49.0 only the variable on

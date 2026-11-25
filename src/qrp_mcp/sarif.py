@@ -58,7 +58,8 @@ def _result(category: str, item: dict[str, Any], keys: dict[int, str]) -> dict[s
     kind = item.get("evidence_kind") or category
     out: dict[str, Any] = {
         "ruleId": f"qrp/{family}",
-        "level": "note" if kind in _NOTE else "warning",
+        # Row 594, the owner's decision of 25.11.2026: a decode a verification follows is low.
+        "level": "note" if kind in _NOTE or item.get("verified_after") else "warning",
         "message": {"text": str(item.get("description") or f"{family} ({kind})")},
         "locations": [_location(str(item["path"]), item.get("line"), item.get("excerpt"))],
         "partialFingerprints": {"qrpBaseline/v1": keys[id(item)]},

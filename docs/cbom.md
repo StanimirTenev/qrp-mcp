@@ -161,6 +161,8 @@ From 0.54.0 a component also carries these:
 - `qrp:reached_from`: for each occurrence another file read imports and calls, a
   `{"path:line": [places]}` object (row 554);
 - an Android `<pin-set>`: its own protocol component, "TLS public-key pin (SHA-256)" (row 556).
+- `qrp:verified_after_only`: `JWT-unverified` where every row is a decode a verification follows
+  in the same block; the summary does not count it (row 594).
 
 ⚠️ A banned algorithm is not marked, it is **absent**: `!RC4` in a cipher list never
 becomes a component. What the line forbids is not inventory; what it enables is.

@@ -845,7 +845,7 @@ def _certificate_components(located: list[dict[str, Any]],
 _CARRIED = {f"{NS}{k}" for k in ("providers", "provider_validation", "provider_pins",
                                  "provider_configuration", "not_negotiable_by", "not_enabled",
                                  "fallback_beside_hybrid", "standalone_pqc", "identifier_only",
-                                 "classification_if_used")}
+                                 "verified_after_only", "classification_if_used")}
 
 
 # The order of a named curve's base point, in bits: SEC 2 v2.0 section 2 (secp*), FIPS 186-4
@@ -1171,6 +1171,9 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
         # another identifier row: the summary does not count it, and the component says so.
         if finding.get("identifier_only"):
             component["properties"].append({"name": f"{NS}identifier_only", "value": "true"})
+        # Row 594: every row is a decode a verification follows -- low, and not counted.
+        if finding.get("verified_after_only"):
+            component["properties"].append({"name": f"{NS}verified_after_only", "value": "true"})
         if finding.get("classification_if_used"):
             component["properties"].append({"name": f"{NS}classification_if_used",
                                             "value": finding["classification_if_used"]})
