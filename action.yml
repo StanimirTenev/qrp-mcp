@@ -44,4 +44,4 @@ runs:
         QRP_OUTPUT: ${{ inputs.output }}
         QRP_LEVEL: ${{ inputs.level }}
       run: |
-        uvx --from qrp-mcp==0.53.0 qrp-mcp scan "$QRP_PATH" --format sarif --out "$QRP_OUTPUT" --level "$QRP_LEVEL"
+        uvx --from qrp-mcp==0.54.0 qrp-mcp scan "$QRP_PATH" --format sarif --out "$QRP_OUTPUT" --level "$QRP_LEVEL"

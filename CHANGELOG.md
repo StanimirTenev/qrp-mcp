@@ -4,7 +4,7 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
-## Unreleased (0.54.0)
+## 0.54.0 (2026-11-25)
 
 Detection changes: findings and their fingerprint move.
 

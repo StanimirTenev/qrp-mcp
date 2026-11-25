@@ -187,7 +187,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: StanimirTenev/qrp-mcp@v0.53.0
+      - uses: StanimirTenev/qrp-mcp@v0.54.0
         id: qrp
         with:
           path: "."               # default; SARIF locations are relative to it
