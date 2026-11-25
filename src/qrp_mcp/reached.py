@@ -23,10 +23,11 @@ _FROM = re.compile(r"^\s*from\s+(\.*)([\w.]*)\s+import\s+(.+)$")
 _IMPORT = re.compile(r"^\s*import\s+(.+)$")
 _TOP = re.compile(r"^(?:async\s+def|def|class)\s+([A-Za-z_]\w*)")
 _ALIAS = re.compile(r"^([A-Za-z_][\w.]*)(?:\s+as\s+([A-Za-z_]\w*))?$")
-REACHED = ("imported and called from {n} place(s) in other files read, the first ten in "
-           "reached_from: static, by import and name -- a call through another name, a "
-           "re-export, importlib or a module outside the tree is not followed, so the list can "
-           "be short")
+REACHED = ("reached from {n} place(s) in other files read, the first ten in reached_from -- a call "
+           "of the function or class this line is in, or, for a line at module level or a name "
+           "imported and not called, the import: static, by import and name; a call through "
+           "another name, a re-export, importlib or a module outside the tree is not followed, so "
+           "the list can be short")
 LIMIT = 10
 
 
