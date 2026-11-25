@@ -66,6 +66,9 @@ crypto-asset libraries, Vyper, and two false signals removed.
     - `tss.NewParameters(tss.S256(), ...)`;
     - the parameter set from slh-dsa's type.
   - bitcoinjs' Psbt signing calls are ECDSA even for a Taproot input, which is Schnorr.
+  - On the probe's 237 lines, 164 had no row on 0.53.0 and 13 still have none. Examples: btcec's
+    signature `.Verify`, Solana's `tx.sign`, `contract X is EIP712`, leanSig's generic calls,
+    the GG20 binaries and circom.
   - Error-message words such as "Not Taproot." are still read as Schnorr (row 589). It is the class
     row 113 left for the owner's decision.
   - A spelling is closed only as far as the saved pages name it. viem's generatePrivateKey,
