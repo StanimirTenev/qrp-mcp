@@ -21,6 +21,14 @@ No detection change: findings and their fingerprint do not move.
   (one more place to bump). Not claimed: it has not been run on GitHub yet. SARIF locations are
   relative to `path`, so a `path` other than `.` misplaces them in code scanning; the README
   says so.
+- **README "Measured"** replaces "Coverage on three public repositories". It covers OWASP Juice Shop
+  and DVWA (shallow clones, commits named) besides OpenSSH, certbot and Vault, with occurrences and
+  how many were read by hand. Juice Shop and DVWA were read in full (393 and 34); for the other
+  three, 30 each were taken by a fixed rule. What was read is stated plainly, false positives
+  included. In Juice Shop, 317 of the 393 rows are ECDSA for the word
+  `web3` or an ethers unit helper, and 240 of those are at medium or high confidence. This is
+  stated as found and is not fixed here. Counts of lines read, not detection figures: no recall
+  or precision.
 
 ## 0.53.0 (2026-11-24)
 

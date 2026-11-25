@@ -329,24 +329,68 @@ block names a key size (`key_size=1024`) is attempted in order to fail, and is n
 block without one (`pytest.raises(InvalidSignature)` over a `verify`) is a use; a function defined inside a test whose
 docstring makes it a rejection test ("... is rejected.") still runs what it calls.
 
-## Coverage on three public repositories
+## Measured
 
-What `coverage.scope` says on three trees this project did not write, measured on 18 Nov 2026 with
-qrp-mcp 0.50.0 (the repositories at OpenSSH `7fe3b24`, certbot `56ee049`, Vault `41e571b`).
+Five trees this project did not write, scanned on 25 Nov 2026 with the 0.54.0 detection code
+(popravki-054 at `5316656`, before the release merge), `scan --level full --no-config
+--as-of 2026-11-25`: OWASP Juice Shop at `c9f9922` and DVWA at `502ac15` (shallow clones of
+their default branches), OpenSSH at `7fe3b24`, certbot at `56ee049`, Vault at `41e571b`.
 `coverage_pct` is the share of the files present that were read; `read_in_full_pct` leaves out the
 files read only in part (a device configuration, a certificate block that did not parse).
-Findings are the entries of `findings`, Weak is `summary.weak_count`.
+Findings are the entries of `findings` (one per family and value), Weak is `summary.weak_count`,
+Occurrences are the rows of `evidence` (one per file, line and family), and Read is how many of
+those were opened in the file and judged by hand.
 
-| Repository | Files present | Read | `coverage_pct` | Read in part | `read_in_full_pct` | Findings | Weak |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| OpenSSH | 873 | 742 | 84.99% | 5 | 84.42% | 72 | 55 |
-| certbot | 1,250 | 850 | 68.00% | 0 | 68.00% | 41 | 28 |
-| Vault | 9,281 | 5,437 | 58.58% | 9 | 58.49% | 74 | 62 |
+| Repository | Files present | Read | `coverage_pct` | Read in part | `read_in_full_pct` | Findings | Weak | Occurrences | Read by hand |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Juice Shop | 1,498 | 936 | 62.48% | 2 | 62.35% | 11 | 6 | 393 | 393 |
+| DVWA | 252 | 191 | 75.79% | 0 | 75.79% | 2 | 1 | 34 | 34 |
+| OpenSSH | 873 | 742 | 84.99% | 5 | 84.42% | 76 | 55 | 9,352 | 30 |
+| certbot | 1,250 | 850 | 68.00% | 0 | 68.00% | 41 | 28 | 769 | 30 |
+| Vault | 9,281 | 5,437 | 58.58% | 9 | 58.49% | 74 | 62 | 3,816 | 30 |
 
-These are reading figures, not detection figures. How well the rules find what is there is a
-different question; the measurements made of it, each with its date and version, are in
-[How it is measured](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/measurement.md), and no recall or precision figure is cited here as
-current.
+**DVWA**, all 34 read: all 34 are uses. 31 are MD5: password hashing in the login and in every
+security level, the seeded user rows, a CSRF session token, a weak-session-id cookie, a client-side
+token. 3 are AES-128-ECB. No false positive. Seen in the tree and not reported by this version:
+AES-128-CBC (`token_library_high.php:4`), AES-GCM and SHA-256, and the minified MD5 implementation
+on one line (`javascript/source/low.php:10`; its call on line 18 is reported).
+
+**Juice Shop**, all 393 read. The 215 rows in UI translation files were checked by key (five keys
+in 44 files), and the English, German, Korean and Chinese files line by line.
+
+- 31 are uses: RS256 signing with an embedded RSA private key (`lib/insecurity.ts`), MD5 password
+  hashing, HMAC-SHA1, an ALB TLS policy in Terraform, the WebAuthn algorithm list, OpenPGP EdDSA
+  signatures, and P-256 keys in tests.
+- 28 are a library that implements the family (ethers, jsonwebtoken), declared, imported or called
+  with the browser wallet's signer. The line itself holds no signature.
+- 11 only name the family: comments, test titles, a key file's URL. The scanner marks 10 of them as
+  named, not used.
+- 6, all in test code, are cryptography of another family. DSA is reported for an ECDSA
+  `crypto.sign` with `dsaEncoding`. ECDH is reported for a `createECDH` that only makes a P-256
+  signing key.
+- **317 are false positives, all ECDSA.** 307 are the word `web3` in route paths, file and
+  component names, tags, test titles and the 215 translation strings. 10 are ethers unit helpers
+  (`formatEther`, `parseUnits`). The scanner marks 77 of the 317 as named, not used, at low
+  confidence. It reports the other 240 at medium or high confidence.
+
+**OpenSSH, certbot, Vault**: there are too many to read them all. 30 of each were read: the
+occurrences sorted by category, path, line and family, then every k-th from the first (k = 312,
+26 and 128). The rule was fixed before any of them was read. These counts describe those 30 lines
+only; nothing is inferred from them about the rest.
+
+- **OpenSSH**: 25 uses, 5 only named. The scanner marks 3 of the 5 (generated comments) as named.
+  It reports the other 2 at medium or high confidence: a `CKM_DSA_SHA512` constant in `pkcs11.h:546`
+  that no `.c` file uses, and a test title string in `regress/unittests/sshkey/test_file.c:440`.
+- **certbot**: 24 uses, 1 library import, 5 only named. The scanner marks 4 of the 5 as named. It
+  reports the fifth at medium confidence: `X25519PublicKey` in a type annotation
+  (`crypto_util.py:358`).
+- **Vault**: 26 uses, 1 declared dependency, 3 only named. The scanner marks all 3 as named.
+
+These are reading figures and counts of lines read, not detection figures. How well the rules find
+what is there is a different question. The measurements made of it, each with its date and
+version, are in
+[How it is measured](https://github.com/StanimirTenev/qrp-mcp/blob/main/docs/measurement.md). No
+recall or precision figure is cited here as current.
 
 ## Added in 0.46.0 to 0.49.0
 
