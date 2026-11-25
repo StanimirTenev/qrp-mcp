@@ -200,6 +200,10 @@ def _call_patterns(lib: Lib, aliases: set[str], named: dict[str, str],
         pats.append(rf"(?<![\w.$])(?:{_alt(named_classes)})::<[^>]*>::\w+")
     if named_functions:
         pats.append(rf"(?<![\w.$])(?:{_alt(named_functions)})\s*(?:<[^>()]*>\s*)?\(")
+    type_news = [b for b in named if b.startswith("new(")]
+    if type_news and lib.methods:
+        # Go: `new(Signature).Sign(sk, msg, dst)`
+        pats.append(rf"(?:{_alt(type_news)})\s*\.\s*(?:{_alt(lib.methods)})\s*\(")
     if receivers and lib.methods:
         pats.append(rf"(?<![\w.$])(?:{_alt(receivers)})(?:\s*\.\s*\w+(?:\(\s*\))?)*?\s*\.\s*(?:{_alt(lib.methods)})\s*(?:<[^>()]*>\s*)?\(")
     return [re.compile(p) for p in pats]
@@ -256,6 +260,27 @@ def calls(findings: list[dict[str, Any]], lines: list[str], rel_path: str, ext: 
         if not (aliases or named) and not import_lines:
             continue
         receivers = _receivers(lib, lines, aliases, named)
+        if lang == "go" and aliases and lib.methods:
+            # Go types (row 582): `var sec bls.SecretKey`, `type PublicKey = blst.P1Affine` and
+            # `new(PublicKey)` bind a value of the library's type.
+            a = _alt(aliases)
+            types = set(re.findall(rf"(?m)^\s*type\s+(\w+)\s*=?\s*\*?(?:{a})\.\w+", text))
+            receivers |= set(re.findall(rf"(?m)^\s*var\s+(\w+)\s+\*?(?:{a})\.\w+", text))
+            if types:
+                t_alt = _alt(types)
+                receivers |= set(re.findall(rf"(?m)^\s*var\s+(\w+)\s+\*?(?:{t_alt})\b", text))
+                receivers |= set(re.findall(
+                    rf"(?m)^\s*(\w+)(?:\s*,\s*\w+)*\s*:?=\s*new\(\s*(?:{t_alt})\s*\)", text))
+                named = {**named, **{f"new({ty})": ty for ty in types}}
+            receivers |= set(re.findall(rf"(?m)^\s*(\w+)(?:\s*,\s*\w+)*\s*:?=\s*new\(\s*(?:{a})\.\w+\s*\)", text))
+            # Values got from those, to a fixed point.
+            for _ in range(3):
+                more = {m.group(1) for line in lines
+                        for m in [re.match(r"^\s*(\w+)(?:\s*,\s*\w+)*\s*:?=\s*(\w+)\s*\.", line)]
+                        if m and m.group(2) in receivers}
+                if more <= receivers:
+                    break
+                receivers |= more
         patterns = _call_patterns(lib, aliases, named, receivers)
         if not patterns and not import_lines:
             continue
@@ -472,4 +497,17 @@ register(
         classes=("SigningKey", "VerifyingKey"),
         methods=("try_sign", "sign", "verifying_key", "verify", "try_sign_with_context",
                  "sign_with_context", "try_verify_with_context")),
+)
+
+# Row 582: blst's Go binding (bindings/go/README) and herumi's bls-eth-go-binary (readme): BLS12-381.
+register(
+    Lib("go", ("github.com/supranational/blst/bindings/go",), "BLS", "BLS12-381", "blst",
+        functions=("KeyGen", "KeyGenV3", "KeyGenV45", "KeyGenV5", "DeriveMasterEip2333"),
+        methods=("From", "Sign", "Verify", "AggregateVerify", "FastAggregateVerify", "Aggregate",
+                 "VerifyCompressed"), go_names={"github.com/supranational/blst/bindings/go": "blst"}),
+    Lib("go", ("github.com/herumi/bls-eth-go-binary/bls", "github.com/herumi/bls-go-binary/bls"),
+        "BLS", "BLS12-381", "herumi bls",
+        functions=("Init", "SetETHmode", "SignByte", "VerifyByte"),
+        methods=("SetByCSPRNG", "GetPublicKey", "SignByte", "Sign", "VerifyByte", "Verify",
+                 "FastAggregateVerify", "AggregateVerify", "Aggregate", "SignHash", "VerifyHash")),
 )

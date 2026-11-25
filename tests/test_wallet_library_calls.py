@@ -314,3 +314,42 @@ def test_solana_web3_is_not_ecdsa(tmp_path):
     result = _scan(tmp_path, "s.js", "const { Keypair } = require('@solana/web3.js');\n")
     families = {r["algorithm"] for r in result["evidence"]["source_code"]}
     assert "Ed25519" in families and "ECDSA" not in families
+
+
+BLST_GO = """package main
+
+import blst "github.com/supranational/blst/bindings/go"
+
+type PublicKey = blst.P1Affine
+type Signature = blst.P2Affine
+
+func run(ikm, msg, dst []byte) bool {
+\tsk := blst.KeyGen(ikm)
+\tpk := new(PublicKey).From(sk)
+\tsig := new(Signature).Sign(sk, msg, dst)
+\treturn sig.Verify(true, pk, true, msg, dst)
+}
+"""
+HERUMI = """package main
+
+import "github.com/herumi/bls-eth-go-binary/bls"
+
+func run(msg []byte) bool {
+\tbls.Init(bls.BLS12_381)
+\tbls.SetETHmode(bls.EthModeDraft07)
+\tvar sec bls.SecretKey
+\tsec.SetByCSPRNG()
+\tpub := sec.GetPublicKey()
+\tsig := sec.SignByte(msg)
+\treturn sig.VerifyByte(pub, msg)
+}
+"""
+
+
+@pytest.mark.parametrize("name, body, lines", [
+    ("blst.go", BLST_GO, (9, 10, 11, 12)), ("herumi.go", HERUMI, (7, 9, 10, 11, 12)),
+], ids=["blst-go", "herumi"])
+def test_row_582_bls_in_go(tmp_path, name, body, lines):
+    rows = _scan(tmp_path, name, body)["evidence"]["source_code"]
+    got = {r["line"] for r in rows if r["algorithm"] == "BLS" and r["evidence_kind"] == "call"}
+    assert set(lines) <= got, sorted((r["line"], r["algorithm"], r["evidence_kind"]) for r in rows)
