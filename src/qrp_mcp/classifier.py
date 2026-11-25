@@ -77,6 +77,8 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     # Rows 415, 416: the round-3 schemes by their libraries' own names (detectors).
     ("DILITHIUMROUND3", "Dilithium round 3", "pqc_ready", "signature"),
     ("SPHINCSROUND3", "SPHINCS+ round 3", "pqc_ready", "signature"),
+    # Row 576: leanSig / hash-sig's generalized XMSS (ePrint 2025/055), not RFC 8391 XMSS.
+    ("GENERALIZEDXMSS", "Generalized XMSS", "pqc_ready", "signature"),
     ("SLHDSA", "SLH-DSA", "pqc_ready", "signature"),
     ("SPHINCS", "SLH-DSA", "pqc_ready", "signature"),
     ("FALCON", "Falcon", "pqc_ready", "signature"),
@@ -218,6 +220,9 @@ _PQC_SCHEMES: dict[str, tuple[str, str]] = {
     "ML-DSA-44-Ed25519 experimental": ("structured lattice", "superseded"),
     "Dilithium round 3": ("structured lattice", "superseded"),
     "SPHINCS+ round 3": ("hash-based", "superseded"),
+    # Row 576: research -- "a generic framework from this paper" (leanSig README, ePrint 2025/055),
+    # in no standardisation process.
+    "Generalized XMSS": ("hash-based", "research"),
     "ML-DSA": ("structured lattice", "standardised"),
     "SLH-DSA": ("hash-based", "standardised"),
     "XMSS": ("hash-based", "standardised"),
@@ -398,9 +403,15 @@ _PRE_STANDARD_NOTE = {
         "and Bouncy Castle calls these the pre-standardisation round-3 algorithms. The "
         "standard is ML-DSA."
     ),
+    "Generalized XMSS": (
+        " Generalized XMSS (leanSig / hash-sig): XMSS-like hash-based signatures built from "
+        "incomparable encodings (ePrint 2025/055), instantiated with Poseidon or SHA3. A research "
+        "scheme in no standardisation process; not RFC 8391 / SP 800-208 XMSS."
+    ),
     "SPHINCS+ round 3": (
         " Named as round-3 SPHINCS+ (liboqs's sphincs ids, the NIST Round 3 submission v3.1; "
-        "Bouncy Castle's sphincsplus classes), not as FIPS 205 SLH-DSA, which differs from it. "
+        "Bouncy Castle's sphincsplus classes; pyspx, bindings for the SPHINCS+ submission), not as "
+        "FIPS 205 SLH-DSA, which differs from it. "
         "liboqs removed SPHINCS+ in 0.16.0. The standard is SLH-DSA."
     ),
     "ML-DSA-44-Ed25519 experimental": (

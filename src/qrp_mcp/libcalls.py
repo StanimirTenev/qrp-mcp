@@ -205,11 +205,12 @@ def _call_patterns(lib: Lib, aliases: set[str], named: dict[str, str],
     return [re.compile(p) for p in pats]
 
 
+# The names assigned (several in a tuple: `pub, priv, _ := falcon.GenerateKey(seed)`), and the value.
 _ASSIGN = {
-    "py": re.compile(r"^\s*(\w+)\s*(?::[^=]+)?=(?!=)\s*(?:await\s+)?(.+)$"),
+    "py": re.compile(r"^\s*((?:\w+\s*,\s*)*\w+)\s*(?::[^=]+)?=(?!=)\s*(?:await\s+)?(.+)$"),
     "js": re.compile(r"^\s*(?:(?:const|let|var)\s+)?(\w+)\s*(?::[^=]+)?=(?![=>])\s*(?:await\s+)?(?:new\s+)?(.+)$"),
-    "go": re.compile(r"^\s*(?:var\s+)?(\w+)(?:\s*,\s*\w+)*\s*:?=(?!=)\s*(.+)$"),
-    "rs": re.compile(r"^\s*let\s+(?:mut\s+)?\(?\s*(?:mut\s+)?(\w+)(?:\s*,[^)=]*)?\)?\s*(?::[^=]+)?=(?!=)\s*(.+)$"),
+    "go": re.compile(r"^\s*(?:var\s+)?((?:\w+\s*,\s*)*\w+)\s*:?=(?!=)\s*(.+)$"),
+    "rs": re.compile(r"^\s*let\s+\(?\s*((?:(?:mut\s+)?\w+\s*,\s*)*(?:mut\s+)?\w+)\s*\)?\s*(?::[^=]+)?=(?!=)\s*(.+)$"),
 }
 
 
@@ -225,7 +226,8 @@ def _receivers(lib: Lib, lines: list[str], aliases: set[str], named: dict[str, s
         if m:
             head = re.match(r"\(?\s*(?:new\s+)?(\w+)", m.group(2))
             if head:
-                assigns.append((m.group(1), head.group(1)))
+                for var in m.group(1).split(","):
+                    assigns.append((var.replace("mut ", "").strip(), head.group(1)))
     found: set[str] = set()
     while True:
         more = {var for var, head in assigns if (head in heads or head in found) and var not in found}
@@ -454,4 +456,20 @@ register(
     Lib("rs", ("frost_p256", "frost_ristretto255", "frost_ed448"), "Schnorr", None, "FROST",
         functions=_FROST),
     Lib("rs", ("frost_ed25519",), "Ed25519", None, "FROST", functions=_FROST),
+)
+
+# Row 578: Algorand's Falcon (github.com/algorand/falcon, falcon.go: GenerateKey, and SignCompressed,
+# ConvertToCT, Verify, VerifyCTSignature on its keys and signatures); go-algorand's
+# crypto.GenerateFalconSigner (И: not on the saved pkg.go.dev page, which names FalconSeed only).
+register(
+    Lib("go", ("github.com/algorand/falcon",), "Falcon", None, "Algorand's falcon",
+        functions=("GenerateKey", "GenerateKeyCompressed"),
+        methods=("SignCompressed", "ConvertToCT", "Verify", "VerifyCTSignature")),
+    Lib("go", ("github.com/algorand/go-algorand/crypto",), "Falcon", None, "go-algorand's crypto",
+        functions=("GenerateFalconSigner", "NewFalconSigner")),
+    # Row 579: RustCrypto slh-dsa (docs.rs/slh-dsa): SigningKey, VerifyingKey and their methods.
+    Lib("rs", ("slh_dsa",), "SLH-DSA", None, "RustCrypto slh-dsa",
+        classes=("SigningKey", "VerifyingKey"),
+        methods=("try_sign", "sign", "verifying_key", "verify", "try_sign_with_context",
+                 "sign_with_context", "try_verify_with_context")),
 )

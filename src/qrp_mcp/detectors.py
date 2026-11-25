@@ -270,6 +270,8 @@ PAIRING_BN254 = "Pairing: the pairing-friendly curve BN254 (alt_bn128)"
 PAIRING_EIP4844_KZG = "Pairing: KZG commitments of EIP-4844 (c-kzg-4844, over BLS12-381)"
 PAIRING_CURVES = {PAIRING_BN254: "BN254", PAIRING_EIP4844_KZG: "BLS12-381"}
 
+GENERALIZED_XMSS = ("Generalized XMSS (leanSig / hash-sig, ePrint 2025/055), not RFC 8391 / "
+                    "SP 800-208 XMSS")
 KYBER_BY_NAME_ONLY = "Kyber named without an identifier (round-3 Kyber, or an old name for ML-KEM)"
 # Read in .rs files only (scan_source_file): elsewhere `rsa_` and `_dsa_` are too often a
 # variable's word for a value it does not hold.
@@ -1480,6 +1482,9 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
      re.compile(r"(?<![A-Za-z])eddilithium3(?![0-9])", re.IGNORECASE)),
     ("SPHINCS+ round 3", PRE_STANDARD_SPHINCS, re.compile(
         r"\bOQS_SIG_alg_sphincs_\w+|\bcrypto\.sphincsplus\b|"
+        # Row 577: pyspx, "bindings for SPHINCS+ ... all parameter sets included as part of the
+        # SPHINCS+ submission to NIST's Post-Quantum Cryptography Standardization project" (README).
+        r"(?<![\w.])pyspx(?:\.\w+)?\b|"
         r"\bSPHINCSPlus(?:Signer|KeyPairGenerator|KeyGenerationParameters|PrivateKeyParameters|"
         r"PublicKeyParameters)\b")),
     ("SLH-DSA", "SLH-DSA (SPHINCS+) usage", re.compile(
@@ -1510,6 +1515,11 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("HQC", "HQC usage", re.compile(r"(?<![A-Za-z])hqc[-_]?(?:128|192|256|[135])(?![0-9])",
                                     re.IGNORECASE)),
     # Also hash-then-sign, SHA256WITHXMSSMT (Bouncy Castle), row 139.
+    # Row 576: leanSig / hash-sig's "XMSS-like hash-based signatures from ... incomparable
+    # encodings" (ePrint 2025/055), instantiated with Poseidon or SHA3 -- not RFC 8391 XMSS. Before
+    # XMSS, which then leaves the line alone.
+    ("Generalized XMSS", GENERALIZED_XMSS, re.compile(
+        r"(?<![A-Za-z])generalized_xmss\b|(?<![A-Za-z0-9_])(?:leansig|hashsig)(?=::|\s*=|\s*\}|\s*;|\s*$)")),
     ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss|(?<=with)xmss", re.IGNORECASE)),
     # Stateful hash-based, SP 800-208. CNSA 2.0 requires LMS or XMSS for firmware
     # and code signing, so a firmware pipeline that had complied scanned as empty.
@@ -4296,6 +4306,8 @@ def scan_source_file(path: Path, rel_path: str,
             # "ML-KEM (Kyber)": the line names the standard and gives its old name.
             if description == KYBER_BY_NAME_ONLY and "ML-KEM" in seen_on_line:
                 continue
+            if algorithm == "XMSS" and "Generalized XMSS" in seen_on_line:
+                continue
             if lowered is not None and literals and not any(s in lowered for s in literals):
                 continue
             # Every match on the line, not the first: a cipher string can both ban
@@ -4683,6 +4695,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _vrf_calls(findings, lines, rel_path)
     findings = libcalls.calls(findings, lines, rel_path, ext, in_test_code)
     findings = _schnorr_not_ecdsa(findings, lines, rel_path)
+    _pyspx_alias(findings, lines)
     if ext == ".sol":
         findings = _evm_precompiles(findings, lines, rel_path)
         findings = _solidity_signatures(findings, lines, rel_path)
@@ -4883,6 +4896,24 @@ def _contract_function_names(findings: list[dict[str, Any]], lines: list[str], e
             f["evidence_kind"] = "identifier"
             f["not_a_use_rule"] = _CONTRACT_NAME_RULE
             f.pop("_kind_if_used", None)
+
+
+# Row 577: `import pyspx.shake_128f as sphincs` -- the alias's word made the calls SLH-DSA. In a
+# Python file that imports pyspx and names no FIPS 205 spelling, an SLH-DSA row is round-3 SPHINCS+.
+_PYSPX_IMPORT = re.compile(r"(?m)^[ \t]*(?:import|from)[ \t]+pyspx\b")
+_FIPS205_WORD = re.compile(r"slh[-_]?dsa", re.IGNORECASE)
+
+
+def _pyspx_alias(findings: list[dict[str, Any]], lines: list[str]) -> None:
+    if not any(f["algorithm"] == "SLH-DSA" for f in findings):
+        return
+    text = "\n".join(lines)
+    if not _PYSPX_IMPORT.search(text) or _FIPS205_WORD.search(text):
+        return
+    for f in findings:
+        if f["algorithm"] == "SLH-DSA":
+            f["algorithm"] = "SPHINCS+ round 3"
+            f["description"] = PRE_STANDARD_SPHINCS
 
 
 # Row 573: libsecp256k1's BIP-340 Schnorr, extrakeys and MuSig2 functions carry the curve's name
