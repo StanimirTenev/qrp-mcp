@@ -1,0 +1,47 @@
+# qrp-mcp as a GitHub Action: scan the checked-out tree and write SARIF 2.1.0 for code scanning.
+#
+# The scanner is the release this file is tagged with (uvx qrp-mcp==X.Y.Z, held to pyproject.toml
+# by tests/test_github_action.py). It runs on the runner and makes no network calls of its own;
+# uvx fetches the package from PyPI once. Every file it did not read is a tool execution
+# notification in the SARIF, with its reason. Upload the file with
+# github/codeql-action/upload-sarif (see the README).
+#
+# Locations in the SARIF are relative to `path`. Code scanning resolves them from the repository
+# root, so leave `path` at "." unless the results are meant for another repository layout.
+name: qrp-mcp post-quantum scan
+description: Offline inventory of quantum-vulnerable cryptography in the checked-out code, as SARIF.
+author: Stanimir Tenev
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: Directory to scan, relative to the workspace.
+    required: false
+    default: "."
+  output:
+    description: Where to write the SARIF file.
+    required: false
+    default: "qrp-mcp.sarif"
+  level:
+    description: "What the quoted line of evidence carries: full, masked (the algorithm name only) or trimmed."
+    required: false
+    default: "masked"
+
+outputs:
+  sarif:
+    description: Path of the SARIF file written.
+    value: ${{ inputs.output }}
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+    - shell: bash
+      env:
+        QRP_PATH: ${{ inputs.path }}
+        QRP_OUTPUT: ${{ inputs.output }}
+        QRP_LEVEL: ${{ inputs.level }}
+      run: |
+        uvx --from qrp-mcp==0.53.0 qrp-mcp scan "$QRP_PATH" --format sarif --out "$QRP_OUTPUT" --level "$QRP_LEVEL"

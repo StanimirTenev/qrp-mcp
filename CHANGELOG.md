@@ -176,6 +176,30 @@ Findings and their fingerprint move where these constructs are present.
   quotations were checked against saved copies of the pages (51 found, 0 missing, 2 without a page).
 - **Not done.** Row 559 (the OIDC `issuer-uri`) is marked for decision and was left.
 
+### GitHub Action and the README "Measured" section
+
+No detection change: findings and their fingerprint do not move.
+
+- **A GitHub Action** (`action.yml` at the root, composite). It installs uv, runs
+  `uvx --from qrp-mcp==X.Y.Z qrp-mcp scan PATH --format sarif --out FILE --level LEVEL`, and gives
+  the file as the output `sarif` for `github/codeql-action/upload-sarif` (example in the README).
+  Inputs `path`, `output` and `level` only, because those are what `scan` has; there is no
+  "fail on" input and the step exits 0 on findings. Inputs reach the command through `env`, not
+  through `${{ }}` in the script. `tests/test_github_action.py` holds the command to the real CLI:
+  each flag must be in `qrp-mcp scan --help`, the default level one of its choices, the same
+  arguments must write SARIF 2.1.0, and the pin and the README's `uses:` must be this release
+  (one more place to bump). Not claimed: it has not been run on GitHub yet. SARIF locations are
+  relative to `path`, so a `path` other than `.` misplaces them in code scanning; the README
+  says so.
+- **README "Measured"** replaces "Coverage on three public repositories". It covers OWASP Juice Shop
+  and DVWA (shallow clones, commits named) besides OpenSSH, certbot and Vault, with occurrences and
+  how many were read by hand. Juice Shop and DVWA were read in full (393 and 34); for the other
+  three, 30 each were taken by a fixed rule. What was read is stated plainly, false positives
+  included. In Juice Shop, 317 of the 393 rows are ECDSA for the word
+  `web3` or an ethers unit helper, and 240 of those are at medium or high confidence. This is
+  stated as found and is not fixed here. Counts of lines read, not detection figures: no recall
+  or precision.
+
 ## 0.53.0 (2026-11-24)
 
 Detection changes: findings and their fingerprint move. Ten more (operation, ecosystem) pairs are
