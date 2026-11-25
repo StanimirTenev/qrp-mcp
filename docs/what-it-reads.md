@@ -522,6 +522,29 @@ Real run against [OpenZeppelin's contracts](https://github.com/OpenZeppelin/open
   algorithm (`us-east-1`) is not a place.
   From 0.47.0, in a `CMakeLists.txt` or `*.cmake` file `${name}` is a CMake variable, set in the
   build, and is not a place; `$ENV{name}` is (row 505).
+  From 0.54.0 (row 560) the same holds for each documented placeholder default:
+  - Spring's `${name:default}`, in YAML, `.properties` and `@Value`;
+  - the shell's `${p:-w}`, `${p-w}`, `${p:=w}` and `${p=w}`;
+  - Compose's `${VAR:-d}` and `${VAR-d}`.
+
+  `:?`, `?`, `:+` and `+` give no default. In a shell script `${X:w}` is a substring, so it is not
+  read as Spring's form there.
+- **gpg key generation** (row 557, 0.54.0): the algo string of `--quick-generate-key`,
+  `--quick-gen-key` and `--quick-add-key` (rsa[N], dsa[N], elg, ed25519, cv25519, ed448, cv448 and
+  the ECC curves) is read, with its size and curve. So are `--default-new-key-algo` and the
+  `--generate-key --batch` parameter file (`Key-Type`, `Key-Length`, `Key-Curve`). `default`,
+  `future-default`, `-` and `pqc` name no family.
+- **Where a Python module is reached from** (row 554, 0.54.0): an occurrence inside a module of the
+  tree carries `reached_from`. That is up to ten places in other files read that import the
+  top-level function or class it is in and call it, or the import line where no call is seen. It
+  also carries `reached_from_count`, and `reached`, which says the list is static and can be short:
+  a call through another name, a re-export or `importlib` is not followed.
+- **A JOSE token with no verified signature** (row 594, 0.54.0): the family `JWT-unverified`,
+  classified `deprecated_weak`, severity high and not quantum vulnerable. It covers an Unsecured
+  JWS (`alg: none`) accepted or made, and a token read without verifying its signature, in these
+  libraries: PyJWT, python-jose, jsonwebtoken, jose (panva), Nimbus, jjwt and golang-jwt. A JWT
+  algorithm setting set to `none` counts too. `none` counts only inside an algorithm setting or
+  argument.
   From 0.49.0 (row 528, audit #7) a JOSE name as the default (`os.environ.get('JWT_ALG',
   'ES256')`, `process.env.JWT_ALG || 'RS256'`) is a place too: RS/PS = RSA, ES = ECDSA, EdDSA.
 - **Which environment reads are places** (row 528, audit #6). Until 0.49.0 only the variable on

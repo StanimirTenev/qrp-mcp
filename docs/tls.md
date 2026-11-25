@@ -82,6 +82,16 @@ not, tested on 22 Oct 2026.
 ### Per listener (nginx, from 0.47.0)
 
 `tls_listeners` (row 490) lists each nginx `server` block with a `listen ... ssl` (or `quic`):
+From 0.54.0 (row 558) every nginx reader here takes the file statement by statement, as nginx
+does: a block on one line (`server { listen 443 ssl; ssl_certificate ...; }`), or two
+directives on one line, read the same as over lines, and keep their physical line. This covers the
+listeners, the unread certificates, the trust stores, the `*_ssl_verify` switches, TLS upstreams
+and `ssl_verify_client`.
+An Android network security configuration (an `.xml` whose root is `<network-security-config>`,
+row 556) gives each `<pin-set>` as a protocols row (`basis: configured_pin`, `pins`,
+`pin_digest`, `pin_expiration`). That row names no family: a pin is a hash of a key that is not in
+the file. Each `<certificates src>` is a `trust_stores` place.
+
 the block's place, its `listen` lines with the port, `server_name` (masked below `--level full`),
 `groups` -- the `ssl_ecdh_curve` value split into groups, each with its families and
 `post_quantum` -- and `certificates` -- each `ssl_certificate[_key]` line with the families on
@@ -121,6 +131,14 @@ exchange offered alone on a line that also offers a hybrid stays a classical fin
 fallback_beside_hybrid` and as `qrp:fallback_beside_hybrid` on its CBOM component. A pure hybrid
 has neither. The classical half inside the hybrid's own name is counted as
 before.
+
+From 0.54.0 (row 555) the opposite case is marked too: ML-KEM with no classical half. A pure group
+(MLKEM512, MLKEM768, MLKEM1024) in any group setting, and Go's `crypto/mlkem` constructors and
+`tls.MLKEM1024`, give the ML-KEM row `standalone_pqc: true` and `standalone_basis`. The places are
+listed on the finding, in `summary.by_role.key_establishment.standalone_pqc` and as
+`qrp:standalone_pqc` on the CBOM component: one filter for the day a weakness in lattices is
+announced. Said of the line: Go code that combines ML-KEM with a classical KEM by hand elsewhere is
+not read as a hybrid.
 
 ⚠️ What is not claimed: that a connection ever uses the fallback. That is settled where TLS
 terminates, as above; the finding is about the file.
