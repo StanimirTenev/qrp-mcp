@@ -4720,6 +4720,8 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _vrf_calls(findings, lines, rel_path)
     findings = libcalls.calls(findings, lines, rel_path, ext, in_test_code)
     findings = _schnorr_not_ecdsa(findings, lines, rel_path)
+    if ext in _NODE_EXT:
+        findings = _node_ec_keys(findings, lines)
     _pyspx_alias(findings, lines)
     if ext == ".sol":
         findings = _evm_precompiles(findings, lines, rel_path)
@@ -4923,6 +4925,59 @@ def _contract_function_names(findings: list[dict[str, Any]], lines: list[str], e
             f["evidence_kind"] = "identifier"
             f["not_a_use_rule"] = _CONTRACT_NAME_RULE
             f.pop("_kind_if_used", None)
+
+
+# Row 599 (Juice Shop's passkey tests), Node's crypto (nodejs.org/api/crypto.html):
+# - `dsaEncoding` "For DSA and ECDSA, this option specifies the format of the generated signature":
+#   it names no family. In a file whose keys are EC (an `'ec'` key type, createECDH) and none DSA, it
+#   is ECDSA; otherwise the identifier gives nothing.
+# - `createECDH(curve)` makes "an Elliptic Curve Diffie-Hellman (ECDH) key exchange object"; the
+#   exchange is `computeSecret`. In a file that never calls it, an object whose private key is set
+#   or read is an EC key pair: its lines are EC, not ECDH.
+_NODE_EXT = frozenset({".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".jsx", ".tsx"})
+_DSA_ENCODING = re.compile(r"\bdsaEncoding\b")
+_NODE_EC_KEY = re.compile(r"""\b(?:generateKeyPair(?:Sync)?|createECDH)\s*\(\s*(?:['"]ec['"]|['"](?:prime256v1|secp\w+)['"])""")
+_NODE_DSA_KEY = re.compile(r"""\bgenerateKeyPair(?:Sync)?\s*\(\s*['"]dsa['"]""")
+_CREATE_ECDH_BIND = re.compile(r"\b(\w+)\s*=\s*(?:\w+\.)?createECDH\s*\(")
+
+
+def _node_ec_keys(findings: list[dict[str, Any]], lines: list[str]) -> list[dict[str, Any]]:
+    text = "\n".join(lines)
+    has_ecdh = "createECDH" in text
+    if not (has_ecdh or "dsaEncoding" in text):
+        return findings
+    ec_keys = bool(_NODE_EC_KEY.search(text)) and not _NODE_DSA_KEY.search(text)
+    # Only an object whose private key is set or read (a key pair made from a seed); a createECDH
+    # alone stays ECDH (row 413).
+    bound = ({v for v in _CREATE_ECDH_BIND.findall(text)
+              if re.search(rf"\b{re.escape(v)}\s*\.\s*(?:setPrivateKey|getPrivateKey)\s*\(", text)}
+             if has_ecdh and "computeSecret" not in text else set())
+    bound_re = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(bound))) + r")\s*\.") if bound else None
+    out = []
+    for f in findings:
+        n = f.get("line", 0)
+        line = lines[n - 1] if 0 < n <= len(lines) else ""
+        same_line = {g["algorithm"] for g in findings if g.get("line") == n}
+        if f["algorithm"] == "DSA" and _DSA_ENCODING.search(line) and not re.search(
+                r"(?<![A-Za-z])dsa(?![A-Za-z])", _DSA_ENCODING.sub("", line), re.IGNORECASE):
+            if ec_keys and "ECDSA" not in same_line:
+                f = {**f, "algorithm": "ECDSA", "evidence_kind": "call",
+                     "description": "ECDSA: crypto.sign with dsaEncoding (DSA and ECDSA only) and "
+                                    "the file's keys are EC"}
+                f.pop("not_a_use_rule", None)
+                out.append(f)
+            continue
+        if (f["algorithm"] == "ECDH" and bound_re is not None
+                and ("createECDH" in line or bound_re.search(line))):
+            if "EC" not in same_line:
+                f = {**f, "algorithm": "EC",
+                     "description": "EC key pair made through createECDH (the file never calls "
+                                    "computeSecret)"}
+                out.append(f)
+                same_line.add("EC")
+            continue
+        out.append(f)
+    return out
 
 
 # Row 577: `import pyspx.shake_128f as sphincs` -- the alias's word made the calls SLH-DSA. In a
