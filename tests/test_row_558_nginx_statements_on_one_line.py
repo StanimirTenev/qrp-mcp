@@ -162,3 +162,15 @@ def test_cli_and_mcp_carry_the_one_line_listener(tmp_path):
     for result in (json.loads(out.read_text()), scan_repo(str(root), level="full")):
         assert [r[0] for r in _listeners(result)] == [1]
         assert len(_unread(result)) == 2
+
+
+def test_a_long_line_of_braces_is_split_in_linear_time():
+    # The corpus regression of 25.11.2026: rust-bakery/nom's benchmarks/canada.json (2.2 MB on nine
+    # lines) did not finish in 15 minutes; the splitter's last alternative rescanned each segment.
+    import time
+    from qrp_mcp.assets import nginx_statements
+    # A long segment that ends at a closing brace, as a GeoJSON coordinate array does.
+    line = '{"type": "Polygon", "coordinates": [' + "[-65.6, 43.5], " * 1500 + "]}"
+    started = time.perf_counter()
+    nginx_statements(line)
+    assert time.perf_counter() - started < 0.5

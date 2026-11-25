@@ -1421,7 +1421,10 @@ def _tokens(line: str) -> list[str]:
 # semicolon it ends with a set of additional instructions surrounded by braces", nginx.org,
 # beginners_guide.html). `server { listen 443 ssl; ... ssl_certificate ...; }` on one line was one
 # line starting with `server`, and every directive after the brace was lost.
-_NGINX_STATEMENT = re.compile(r"[^;{}]*[;{]|\}|[^;{}]+$")
+# Cut at each delimiter in one pass: a regex whose alternatives rescan a long segment that ends at
+# `}` was quadratic, and a 2.2 MB GeoJSON line (rust-bakery/nom, canada.json) did not finish in 15
+# minutes in the corpus regression of 25.11.2026.
+_NGINX_DELIMITER = re.compile(r"[;{}]")
 
 
 def nginx_statements(line: str) -> list[str]:
@@ -1430,7 +1433,16 @@ def nginx_statements(line: str) -> list[str]:
     text = line.split("#", 1)[0]
     if text.count(";") + text.count("{") + text.count("}") <= 1:
         return [text]
-    return [s for s in _NGINX_STATEMENT.findall(text) if s.strip()]
+    out: list[str] = []
+    start = 0
+    for m in _NGINX_DELIMITER.finditer(text):
+        if m.group(0) == "}":
+            out.extend((text[start:m.start()], "}"))
+        else:
+            out.append(text[start:m.end()])
+        start = m.end()
+    out.append(text[start:])
+    return [s for s in out if s.strip()]
 
 
 def scan_tls_listeners(rel_path: str, lines: list[str]) -> list[dict[str, Any]]:

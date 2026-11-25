@@ -823,6 +823,8 @@ def _tls_listeners(result: dict[str, Any], root: Path) -> dict[str, Any] | None:
             continue
         # Row 558: read statement by statement, so a block or two directives on one line are
         # read as nginx reads them; each keeps the line it is on.
+        if not any("server" in raw for raw in lines):
+            continue
         statements = [(n, s) for n, raw in enumerate(lines, 1)
                       for s in assets.nginx_statements(raw)]
         if not any(_NGINX_SERVER.match(line) for _, line in statements):
