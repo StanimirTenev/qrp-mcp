@@ -228,3 +228,38 @@ def test_android_store_keywords_are_not_masked(tmp_path):
         '    </trust-anchors>\n  </base-config>\n</network-security-config>\n')
     result = scan_repo(str(tmp_path))
     assert sorted(p["file"] for p in result["trust_stores"]["places"]) == ["system", "user"]
+
+
+# Owner's decision 5 (25.11.2026): a decode a verification follows is low and is not weak. Where
+# every JWT-unverified row carries verified_after, the finding stays (it says where the line reads
+# the token unverified) but is low, and neither weak_count nor highest_severity moves for it.
+_VERIFIED_LATER = ("import jwt from 'jsonwebtoken'\n\nfunction check (token) {\n"
+                   "  const claims = jwt.decode(token)\n  jwt.verify(token, publicKey)\n"
+                   "  return claims\n}\n")
+
+
+def _jwt_finding(result: dict) -> dict:
+    return next(f for f in result["findings"] if f["algorithm_family"] == "JWT-unverified")
+
+
+@pytest.mark.parametrize("run", [scan_directory, lambda p: scan_repo(str(p))])
+def test_only_verified_after_rows_are_low_and_not_weak(tmp_path, run):
+    (tmp_path / "v.ts").write_text(_VERIFIED_LATER)
+    result = run(tmp_path)
+    assert _after(result) == [(4, "v.ts:5")]
+    finding = _jwt_finding(result)
+    assert finding["severity"] == "low"
+    assert finding["verified_after_only"] is True
+    assert result["summary"]["weak_count"] == 0
+    assert result["summary"]["highest_severity"] != "high"
+
+
+def test_an_unverified_row_beside_it_keeps_the_finding_high(tmp_path):
+    (tmp_path / "v.ts").write_text(_VERIFIED_LATER)
+    (tmp_path / "p.ts").write_text("import jwt from 'jsonwebtoken'\nconst c = jwt.decode(token)\n")
+    result = scan_directory(tmp_path)
+    assert sorted(_after(result)) == [(2, None), (4, "v.ts:5")]
+    finding = _jwt_finding(result)
+    assert finding["severity"] == "high" and "verified_after_only" not in finding
+    assert result["summary"]["weak_count"] == 1
+    assert result["summary"]["highest_severity"] == "high"

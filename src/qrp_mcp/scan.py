@@ -177,8 +177,17 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
                                f"read as names, not uses (`mlkem_key`, `kyber_exchange`): "
                                f"not counted as post-quantum. Were it used, it would be "
                                f"{f.classification}. {f.reason}")})
+    # Row 594, the owner's decision of 25.11.2026: a family whose every row is a decode that a
+    # verification follows (`verified_after`) stays a finding, low, and is not counted -- neither
+    # weak_count nor the high severity of an unverified token moves for it.
+    verified_later = {name for name, items in _in_use(scan_result).items()
+                      if all(i.get("verified_after") for i in items)}
+    for f in response.findings:
+        if detected_by_name.get(f.raw_value) in verified_later:
+            f.severity = "low"
+            notes.setdefault(f.algorithm_family, {})["verified_after_only"] = True
     counted = [f for f in response.findings
-               if detected_by_name.get(f.raw_value) not in by_name_only]
+               if detected_by_name.get(f.raw_value) not in by_name_only | verified_later]
     summary = summarize(counted, set_aside, protected)
     summary.by_role = _by_role(counted, roles, detected_by_name, set_aside, protected)
     fallbacks = {family: note["fallback_beside_hybrid"] for family, note in sorted(notes.items())

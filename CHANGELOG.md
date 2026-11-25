@@ -159,7 +159,11 @@ Findings and their fingerprint move where these constructs are present.
   The rule for a decode that a verification follows in the same block (Juice Shop
   `routes/verify.ts:119`, verified six lines below): it is still a row, because the line does read
   the token unverified. The row now carries `verified_after` and says only that. It does not say
-  the token is accepted unverified, and the finding's reason says so too.
+  the token is accepted unverified, and the finding's reason says so too. Where every
+  `JWT-unverified` row of the tree carries `verified_after` (the owner's decision), the finding is
+  `low` with `verified_after_only: true` and is not counted: `weak_count`, `highest_severity` and
+  `total_findings` do not move for it, as for a family named only in identifiers. One row without
+  `verified_after` keeps the finding high and counted.
 
   `none` lists and `verify_signature` are read only in a file that imports a JOSE library.
   jose's `decodeJwt` and `UnsecuredJWT` are read only in a JS/TS file that imports `jose`, because
