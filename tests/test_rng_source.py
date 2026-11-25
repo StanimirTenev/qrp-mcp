@@ -121,9 +121,10 @@ def test_a_generator_row_never_moves_the_status(tmp_path):
     result = scan_directory(tmp_path)
     assert result["randomness"]["calls"]
     go = _eco(result, "Go")
-    # external/Go is closed since 24.11.2026; rng_source still never counts.
+    # external/Go is closed since 24.11.2026, apiname/pqc/sign of Go since 0.54.0; rng_source still
+    # never counts.
     assert go["status"] == "closed" and go["open_operations"] == []
-    assert go["closed_operations"] == ["external"]
+    assert go["closed_operations"] == ["apiname", "external", "pqc", "sign"]
     assert "rng_source" not in go["known_operations"] + go["closed_operations"]
 
 
