@@ -4664,6 +4664,7 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _powershell_continued_hash(findings, lines, rel_path)
     findings = _certreq_request_hash(findings, lines, rel_path)
     findings = _python_key_generation(findings, lines, rel_path)  # keysize/Py
+    findings = _gpg_key_generation(findings, lines, rel_path)  # keysize/CI, row 557
     findings = _schannel_min_key_length(findings, lines, rel_path)
     _wrapped_key(findings, lines)
     _attach_providers(findings, lines)
@@ -5542,6 +5543,124 @@ def _py_argument(args: list[str], keyword: str | None, position: int | None) -> 
     if position is not None and position < len(positional):
         return positional[position]
     return None
+
+
+# Row 557 (25.11.2026): `gpg --batch --quick-gen-key ops@bank.example rsa3072 encrypt never` gave
+# nothing, while openssl genrsa and ssh-keygen on the same file were read. The algorithm a GnuPG key
+# generation names, as the GnuPG manual documents it (gnupg.org/documentation/manuals/gnupg, read
+# 25.11.2026): `--quick-generate-key user-id [algo [usage [expire]]]` and `--quick-gen-key`, and
+# `--quick-add-key fpr [algo ...]` (OpenPGP Key Management: "Supported algorithms are “rsa”, “dsa”,
+# “elg”, “ed25519”, “cv25519”, and other ECC curves ... a string “rsa4096” requests that the key
+# length is 4096 bits", the curves "in the format as used by key listings"); `--default-new-key-algo`
+# "rsa2048/cert,sign+rsa2048/encr" (Esoteric Options); and the parameter file of `--generate-key
+# --batch` (Unattended key generation: `Key-Type:` / `Subkey-Type:` "an OpenPGP algorithm number or
+# a string with the algorithm name" -- "RSA=1, DSA=17" --, `Key-Length:` / `Subkey-Length:` in bits,
+# `Key-Curve:` / `Subkey-Curve:`). "default", "future-default", "-" and "pqc" name what the gpg that
+# runs chooses and are no family here. A row an earlier rule already made for the family on the
+# line is given the size or curve, not a second row.
+_GPG_QUICK = re.compile(
+    r"\bgpg2?\b[^|;&\n]*?\s--quick-(?:gen(?:erate)?|add)-key\s+"
+    r"(?:\"[^\"]*\"|'[^']*'|[^\s\"']+)\s+[\"']?([A-Za-z][\w-]*)")
+_GPG_DEFAULT_ALGO = re.compile(r"(?:^|\s)(?:--)?default-new-key-algo\s+[\"']?([\w/,+-]+)")
+_GPG_BATCH = re.compile(r"^\s*(Key|Subkey)-(Type|Length|Curve):\s*(\S+)")
+_GPG_BATCH_TYPE = {"rsa": "RSA", "1": "RSA", "dsa": "DSA", "17": "DSA", "elg": "ElGamal",
+                   "elg-e": "ElGamal", "16": "ElGamal", "ecdsa": "ECDSA", "19": "ECDSA",
+                   "ecdh": "ECDH", "18": "ECDH", "eddsa": "EdDSA", "22": "EdDSA"}
+# The curve names gpg's key listings use (`gpg --with-colons --list-config curve`).
+_GPG_CURVES = {"ed25519": ("Ed25519", None, None), "ed448": ("Ed448", None, None),
+               "cv25519": ("X25519", None, None), "cv448": ("X448", None, None),
+               "nistp256": ("EC", 256, "P-256"), "nistp384": ("EC", 384, "P-384"),
+               "nistp521": ("EC", 521, "P-521"),
+               "brainpoolp256r1": ("EC", 256, "brainpoolP256r1"),
+               "brainpoolp384r1": ("EC", 384, "brainpoolP384r1"),
+               "brainpoolp512r1": ("EC", 512, "brainpoolP512r1"),
+               "secp256k1": ("ECDSA", 256, "secp256k1")}
+_GPG_ALGO = re.compile(r"^(rsa|dsa|elg)(\d{3,5})?$")
+_SAME_FAMILY = {"EC": {"EC", "ECDSA", "ECDH"}, "ECDSA": {"EC", "ECDSA", "ECDH"},
+                "ECDH": {"EC", "ECDSA", "ECDH"}, "Ed25519": {"Ed25519", "EdDSA"},
+                "Ed448": {"Ed448", "EdDSA"}}
+
+
+def _gpg_algo(word: str) -> tuple[str, int | None, str | None] | None:
+    low = word.lower()
+    m = _GPG_ALGO.match(low)
+    if m:
+        family = {"rsa": "RSA", "dsa": "DSA", "elg": "ElGamal"}[m.group(1)]
+        return family, int(m.group(2)) if m.group(2) else None, None
+    return _GPG_CURVES.get(low)
+
+
+def _gpg_key_generation(findings: list[dict[str, Any]], lines: list[str],
+                        rel_path: str) -> list[dict[str, Any]]:
+    if not any("gpg" in line or "-key-algo" in line or "ey-Type:" in line for line in lines):
+        return findings
+    # (line, family, size, curve, what, the Key-Curve line of an ECC key in a parameter file)
+    wanted: list[list[Any]] = []
+    batch: dict[str, Any] | None = None
+    # A parameter file is read as one where the file says it is gpg's (a control statement, a
+    # name parameter, or the command that takes it).
+    parameter_file = any(w in line for line in lines for w in (
+        "%commit", "Name-Real:", "Name-Email:", "--generate-key", "--gen-key"))
+    for n, line in enumerate(lines, 1):
+        if line.lstrip().startswith(("#", "//")):
+            continue
+        m = _GPG_QUICK.search(line)
+        algo = _gpg_algo(m.group(1)) if m else None
+        if algo:
+            wanted.append([n, *algo, "the algorithm of a gpg key generation "
+                                     "(--quick-generate-key / --quick-add-key)", None])
+        m = _GPG_DEFAULT_ALGO.search(line)
+        for part in m.group(1).split("+") if m else ():
+            algo = _gpg_algo(part.split("/", 1)[0])
+            if algo:
+                wanted.append([n, *algo, "the algorithm of gpg's new keys "
+                                         "(--default-new-key-algo)", None])
+        m = _GPG_BATCH.match(line) if parameter_file else None
+        if not m:
+            continue
+        which, field, value = m.group(1), m.group(2), m.group(3).lower()
+        if field == "Type":
+            family = _GPG_BATCH_TYPE.get(value)
+            batch = {"which": which, "row": None}
+            if family:
+                batch["row"] = [n, family, None, None, f"the {which.lower()} type of a gpg key "
+                                f"generation parameter file ({which}-Type)", None]
+                wanted.append(batch["row"])
+        elif batch and batch["which"] == which and batch["row"]:
+            row = batch["row"]
+            if field == "Length" and value.isdigit() and row[1] in ("RSA", "DSA"):
+                row[2] = int(value)
+            elif field == "Curve" and value in _GPG_CURVES and row[1] in ("ECDSA", "ECDH", "EdDSA"):
+                family, row[2], row[3] = _GPG_CURVES[value]
+                # The curve names the family where the type does not: EdDSA on ed25519 is
+                # Ed25519, ECDH on cv25519 is X25519; ECDSA and ECDH on a NIST curve stay so.
+                if family not in ("EC", "ECDSA"):
+                    row[1] = family
+                row[5] = n
+    # The key of a parameter file is one row on its Type line: the generic rows its type and curve
+    # words made on the two lines are that key, and are replaced by it.
+    ecc = {"EC", "ECDSA", "ECDH", "EdDSA", "Ed25519", "Ed448", "X25519", "X448"}
+    replaced = {(row[0], f) for row in wanted if row[5] for f in ecc} | {
+        (row[5], f) for row in wanted if row[5] for f in ecc}
+    if replaced:
+        findings = [f for f in findings if (f["line"], f.get("algorithm")) not in replaced]
+    added: list[dict[str, Any]] = []
+    for n, family, size, curve, said, curve_line in wanted:
+        held = [] if curve_line else [f for f in findings if f["line"] == n and f.get(
+            "algorithm") in _SAME_FAMILY.get(family, {family})]
+        for f in held:
+            if size and f.get("key_size") in (None, "undetermined"):
+                f["key_size"] = size
+            if curve and not f.get("curve"):
+                f["curve"] = curve
+        if held or any(a["line"] == n and a["algorithm"] == family for a in added):
+            continue
+        added.append({"path": rel_path, "line": n, "algorithm": family,
+                      "description": f"{family} as {said}",
+                      "excerpt": lines[n - 1].strip()[:200], "evidence_kind": "declaration",
+                      "in_test_code": in_test_code(rel_path),
+                      **({"key_size": size} if size else {}), **({"curve": curve} if curve else {})})
+    return sorted(findings + added, key=lambda f: f["line"]) if added or replaced else findings
 
 
 def _python_key_generation(findings: list[dict[str, Any]], lines: list[str],

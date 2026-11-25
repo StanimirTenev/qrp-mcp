@@ -1,0 +1,234 @@
+# Operation `keysize`, ecosystem CI (25.11.2026, row 557): the algorithm, size and curve a GnuPG key
+# generation names in a script or a pipeline -- `--quick-generate-key` / `--quick-gen-key` and
+# `--quick-add-key` with an algo string, `--default-new-key-algo`, and the parameter file of
+# `--generate-key --batch`. Kept in a file of its own. Pages fetched 25.11.2026 (GnuPG manual).
+# `expect`: a source_code row on the line with the family, and the size or curve the string names.
+
+operation = "keysize"
+catalogue_version = "1"
+
+[[ecosystems]]
+ecosystem = "CI"
+scope = "gpg/gpg2 --quick-generate-key, --quick-gen-key and --quick-add-key with an algo string (rsa, rsaNNNN, dsa, dsaNNNN, elg, ed25519, cv25519, ed448, cv448, nistp256/384/521, brainpoolP256r1/384r1/512r1, secp256k1); --default-new-key-algo and default-new-key-algo in gpg.conf; the --generate-key --batch parameter file (Key-Type / Subkey-Type by name or number, Key-Length / Subkey-Length, Key-Curve / Subkey-Curve) in a file that is gpg's (%commit, Name-Real, Name-Email, --generate-key). Not covered: default, future-default, - and pqc (what the gpg that runs chooses), an interactive --full-generate-key (no algorithm on its line), a parameter file of a type the scanner does not read, a command split over lines with a backslash."
+
+[[ecosystems.spellings]]
+id = "gpg-quick-generate-key-rsaNNNN"
+spelling = "gpg --quick-generate-key USER-ID rsaNNNN"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "a string “rsa4096” requests that the key length is 4096 bits"
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-generate-key ops@bank.example rsa4096 sign never
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "RSA", key_size = 4096}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-gen-key ops@bank.example rsa3072 encrypt never
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "RSA", key_size = 3072}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+#!/bin/sh
+gpg2 --batch --passphrase '' --quick-generate-key "Ops Team <ops@bank.example>" rsa2048 cert
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-quick-gen-key"
+spelling = "gpg --quick-gen-key USER-ID ALGO"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "--quick-generate-key user-id [ algo [ usage [ expire ]]] --quick-gen-key"
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-gen-key ops@bank.example dsa2048
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "DSA", key_size = 2048}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-algo-rsa"
+spelling = "gpg --quick-generate-key USER-ID rsa"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "For example the string “rsa” adds an RSA key with the default key length"
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-generate-key ops@bank.example rsa
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "RSA", key_size = "undetermined"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-quick-add-key"
+spelling = "gpg --quick-add-key FPR ALGO USAGE"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "--quick-add-key fpr [ algo [ usage [ expire ]]] Directly add a subkey to the key identified by the fingerprint fpr ."
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-add-key 8D1F5A3C29E6B7D4 rsa3072 encr
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "RSA", key_size = 3072}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-algo-dsa"
+spelling = "gpg --quick-add-key FPR dsa"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "Supported algorithms are “rsa”, “dsa”, “elg”, “ed25519”, “cv25519”, and other ECC curves."
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-add-key 8D1F5A3C29E6B7D4 dsa sign
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "DSA"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-algo-elg"
+spelling = "gpg --quick-add-key FPR elg"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "Supported algorithms are “rsa”, “dsa”, “elg”, “ed25519”, “cv25519”, and other ECC curves."
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-add-key 8D1F5A3C29E6B7D4 elg encr
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "ElGamal"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-algo-ed25519"
+spelling = "gpg --quick-generate-key USER-ID ed25519"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "Supported algorithms are “rsa”, “dsa”, “elg”, “ed25519”, “cv25519”, and other ECC curves."
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-generate-key archive@bank.example ed25519 sign never
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "Ed25519"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-algo-cv25519"
+spelling = "gpg --quick-add-key FPR cv25519 encr"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "Supported algorithms are “rsa”, “dsa”, “elg”, “ed25519”, “cv25519”, and other ECC curves."
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-add-key 8D1F5A3C29E6B7D4 cv25519 encr
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-algo-nistp256"
+spelling = "gpg --quick-generate-key USER-ID nistp256"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html"
+quote = "all TPM 2.0 systems are mandated to have the rsa2048 and nistp256 algorithms"
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-generate-key ops@bank.example nistp256
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "EC", key_size = 256, curve = "P-256"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-algo-other-curves"
+spelling = "gpg --quick-generate-key USER-ID ed448 / cv448 / nistp384 / nistp521 / brainpoolPNNNr1 / secp256k1"
+source = "none"
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --quick-generate-key ops@bank.example brainpoolP384r1
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "EC", key_size = 384}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-default-new-key-algo"
+spelling = "gpg --default-new-key-algo \"rsa2048/cert,sign+rsa2048/encr\""
+source = "https://www.gnupg.org/documentation/manuals/gnupg/GPG-Esoteric-Options.html"
+quote = "For example the current default of \"rsa2048/cert,sign+rsa2048/encr\" (or \"rsa3072\" ) can be changed to the value of what we currently call future default, which is \"ed25519/cert,sign+cv25519/encr\""
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --default-new-key-algo "rsa2048/cert,sign+rsa2048/encr" --quick-gen-key ops@bank.example default
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "RSA", key_size = 2048}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+#!/bin/sh
+gpg --batch --default-new-key-algo "ed25519/cert,sign+cv25519/encr" --quick-gen-key ops@bank.example default
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "Ed25519"}}, {at = "evidence.source_code", match = {path = "keys.sh", line = 2, algorithm = "X25519"}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-batch-key-type-length"
+spelling = "Key-Type: DSA / Key-Length: 1024 / Subkey-Type: ELG-E (gpg --batch --generate-key)"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/Unattended-GPG-key-generation.html"
+quote = "Key-Type: DSA Key-Length: 1024 Subkey-Type: ELG-E Subkey-Length: 1024"
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+cat >foo <<EOF
+%echo Generating a basic OpenPGP key
+Key-Type: DSA
+Key-Length: 1024
+Subkey-Type: ELG-E
+Subkey-Length: 1024
+Name-Real: Joe Tester
+Expire-Date: 0
+%commit
+EOF
+gpg --batch --generate-key foo
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 4, algorithm = "DSA", key_size = 1024}}, {at = "evidence.source_code", match = {path = "keys.sh", line = 6, algorithm = "ElGamal"}}]}
+
+[[ecosystems.spellings.variants]]
+snippet = '''
+#!/bin/sh
+gpg --batch --generate-key <<EOF
+Key-Type: RSA
+Key-Length: 3072
+Name-Real: Ops
+%commit
+EOF
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 3, algorithm = "RSA", key_size = 3072}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-batch-key-type-number"
+spelling = "Key-Type: 1 (RSA by its OpenPGP algorithm number)"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/Unattended-GPG-key-generation.html"
+quote = "algo may either be an OpenPGP algorithm number or a string with the algorithm name."
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --generate-key <<EOF
+Key-Type: 1
+Key-Length: 4096
+Name-Real: Ops
+%commit
+EOF
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 3, algorithm = "RSA", key_size = 4096}}]}
+
+[[ecosystems.spellings]]
+id = "gpg-batch-key-curve"
+spelling = "Key-Type: EDDSA / Key-Curve: ed25519; Subkey-Type: ECDH / Subkey-Curve: cv25519"
+source = "https://www.gnupg.org/documentation/manuals/gnupg/Unattended-GPG-key-generation.html"
+quote = "Key-Curve: curve The requested elliptic curve of the generated key. This is a required parameter for ECC keys."
+file = "keys.sh"
+snippet = '''
+#!/bin/sh
+gpg --batch --generate-key <<EOF
+Key-Type: EDDSA
+Key-Curve: ed25519
+Subkey-Type: ECDH
+Subkey-Curve: cv25519
+Name-Real: Ops
+%commit
+EOF
+'''
+expect = {rows = [{at = "evidence.source_code", match = {path = "keys.sh", line = 3, algorithm = "Ed25519"}}, {at = "evidence.source_code", match = {path = "keys.sh", line = 5, algorithm = "X25519"}}]}
