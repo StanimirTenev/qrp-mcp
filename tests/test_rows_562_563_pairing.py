@@ -214,3 +214,49 @@ def test_through_the_command_line_and_the_cbom(tmp_path):
     doc = json.loads(cbom.read_text())
     names = [c.get("name", "") for c in doc.get("components", [])]
     assert any("Pairing" in n for n in names), names
+
+
+def _all_paths_tree(tmp_path):
+    tree = tmp_path / "chain"
+    tree.mkdir()
+    (tree / "Verifier.sol").write_text(SOL)
+    for name, body, _line, _curve in CASES:
+        (tree / name).write_text(body)
+    return tree
+
+
+def test_the_mcp_tool_and_a_sarif_mandate_scan(tmp_path):
+    tree = _all_paths_tree(tmp_path)
+    tool = getattr(server.scan_repo, "fn", server.scan_repo)(str(tree))
+    tool = json.loads(tool) if isinstance(tool, str) else tool
+    assert "Pairing" in tool["detected_algorithms"]
+    assert tool["summary"]["readiness_by_role"]["proof"] == "classical_only"
+    out = tmp_path / "out.sarif"
+    code = server.scan_to_file([str(tree), "--no-config", "--format", "sarif", "--mandate",
+                                "cnsa-2.0", "--out", str(out)])
+    assert code in (0, 1)
+    run = json.loads(out.read_text())["runs"][0]
+    assert any(r["properties"].get("algorithm_family", r["properties"].get("algorithm")) == "Pairing"
+               or "Pairing" in json.dumps(r) for r in run["results"])
+
+
+def test_the_cbom_of_a_pairing_tree_is_valid(tmp_path):
+    jsonschema = pytest.importorskip("jsonschema")
+    tree = _all_paths_tree(tmp_path)
+    cbom = getattr(server.export_cbom, "fn", server.export_cbom)(str(tree))
+    schema_dir = Path(__file__).parent / "schema"
+    schema = json.loads((schema_dir / "bom-1.6.schema.json").read_text())
+    store = {
+        "http://cyclonedx.org/schema/spdx.SNAPSHOT.schema.json":
+            json.loads((schema_dir / "spdx.schema.json").read_text()),
+        "http://cyclonedx.org/schema/jsf-0.82.SNAPSHOT.schema.json":
+            json.loads((schema_dir / "jsf-0.82.schema.json").read_text()),
+    }
+    validator = jsonschema.Draft7Validator(
+        schema, resolver=jsonschema.RefResolver.from_schema(schema, store=store))
+    assert sorted(str(e.message) for e in validator.iter_errors(cbom)) == []
+    pairing = [c for c in cbom["components"] if "Pairing" in c.get("name", "")]
+    assert pairing
+    prim = {c.get("cryptoProperties", {}).get("algorithmProperties", {}).get("primitive")
+            for c in pairing}
+    assert prim == {"other"}, prim

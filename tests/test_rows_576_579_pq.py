@@ -108,3 +108,15 @@ def test_rustcrypto_slh_dsa_calls(tmp_path):
     rows = _scan(tmp_path, {"slh.rs": SLH})["evidence"]["source_code"]
     lines = {r["line"] for r in rows if r["algorithm"] == "SLH-DSA" and r["evidence_kind"] == "call"}
     assert {4, 5, 6} <= lines, sorted((r["line"], r["algorithm"], r["evidence_kind"]) for r in rows)
+
+
+def test_hashsig_and_leansig_as_plain_words_are_not_a_scheme(tmp_path):
+    result = _scan(tmp_path, {"b.c": "int f(void) { return hashsig; }\n",
+                              "c.py": "hashsig = h(sig)\nleansig = 1\n"})
+    assert "Generalized XMSS" not in {r["algorithm"] for r in result["evidence"]["source_code"]}
+
+
+def test_go_algorand_crypto_import_alone_is_not_falcon(tmp_path):
+    result = _scan(tmp_path, {"a.go": 'package main\n\nimport "github.com/algorand/go-algorand/crypto"\n\n'
+                                      "func h(b []byte) crypto.Digest { return crypto.Hash(b) }\n"})
+    assert "Falcon" not in {r["algorithm"] for r in result["evidence"]["source_code"]}

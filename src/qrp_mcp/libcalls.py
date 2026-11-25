@@ -356,7 +356,9 @@ _BTC_SCHNORR = ("signSchnorr", "verifySchnorr", "xOnlyPointAddTweak", "xOnlyPoin
                 "xOnlyPointFromPoint", "tweak")
 register(
     # go-ethereum/crypto (pkg.go.dev): secp256k1 keys and signatures.
+    # go-ethereum's crypto holds Keccak256 too: the import alone is no ECDSA row.
     Lib("go", ("github.com/ethereum/go-ethereum/crypto",), "ECDSA", _K1, "go-ethereum's crypto",
+        import_row=False,
         functions=("CompressPubkey", "DecompressPubkey", "Ecrecover", "FromECDSA", "FromECDSAPub",
                    "GenerateKey", "HexToECDSA", "LoadECDSA", "PubkeyToAddress", "S256",
                    "SaveECDSA", "Sign", "SigToPub", "ToECDSA", "ToECDSAUnsafe", "UnmarshalPubkey",
@@ -372,7 +374,8 @@ register(
     Lib("js", ("ethers",), "ECDH", _K1, "ethers", binds=_ETHERS_SIGNERS,
         methods=("computeSharedSecret",), import_row=False),
     # viem (site/pages/docs/accounts/local/*, utilities/*).
-    Lib("js", ("viem",), "ECDSA", _K1, "viem",
+    # viem is an Ethereum client (createPublicClient, ...): the import alone is no ECDSA row.
+    Lib("js", ("viem",), "ECDSA", _K1, "viem", import_row=False,
         functions=("generatePrivateKey", "privateKeyToAccount", "mnemonicToAccount",
                    "hdKeyToAccount", "privateKeyToAddress", "verifyMessage", "verifyTypedData",
                    "verifyHash", "recoverAddress", "recoverMessageAddress", "recoverPublicKey",
@@ -460,7 +463,7 @@ register(
         "CometBFT's secp256k1", functions=("GenPrivKey", "GenPrivKeyFromSecret"),
         methods=("Sign", "VerifySignature")),
     # cosmjs proto-signing / amino (README, directsecp256k1hdwallet.ts, secp256k1hdwallet.ts).
-    Lib("js", ("@cosmjs/proto-signing", "@cosmjs/amino"), "ECDSA", _K1, "cosmjs",
+    Lib("js", ("@cosmjs/proto-signing", "@cosmjs/amino"), "ECDSA", _K1, "cosmjs", import_row=False,
         classes=("DirectSecp256k1HdWallet", "DirectSecp256k1Wallet", "Secp256k1HdWallet",
                  "Secp256k1Wallet"),
         methods=("signDirect", "signAmino")),
@@ -501,8 +504,9 @@ register(
     Lib("go", ("github.com/algorand/falcon",), "Falcon", None, "Algorand's falcon",
         functions=("GenerateKey", "GenerateKeyCompressed"),
         methods=("SignCompressed", "ConvertToCT", "Verify", "VerifyCTSignature")),
+    # go-algorand's crypto is mostly not Falcon (hashes, ed25519): its import is no Falcon row.
     Lib("go", ("github.com/algorand/go-algorand/crypto",), "Falcon", None, "go-algorand's crypto",
-        functions=("GenerateFalconSigner", "NewFalconSigner")),
+        functions=("GenerateFalconSigner", "NewFalconSigner"), import_row=False),
     # Row 579: RustCrypto slh-dsa (docs.rs/slh-dsa): SigningKey, VerifyingKey and their methods.
     Lib("rs", ("slh_dsa",), "SLH-DSA", None, "RustCrypto slh-dsa",
         classes=("SigningKey", "VerifyingKey"),

@@ -1520,7 +1520,8 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # encodings" (ePrint 2025/055), instantiated with Poseidon or SHA3 -- not RFC 8391 XMSS. Before
     # XMSS, which then leaves the line alone.
     ("Generalized XMSS", GENERALIZED_XMSS, re.compile(
-        r"(?<![A-Za-z])generalized_xmss\b|(?<![A-Za-z0-9_])(?:leansig|hashsig)(?=::|\s*=|\s*\}|\s*;|\s*$)")),
+        # The crate names only as a Rust path: `hashsig` and `leansig` are also variables' names.
+        r"(?<![A-Za-z])generalized_xmss\b|(?<![A-Za-z0-9_:])(?:leansig|hashsig)::")),
     ("XMSS", "XMSS usage", re.compile(r"(?<![A-Za-z])xmss|(?<=with)xmss", re.IGNORECASE)),
     # Stateful hash-based, SP 800-208. CNSA 2.0 requires LMS or XMSS for firmware
     # and code signing, so a firmware pipeline that had complied scanned as empty.
@@ -4946,9 +4947,14 @@ def _schnorr_not_ecdsa(findings: list[dict[str, Any]], lines: list[str],
                      or (rel_path.lower().endswith(tuple(_C_EXT)) and _SCHNORR_SECP_C.search(line)))
                 and not _ECDSA_WORD.search(line)):
             if n not in schnorr_lines:
+                frost = _SCHNORR_FROST.search(line)
+                curve = ("secp256k1" if not frost or "secp256k1" in frost.group(0)
+                         else None)
                 f = {**f, "algorithm": "Schnorr",
-                     "description": "Schnorr usage (BIP-340 / MuSig2 / FROST over secp256k1)",
-                     "curve": "secp256k1"}
+                     "description": "Schnorr usage (BIP-340 / MuSig2 / FROST)"}
+                f.pop("curve", None)
+                if curve:
+                    f["curve"] = curve
                 f.pop("key_size", None)
                 schnorr_lines.add(n)
                 out.append(f)

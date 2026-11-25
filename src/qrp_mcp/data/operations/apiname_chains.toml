@@ -34,7 +34,7 @@ func run(hash []byte) {
 	key, _ := crypto.GenerateKey()
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "geth_alias.go"
@@ -49,7 +49,7 @@ func run(hash []byte) {
 	key, _ := ethcrypto.GenerateKey()
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "geth-sign"
@@ -68,7 +68,7 @@ func run(hash []byte) {
 	sig, _ := crypto.Sign(hash, key)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "geth_alias.go"
@@ -83,7 +83,7 @@ func run(hash []byte) {
 	sig, _ := ethcrypto.Sign(hash, key)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "geth-sigtopub"
@@ -102,7 +102,7 @@ func run(hash []byte) {
 	pub, _ := crypto.SigToPub(hash, sig)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "geth_alias.go"
@@ -117,7 +117,7 @@ func run(hash []byte) {
 	pub, _ := ethcrypto.SigToPub(hash, sig)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "geth-ecrecover"
@@ -136,7 +136,7 @@ func run(hash []byte) {
 	pub, _ := crypto.Ecrecover(hash, sig)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "geth_alias.go"
@@ -151,7 +151,7 @@ func run(hash []byte) {
 	pub, _ := ethcrypto.Ecrecover(hash, sig)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "geth-verifysignature"
@@ -170,7 +170,7 @@ func run(hash []byte) {
 	ok := crypto.VerifySignature(pub, hash, sig[:64])
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "geth_alias.go"
@@ -185,7 +185,7 @@ func run(hash []byte) {
 	ok := ethcrypto.VerifySignature(pub, hash, sig[:64])
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "geth-hextoecdsa"
@@ -204,7 +204,7 @@ func run(hash []byte) {
 	k, _ := crypto.HexToECDSA(hexKey)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "geth_alias.go"
@@ -219,7 +219,7 @@ func run(hash []byte) {
 	k, _ := ethcrypto.HexToECDSA(hexKey)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "geth-loadecdsa"
@@ -238,7 +238,7 @@ func run(hash []byte) {
 	k, _ := crypto.LoadECDSA("node.key")
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "geth_alias.go"
@@ -253,7 +253,7 @@ func run(hash []byte) {
 	k, _ := ethcrypto.LoadECDSA("node.key")
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "geth-pubkeytoaddress"
@@ -272,7 +272,7 @@ func run(hash []byte) {
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "geth_alias.go"
@@ -287,7 +287,7 @@ func run(hash []byte) {
 	addr := ethcrypto.PubkeyToAddress(key.PublicKey)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "gnark-groth16-setup"
@@ -306,7 +306,7 @@ func run() {
 	pk, vk, _ := groth16.Setup(ccs)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "gnark-groth16-prove"
@@ -325,7 +325,7 @@ func run() {
 	proof, _ := groth16.Prove(ccs, pk, witness)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "gnark-groth16-verify"
@@ -344,7 +344,7 @@ func run() {
 	_ = groth16.Verify(proof, vk, publicWitness)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "gnark-bn254"
@@ -361,7 +361,7 @@ func run() {
 	ccs, _ := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, &circuit)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "tss-lib-keygen-party"
@@ -380,7 +380,7 @@ func run() {
 	party := keygen.NewLocalParty(params, outCh, endCh, preParams)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "tss-lib-preparams"
@@ -399,7 +399,7 @@ func run() {
 	preParams, _ := keygen.GeneratePreParams(1 * time.Minute)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "blst-go-keygen"
@@ -422,7 +422,7 @@ func run(ikm, msg, dst []byte) bool {
 	return sig.Verify(true, pk, true, msg, dst)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 9, algorithm = "BLS"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 9, algorithm = "BLS", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "blst-go-from"
@@ -445,7 +445,7 @@ func run(ikm, msg, dst []byte) bool {
 	return sig.Verify(true, pk, true, msg, dst)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 10, algorithm = "BLS"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 10, algorithm = "BLS", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "blst-go-sign"
@@ -468,7 +468,7 @@ func run(ikm, msg, dst []byte) bool {
 	return sig.Verify(true, pk, true, msg, dst)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 11, algorithm = "BLS"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 11, algorithm = "BLS", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "blst-go-verify"
@@ -491,7 +491,7 @@ func run(ikm, msg, dst []byte) bool {
 	return sig.Verify(true, pk, true, msg, dst)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 12, algorithm = "BLS"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 12, algorithm = "BLS", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "herumi-setethmode"
@@ -508,7 +508,7 @@ func run() {
 	bls.SetETHmode(bls.EthModeDraft07)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "BLS"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 6, algorithm = "BLS", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "herumi-signbyte"
@@ -528,7 +528,7 @@ func run(msg []byte) {
 	_ = sig
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "BLS"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 8, algorithm = "BLS", evidence_kind = "call"}}]}
 
 [[ecosystems]]
 ecosystem = "JS"
@@ -544,7 +544,7 @@ snippet = '''
 import { Wallet, HDNodeWallet, SigningKey } from "ethers";
 const w = Wallet.createRandom();
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "w_ns.js"
@@ -552,7 +552,7 @@ snippet = '''
 const { ethers } = require("ethers");
 const w = ethers.Wallet.createRandom();
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ethers-new-wallet"
@@ -564,7 +564,7 @@ snippet = '''
 import { Wallet, HDNodeWallet, SigningKey } from "ethers";
 const w = new Wallet(process.env.PRIVATE_KEY);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "w_ns.js"
@@ -572,7 +572,7 @@ snippet = '''
 const { ethers } = require("ethers");
 const w = new ethers.Wallet(process.env.PRIVATE_KEY);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ethers-hd-fromphrase"
@@ -584,7 +584,7 @@ snippet = '''
 import { Wallet, HDNodeWallet, SigningKey } from "ethers";
 const hd = HDNodeWallet.fromPhrase(phrase);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "w_ns.js"
@@ -592,7 +592,7 @@ snippet = '''
 const { ethers } = require("ethers");
 const hd = ethers.HDNodeWallet.fromPhrase(phrase);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ethers-signmessage"
@@ -605,7 +605,7 @@ import { Wallet, HDNodeWallet, SigningKey } from "ethers";
 const w = Wallet.createRandom();
 const s = w.signMessageSync("hi");
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "w_ns.js"
@@ -614,7 +614,7 @@ const { ethers } = require("ethers");
 const w = ethers.Wallet.createRandom();
 const s = w.signMessageSync("hi");
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ethers-derivepath"
@@ -627,7 +627,7 @@ import { Wallet, HDNodeWallet, SigningKey } from "ethers";
 const hd = HDNodeWallet.fromPhrase(p);
 const c = hd.derivePath("m/44'/60'/0'/0/1");
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "w_ns.js"
@@ -636,7 +636,7 @@ const { ethers } = require("ethers");
 const hd = ethers.HDNodeWallet.fromPhrase(p);
 const c = hd.derivePath("m/44'/60'/0'/0/1");
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ethers-signingkey-sign"
@@ -649,7 +649,7 @@ import { Wallet, HDNodeWallet, SigningKey } from "ethers";
 const sk = new SigningKey(privateKey);
 const raw = sk.sign(digest);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ethers-computesharedsecret"
@@ -662,7 +662,7 @@ import { Wallet, HDNodeWallet, SigningKey } from "ethers";
 const sk = new SigningKey(privateKey);
 const s = sk.computeSharedSecret(other);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDH"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDH", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "viem-privatekeytoaccount"
@@ -674,7 +674,7 @@ snippet = '''
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 const account = privateKeyToAccount(pk)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "viem-account-signmessage"
@@ -687,7 +687,7 @@ import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 const account = privateKeyToAccount(pk)
 const s = await account.signMessage({ message: 'hi' })
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "v2.ts"
@@ -696,7 +696,7 @@ import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 const signer = privateKeyToAccount(pk)
 const s = await signer.signMessage({ message: 'hi' })
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "viem-verifymessage"
@@ -708,7 +708,7 @@ snippet = '''
 import { verifyMessage } from 'viem'
 const ok = await verifyMessage({ address, message, signature })
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "viem-recoveraddress"
@@ -720,7 +720,7 @@ snippet = '''
 import { recoverAddress } from 'viem'
 const who = await recoverAddress({ hash, signature })
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "snarkjs-groth16-fullprove"
@@ -732,7 +732,7 @@ snippet = '''
 const snarkjs = require("snarkjs");
 const { proof } = await snarkjs.groth16.fullProve(input, "c.wasm", "c.zkey");
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "snarkjs-groth16-verify"
@@ -744,7 +744,7 @@ snippet = '''
 const snarkjs = require("snarkjs");
 const ok = await snarkjs.groth16.verify(vKey, publicSignals, proof);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ckzg-node-commitment"
@@ -756,7 +756,7 @@ snippet = '''
 const { blobToKzgCommitment, computeBlobKzgProof, verifyBlobKzgProof } = require("c-kzg");
 const c = blobToKzgCommitment(blob);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ckzg-node-proof"
@@ -768,7 +768,7 @@ snippet = '''
 const { blobToKzgCommitment, computeBlobKzgProof, verifyBlobKzgProof } = require("c-kzg");
 const p = computeBlobKzgProof(blob, c);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ckzg-node-verify"
@@ -780,7 +780,7 @@ snippet = '''
 const { blobToKzgCommitment, computeBlobKzgProof, verifyBlobKzgProof } = require("c-kzg");
 const ok = verifyBlobKzgProof(blob, c, p);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "tiny-secp256k1-sign"
@@ -792,7 +792,7 @@ snippet = '''
 const ecc = require('tiny-secp256k1');
 const s = ecc.sign(hash, privateKey);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "t_esm.js"
@@ -800,7 +800,7 @@ snippet = '''
 import * as secp from 'tiny-secp256k1';
 const s = secp.sign(hash, privateKey);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "tiny-secp256k1-pointfromscalar"
@@ -812,7 +812,7 @@ snippet = '''
 const ecc = require('tiny-secp256k1');
 const p = ecc.pointFromScalar(privateKey);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "t_esm.js"
@@ -820,7 +820,7 @@ snippet = '''
 import * as secp from 'tiny-secp256k1';
 const p = secp.pointFromScalar(privateKey);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "tiny-secp256k1-signschnorr"
@@ -832,7 +832,7 @@ snippet = '''
 const ecc = require('tiny-secp256k1');
 const s = ecc.signSchnorr(hash, privateKey);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "t_esm.js"
@@ -840,7 +840,7 @@ snippet = '''
 import * as secp from 'tiny-secp256k1';
 const s = secp.signSchnorr(hash, privateKey);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "tiny-secp256k1-verifyschnorr"
@@ -852,7 +852,7 @@ snippet = '''
 const ecc = require('tiny-secp256k1');
 const ok = ecc.verifySchnorr(hash, x, s);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "t_esm.js"
@@ -860,7 +860,7 @@ snippet = '''
 import * as secp from 'tiny-secp256k1';
 const ok = secp.verifySchnorr(hash, x, s);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "tiny-secp256k1-xonlytweak"
@@ -872,7 +872,7 @@ snippet = '''
 const ecc = require('tiny-secp256k1');
 const t = ecc.xOnlyPointAddTweak(x, tweak);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "t_esm.js"
@@ -880,7 +880,7 @@ snippet = '''
 import * as secp from 'tiny-secp256k1';
 const t = secp.xOnlyPointAddTweak(x, tweak);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Schnorr", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "bip32-factory"
@@ -893,7 +893,7 @@ const ecc = require('tiny-secp256k1');
 const { BIP32Factory } = require('bip32');
 const bip32 = BIP32Factory(ecc);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "b_esm.js"
@@ -902,7 +902,7 @@ import * as ecc from 'tiny-secp256k1';
 import BIP32Factory from 'bip32';
 const bip32 = BIP32Factory(ecc);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "bip32-derivepath"
@@ -917,7 +917,7 @@ const bip32 = BIP32Factory(ecc);
 const root = bip32.fromSeed(seed);
 const child = root.derivePath("m/0/1");
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 5, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 5, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "solana-keys-generatekeypair"
@@ -929,7 +929,7 @@ snippet = '''
 import { generateKeyPair, signBytes, verifySignature } from '@solana/keys';
 const kp = await generateKeyPair();
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "solana-keys-signbytes"
@@ -941,7 +941,7 @@ snippet = '''
 import { generateKeyPair, signBytes, verifySignature } from '@solana/keys';
 const s = await signBytes(privateKey, data);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "solana-keys-verifysignature"
@@ -953,7 +953,7 @@ snippet = '''
 import { generateKeyPair, signBytes, verifySignature } from '@solana/keys';
 const ok = await verifySignature(publicKey, s, data);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "solana-web3-keypair-generate"
@@ -965,7 +965,7 @@ snippet = '''
 const { Keypair } = require('@solana/web3.js');
 const kp = Keypair.generate();
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "solana-web3-keypair-fromsecretkey"
@@ -977,7 +977,7 @@ snippet = '''
 const { Keypair } = require('@solana/web3.js');
 const kp = Keypair.fromSecretKey(secretKey);
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "Ed25519", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "cosmjs-frommnemonic"
@@ -989,20 +989,7 @@ snippet = '''
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 const w = await DirectSecp256k1HdWallet.fromMnemonic(m, { prefix: 'cosmos' });
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
-
-[[ecosystems.spellings]]
-id = "cosmjs-signdirect"
-spelling = "public async signDirect"
-source = "https://raw.githubusercontent.com/cosmos/cosmjs/main/packages/proto-signing/src/directsecp256k1hdwallet.ts"
-quote = "public async signDirect(signerAddress: string, signDoc: SignDoc): Promise<DirectSig"
-file = "c.js"
-snippet = '''
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
-const w = await DirectSecp256k1HdWallet.fromMnemonic(m);
-const r = await w.signDirect(address, signDoc);
-'''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "noble-bn254"
@@ -1030,7 +1017,7 @@ snippet = '''
 from eth_account import Account
 acct = Account.create()
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "a_alias.py"
@@ -1038,7 +1025,7 @@ snippet = '''
 from eth_account import Account as EthAccount
 acct = EthAccount.create()
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "eth-account-from-key"
@@ -1050,7 +1037,7 @@ snippet = '''
 from eth_account import Account
 acct = Account.from_key(private_key)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "a_alias.py"
@@ -1058,7 +1045,7 @@ snippet = '''
 from eth_account import Account as EthAccount
 acct = EthAccount.from_key(private_key)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "eth-account-sign-message"
@@ -1070,7 +1057,7 @@ snippet = '''
 from eth_account import Account
 s = Account.sign_message(msg, private_key)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "a_alias.py"
@@ -1078,7 +1065,7 @@ snippet = '''
 from eth_account import Account as EthAccount
 s = EthAccount.sign_message(msg, private_key)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "eth-account-sign-transaction"
@@ -1090,7 +1077,7 @@ snippet = '''
 from eth_account import Account
 s = Account.sign_transaction(tx, private_key)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "a_alias.py"
@@ -1098,7 +1085,7 @@ snippet = '''
 from eth_account import Account as EthAccount
 s = EthAccount.sign_transaction(tx, private_key)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "eth-account-recover-message"
@@ -1110,7 +1097,7 @@ snippet = '''
 from eth_account import Account
 who = Account.recover_message(msg, signature=sig)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "a_alias.py"
@@ -1118,7 +1105,7 @@ snippet = '''
 from eth_account import Account as EthAccount
 who = EthAccount.recover_message(msg, signature=sig)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "eth-account-local-sign-message"
@@ -1131,7 +1118,7 @@ from eth_account import Account
 acct = Account.create()
 signed = acct.sign_message(msg)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "a_v.py"
@@ -1140,7 +1127,7 @@ from eth_account import Account
 wallet = Account.from_key(k)
 signed = wallet.sign_message(msg)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "eth-keys-sign-msg"
@@ -1153,7 +1140,7 @@ from eth_keys import keys
 pk = keys.PrivateKey(b)
 sig = pk.sign_msg(b'a message')
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "py-ecc-bls-sign"
@@ -1165,7 +1152,7 @@ snippet = '''
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 sig = bls_pop.Sign(sk, message)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "BLS"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "BLS", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "bitcoinlib-signmessage"
@@ -1177,7 +1164,7 @@ snippet = '''
 from bitcoin.signmessage import BitcoinMessage, VerifyMessage, SignMessage
 sig = SignMessage(key, message)
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 2, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems]]
 ecosystem = "Rust"
@@ -1195,7 +1182,7 @@ fn main() {
     let signer = PrivateKeySigner::random();
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "alloy-sign-message-sync"
@@ -1210,7 +1197,7 @@ fn main() {
     let s = signer.sign_message_sync(b"hello").unwrap();
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ethers-rs-localwallet"
@@ -1224,7 +1211,7 @@ fn main() {
     let wallet = LocalWallet::new(&mut rng);
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "rust-secp256k1-sign-ecdsa"
@@ -1239,7 +1226,7 @@ fn main() {
     let sig = secp.sign_ecdsa(message, &secret_key);
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "rust-secp256k1-generate-keypair"
@@ -1254,7 +1241,7 @@ fn main() {
     let (sk, pk) = secp.generate_keypair(&mut rng);
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "ECDSA", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "rust-secp256k1-sign-schnorr"
@@ -1269,7 +1256,7 @@ fn main() {
     let s = secp.sign_schnorr(&digest, &keypair);
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "Schnorr"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 4, algorithm = "Schnorr", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "solana-keypair-new"
@@ -1283,7 +1270,7 @@ fn main() {
     let kp = Keypair::new();
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "Ed25519", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ark-groth16-prove"
@@ -1297,7 +1284,7 @@ fn main() {
     let proof = Groth16::<Bn254>::prove(&pk, c, &mut rng).unwrap();
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "Pairing"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "Pairing", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "ark-bn254"
@@ -1323,7 +1310,7 @@ fn main() {
     let sk = SecretKey::key_gen(&ikm, &[]).unwrap();
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "BLS"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "BLS", evidence_kind = "call"}}]}
 
 [[ecosystems]]
 ecosystem = "CI"

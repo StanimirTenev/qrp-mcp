@@ -82,11 +82,11 @@ def test_status_is_read_against_the_catalogue(tmp_path):
     assert go["open_operations"] == [] and "vrf" not in go["known_operations"]
     assert "may_miss" not in go
     rust = _eco(result, "Rust")
-    # Rust's and JS's apiname since 0.54.0; their other known operations stay open.
+    # Rust's apiname and pqc, JS's apiname and sign since 0.54.0; their other known operations stay open.
     assert rust["status"] == "partially_closed" and "vrf" not in rust["known_operations"]
     assert rust["closed_operations"] == ["apiname", "pqc"]
     js = _eco(result, "JS")
-    assert js["status"] == "partially_closed" and js["closed_operations"] == ["apiname"]
+    assert js["status"] == "partially_closed" and js["closed_operations"] == ["apiname", "sign"]
     assert js["may_miss"].startswith("here we may miss")
 
 

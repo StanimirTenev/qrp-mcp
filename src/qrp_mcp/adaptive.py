@@ -33,7 +33,7 @@ from . import assets, confidence, detectors, operations
 # An ecosystem is `closed` when the catalogue holds every one of them: a statement about the gaps
 # known so far, not about every way the ecosystem can name an algorithm. `vrf` of Go and Rust:
 # row 535 (19.11.2026). Go's apiname, pqc and sign and Rust's pqc: the crypto-asset probe of
-# 25.11.2026 (rows 561, 576-579, 582, 586, 587).
+# 25.11.2026 (rows 561, 576-579, 582, 586, 587); JS's sign: row 593.
 KNOWN_OPERATIONS: dict[str, tuple[str, ...]] = {
     "C": ("apiname", "ciphers", "external", "keyfile", "keysize", "pqc", "protover", "sign",
           "tlsgroups", "usectx"),
@@ -42,7 +42,7 @@ KNOWN_OPERATIONS: dict[str, tuple[str, ...]] = {
     "Go": ("apiname", "external", "pqc", "sign", "vrf"),
     "IPsec": ("ike", "keysize", "symhash"),
     "IaC": ("ciphers", "encrypt", "external", "keyfile", "keysize", "pqc", "sign"),
-    "JS": ("apiname", "encrypt", "keysize", "protover", "usectx"),
+    "JS": ("apiname", "encrypt", "keysize", "protover", "sign", "usectx"),
     "Java": ("apiname", "ciphers", "encrypt", "external", "keyfile", "keysize", "pqc", "protover",
              "symhash"),
     "NET": ("apiname", "ciphers", "external", "keyfile", "keysize", "protover", "sign", "symhash",

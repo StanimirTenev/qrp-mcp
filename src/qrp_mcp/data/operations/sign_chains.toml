@@ -1,5 +1,6 @@
-# Operation `sign`, ecosystem Go (qrp-mcp 0.54.0, 25.11.2026): CometBFT's ed25519 keys sign and
-# verify (`pv.Sign(msg)`, `pv.PubKey().VerifySignature(msg, sig)`), ZA-OPRAVYANE row 586. Kept in a
+# Operation `sign`, ecosystems Go and JS (qrp-mcp 0.54.0, 25.11.2026): CometBFT's ed25519 keys sign
+# and verify (`pv.Sign(msg)`, `pv.PubKey().VerifySignature(msg, sig)`), row 586; cosmjs's
+# `wallet.signDirect(address, signDoc)`, row 593. Kept in a
 # file of its own (sign/NET and sign/CI are written elsewhere). Written by qrp-kachestvo/
 # roy-2026-11-25-kripto/katalog/gen_apiname_chains.py; quotes checked verbatim on the saved page.
 
@@ -26,7 +27,7 @@ func run(msg []byte) {
 	sig, _ := pv.Sign(msg)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings.variants]]
 file = "comet_v.go"
@@ -40,7 +41,7 @@ func run(msg []byte) {
 	sig, _ := validatorKey.Sign(msg)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519", evidence_kind = "call"}}]}
 
 [[ecosystems.spellings]]
 id = "cometbft-ed25519-verify"
@@ -58,4 +59,21 @@ func run(msg []byte) {
 	ok := pv.PubKey().VerifySignature(msg, sig)
 }
 '''
-expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519"}}]}
+expect = {rows = [{at = "evidence.source_code", match = {line = 7, algorithm = "Ed25519", evidence_kind = "call"}}]}
+
+[[ecosystems]]
+ecosystem = "JS"
+scope = "cosmjs DirectSecp256k1HdWallet: signDirect on a wallet from fromMnemonic (row 593). Not covered: signAmino, other JS signers."
+
+[[ecosystems.spellings]]
+id = "cosmjs-signdirect"
+spelling = "public async signDirect"
+source = "https://raw.githubusercontent.com/cosmos/cosmjs/main/packages/proto-signing/src/directsecp256k1hdwallet.ts"
+quote = "public async signDirect(signerAddress: string, signDoc: SignDoc): Promise<DirectSig"
+file = "c.js"
+snippet = '''
+import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
+const w = await DirectSecp256k1HdWallet.fromMnemonic(m);
+const r = await w.signDirect(address, signDoc);
+'''
+expect = {rows = [{at = "evidence.source_code", match = {line = 3, algorithm = "ECDSA", evidence_kind = "call"}}]}
