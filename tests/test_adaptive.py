@@ -462,3 +462,20 @@ def test_not_attributed_reaches_the_cbom_of_the_command_and_of_the_tool(tmp_path
     for cbom in (json.loads(out.read_text()), tool):
         props = {p["name"]: p["value"] for p in cbom["properties"]}
         assert props["qrp:ecosystems:not_attributed:count"] == "2"
+
+
+def test_a_closed_operation_says_which_list_it_is_closed_against(tmp_path):
+    """Decision of 25.11.2026: Go reads `closed`, JS/Py/Rust `partially_closed`, and the output says
+    the bound -- each closed operation with the `scope` of its catalogue entry -- so `closed` reads
+    as closed against that list, not against every library of the ecosystem."""
+    result = scan_directory(_write(tmp_path, {
+        "a.go": 'package main\n\nimport "github.com/ethereum/go-ethereum/crypto"\n\n'
+                "func f() { k, _ := crypto.GenerateKey(); _ = k }\n",
+        "a.py": "from eth_account import Account\na = Account.create()\n"}))
+    go, py = _eco(result, "Go"), _eco(result, "Py")
+    assert go["status"] == "closed"
+    assert set(go["closed_scope"]) == set(go["closed_operations"])
+    assert "go-ethereum/crypto" in " ".join(go["closed_scope"]["apiname"])
+    assert py["status"] == "partially_closed" and "eth_account" in " ".join(py["closed_scope"]["apiname"])
+    assert "closed_scope" in result["ecosystems"]["meaning"]
+    assert "against the libraries" in result["ecosystems"]["meaning"]

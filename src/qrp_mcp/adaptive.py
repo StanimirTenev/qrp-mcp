@@ -131,7 +131,9 @@ ECOSYSTEMS_MEANING = (
     "catalogue holds every one; `partially_closed` -- some; `not_closed` -- none, or the "
     "ecosystem has no catalogue entry at all. A closed operation is one whose documented "
     "spellings are tested one by one; it is not a claim that nothing can be missed, and an "
-    "operation with no recorded gap is not counted. An operation most trees never perform (`vrf`) "
+    "operation with no recorded gap is not counted. An operation is closed against the libraries "
+    "and names its catalogue entries list, given for each closed operation in `closed_scope`; "
+    "another library of the same ecosystem is not covered by it. An operation most trees never perform (`vrf`) "
     "counts -- known, closed or open -- only where the scan found it in that ecosystem, outside test "
     "code. `rng_source` is in operation_closure but never counts toward a status here: its rows "
     "are in `randomness`. Context only: it does not affect the "
@@ -206,9 +208,12 @@ def _ecosystems(result: dict[str, Any], root: Path) -> dict[str, Any]:
         if eco:
             add(eco, "crypto_dependency", dep["path"])
     catalogue: dict[str, set[str]] = {}
+    scopes: dict[tuple[str, str], list[str]] = {}
     for doc in operations.catalogue():
         for entry in doc["ecosystems"]:
             catalogue.setdefault(entry["ecosystem"], set()).add(doc["operation"])
+            if entry.get("scope"):
+                scopes.setdefault((entry["ecosystem"], doc["operation"]), []).append(entry["scope"])
     found: dict[str, set[str]] = {}
     for rows in (result.get("evidence") or {}).values():
         for row in rows if isinstance(rows, list) else ():
@@ -234,6 +239,8 @@ def _ecosystems(result: dict[str, Any], root: Path) -> dict[str, Any]:
             "only_in_test_code": all(detectors.in_test_code(p) for p in every),
             "known_operations": sorted(known),
             "closed_operations": closed,
+            # 25.11.2026: what each closed operation is closed against -- its catalogue's scope.
+            "closed_scope": {op: scopes.get((eco, op), []) for op in closed},
             "open_operations": still_open,
         }
         if not catalogue:
