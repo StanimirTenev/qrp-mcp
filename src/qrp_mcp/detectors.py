@@ -4677,6 +4677,7 @@ def scan_source_file(path: Path, rel_path: str,
         findings = sorted(findings + by_identifier, key=lambda f: f["line"])
     _settle_names_defined_here(findings)
     _name_not_a_use_rules(findings, lines, denial_lines)
+    _contract_function_names(findings, lines, ext)
     findings = _sodium_signatures(findings, lines, rel_path)
     findings = _pq_operations(findings, lines, rel_path)
     findings = _vrf_calls(findings, lines, rel_path)
@@ -4843,6 +4844,43 @@ def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
                       "excerpt": line.strip()[:200], "evidence_kind": kind,
                       "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 580 (owner's exception to rule 132, 25.11.2026): the name of a contract function is an
+# identifier, never algorithm evidence, whatever family it names. go-ethereum's 4-byte selector
+# database (`signer/fourbyte/4byte.json`: `"4fb7db3f": "KYBER_PROXY()"`) named Kyber Network's
+# contracts, a DeFi exchange, and its ten lines made a tree `hybrid_pre_standard`. Read so: in JSON, a
+# string that is a function signature (`name(types)`) -- a selector's value or an array entry -- and
+# the `"name"` of an ABI entry in a file that is an ABI (it holds "stateMutability" or a "type" of
+# function/event); in a Solidity source, a Kyber name (a KEM is not run in a contract).
+_SIGNATURE_STRING = re.compile(r'^\s*(?:"(?:0x)?[0-9A-Fa-f]{8}"\s*:\s*)?"[A-Za-z_$][\w$]*\([\w\[\],() ]*\)"\s*,?\s*$')
+_ABI_NAME = re.compile(r'^\s*"name"\s*:\s*"[A-Za-z_$][\w$]*"\s*,?\s*$')
+_ABI_FILE = re.compile(r'"stateMutability"|"type"\s*:\s*"(?:function|event|constructor)"')
+_CONTRACT_NAME_RULE = "contract function name"
+
+
+def _contract_function_names(findings: list[dict[str, Any]], lines: list[str], ext: str) -> None:
+    if ext == ".sol":
+        hits = [f for f in findings if f["algorithm"] == "Kyber"]
+    elif ext == ".json" and findings:
+        abi = None
+        hits = []
+        for f in findings:
+            line = lines[f["line"] - 1] if 0 < f.get("line", 0) <= len(lines) else ""
+            if _SIGNATURE_STRING.match(line):
+                hits.append(f)
+                continue
+            if abi is None:
+                abi = bool(_ABI_FILE.search("\n".join(lines)))
+            if abi and (_ABI_NAME.match(line) or _ABI_FILE.search(line)):
+                hits.append(f)
+    else:
+        return
+    for f in hits:
+        if f.get("evidence_kind") not in ("comment", "ban", "identifier"):
+            f["evidence_kind"] = "identifier"
+            f["not_a_use_rule"] = _CONTRACT_NAME_RULE
+            f.pop("_kind_if_used", None)
 
 
 # Rows 562-564: a Solidity contract reaches the EVM's precompiled contracts by address, with no
