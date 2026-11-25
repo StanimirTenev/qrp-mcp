@@ -20,6 +20,19 @@
 BIP340/Taproot Schnorr. Solidity (`.sol`), Rust (`.rs`), Move and Cairo are scanned alongside
 Python, Go, Java, Kotlin, Scala, Groovy, JS/TS, Ruby, PHP, C/C++/C# — headers included — PowerShell,
 Perl and shell.
+From 0.54.0 (unreleased) the calls of wallet and chain libraries are read in a file that imports the
+library, under the name it is bound to, and a method only on a value the file got from it
+(`libcalls.py`): go-ethereum `crypto`, ethers v5/v6, viem, web3.js, eth_account, eth_keys, alloy,
+ethers-rs, tiny-secp256k1, bip32, ecpair, bitcoinjs `Psbt`, rust-secp256k1, python-bitcoinlib,
+`@solana/keys`/`kit`/`web3.js`, solana-sdk, CometBFT, cosmjs, tss-lib, blst, herumi, py_ecc, noble
+bls12-381, FROST, Algorand Falcon, RustCrypto slh-dsa -- with the curve where the library has one.
+libsecp256k1's schnorrsig/extrakeys/musig functions and FROST over secp256k1 are Schnorr, not ECDSA.
+In Solidity, OpenZeppelin's `P256`/`WebAuthn` (ECDSA P-256), `RSA.pkcs1Sha256`, `ECDSA.recover` and
+`SignatureChecker` (secp256k1), the using-for `h.recover(sig)`, and the precompile addresses of a
+`staticcall` (0x100 is RIP-7212 P256VERIFY); Solidity's comments are comments. Vyper (`.vy`) is
+read, with `ecrecover`, `ecadd` and `ecmul`. A contract function's name -- a 4-byte selector's
+signature, an ABI entry's `name` -- is an identifier, never algorithm evidence (row 580).
+leanSig's generalized XMSS is its own research family, not XMSS; pyspx is round-3 SPHINCS+.
 From 0.47.0 Swift (`.swift`) is read too, with Apple's names: CryptoKit's `P256`/`P384`/`P521`
 `.Signing` (ECDSA, the curve from the name) and `.KeyAgreement` (ECDH), also under
 `SecureEnclave.`, `Curve25519.Signing` (Ed25519; `Curve25519.KeyAgreement` is X25519), and the
@@ -206,7 +219,13 @@ SIKE read `no_quantum_vulnerable_detected` (raised by Larisa Ghazaryan). `pqc_pr
 and `broken_pqc_count` sit beside `pqc_ready_count`, and `list_algorithms` answers with the same
 classification a scan gives. From 0.35.0 `summary.by_role` gives the same value for key
 establishment and for signatures apart, with the families in each (`none_found` for a part with
-none). From 0.51.0 a verifiable random function is a third part, `by_role.vrf`,
+none). From 0.54.0 (unreleased) pairing-based cryptography is a part of its own, `by_role.proof`,
+present only where one is found: the family `Pairing` -- zk-SNARKs (Groth16, PLONK through
+snarkjs or gnark), KZG commitments (c-kzg-4844, EIP-4844) and the EVM's curve and pairing
+precompiles (0x06-0x08 BN254, 0x0a KZG, 0x0b-0x11 BLS12-381, read on a `staticcall`'s address),
+with the curve where the name gives it (BN254, BLS12-381). Shor's algorithm computes the discrete
+logarithms a pairing rests on; no replacement is named (rows 562, 563). Poseidon, keccak and
+STARK/FRI are not pairings, and PLONK alone is not read. From 0.51.0 a verifiable random function is a third part, `by_role.vrf`,
 present only where one is found: ECVRF (RFC 9381), its own family, through the Go libraries coname,
 go-ecvrf and keytransparency's p256 and Rust's `vrf` crate, and RFC 9381's suite names
 (`data/operations/vrf.toml`). It is quantum-vulnerable and no replacement is named for it: a

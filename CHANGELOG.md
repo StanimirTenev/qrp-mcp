@@ -4,6 +4,67 @@ What changed in each version of qrp-mcp, newest first. Each entry says what was 
 was found, and what is not claimed. Changes before 0.33.0 are described where the behaviour
 is, in the [docs](docs/) ("From 0.28.0 ..."); the tag of every version is on GitHub.
 
+## Unreleased (0.54.0)
+
+Detection changes: findings and their fingerprint move. A new family and role, the calls of
+crypto-asset libraries, Vyper, and two false signals removed.
+
+- **How it was found.** A probe of the crypto-asset world on 25.11.2026: the documentation of each
+  wallet, BLS, SNARK, KZG and chain library was saved, one call per line was written from it, and
+  0.53.0 was run over the lines (qrp-kachestvo/roy-2026-11-25-kripto). Most calls were read and gave
+  nothing, or a row only on the import line; pairing-based cryptography gave nothing anywhere. A
+  positive control on OpenZeppelin, lighthouse, bitcoinjs-lib and go-ethereum quoted the same
+  gaps in real code. Rows 561-593 of the fix list.
+- **`Pairing`, a family with its own role `proof`** (rows 562, 563). zk-SNARKs (Groth16, PLONK
+  through snarkjs or gnark), KZG commitments (c-kzg-4844) and the EVM's curve and pairing
+  precompiles over BN254 and BLS12-381. A pairing rests on discrete logarithms Shor's algorithm
+  computes. `summary.by_role.proof` and `readiness_by_role.proof` appear only where one is found;
+  no replacement is named, because a signature scheme does not replace a proof system; CBOM
+  primitive `other`. Poseidon, keccak, STARK/FRI and PLONK as a bare word are not read.
+- **Calls of a library read in a file that imports it** (`libcalls.py`; rows 561, 568-575, 578,
+  579, 581-588, 591-593). go-ethereum `crypto` (row 561: `crypto.GenerateKey()`, `crypto.Sign`),
+  ethers v5/v6, viem, web3.js, eth_account, eth_keys, alloy, ethers-rs, tiny-secp256k1, bip32,
+  ecpair, bitcoinjs Psbt, rust-secp256k1, python-bitcoinlib, the Solana SDKs, CometBFT, cosmjs,
+  tss-lib, blst, herumi, py_ecc, noble bls12-381, FROST, Algorand Falcon, RustCrypto slh-dsa. A call
+  counts only under the name the import binds, and a method only on a value the file got from the
+  library; the library's curve is given where it has only one.
+- **Solidity and Vyper** (rows 564-567). OpenZeppelin's P256/WebAuthn (ECDSA P-256), RSA,
+  ECDSA/SignatureChecker (secp256k1) and the using-for `h.recover(sig)` are read. So is the address
+  of a precompile `staticcall`, including RIP-7212 P256VERIFY at 0x100. `.sol` comments were read
+  as code until now. `.vy` is read, with `ecrecover`, `ecadd` and `ecmul`.
+- **Wrong family or status.**
+  - libsecp256k1's schnorrsig, extrakeys and musig functions, and FROST over secp256k1, are now
+    Schnorr instead of ECDSA (rows 573, 588).
+  - `@solana/web3.js` no longer adds ECDSA (row 584).
+  - leanSig/hash-sig's generalized XMSS is its own research family, never `pqc_ready`. It was XMSS,
+    `standardised` (row 576). This is from its README only, not from a comparison with the XMSS
+    specification.
+  - pyspx is round-3 SPHINCS+ by its README's words, in both spellings (row 577).
+- **A contract function's name is not algorithm evidence** (row 580; an exception to rule 132
+  approved by the owner). A 4-byte selector's signature (`"4fb7db3f": "KYBER_PROXY()"`, Kyber
+  Network's contracts in go-ethereum's `4byte.json`), an ABI entry's `name` and a Kyber name in
+  Solidity are now identifiers. They made go-ethereum's key establishment `hybrid_pre_standard`.
+- **Closure catalogue**: 38 pairs and 1,930 sourced spellings. New pairs: apiname in Go, JS, Python,
+  Rust and CI; pqc in Go, Python and Rust; sign in Go. Each quote is cut from the saved page and
+  checked verbatim, 82 of 82. `KNOWN_OPERATIONS` gains Go's apiname, pqc and sign and Rust's pqc.
+  Go stays `closed`. JS and Rust move to `partially_closed`.
+- **Corpus regression** against 0.53.0: no growth in A' or B' in either split (disagreement with a
+  model, not recall or precision; the labeller has no Pairing family).
+- **Not claimed / not done.**
+  - Solidity, Vyper and circom have no ecosystem in the catalogue; their spellings are tested
+    apart.
+  - Not read:
+    - `.circom` (row 590);
+    - generic Rust calls through a type parameter (`S::key_gen` in leanSig);
+    - the GG20 command-line binaries;
+    - `tss.NewParameters(tss.S256(), ...)`;
+    - the parameter set from slh-dsa's type.
+  - Error-message words such as "Not Taproot." are still read as Schnorr (row 589). It is the class
+    row 113 left for the owner's decision.
+  - A spelling is closed only as far as the saved pages name it. viem's generatePrivateKey,
+    c-kzg's Python functions and FROST's `generate_with_dealer` are read by the rules but not
+    catalogued.
+
 ## 0.53.0 (2026-11-24)
 
 Detection changes: findings and their fingerprint move. Ten more (operation, ecosystem) pairs are

@@ -196,6 +196,10 @@ test.
   number generators the code calls, below. From 0.53.0 a spelling can carry `variants`, the same
   spelling with its free parts (a variable, setting or receiver name) changed, each its own test:
   two gaps inside closed pairs (rows 540, 546) came from a catalogue that held those parts fixed.
+  Unreleased (0.54.0): 38 pairs and 1,930 sourced spellings, adding the calls of crypto-asset
+  libraries -- wallets, BLS, pairing-based proofs and commitments in Go, JS, Python, Rust and on
+  snarkjs's command line, and the post-quantum signature libraries of the chains
+  (`apiname_chains.toml`, `pqc_chains.toml`, `sign_chains.toml`).
 - **`randomness`: the generators the code calls, as context.** Each generator API called on a line
   is a row in one of three classes, from the generator's own documentation: `weak` (a non-cryptographic
   PRNG: Python `random` and `numpy.random`, Go `math/rand` and `math/rand/v2`,
