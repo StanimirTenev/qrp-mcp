@@ -65,6 +65,16 @@ _BY_FAMILY["ECVRF"] = {
              "signature scheme does not give a VRF's unique, verifiable output. This is a "
              "protocol choice. (Design judgement, not a statement of the standards.)"),
     "standards": []}
+# Rows 562, 563: a pairing-based proof system or commitment is not a signature either.
+_BY_FAMILY["Pairing"] = {
+    "options": [],
+    "note": ("No replacement is named: the standards this tool cites define post-quantum "
+             "key establishment and signatures, not a proof system or a polynomial "
+             "commitment. Post-quantum alternatives exist in research and in production "
+             "(hash-based proof systems such as STARKs with FRI; lattice-based commitments), "
+             "and moving to one changes the circuit, the verifier and the trusted setup. This "
+             "is a protocol choice. (Design judgement, not a statement of the standards.)"),
+    "standards": []}
 # SM2 and ElGamal sign and encrypt alike (row 139).
 for fam in ("RSA", "EC", "SM2", "ElGamal"):
     _BY_FAMILY[fam] = {

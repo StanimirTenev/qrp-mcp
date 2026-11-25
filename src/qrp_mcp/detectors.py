@@ -21,8 +21,8 @@ from . import _warm
 # The rules' regexes compile through the cache of _warm until the end of this module.
 _warm.start_regex()
 
-from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirection, linegate,
-               mqsc, oids, openpgp, opcua, plist, registry, snk, suppression, switches,
+from . import (aws_tls, components, config_values, dnssec, fortios, ike, indirection, libcalls,
+               linegate, mqsc, oids, openpgp, opcua, plist, registry, snk, suppression, switches,
                wireguard)
 from . import grammar
 from .classifier import _PQC_SCHEMES
@@ -265,6 +265,11 @@ _CREATE_ECDH = re.compile(r"\bcreateECDH\(\s*[\"'`]$")
 PRE_STANDARD_DILITHIUM = ("round-3 CRYSTALS-Dilithium by a Bouncy Castle class or package "
                           "(crystals.dilithium), not FIPS 204 ML-DSA")
 PRE_STANDARD_SPHINCS = "round-3 SPHINCS+ by a liboqs or Bouncy Castle name, not FIPS 205 SLH-DSA"
+# Rows 562, 563: the pairing curve a Pairing rule's name gives.
+PAIRING_BN254 = "Pairing: the pairing-friendly curve BN254 (alt_bn128)"
+PAIRING_EIP4844_KZG = "Pairing: KZG commitments of EIP-4844 (c-kzg-4844, over BLS12-381)"
+PAIRING_CURVES = {PAIRING_BN254: "BN254", PAIRING_EIP4844_KZG: "BLS12-381"}
+
 KYBER_BY_NAME_ONLY = "Kyber named without an identifier (round-3 Kyber, or an old name for ML-KEM)"
 # Read in .rs files only (scan_source_file): elsewhere `rsa_` and `_dsa_` are too often a
 # variable's word for a value it does not hold.
@@ -893,6 +898,27 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("BLS", "BLS signature usage", re.compile(
         r"bls12[-_]?381|\bblst\b|@chainsafe/bls|\bbls_sig\b", re.IGNORECASE,
     )),
+    # Rows 562, 563: pairing-based cryptography (classifier.py, role `proof`). Only names that are
+    # pairing-based wherever they stand: the Barreto-Naehrig curve (py_ecc's alt_bn128, snarkjs's
+    # bn128, gnark's ecc.BN254, arkworks' ark_bn254 and Bn254, noble's bn254), Groth16 (a pairing
+    # SNARK by construction), snarkjs (Groth16, PLONK and FFLONK over bn128/BLS12-381, README) and
+    # KZG commitments (pairing-checked by construction; c-kzg-4844 is EIP-4844's, over BLS12-381).
+    # Not PLONK alone (also a word, and a PLONK over FRI is hash-based), not Poseidon or keccak.
+    ("Pairing", PAIRING_BN254, re.compile(
+        r"(?<![A-Za-z0-9])(?:alt_)?bn(?:254|128)(?![0-9])", re.IGNORECASE)),
+    ("Pairing", PAIRING_EIP4844_KZG, re.compile(
+        r"(?<![A-Za-z0-9])c-?kzg(?:-4844)?(?![A-Za-z0-9])|\brust_eth_kzg\b|"
+        r"\b(?:blob_to_kzg_commitment|compute_blob_kzg_proof|verify_blob_kzg_proof(?:_batch)?|"
+        r"compute_kzg_proof|verify_kzg_proof|compute_cells_and_kzg_proofs|verify_cell_kzg_proof_batch|"
+        r"blobToKzgCommitment|computeBlobKzgProof|verifyBlobKzgProof(?:Batch)?|computeKzgProof|"
+        r"verifyKzgProof|computeCellsAndKzgProofs|verifyCellKzgProofBatch)\b")),
+    ("Pairing", "Pairing: Groth16 zk-SNARK (pairing-based by construction)", re.compile(
+        r"(?<![A-Za-z])groth16(?![0-9])", re.IGNORECASE)),
+    ("Pairing", "Pairing: snarkjs (Groth16, PLONK and FFLONK over pairing curves)", re.compile(
+        r"(?<![A-Za-z0-9])snarkjs(?![A-Za-z0-9])")),
+    ("Pairing", "Pairing: a KZG polynomial commitment (pairing-checked)", re.compile(
+        r"(?<![A-Za-z])kzg(?![a-z])|(?<![A-Z])(?:Kzg|KZG)(?![a-z])")),
+    ("Pairing", "Pairing: gnark's PLONK backend", re.compile(r"gnark/backend/plonk\b")),
     # MD5, SHA-1 and DES as a MAC or inside a key derivation: HmacSHA1, sshd's `MACs
     # hmac-sha1`, PBKDF2WithHmacSHA1, strongSwan's prfsha1, Bouncy Castle's DESMAC. Reported
     # as the hash or cipher it is, with the use and that a quantum computer does not break
@@ -3125,6 +3151,9 @@ _SLASH_COMMENT_EXT = {
     ".json5", ".fs", ".fsx",
     # Row 498: device tree source (dtc) takes C comments.
     ".its", ".dts", ".dtsi", ".dtso",
+    # Rows 562-566: Solidity takes `//`, `/* */` and NatSpec `/** */` comments. Until 0.54.0 its
+    # comments were read as code: OpenZeppelin's P-256 was seen only in its NatSpec.
+    ".sol",
 }
 _HASH_COMMENT_EXT = {
     ".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".pm", ".ps1", ".psm1",
@@ -4338,6 +4367,8 @@ def scan_source_file(path: Path, rel_path: str,
                 item["key_size"] = size
             if description in DNSSEC_CURVES:
                 item["curve"], item["key_size"] = DNSSEC_CURVES[description]
+            if description in PAIRING_CURVES:
+                item["curve"] = PAIRING_CURVES[description]
             findings.append(item)
             if pattern in _NAMES_A_PIECE:
                 by_pattern[algorithm] = (item, [(m.start(), m.end()) for m in matches])
@@ -4649,6 +4680,9 @@ def scan_source_file(path: Path, rel_path: str,
     findings = _sodium_signatures(findings, lines, rel_path)
     findings = _pq_operations(findings, lines, rel_path)
     findings = _vrf_calls(findings, lines, rel_path)
+    findings = libcalls.calls(findings, lines, rel_path, ext, in_test_code)
+    if ext == ".sol":
+        findings = _evm_precompiles(findings, lines, rel_path)
     _android_keystore_spec(findings, lines)
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
@@ -4808,6 +4842,57 @@ def _vrf_calls(findings: list[dict[str, Any]], lines: list[str],
                                       else "ECVRF usage (a call into the VRF library this file imports)"),
                       "excerpt": line.strip()[:200], "evidence_kind": kind,
                       "in_test_code": in_test_code(rel_path)})
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Rows 562-564: a Solidity contract reaches the EVM's precompiled contracts by address, with no
+# name on the line: `staticcall(gas(), 0x08, ...)` in assembly, `address(0x0a).staticcall(...)`.
+# Read on the address argument of a staticcall only -- a byte 0x08 elsewhere is no address.
+# EIP-196 ("Address of ADD: 0x6", "Address for MUL: 0x7") and EIP-197 ("Address: 0x8"): BN254;
+# EIP-4844 POINT_EVALUATION_PRECOMPILE_ADDRESS `Bytes20(0x0A)`: a KZG proof over BLS12-381;
+# EIP-2537 0x0b-0x11 (BLS12_G1ADD ... BLS12_MAP_FP2_TO_G2): BLS12-381; RIP-7212 P256VERIFY at
+# `0x100`: ECDSA over secp256r1.
+_PRECOMPILES = {
+    6: ("Pairing", "BN254", "the BN254 ECADD precompile (EIP-196, 0x06)"),
+    7: ("Pairing", "BN254", "the BN254 ECMUL precompile (EIP-196, 0x07)"),
+    8: ("Pairing", "BN254", "the BN254 pairing check precompile (EIP-197, 0x08)"),
+    10: ("Pairing", "BLS12-381", "the KZG point evaluation precompile (EIP-4844, 0x0a)"),
+    **{n: ("Pairing", "BLS12-381", f"the BLS12-381 precompile {name} (EIP-2537, {n:#04x})")
+       for n, name in ((0x0b, "BLS12_G1ADD"), (0x0c, "BLS12_G1MSM"), (0x0d, "BLS12_G2ADD"),
+                       (0x0e, "BLS12_G2MSM"), (0x0f, "BLS12_PAIRING_CHECK"),
+                       (0x10, "BLS12_MAP_FP_TO_G1"), (0x11, "BLS12_MAP_FP2_TO_G2"))},
+    0x100: ("ECDSA", "P-256", "the P256VERIFY precompile (RIP-7212, 0x100)"),
+}
+_ADDRESS = r"(0x[0-9A-Fa-f]{1,40}|\d{1,3})"
+# Yul `staticcall(gas, address, ...)`: the gas is a word, a call (`gas()`, `sub(gas(), 2000)`) or a
+# number; Solidity `address(N).staticcall(` and `IPrecompile(address(N))`-free forms only.
+_PRECOMPILE_CALL = re.compile(
+    r"\bstaticcall\(\s*(?:\w+\((?:[^()]|\([^()]*\))*\)|\w+)\s*,\s*" + _ADDRESS + r"\s*,"
+    r"|\baddress\(\s*" + _ADDRESS + r"\s*\)\s*\.\s*staticcall\b")
+
+
+def _evm_precompiles(findings: list[dict[str, Any]], lines: list[str],
+                     rel_path: str) -> list[dict[str, Any]]:
+    if "staticcall" not in "\n".join(lines):
+        return findings
+    added = []
+    inside = False
+    for n, line in enumerate(lines, 1):
+        spans, inside_after = _comment_spans(line, ".sol", inside)
+        code = _code_only(line, spans)
+        inside = inside_after
+        for m in _PRECOMPILE_CALL.finditer(code):
+            raw = m.group(1) or m.group(2)
+            number = int(raw, 16) if raw.lower().startswith("0x") else int(raw)
+            if number not in _PRECOMPILES:
+                continue
+            family, curve, said = _PRECOMPILES[number]
+            if any(f["line"] == n and f["algorithm"] == family for f in findings + added):
+                continue
+            added.append({"path": rel_path, "line": n, "algorithm": family,
+                          "description": f"{family} usage ({said})", "curve": curve,
+                          "excerpt": line.strip()[:200], "evidence_kind": "call",
+                          "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 

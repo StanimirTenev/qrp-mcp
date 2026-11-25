@@ -976,7 +976,8 @@ def _readiness_by_role(result: dict[str, Any]) -> None:
     two parts' values, so a reader of the headline alone sees when they differ."""
     summary = result["summary"]
     parts = {part: summary["by_role"][part]["pqc_readiness"]
-             for part in ("key_establishment", "signature", "vrf") if part in summary["by_role"]}
+             for part in ("key_establishment", "signature", "vrf", "proof")
+             if part in summary["by_role"]}
     rebuilt: dict[str, Any] = {}
     for key, value in summary.items():
         rebuilt[key] = value
@@ -1169,6 +1170,8 @@ def _by_role(findings: list[Any], roles: dict[str, dict[str, int]],
     undetermined: set[str] = set()
     # Row 535: a VRF is its own part, present only where one is found.
     vrf = [f for f in findings if kinds.get(f.algorithm_family) == "vrf"]
+    # Rows 562, 563: so is a pairing-based proof or commitment (zk-SNARK, KZG).
+    proof = [f for f in findings if kinds.get(f.algorithm_family) == "proof"]
     for f in findings:
         kind = kinds.get(f.algorithm_family)
         if kind == "key_exchange":
@@ -1193,6 +1196,9 @@ def _by_role(findings: list[Any], roles: dict[str, dict[str, int]],
     if vrf:
         out["vrf"] = {"families": sorted({f.algorithm_family for f in vrf}),
                       "pqc_readiness": summarize(vrf, set_aside, protected).pqc_readiness}
+    if proof:
+        out["proof"] = {"families": sorted({f.algorithm_family for f in proof}),
+                        "pqc_readiness": summarize(proof, set_aside, protected).pqc_readiness}
     out["role_not_determined"] = sorted(undetermined)
     return out
 

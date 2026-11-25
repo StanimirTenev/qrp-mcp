@@ -178,6 +178,12 @@ _PUBLIC_KEY_FAMILIES: list[tuple[str, str, str, str]] = [
     # the curve's group (RFC 9381, 7.2, 7.3), which Shor's algorithm breaks. Its own role, `vrf`:
     # not a signature, so a signature scheme does not replace it.
     ("ECVRF", "ECVRF", "classical_vulnerable", "vrf"),
+    # Rows 562, 563: pairing-based cryptography over BN254 (alt_bn128) or BLS12-381 -- zk-SNARKs
+    # (Groth16, PLONK with KZG), KZG polynomial commitments (EIP-4844), the EVM's pairing and curve
+    # precompiles. A pairing maps into a group whose discrete logarithm, like those of G1 and G2,
+    # Shor's algorithm computes. Its own role, `proof`: a SNARK verifier or a commitment is not a
+    # signature, and a signature scheme does not replace it. BLS signatures keep their own family.
+    ("PAIRING", "Pairing", "classical_vulnerable", "proof"),
     ("ELGAMAL", "ElGamal", "classical_vulnerable", "public_key"),
     ("DIFFIEHELLMAN", "DH", "classical_vulnerable", "key_exchange"),
     ("DHE", "DH", "classical_vulnerable", "key_exchange"),
