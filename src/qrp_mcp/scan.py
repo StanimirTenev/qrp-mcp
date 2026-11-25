@@ -11,7 +11,7 @@ from typing import Any
 
 from . import (__version__, adaptive, assets, aws_tls, baseline as baseline_mod, certificates,
                confidence, config, coverage, detectors, dnssec, ike, opcua, operations, profiles,
-               randomness, remediation, suppression)
+               randomness, reached, remediation, suppression)
 from .classifier import (_OID_FAMILIES, SIZED_FAMILIES, FingerprintRequest, classical_status,
                          fingerprint, known_algorithms, summarize)
 
@@ -434,6 +434,8 @@ def scan_directory(path: str | Path, exclude: Path | list[Path] | None = None,
     # that the table does not know, named rather than left out.
     files_read = result.get("files_read") or []
     assets.join_imports(repo_path, files_read, result["evidence"]["dependencies"])
+    # Row 554: the files read that import and call a Python module's cryptography.
+    reached.annotate(repo_path, files_read, result["evidence"]["source_code"])
     result["dependencies_not_in_table"] = _declared_not_known(repo_path, files_read)
     # Rows 156, 176: where the algorithm is chosen outside the files read.
     places = scan_result.get("runtime_choices") or []

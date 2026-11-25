@@ -502,6 +502,23 @@ def _parameter(item: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
     return None
 
 
+def _reached_properties(components: list[dict[str, Any]], scan_result: dict[str, Any]) -> None:
+    """Row 554: `qrp:reached_from` on a component whose occurrences other files read import and
+    call, as {"path:line": [the places]} (an occurrence carries no properties of its own)."""
+    reached = {(i["path"], i["line"]): i["reached_from"]
+               for i in scan_result["evidence"].get("source_code") or []
+               if isinstance(i, dict) and i.get("reached_from")}
+    if not reached:
+        return
+    for component in components:
+        found = {f"{o['location']}:{o['line']}": reached[(o["location"], o["line"])]
+                 for o in component.get("evidence", {}).get("occurrences") or []
+                 if (o.get("location"), o.get("line")) in reached}
+        if found:
+            component.setdefault("properties", []).append(
+                {"name": f"{NS}reached_from", "value": json.dumps(found, ensure_ascii=False)})
+
+
 def _confidence_properties(components: list[dict[str, Any]], scan_result: dict[str, Any],
                            family_of: dict[str, str],
                            family_by_ref: dict[str, str] | None = None) -> None:
@@ -1649,6 +1666,7 @@ def build(scan_result: dict[str, Any]) -> dict[str, Any]:
             [{"name": f"{NS}sha256_crlf_as_lf", "value": folded[path]}] if path in folded else []),
     } for path in cited]
     _confidence_properties(components, scan_result, family_of, family_by_ref)
+    _reached_properties(components, scan_result)
 
     # `complete` is a claim about the component list, so it is tied to the file
     # count rather than to the run finishing without error. Anything short of

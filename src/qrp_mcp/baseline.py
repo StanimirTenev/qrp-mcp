@@ -35,7 +35,9 @@ _NOT_IDENTITY = {"line", "in_test_code", "role", "provider", "tls_termination", 
                  # Row 519: read from another line of the file (the KMS client, the import).
                  "key_location",
                  # Row 555, as in closure.
-                 "standalone_pqc", "standalone_basis"}
+                 "standalone_pqc", "standalone_basis",
+                 # Row 554, as in closure.
+                 "reached_from", "reached_from_count", "reached"}
 
 
 def family(item: dict[str, Any]) -> str:
