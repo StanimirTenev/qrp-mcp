@@ -67,10 +67,10 @@ A new family and role, the calls of crypto-asset libraries, Vyper, and two false
   catalogue entry. `ecosystems.meaning` says an operation is closed against the libraries its
   catalogue lists, not every library of the ecosystem. Go reads `closed` on that bounded list; JS,
   Python and Rust read `partially_closed`. Findings and the fingerprint do not change.
-- **Corpus regression** against 0.53.0, at the last commit. This is disagreement with a model, not
-  recall or precision.
-  - A' is unchanged in both splits. B' falls: `obuchenie` 264 to 257, `merene` 42 to 34. The gate
-    passes.
+- **Corpus regression** against 0.53.0, on the merged release (b92490e: these rows, rows 554-560
+  and 594, and the Action). This is disagreement with a model, not recall or precision.
+  - A' is unchanged in both splits. B' falls, all of it ECDSA: `obuchenie` 264 to 257, `merene` 42
+    to 34. The gate passes (exit 0). The same figures as at 8268433, before the merge.
   - An earlier commit of this release made the gate exit 1: ECDSA B' rose by 10 chunks, all in
     bitcoinjs-lib's tests (`psbt.signInput`, `bip32.fromSeed`, `keyPair.sign`). The owner decided to
     ship 0.54.0 even so. Those ten rows are still there.
