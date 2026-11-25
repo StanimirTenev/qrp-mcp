@@ -58,6 +58,7 @@ SOURCE_EXTENSIONS = {
     ".ps1", ".psm1", ".pl", ".pm",
     # Smart contracts and chain tooling
     ".sol", ".rs", ".move", ".cairo",
+    ".vy",  # row 567: Vyper contracts
     # JVM languages other than Java, and the ES-module spellings of JavaScript.
     # Measured on a rival's labelled corpus: eight of its 176 labels sit in .kt and
     # .mjs files, and this scanner opened none of them -- the single largest hole in
@@ -3166,7 +3167,7 @@ _SLASH_COMMENT_EXT = {
     ".sol",
 }
 _HASH_COMMENT_EXT = {
-    ".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".pm", ".ps1", ".psm1",
+    ".py", ".rb", ".sh", ".bash", ".zsh", ".pl", ".pm", ".ps1", ".psm1", ".vy",
     ".yaml", ".yml", ".toml", ".conf", ".cnf", ".cfg", ".ini", ".properties",
     ".tf", ".tfvars", ".r", ".cmake", ".mk", ".t", ".env", ".gitignore",
 }
@@ -3175,7 +3176,7 @@ _DASH_COMMENT_EXT = {".sql", ".lua", ".hs", ".adb", ".ads"}
 # is a string to the interpreter and a comment to every reader, and an
 # independent comparison counted an example call inside one as a use. Treated
 # as a comment here for the same reason `#` is: nothing in it runs.
-_DOCSTRING_EXT = {".py", ".pyi"}
+_DOCSTRING_EXT = {".py", ".pyi", ".vy"}  # Vyper's docstrings are Python's (row 567)
 _TRIPLE = ('"""', "'''")
 
 
@@ -4699,6 +4700,8 @@ def scan_source_file(path: Path, rel_path: str,
     if ext == ".sol":
         findings = _evm_precompiles(findings, lines, rel_path)
         findings = _solidity_signatures(findings, lines, rel_path)
+    if ext == ".vy":
+        findings = _vyper_curve_builtins(findings, lines, rel_path)
     _android_keystore_spec(findings, lines)
     _dotnet_key_size_property(findings, lines)
     _cng_key_pair_size(findings, lines)
@@ -5024,6 +5027,31 @@ def _solidity_signatures(findings: list[dict[str, Any]], lines: list[str],
             if curve:
                 item["curve"] = curve
             added.append(item)
+    return sorted(findings + added, key=lambda f: f["line"]) if added else findings
+
+
+# Row 567: Vyper's built-ins `ecadd` and `ecmul` "Take two points on the Alt-BN128 curve" / "a point
+# on the Alt-BN128 curve" (docs/built-in-functions.rst); `ecrecover` is read by the secp256k1 rule.
+_VYPER_EC = re.compile(r"(?<![\w.])ec(?:add|mul)\s*\(")
+
+
+def _vyper_curve_builtins(findings: list[dict[str, Any]], lines: list[str],
+                          rel_path: str) -> list[dict[str, Any]]:
+    added = []
+    inside_doc = ""
+    for n, line in enumerate(lines, 1):
+        was_doc = bool(inside_doc)
+        spans, _ = _comment_spans(line, ".vy", False)
+        doc_spans, inside_doc = _docstring_spans(line, inside_doc)
+        code = _code_only(line, spans + doc_spans)
+        if was_doc or not _VYPER_EC.search(code):
+            continue
+        if any(f["line"] == n and f["algorithm"] == "Pairing" for f in findings):
+            continue
+        added.append({"path": rel_path, "line": n, "algorithm": "Pairing", "curve": "BN254",
+                      "description": "Pairing usage (Vyper's ecadd / ecmul on Alt-BN128)",
+                      "excerpt": line.strip()[:200], "evidence_kind": "call",
+                      "in_test_code": in_test_code(rel_path)})
     return sorted(findings + added, key=lambda f: f["line"]) if added else findings
 
 
