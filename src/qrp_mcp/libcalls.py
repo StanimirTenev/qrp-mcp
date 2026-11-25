@@ -364,7 +364,8 @@ register(
                    "SaveECDSA", "Sign", "SigToPub", "ToECDSA", "ToECDSAUnsafe", "UnmarshalPubkey",
                    "ValidateSignatureValues", "VerifySignature")),
     # ethers v6 (docs.ethers.org/v6/api/wallet, /crypto) and v5 (/v5/api/signer, utils/signing-key).
-    Lib("js", ("ethers",), "ECDSA", _K1, "ethers",
+    # Row 598: importing ethers is no signature (providers, contracts, unit helpers); its calls are.
+    Lib("js", ("ethers",), "ECDSA", _K1, "ethers", import_row=False,
         classes=_ETHERS_SIGNERS,
         functions=("verifyMessage", "verifyTypedData", "recoverAddress", "computeAddress",
                    "recoverPublicKey", "computePublicKey"),
@@ -382,11 +383,17 @@ register(
                    "recoverTypedDataAddress", "signMessage", "signTypedData", "sign"),
         methods=("signMessage", "signTypedData", "signTransaction", "sign", "signAuthorization")),
     # web3.js v4 accounts (docs.web3js.org/libdocs/Accounts): the curve of its rows.
-    Lib("js", ("web3", "web3-eth-accounts"), "ECDSA", _K1, "web3.js", classes=("Web3",),
+    Lib("js", ("web3", "web3-eth-accounts"), "ECDSA", _K1, "web3.js", import_row=False,
+        binds=("Web3",),
         functions=("create", "privateKeyToAccount", "sign", "signTransaction", "recover",
                    "recoverTransaction", "privateKeyToAddress", "privateKeyToPublicKey"),
         methods=("create", "privateKeyToAccount", "sign", "signTransaction", "recover",
                  "recoverTransaction", "privateKeyToAddress", "privateKeyToPublicKey")),
+    # web3.py (web3py.readthedocs.io, web3.eth.account): `w3.eth.account.create()`,
+    # `.sign_transaction(...)`; the other account methods are eth_account's (И on this page).
+    Lib("py", ("web3",), "ECDSA", _K1, "web3.py", import_row=False, binds=("Web3",),
+        methods=("create", "sign_transaction", "sign_message", "from_key", "recover_message",
+                 "recover_transaction", "unsafe_sign_hash", "sign_typed_data")),
     # eth_account (eth-account.readthedocs.io) and eth_keys (README).
     Lib("py", ("eth_account",), "ECDSA", _K1, "eth_account", classes=("Account",),
         methods=("sign_message", "sign_transaction", "sign_typed_data", "unsafe_sign_hash",

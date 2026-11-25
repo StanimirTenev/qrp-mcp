@@ -802,7 +802,10 @@ ALGORITHM_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     # both secp256k1 only, gave nothing; the import names them.
     ("ECDSA", SECP256K1_RULE, re.compile(
         r"(?<!createECDH\(.)secp256k1|\bbtcec\b|bitcoinjs-lib|\bECPair\b|"
-        r"\becrecover\s*\(|ECDSA\.recover|\bethers\b|(?<!@solana/)\bweb3\b|\beth_(?:keys|account)\b|"
+        # Not `ethers` or `web3` as bare words (row 598: Juice Shop's routes, component names and
+        # i18n strings say "web3"; ethers' unit helpers sign nothing): their calls are read in
+        # libcalls.py, in a file that imports them.
+        r"\becrecover\s*\(|ECDSA\.recover|\beth_(?:keys|account)\b|"
         # Whole method names: `personal_signature` is a form field, not the JSON-RPC
         # call (ZA-OPRAVYANE row 78).
         r"(?<![A-Za-z0-9])(?:eth_sign\w*|personal_sign)(?![A-Za-z0-9])|signTypedData",
