@@ -331,15 +331,16 @@ docstring makes it a rejection test ("... is rejected.") still runs what it call
 
 ## Measured
 
-Five trees this project did not write, scanned on 25 Nov 2026 with the 0.54.0 detection code
-(popravki-054 at `5316656`, before the release merge), `scan --level full --no-config
---as-of 2026-11-25`: OWASP Juice Shop at `c9f9922` and DVWA at `502ac15` (shallow clones of
+Five trees this project did not write, scanned on 25 Nov 2026 with a pre-release build of 0.54.0
+(commit `5316656`), `scan --level full --no-config --as-of 2026-11-25`: OWASP Juice Shop at `c9f9922` and DVWA at `502ac15` (shallow clones of
 their default branches), OpenSSH at `7fe3b24`, certbot at `56ee049`, Vault at `41e571b`.
 `coverage_pct` is the share of the files present that were read; `read_in_full_pct` leaves out the
 files read only in part (a device configuration, a certificate block that did not parse).
 Findings are the entries of `findings` (one per family and value), Weak is `summary.weak_count`,
-Occurrences are the rows of `evidence` (one per file, line and family), and Read is how many of
-those were opened in the file and judged by hand.
+Occurrences are the rows of `evidence` (a family at a file and line, per category), and Read by
+hand is how many of those were checked against the line in the file and judged one by one. Key,
+certificate and signature files were decoded (`openssl`, `ssh-keygen -l`, `gpg --list-packets`) to
+check the family the scanner gave.
 
 | Repository | Files present | Read | `coverage_pct` | Read in part | `read_in_full_pct` | Findings | Weak | Occurrences | Read by hand |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -352,11 +353,12 @@ those were opened in the file and judged by hand.
 **DVWA**, all 34 read: all 34 are uses. 31 are MD5: password hashing in the login and in every
 security level, the seeded user rows, a CSRF session token, a weak-session-id cookie, a client-side
 token. 3 are AES-128-ECB. No false positive. Seen in the tree and not reported by this version:
-AES-128-CBC (`token_library_high.php:4`), AES-GCM and SHA-256, and the minified MD5 implementation
-on one line (`javascript/source/low.php:10`; its call on line 18 is reported).
+MD5 in the seed rows of two `.sql` files (`database/create_postgresql_db.sql:3`,
+`database/create_mssql_db.sql:11`), which are not read and are listed with `type_not_claimed`;
+AES-128-CBC (`token_library_high.php:4`), AES-GCM and SHA-256 in `.php` files; and the minified MD5
+implementation on one line (`javascript/source/low.php:10`; its call on line 18 is reported).
 
-**Juice Shop**, all 393 read. The 215 rows in UI translation files were checked by key (five keys
-in 44 files), and the English, German, Korean and Chinese files line by line.
+**Juice Shop**, all 393 read, the 215 rows in 44 UI translation files among them.
 
 - 31 are uses: RS256 signing with an embedded RSA private key (`lib/insecurity.ts`), MD5 password
   hashing, HMAC-SHA1, an ALB TLS policy in Terraform, the WebAuthn algorithm list, OpenPGP EdDSA
@@ -370,21 +372,24 @@ in 44 files), and the English, German, Korean and Chinese files line by line.
   signing key.
 - **317 are false positives, all ECDSA.** 307 are the word `web3` in route paths, file and
   component names, tags, test titles and the 215 translation strings. 10 are ethers unit helpers
-  (`formatEther`, `parseUnits`). The scanner marks 77 of the 317 as named, not used, at low
-  confidence. It reports the other 240 at medium or high confidence.
+  (`formatEther`, `parseUnits`). The scanner marks 75 of the 317 as named, not used, and gives 2
+  more low confidence (an import line). It reports the other 240 at medium or high confidence.
 
 **OpenSSH, certbot, Vault**: there are too many to read them all. 30 of each were read: the
 occurrences sorted by category, path, line and family, then every k-th from the first (k = 312,
 26 and 128). The rule was fixed before any of them was read. These counts describe those 30 lines
 only; nothing is inferred from them about the rest.
 
-- **OpenSSH**: 25 uses, 5 only named. The scanner marks 3 of the 5 (generated comments) as named.
-  It reports the other 2 at medium or high confidence: a `CKM_DSA_SHA512` constant in `pkcs11.h:546`
+- **OpenSSH**: 25 uses, 5 only named. The scanner marks 3 of the 5 (generated comments) as named,
+  not used. It reports the other 2 at medium or high confidence: a `CKM_DSA_SHA512` constant in `pkcs11.h:546`
   that no `.c` file uses, and a test title string in `regress/unittests/sshkey/test_file.c:440`.
-- **certbot**: 24 uses, 1 library import, 5 only named. The scanner marks 4 of the 5 as named. It
-  reports the fifth at medium confidence: `X25519PublicKey` in a type annotation
+  It also marks 2 of the uses as named, not used: lines of a key implementation table that start
+  with a `/* .field = */` comment.
+- **certbot**: 24 uses, 1 library import, 5 only named. The scanner marks 3 of the 5 as named, not
+  used, and gives a fourth (a test function name) low confidence. It reports the fifth at medium
+  confidence: `X25519PublicKey` in a type annotation
   (`crypto_util.py:358`).
-- **Vault**: 26 uses, 1 declared dependency, 3 only named. The scanner marks all 3 as named.
+- **Vault**: 26 uses, 1 declared dependency, 3 only named. The scanner marks all 3 as named, not used.
 
 These are reading figures and counts of lines read, not detection figures. How well the rules find
 what is there is a different question. The measurements made of it, each with its date and

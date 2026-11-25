@@ -68,8 +68,11 @@ def test_every_flag_and_value_is_one_scan_accepts():
     # Every input the command reads is declared, and passed through env, not ${{ }} in `run:`.
     for word in words:
         assert "${{" not in word, word
+    env = dict(re.findall(r"^\s+QRP_([A-Z_]+):\s*\$\{\{\s*inputs\.([a-z-]+)\s*\}\}\s*$",
+                          ACTION.read_text(), re.M))
     for name in re.findall(r"\$\{?QRP_([A-Z_]+)", " ".join(words)):
-        assert name.lower().replace("_", "-") in names, (name, names)
+        assert env.get(name) == name.lower().replace("_", "-"), (name, env)
+        assert env[name] in names, (name, names)
 
 
 def test_the_same_arguments_write_sarif(tmp_path):
