@@ -2,6 +2,8 @@
 
 <!-- mcp-name: eu.quantumreadiness/qrp-mcp -->
 
+[![StanimirTenev/qrp-mcp MCP server](https://glama.ai/mcp/servers/StanimirTenev/qrp-mcp/badges/score.svg)](https://glama.ai/mcp/servers/StanimirTenev/qrp-mcp)
+
 **Offline post-quantum scanner for code: CycloneDX CBOM, RNG calls next to keys, what it did not read.**
 
 ![qrp-mcp 0.52.0 scanning certbot at 56ee049: the verdict, the families by role, and the files it did not read](docs/media/scan-certbot.gif)
